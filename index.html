@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#111827" />
+  <title>NovelWriter</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="assets/icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="assets/icon-192.png" alt="" class="brand__icon" />
+      <div class="brand__text">
+        <div class="brand__title">NovelWriter</div>
+        <div class="brand__sub" id="saveStatus">Ready</div>
+      </div>
+    </div>
+
+    <div class="topbar__actions">
+      <button class="btn btn--ghost" id="btnExport" title="Export">Export</button>
+      <button class="btn btn--ghost" id="btnSettings" title="Settings">Settings</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar" aria-label="Chapters">
+      <div class="sidebar__header">
+        <div class="sidebar__title">Chapters</div>
+        <button class="btn btn--primary btn--small" id="btnNewChapter">+ New</button>
+      </div>
+
+      <div class="sidebar__meta">
+        <input id="novelTitle" class="input" placeholder="Novel title…" autocomplete="off" />
+      </div>
+
+      <ul class="chapters" id="chaptersList" aria-label="Chapter list"></ul>
+
+      <div class="sidebar__footer">
+        <button class="btn btn--ghost btn--small" id="btnBackup">Export Backup</button>
+        <label class="btn btn--ghost btn--small fileLabel">
+          Import Backup
+          <input id="importFile" type="file" accept="application/json" />
+        </label>
+      </div>
+    </aside>
+
+    <section class="editorPane">
+      <div class="chapterBar">
+        <div class="chapterBar__left">
+          <input id="chapterTitle" class="input input--title" placeholder="Chapter title…" autocomplete="off" />
+        </div>
+        <div class="chapterBar__right">
+          <button class="btn btn--ghost btn--small" id="btnDeleteChapter">Delete</button>
+        </div>
+      </div>
+
+      <div class="editorWrap">
+        <div class="toolbar" id="toolbar">
+          <button class="tb" data-cmd="bold" title="Bold"><b>B</b></button>
+          <button class="tb" data-cmd="italic" title="Italic"><i>I</i></button>
+          <button class="tb" data-cmd="strike" title="Strike"><s>S</s></button>
+          <span class="sep"></span>
+          <button class="tb" data-cmd="h1" title="Heading 1">H1</button>
+          <button class="tb" data-cmd="h2" title="Heading 2">H2</button>
+          <button class="tb" data-cmd="p" title="Paragraph">P</button>
+          <span class="sep"></span>
+          <button class="tb" data-cmd="ul" title="Bullet list">• List</button>
+          <button class="tb" data-cmd="ol" title="Ordered list">1. List</button>
+          <button class="tb" data-cmd="quote" title="Blockquote">❝ ❞</button>
+          <span class="sep"></span>
+          <button class="tb" data-cmd="undo" title="Undo">↶</button>
+          <button class="tb" data-cmd="redo" title="Redo">↷</button>
+        </div>
+
+        <div id="editor" class="editor" aria-label="Editor"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Export modal -->
+  <dialog class="modal" id="exportModal">
+    <form method="dialog" class="modal__card">
+      <div class="modal__header">
+        <div class="modal__title">Export</div>
+        <button class="iconBtn" value="cancel" aria-label="Close">✕</button>
+      </div>
+
+      <div class="modal__body">
+        <p class="muted">Exports the whole novel (all chapters) in current order.</p>
+        <div class="grid">
+          <button class="btn btn--primary" id="exportDocx" type="button">Export DOCX</button>
+          <button class="btn btn--primary" id="exportPdf" type="button">Export PDF</button>
+          <button class="btn btn--primary" id="exportRtf" type="button">Export RTF</button>
+        </div>
+        <div class="row">
+          <label class="check">
+            <input type="checkbox" id="exportIncludeChapterHeadings" checked />
+            Include chapter headings
+          </label>
+        </div>
+      </div>
+
+      <div class="modal__footer">
+        <button class="btn btn--ghost" value="cancel">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Settings modal -->
+  <dialog class="modal" id="settingsModal">
+    <form method="dialog" class="modal__card">
+      <div class="modal__header">
+        <div class="modal__title">Settings</div>
+        <button class="iconBtn" value="cancel" aria-label="Close">✕</button>
+      </div>
+
+      <div class="modal__body">
+        <h3 class="h3">Online Sync (optional)</h3>
+        <p class="muted">If configured, the app can sync your novel to a server when online.</p>
+
+        <label class="field">
+          <span>Novel ID</span>
+          <input class="input" id="syncNovelId" placeholder="e.g. my-novel-001" autocomplete="off" />
+        </label>
+
+        <label class="field">
+          <span>Sync URL</span>
+          <input class="input" id="syncUrl" placeholder="https://your-api.example.com" autocomplete="off" />
+        </label>
+
+        <label class="field">
+          <span>Auth Header (optional)</span>
+          <input class="input" id="syncAuth" placeholder="Bearer …" autocomplete="off" />
+        </label>
+
+        <div class="row">
+          <button class="btn btn--primary" id="btnSyncNow" type="button">Sync Now</button>
+          <span class="muted" id="syncStatus"></span>
+        </div>
+
+        <hr class="hr" />
+
+        <h3 class="h3">App</h3>
+        <label class="field">
+          <span>Autosave interval (ms)</span>
+          <input class="input" id="autosaveMs" type="number" min="250" step="50" />
+        </label>
+
+        <div class="row">
+          <button class="btn btn--ghost" id="btnResetApp" type="button">Reset local data</button>
+        </div>
+
+        <p class="muted small">Tip: if caching gets weird after an update, open once with <code>?nosw=1</code>.</p>
+      </div>
+
+      <div class="modal__footer">
+        <button class="btn btn--ghost" value="cancel">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
