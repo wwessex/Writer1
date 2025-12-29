@@ -427,7 +427,26 @@ async function boot() {
   $("#btnToggleSidebar")?.addEventListener("click", () => {
     state.sidebarHidden = !state.sidebarHidden;
     applyViewPrefs();
-  updateHeaderHeight();
+  
+
+  $("#btnTheme")?.addEventListener("click", () => {
+    // Toggle between light/dark
+    state.theme = (state.theme === "light") ? "dark" : "light";
+    applyTheme();
+    updateThemeButton();
+    saveSettings();
+  });
+
+  // Optional: system theme (hold the theme button)
+  $("#btnTheme")?.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    const prefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+    state.theme = prefersLight ? "light" : "dark";
+    applyTheme();
+    updateThemeButton();
+    saveSettings();
+  });
+updateHeaderHeight();
     saveSettings();
   });
 
