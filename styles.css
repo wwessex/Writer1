@@ -95,6 +95,9 @@ body{
 }
 
 *{box-sizing:border-box}
+html, body{overflow-x:hidden}
+body{touch-action: pan-y}
+
 html,body{height:100%}
 body{
   margin:0;
@@ -642,12 +645,9 @@ body.sidebarHidden .layout{grid-template-columns: 1fr}
 }
 
 /* Keep content away from iOS notches/home bar */
-body{
-  padding-top: var(--safeTop);
-  padding-left: var(--safeLeft);
-  padding-right: var(--safeRight);
-}
-
+body{padding-top: var(--safeTop);}
+.appHeader{padding-left: var(--safeLeft); padding-right: var(--safeRight);}
+.layout{padding-left: var(--safeLeft); padding-right: var(--safeRight); box-sizing:border-box; width:100%; max-width:100%;}
 /* Prevent clipping on small viewports: scroll inside panes */
 .layout{min-height:0}
 .sidebar{min-height:0; overflow:auto}
@@ -675,4 +675,19 @@ body{
   .topbar{flex-wrap:nowrap}
   .docTitleInput{width:min(220px, 42vw)}
   .topbar__actions{gap:8px}
+}
+
+/* Avoid accidental horizontal overflow when padding is applied */
+.layout{overflow-x:hidden}
+.menubar, .ribbon{max-width:100%}
+.sidebar, .editorPane{max-width:100%}
+
+/* Phones: always compact the header a bit */
+@media (max-width: 520px){
+  .brand__sub{display:none}
+  .statusPills{display:none}
+  .topbar{padding:8px var(--uiPad)}
+  .menubar{padding:2px var(--uiPad) 4px}
+  .ribbon{padding:6px var(--uiPad) 8px}
+  .ribbonGroup{padding:6px 8px}
 }
