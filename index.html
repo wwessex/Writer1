@@ -259,7 +259,62 @@
     </form>
   </dialog>
 
+  <script>
+  // Bootloader: shows on-page errors if modules fail to load (common on iOS / wrong folder / caching)
+  (async () => {
+    const statusEl = document.getElementById("saveStatus");
+    const show = (title, detail) => {
+      statusEl && (statusEl.textContent = "Error");
+      const box = document.createElement("div");
+      box.style.cssText = [
+        "position:fixed","inset:12px","z-index:9999",
+        "background:rgba(10,15,32,.96)","border:1px solid rgba(255,255,255,.14)",
+        "border-radius:16px","padding:14px","box-shadow:0 20px 50px rgba(0,0,0,.45)",
+        "font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial",
+        "color:#e5e7eb","overflow:auto"
+      ].join(";");
+      box.innerHTML = `
+        <div style="font-weight:800;font-size:16px;margin-bottom:6px">${title}</div>
+        <div style="color:#9ca3af;margin-bottom:10px">This means the JavaScript didn't start, so the editor can't be typed in.</div>
+        <pre style="white-space:pre-wrap;background:rgba(0,0,0,.25);padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.08);">${String(detail||"")}</pre>
+        <div style="margin-top:10px;color:#9ca3af">
+          <div><b>Fix checklist:</b></div>
+          <ol>
+            <li>Make sure <code>index.html</code> and <code>app.js</code> are in the SAME published folder on GitHub Pages.</li>
+            <li>Try opening <code>.../app.js</code> in Safari — it should show JavaScript, not a 404 page.</li>
+            <li>After updating files, open once with <code>?nosw=1</code> then reload.</li>
+          </ol>
+        </div>
+        <button id="closeDiag" style="margin-top:12px;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#e5e7eb;cursor:pointer">Close</button>
+      `;
+      document.body.appendChild(box);
+      box.querySelector("#closeDiag")?.addEventListener("click", () => box.remove());
+    };
 
-  <script type="module" src="app.js"></script>
+    try {
+      statusEl && (statusEl.textContent = "Loading…");
+      const params = new URLSearchParams(location.search);
+
+      // Allow SW reset even if app.js fails
+      if (params.get("nosw") === "1" && "serviceWorker" in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r => r.unregister()));
+      }
+
+      // Verify app.js reachable (helps catch wrong folder / 404)
+      const r = await fetch("./app.js", { cache: "no-store" });
+      if (!r.ok) throw new Error("Fetch ./app.js failed: HTTP " + r.status);
+      const txt = await r.text();
+      if (!txt || txt.length < 200) throw new Error("app.js looks too small; got " + (txt ? txt.length : 0) + " chars.");
+
+      // Start app with cache-bust to avoid stale SW/module cache
+      await import("./app.js?v=" + Date.now());
+      statusEl && (statusEl.textContent = "Ready");
+    } catch (err) {
+      show("NovelWriter failed to start", err && (err.stack || err.message || String(err)));
+    }
+  })();
+  </script>
+
 </body>
 </html>
