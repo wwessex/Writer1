@@ -18,6 +18,8 @@ import { exportDOCX, exportPDF, exportRTF } from "./export.js";
 /* ---------------------------
   Small utilities
 --------------------------- */
+const APP_VERSION = "1.0.1";
+
 const $ = (sel) => document.querySelector(sel);
 
 function debounce(fn, ms) {
@@ -47,7 +49,7 @@ function nowStamp() {
 }
 
 function setStatus(text) {
-  $("#saveStatus").textContent = text;
+  $("#saveStatus").textContent = `${text} · v${APP_VERSION}`;
 }
 
 /* ---------------------------
@@ -156,11 +158,43 @@ function renderChapters() {
       <div class="dragHandle" title="Drag to reorder"></div>
       <div class="chapterName">${escapeHtml(ch.title || "Untitled")}</div>
       <div class="chapterMeta">${formatMiniDate(ch.updatedAt)}</div>
+      <div class="chapterActions" aria-label="Reorder">
+        <button class="miniBtn" type="button" data-move="up" title="Move up">▲</button>
+        <button class="miniBtn" type="button" data-move="down" title="Move down">▼</button>
+      </div>
     `;
 
     li.addEventListener("click", () => openChapter(ch.id));
+    // Mobile-friendly reorder buttons (drag & drop is unreliable on iOS)
+    li.querySelectorAll(".miniBtn").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const dir = btn.dataset.move;
+        const ids = state.chapters.map(c => c.id);
+        const idx = ids.indexOf(ch.id);
+        if (idx < 0) return;
+        const swapWith = dir === "up" ? idx - 1 : idx + 1;
+        if (swapWith < 0 || swapWith >= ids.length) return;
+        const tmp = ids[idx];
+        ids[idx] = ids[swapWith];
+        ids[swapWith] = tmp;
+        await persistChapterOrder(ids, "Chapters reordered");
+      });
+    });
     bindDragHandlers(li);
     ul.appendChild(li);
+  }
+}
+
+async function persistChapterOrder(ids, statusText = "Chapters reordered") {
+  state.chapters = ids.map(id => state.chapters.find(c => c.id === id)).filter(Boolean);
+  renderChapters();
+  try {
+    await reorderChapters(state.novelId, ids);
+    setStatus(statusText);
+  } catch (err) {
+    console.warn(err);
+    setStatus("Reorder failed");
   }
 }
 
@@ -197,17 +231,7 @@ function bindDragHandlers(li) {
     if (from < 0 || to < 0) return;
 
     ids.splice(to, 0, ids.splice(from, 1)[0]);
-    // reorder state.chapters accordingly
-    state.chapters = ids.map(id => state.chapters.find(c => c.id === id));
-    renderChapters();
-
-    try {
-      await reorderChapters(state.novelId, ids);
-      setStatus("Chapters reordered");
-    } catch (err) {
-      console.warn(err);
-      setStatus("Reorder failed");
-    }
+    await persistChapterOrder(ids, "Chapters reordered");
   });
 }
 
@@ -343,11 +367,17 @@ async function boot() {
   $("#chapterTitle").addEventListener("blur", flushChapterTitle);
 
   $("#btnNewChapter").addEventListener("click", async () => {
-    const chap = await createChapter(state.novelId, `Chapter ${state.chapters.length + 1}`);
-    state.chapters.push(chap);
-    await openChapter(chap.id);
-    renderChapters();
-    setStatus("Chapter added");
+    try {
+      const chap = await createChapter(state.novelId, `Chapter ${state.chapters.length + 1}`);
+      state.chapters.push(chap);
+      await openChapter(chap.id);
+      renderChapters();
+      setStatus("Chapter added");
+    } catch (e) {
+      console.warn(e);
+      alert("Could not create a chapter (storage unavailable?).");
+      setStatus("Create failed");
+    }
   });
 
   $("#btnDeleteChapter").addEventListener("click", async () => {
