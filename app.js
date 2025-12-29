@@ -650,6 +650,8 @@ function setupMenus() {
       m.classList.remove("is-open");
       // Ensure inline display doesn't keep it visible
       m.style.display = "none";
+      const menusRoot = document.querySelector(".menus");
+      if (menusRoot && m.parentElement === document.body) menusRoot.appendChild(m);
     });
   };
 
@@ -657,6 +659,7 @@ function setupMenus() {
   const openMenu = (key, btn) => {
     closeAllMenus();
     const menu = menus[key];
+    const menusRoot = document.querySelector(".menus");
     if (!menu) return;
 
     // Make it visible for measurement/positioning
@@ -664,6 +667,12 @@ function setupMenus() {
     menu.classList.add("is-open");
     menu.style.position = "fixed";
     menu.style.zIndex = "10000";
+
+    // iOS Safari: avoid stacking-context issues by placing menu at <body> while open
+    if (menu.parentElement !== document.body) {
+      menu.dataset._home = "1";
+      document.body.appendChild(menu);
+    }
 
     const rect = btn.getBoundingClientRect();
     // Measure after display
@@ -696,22 +705,23 @@ function setupMenus() {
     btn.addEventListener("click", (e) => {
       const key = btn.dataset.menu;
       const menu = menus[key];
+    const menusRoot = document.querySelector(".menus");
       const isOpen = menu?.classList.contains("is-open");
-      if (isOpen) closeAll();
+      if (isOpen) closeAllMenus();
       else openMenu(key, btn);
     });
   });
 
   document.addEventListener("click", (e) => {
-    const inMenu = e.target.closest(".menubar");
-    if (!inMenu) closeAll();
+    const inMenu = e.target.closest(".menubar") || e.target.closest(".menu");
+    if (!inMenu) closeAllMenus();
   });
 
   // Menu actions
   document.querySelectorAll(".menuItem").forEach(item => {
     item.addEventListener("click", async () => {
       const a = item.dataset.action;
-      closeAll();
+      closeAllMenus();
 
       switch (a) {
         case "export":

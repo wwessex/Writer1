@@ -182,9 +182,13 @@ body{
   max-height: min(60vh, 420px);
   overflow:auto;
   -webkit-overflow-scrolling: touch;
-  border:1px solid rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.14);
   border-radius:14px;
-  background:rgba(15,23,42,.98);
+  background-color:#0f172a;
+  opacity:1;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+  pointer-events:auto;
   box-shadow: 0 14px 40px rgba(0,0,0,.35);
 }
 .menu.is-open{display:block}
@@ -748,7 +752,8 @@ body{padding-top: var(--safeTop);}
   box-shadow: 0 18px 55px rgba(0,0,0,.18);
 }
 :root[data-theme="light"] .menu{
-  background: rgba(255,255,255,.98);
+  background-color:#ffffff;
+  opacity:1;
   border-color: rgba(0,0,0,.12);
   box-shadow: 0 14px 40px rgba(0,0,0,.16);
 }
@@ -756,3 +761,6 @@ body{padding-top: var(--safeTop);}
 :root[data-theme="light"] .menuSep{background:rgba(0,0,0,.10)}
 
 .menus{position:relative; z-index:10000}
+
+/* Menu safety */
+.menu.is-open{display:block}
