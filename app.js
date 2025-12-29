@@ -643,9 +643,14 @@ function setupMenus() {
     help: $("#menu-help")
   };
 
-  const closeAll = () => {
+  const closeAllMenus = () => {
     document.querySelectorAll(".menuBtn").forEach(b => b.classList.remove("is-open"));
-    Object.values(menus).forEach(m => m?.classList.remove("is-open"));
+    Object.values(menus).forEach(m => {
+      if (!m) return;
+      m.classList.remove("is-open");
+      // Ensure inline display doesn't keep it visible
+      m.style.display = "none";
+    });
   };
 
   // Position menu under clicked button
@@ -654,8 +659,9 @@ function setupMenus() {
     const menu = menus[key];
     if (!menu) return;
 
-    // Show first so we can measure it
+    // Make it visible for measurement/positioning
     menu.style.display = "block";
+    menu.classList.add("is-open");
     menu.style.position = "fixed";
     menu.style.zIndex = "10000";
 
