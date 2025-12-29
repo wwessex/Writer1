@@ -1,10 +1,10 @@
 /* NovelWriter Service Worker — offline cache */
-const CACHE_NAME = "novelwriter-v14";
+const CACHE_NAME = "novelwriter-v15";
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css",
-  "./styles.css?v=14",
+  "./styles.css?v=15",
+  "./styles.css?v=15?v=15",
   "./app.js",
   "./storage.js",
   "./editor.js",

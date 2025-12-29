@@ -650,16 +650,40 @@ function setupMenus() {
 
   // Position menu under clicked button
   const openMenu = (key, btn) => {
-    closeAll();
+    closeAllMenus();
     const menu = menus[key];
     if (!menu) return;
+
+    // Show first so we can measure it
+    menu.style.display = "block";
+    menu.style.position = "fixed";
+    menu.style.zIndex = "10000";
+
+    const rect = btn.getBoundingClientRect();
+    // Measure after display
+    const mrect = menu.getBoundingClientRect();
+
+    // Default placement: under the menubar button
+    let left = rect.left;
+    let top = rect.bottom + 6;
+
+    // Clamp within viewport
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    if (left + mrect.width > vw - 8) left = vw - mrect.width - 8;
+    if (left < 8) left = 8;
+
+    // If there's not enough space below, open upward
+    if (top + mrect.height > vh - 8 && rect.top > mrect.height + 8) {
+      top = rect.top - mrect.height - 6;
+    }
+    if (top < 8) top = 8;
+
+    menu.style.left = Math.round(left) + "px";
+    menu.style.top = Math.round(top) + "px";
+
     btn.classList.add("is-open");
-    // compute left from button
-    const r = btn.getBoundingClientRect();
-    const parent = btn.closest(".menubar").getBoundingClientRect();
-    const left = Math.max(10, r.left - parent.left);
-    menu.style.left = `${left}px`;
-    menu.classList.add("is-open");
   };
 
   document.querySelectorAll(".menuBtn").forEach(btn => {

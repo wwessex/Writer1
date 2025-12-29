@@ -174,17 +174,18 @@ body{
   background: linear-gradient(90deg, var(--accent), var(--m3-tertiary));
 }
 .menu{
-  position:absolute;
-  top: calc(100% + 6px);
-  left: 10px;
+  position:fixed;
   display:none;
-  z-index: 9999;
+  z-index:10000;
   min-width: 220px;
+  max-width: min(92vw, 360px);
+  max-height: min(60vh, 420px);
+  overflow:auto;
+  -webkit-overflow-scrolling: touch;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:14px;
   background:rgba(15,23,42,.98);
-  border:1px solid rgba(255,255,255,.10);
-  border-radius:12px;
-  box-shadow: var(--shadow);
-  padding:6px;
+  box-shadow: 0 14px 40px rgba(0,0,0,.35);
 }
 .menu.is-open{display:block}
 .menuItem{
@@ -753,3 +754,5 @@ body{padding-top: var(--safeTop);}
 }
 :root[data-theme="light"] .menuItem:hover{background:rgba(0,0,0,.04)}
 :root[data-theme="light"] .menuSep{background:rgba(0,0,0,.10)}
+
+.menus{position:relative; z-index:10000}
