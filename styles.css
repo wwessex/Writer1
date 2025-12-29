@@ -615,3 +615,14 @@ body.sidebarHidden .layout{grid-template-columns: 1fr}
   background: rgba(0,0,0,.02) !important;
   border-color: rgba(0,0,0,.10) !important;
 }
+
+
+
+/* Light theme: editor header bar should match Docs (not dark) */
+:root[data-theme="light"] .chapterBar{
+  background: rgba(255,255,255,.86);
+  border-bottom:1px solid rgba(0,0,0,.10);
+}
+:root[data-theme="light"] .editorWrap{
+  background: rgba(0,0,0,.02);
+}
