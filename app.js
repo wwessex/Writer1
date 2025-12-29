@@ -49,6 +49,41 @@ function setStatus(text) {
   $("#saveStatus").textContent = text;
 }
 
+// Word counts (fast, no heavy deps)
+function countWordsInString(s) {
+  if (!s) return 0;
+  const m = String(s).match(/[A-Za-z0-9]+(?:'[A-Za-z0-9]+)?/g);
+  return m ? m.length : 0;
+}
+function countWordsFromJson(node) {
+  if (!node) return 0;
+  if (node.type === "text") return countWordsInString(node.text || "");
+  let sum = 0;
+  const c = node.content || [];
+  for (const child of c) sum += countWordsFromJson(child);
+  return sum;
+}
+const updateCountsDebounced = debounce(() => {
+  try {
+    const active = state.chapters.find(c => c.id === state.activeChapterId);
+    const chapterWords = active?.content ? countWordsFromJson(active.content) : 0;
+    const totalWords = state.chapters.reduce((acc, c) => acc + (c.content ? countWordsFromJson(c.content) : 0), 0);
+    $("#chapterWords") && ($("#chapterWords").textContent = chapterWords.toLocaleString());
+    $("#totalWords") && ($("#totalWords").textContent = totalWords.toLocaleString());
+  } catch {}
+}, 500);
+
+function setConnectionPill() {
+  const online = navigator.onLine;
+  const pill = $("#connPill");
+  const text = $("#connText");
+  if (text) text.textContent = online ? "Online" : "Offline";
+  if (pill) {
+    pill.classList.toggle("is-offline", !online);
+    pill.classList.toggle("is-online", online);
+  }
+}
+
 function applyViewPrefs() {
   document.body.classList.toggle("pageView", !!state.pageView);
   document.body.classList.toggle("sidebarHidden", !!state.sidebarHidden);
@@ -142,6 +177,7 @@ function onEditorUpdate(jsonDoc) {
   ch.updatedAt = Date.now();
   // async write to IndexedDB (debounced)
   writeChapterDebounced(id, { content: jsonDoc });
+  updateCountsDebounced();
 }
 
 const writeChapterDebounced = debounce(async (id, patch) => {
@@ -242,6 +278,7 @@ async function openChapter(id) {
   // Load content into editor (isolated per chapter)
   setEditorDoc(editor, ch?.content);
   renderChapters();
+  updateCountsDebounced();
 }
 
 async function flushChapterTitle() {
@@ -327,6 +364,7 @@ async function loadFromDB() {
   const active = state.chapters.find(c => c.id === state.activeChapterId);
   $("#chapterTitle").value = active?.title || "";
   setEditorDoc(editor, active?.content);
+  updateCountsDebounced();
 }
 
 async function boot() {
@@ -359,6 +397,7 @@ async function boot() {
   await loadFromDB();
 
   setStatus(navigator.onLine ? "Ready" : "Ready (offline)");
+  setConnectionPill();
 
   // Header toggles
   $("#btnToggleSidebar")?.addEventListener("click", () => {
@@ -515,8 +554,8 @@ async function boot() {
   window.addEventListener("orientationchange", () => setTimeout(updateHeaderHeight, 50));
 
   // Online/offline status
-  window.addEventListener("online", () => setStatus("Online"));
-  window.addEventListener("offline", () => setStatus("Offline"));
+  window.addEventListener("online", () => { setStatus("Online"); setConnectionPill(); });
+  window.addEventListener("offline", () => { setStatus("Offline"); setConnectionPill(); });
 }
 
 function formatMiniDate(ts) {
