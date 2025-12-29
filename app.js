@@ -70,6 +70,11 @@ const updateCountsDebounced = debounce(() => {
     const totalWords = state.chapters.reduce((acc, c) => acc + (c.content ? countWordsFromJson(c.content) : 0), 0);
     $("#chapterWords") && ($("#chapterWords").textContent = chapterWords.toLocaleString());
     $("#totalWords") && ($("#totalWords").textContent = totalWords.toLocaleString());
+    const wc = document.getElementById("wordCountModal");
+    if (wc && wc.open) {
+      $("#wcChapter") && ($("#wcChapter").textContent = chapterWords.toLocaleString());
+      $("#wcTotal") && ($("#wcTotal").textContent = totalWords.toLocaleString());
+    }
   } catch {}
 }, 500);
 
@@ -87,6 +92,20 @@ function setConnectionPill() {
 function applyViewPrefs() {
   document.body.classList.toggle("pageView", !!state.pageView);
   document.body.classList.toggle("sidebarHidden", !!state.sidebarHidden);
+}
+
+function applyTheme() {
+  const t = (state.theme === "light") ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", t);
+}
+
+function updateThemeButton() {
+  const btn = $("#btnTheme");
+  const icon = btn?.querySelector('.material-symbols-rounded');
+  if (!btn || !icon) return;
+  const isLight = (document.documentElement.getAttribute('data-theme') === 'light');
+  icon.textContent = isLight ? 'light_mode' : 'dark_mode';
+  btn.title = isLight ? 'Switch to dark' : 'Switch to light';
 }
 
 function updateHeaderHeight() {
@@ -126,6 +145,7 @@ const state = {
   novelId: "default",
   pageView: true,
   sidebarHidden: false,
+  theme: "dark",
   novelTitle: "Untitled Novel",
   chapters: [],
   activeChapterId: null,
@@ -147,10 +167,11 @@ function loadSettings() {
     if (s.sync) state.sync = { ...state.sync, ...s.sync };
     if (typeof s.pageView === "boolean") state.pageView = s.pageView;
     if (typeof s.sidebarHidden === "boolean") state.sidebarHidden = s.sidebarHidden;
+    if (typeof s.theme === "string") state.theme = s.theme;
   } catch {}
 }
 function saveSettings() {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ autosaveMs: state.autosaveMs, sync: state.sync, pageView: state.pageView, sidebarHidden: state.sidebarHidden }));
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ autosaveMs: state.autosaveMs, sync: state.sync, pageView: state.pageView, sidebarHidden: state.sidebarHidden, theme: state.theme }));
 }
 
 /* ---------------------------
@@ -354,6 +375,7 @@ async function loadFromDB() {
   state.chapters = chapters || [];
 
   $("#novelTitle").value = state.novelTitle;
+  $("#docTitleTop") && ($("#docTitleTop").value = state.novelTitle);
 
   // Ensure an active chapter
   if (!state.activeChapterId || !state.chapters.some(c => c.id === state.activeChapterId)) {
@@ -369,8 +391,10 @@ async function loadFromDB() {
 
 async function boot() {
   loadSettings();
+  applyTheme();
   applyViewPrefs();
   updateHeaderHeight();
+  updateThemeButton();
 
   await ensureDefaultNovel();
 
@@ -411,6 +435,16 @@ async function boot() {
   $("#novelTitle").addEventListener("input", debounce(async (e) => {
     const title = e.target.value.trim() || "Untitled Novel";
     state.novelTitle = title;
+    $("#docTitleTop") && ($("#docTitleTop").value = title);
+    await updateNovelTitle(state.novelId, title);
+    setStatus("Saved locally");
+  }, 250));
+
+  // Top title (Docs-like)
+  $("#docTitleTop")?.addEventListener("input", debounce(async (e) => {
+    const title = e.target.value.trim() || "Untitled Novel";
+    state.novelTitle = title;
+    $("#novelTitle") && ($("#novelTitle").value = title);
     await updateNovelTitle(state.novelId, title);
     setStatus("Saved locally");
   }, 250));
@@ -585,6 +619,7 @@ function setupMenus() {
     view: $("#menu-view"),
     insert: $("#menu-insert"),
     format: $("#menu-format"),
+    tools: $("#menu-tools"),
     help: $("#menu-help")
   };
 
@@ -686,6 +721,12 @@ function setupMenus() {
           break;
         case "p":
           editor?.chain().focus().setParagraph().run();
+          break;
+        case "word-count":
+          // Populate modal from pills (already updated)
+          $("#wcChapter") && ($("#wcChapter").textContent = $("#chapterWords")?.textContent || "0");
+          $("#wcTotal") && ($("#wcTotal").textContent = $("#totalWords")?.textContent || "0");
+          $("#wordCountModal").showModal();
           break;
         case "about":
           $("#aboutModal").showModal();

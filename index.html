@@ -7,6 +7,7 @@
   <title>NovelWriter</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="assets/icon-192.png" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0,0" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -16,7 +17,7 @@
       <button class="iconBtn iconBtn--square" id="btnToggleSidebar" title="Toggle Chapters" aria-label="Toggle chapters">☰</button>
       <img src="assets/icon-192.png" alt="" class="brand__icon" />
       <div class="brand__text">
-        <div class="brand__title">NovelWriter</div>
+        <input id="docTitleTop" class="docTitleInput" value="Untitled Novel" aria-label="Document title" />
         <div class="brand__sub" id="saveStatus">Ready</div>
       </div>
     </div>
@@ -37,6 +38,7 @@
     </div>
 
     <div class="topbar__actions">
+      <button class="iconBtn iconBtn--square" id="btnTheme" title="Toggle theme" aria-label="Toggle theme"><span class="material-symbols-rounded" aria-hidden="true">dark_mode</span></button>
       <button class="btn btn--ghost" id="btnExport" title="Export">Export</button>
       <button class="btn btn--ghost" id="btnSettings" title="Settings">Settings</button>
     </div>
@@ -48,6 +50,7 @@
     <button class="menuBtn" data-menu="view">View</button>
     <button class="menuBtn" data-menu="insert">Insert</button>
     <button class="menuBtn" data-menu="format">Format</button>
+    <button class="menuBtn" data-menu="tools">Tools</button>
     <button class="menuBtn" data-menu="help">Help</button>
 
     <div class="menu" id="menu-file" role="menu">
@@ -83,6 +86,11 @@
       <button class="menuItem" data-action="h1">Heading 1</button>
       <button class="menuItem" data-action="h2">Heading 2</button>
       <button class="menuItem" data-action="p">Paragraph</button>
+    </div>
+
+    <div class="menu" id="menu-tools" role="menu">
+      <button class="menuItem" data-action="word-count">Word count</button>
+      <button class="menuItem" data-action="toggle-page">Toggle Page View</button>
     </div>
 
     <div class="menu" id="menu-help" role="menu">
@@ -273,6 +281,34 @@
       </div>
     </form>
   </dialog>
+
+
+  <!-- Word count modal -->
+  <dialog class="modal" id="wordCountModal">
+    <form method="dialog" class="modal__card">
+      <div class="modal__header">
+        <div class="modal__title">Word count</div>
+        <button class="iconBtn" value="cancel" aria-label="Close">✕</button>
+      </div>
+      <div class="modal__body">
+        <div class="wcGrid">
+          <div class="wcCard">
+            <div class="wcLabel">Chapter</div>
+            <div class="wcValue" id="wcChapter">0</div>
+          </div>
+          <div class="wcCard">
+            <div class="wcLabel">Total</div>
+            <div class="wcValue" id="wcTotal">0</div>
+          </div>
+        </div>
+        <p class="muted small">Counts are approximate (based on your current draft text).</p>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--ghost" value="cancel">Close</button>
+      </div>
+    </form>
+  </dialog>
+
 
   <script>
   // Bootloader: shows on-page errors if modules fail to load (common on iOS / wrong folder / caching)
