@@ -590,3 +590,31 @@ body.sidebarHidden .layout{grid-template-columns: 1fr}
 :root[data-theme="light"] .chapters{
   background: rgba(255,255,255,.60);
 }
+
+
+
+/* Light theme: sidebar + chapters contrast */
+:root[data-theme="light"] .sidebar{
+  background: rgba(255,255,255,.82);
+  border-right:1px solid rgba(0,0,0,.10);
+}
+:root[data-theme="light"] .chapters{
+  background: rgba(255,255,255,.78);
+  border:1px solid rgba(0,0,0,.08);
+}
+:root[data-theme="light"] .chapterItem:hover{background:rgba(0,0,0,.035)}
+:root[data-theme="light"] .chapterItem.is-active{background:rgba(26,115,232,.10)}
+:root[data-theme="light"] .chapterItem.is-active::before{
+  background: linear-gradient(180deg, rgba(26,115,232,.95), rgba(0,188,212,.70));
+}
+:root[data-theme="light"] .pill{
+  background: rgba(255,255,255,.86);
+  border-color: rgba(0,0,0,.08);
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+}
+:root[data-theme="light"] .btn{
+  border-color: rgba(0,0,0,.10);
+}
+:root[data-theme="light"] .btn:hover{
+  box-shadow: 0 0 0 4px rgba(26,115,232,.10);
+}
