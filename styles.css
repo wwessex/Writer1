@@ -84,7 +84,7 @@ body{
     filter: blur(80px);
     opacity:.55;
     animation: aurora 18s linear infinite;
-    pointer-events:none;
+    pointer-events:auto;
     z-index:-1;
   }
   @keyframes aurora{
@@ -124,7 +124,7 @@ body{
   inset:0;
   background: var(--accentGrad);
   opacity: .08;
-  pointer-events:none;
+  pointer-events:auto;
 }
 .appHeader .topbar{
   position:relative;
@@ -764,3 +764,6 @@ body{padding-top: var(--safeTop);}
 
 /* Menu safety */
 .menu.is-open{display:block}
+
+
+.hiddenFile{position:fixed; left:-9999px; top:-9999px; width:1px; height:1px; opacity:0; pointer-events:auto}

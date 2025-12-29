@@ -116,6 +116,39 @@ export async function importBackup(payload) {
   return true;
 }
 
+
+export async function replaceFromImport(novelId, novelTitle, chapters) {
+  if (!novelId) novelId = "default";
+  if (!Array.isArray(chapters) || !chapters.length) throw new Error("No chapters to import");
+
+  const now = Date.now();
+  await db.transaction("rw", db.novels, db.chapters, async () => {
+    const n = await db.novels.get(novelId);
+    if (!n) {
+      await db.novels.put({ id: novelId, title: novelTitle || "Untitled Novel", updatedAt: now });
+    } else {
+      n.title = novelTitle || n.title || "Untitled Novel";
+      n.updatedAt = now;
+      await db.novels.put(n);
+    }
+
+    await db.chapters.where({ novelId }).delete();
+
+    for (let i = 0; i < chapters.length; i++) {
+      const ch = chapters[i];
+      await db.chapters.put({
+        id: crypto.randomUUID(),
+        novelId,
+        order: i + 1,
+        title: ch.title || `Chapter ${i + 1}`,
+        updatedAt: now,
+        content: ch.doc || { type: "doc", content: [{ type: "paragraph" }] }
+      });
+    }
+  });
+  return true;
+}
+
 export async function resetAllData() {
   await db.delete();
   // Dexie needs re-open after delete

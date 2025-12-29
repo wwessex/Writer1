@@ -9,6 +9,7 @@ import {
   reorderChapters,
   exportBackup,
   importBackup,
+  replaceFromImport,
   resetAllData
 } from "./storage.js";
 
@@ -521,6 +522,33 @@ async function boot() {
     }
   });
 
+
+  $("#importDocRtf").addEventListener("change", async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const ok = confirm("Importing a Word/RTF file will replace your current chapters in this novel. Continue?");
+    if (!ok) { e.target.value = ""; return; }
+
+    try {
+      setStatus("Importing document…");
+      const mod = await import("./importer.js");
+      const parsed = await mod.parseImportFile(file);
+
+      await replaceFromImport(state.novelId, parsed.novelTitle, parsed.chapters);
+
+      state.activeChapterId = null;
+      await loadFromDB();
+      setStatus("Imported Word/RTF");
+    } catch (err) {
+      console.warn(err);
+      alert("Import failed: " + (err?.message || err));
+      setStatus("Import failed");
+    } finally {
+      e.target.value = "";
+    }
+  });
+
   // Export modal
   const exportModal = $("#exportModal");
   $("#btnExport").addEventListener("click", () => exportModal.showModal());
@@ -733,6 +761,9 @@ function setupMenus() {
         case "backup-import":
           // trigger existing file input (hidden inside sidebar label)
           $("#importFile").click();
+          break;
+        case "import-docrtf":
+          $("#importDocRtf").click();
           break;
         case "settings":
           $("#btnSettings").click();

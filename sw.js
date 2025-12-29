@@ -1,17 +1,17 @@
 /* NovelWriter Service Worker — offline cache */
-const CACHE_NAME = "novelwriter-v17";
+const CACHE_NAME = "novelwriter-v18";
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=17?v=17",
-  "./styles.css?v=17?v=17?v=15",
+  "./styles.css?v=18",
   "./app.js",
   "./storage.js",
   "./editor.js",
   "./export.js",
+  "./importer.js",
   "./manifest.webmanifest",
   "./assets/icon-192.png",
-  "./assets/icon-512.png"
+  "./assets/icon-512.png",
 ];
 
 // External ESM/CDN modules are cached on-demand via runtime caching.
