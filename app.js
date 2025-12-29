@@ -427,17 +427,18 @@ async function boot() {
   $("#btnToggleSidebar")?.addEventListener("click", () => {
     state.sidebarHidden = !state.sidebarHidden;
     applyViewPrefs();
-  
+    updateHeaderHeight();
+    saveSettings();
+  });
 
   $("#btnTheme")?.addEventListener("click", () => {
-    // Toggle between light/dark
     state.theme = (state.theme === "light") ? "dark" : "light";
     applyTheme();
     updateThemeButton();
     saveSettings();
   });
 
-  // Optional: system theme (hold the theme button)
+  // Optional: system theme (press & hold, then release on iOS; right-click on desktop)
   $("#btnTheme")?.addEventListener("contextmenu", (e) => {
     e.preventDefault();
     const prefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
@@ -446,11 +447,9 @@ async function boot() {
     updateThemeButton();
     saveSettings();
   });
-updateHeaderHeight();
-    saveSettings();
-  });
 
   // Events
+
   $("#novelTitle").addEventListener("input", debounce(async (e) => {
     const title = e.target.value.trim() || "Untitled Novel";
     state.novelTitle = title;
