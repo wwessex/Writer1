@@ -9,11 +9,45 @@ import {
   reorderChapters,
   exportBackup,
   importBackup,
-  replaceFromImport,
   resetAllData
 } from "./storage.js";
 
 import { createNovelEditor, setEditorDoc, bindToolbar } from "./editor.js";
+
+
+async function replaceNovelWithImport(parsed) {
+  // Backward-compatible importer: does NOT rely on storage.js exporting replaceFromImport.
+  // Uses existing exported storage operations.
+  const novelTitle = parsed?.novelTitle || "Untitled Novel";
+  const chapters = Array.isArray(parsed?.chapters) ? parsed.chapters : [];
+  if (!chapters.length) throw new Error("No chapters to import");
+
+  // Update novel title
+  await updateNovelTitle(state.novelId, novelTitle);
+
+  // Delete existing chapters
+  const current = await getNovel(state.novelId);
+  for (const c of (current.chapters || [])) {
+    await deleteChapter(c.id);
+  }
+
+  // Create new chapters + set content
+  const newIds = [];
+  for (let i = 0; i < chapters.length; i++) {
+    const ch = chapters[i] || {};
+    const title = ch.title || `Chapter ${i + 1}`;
+    const created = await createChapter(state.novelId, title);
+    await updateChapterMeta(created.id, {
+      title,
+      order: i + 1,
+      content: ch.doc || { type: "doc", content: [{ type: "paragraph" }] }
+    });
+    newIds.push(created.id);
+  }
+
+  // Ensure final order
+  await reorderChapters(state.novelId, newIds);
+}
 
 /* ---------------------------
   Small utilities
@@ -535,7 +569,7 @@ async function boot() {
       const mod = await import("./importer.js");
       const parsed = await mod.parseImportFile(file);
 
-      await replaceFromImport(state.novelId, parsed.novelTitle, parsed.chapters);
+      await replaceNovelWithImport(parsed);
 
       state.activeChapterId = null;
       await loadFromDB();
