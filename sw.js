@@ -1,5 +1,5 @@
 /* NovelWriter Service Worker — offline cache */
-const CACHE_NAME = "novelwriter-v2";
+const CACHE_NAME = "novelwriter-v3";
 const CORE_ASSETS = [
   "./",
   "./index.html",

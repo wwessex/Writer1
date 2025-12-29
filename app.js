@@ -13,7 +13,6 @@ import {
 } from "./storage.js";
 
 import { createNovelEditor, setEditorDoc, bindToolbar } from "./editor.js";
-import { exportDOCX, exportPDF, exportRTF } from "./export.js";
 
 /* ---------------------------
   Small utilities
@@ -53,6 +52,13 @@ function setStatus(text) {
 function applyViewPrefs() {
   document.body.classList.toggle("pageView", !!state.pageView);
   document.body.classList.toggle("sidebarHidden", !!state.sidebarHidden);
+}
+
+function updateHeaderHeight() {
+  const header = document.querySelector('.appHeader');
+  if (!header) return;
+  const h = Math.ceil(header.getBoundingClientRect().height);
+  document.documentElement.style.setProperty('--headerH', `${h}px`);
 }
 
 /* ---------------------------
@@ -326,6 +332,7 @@ async function loadFromDB() {
 async function boot() {
   loadSettings();
   applyViewPrefs();
+  updateHeaderHeight();
 
   await ensureDefaultNovel();
 
@@ -357,6 +364,7 @@ async function boot() {
   $("#btnToggleSidebar")?.addEventListener("click", () => {
     state.sidebarHidden = !state.sidebarHidden;
     applyViewPrefs();
+  updateHeaderHeight();
     saveSettings();
   });
 
@@ -435,21 +443,24 @@ async function boot() {
   $("#exportDocx").addEventListener("click", async () => {
     setStatus("Exporting DOCX…");
     const data = await getExportData();
-    await exportDOCX(data);
+    const mod = await import("./export.js");
+    await mod.exportDOCX(data);
     setStatus("Exported DOCX");
   });
 
   $("#exportPdf").addEventListener("click", async () => {
     setStatus("Exporting PDF…");
     const data = await getExportData();
-    await exportPDF(data);
+    const mod = await import("./export.js");
+    await mod.exportPDF(data);
     setStatus("Exported PDF");
   });
 
   $("#exportRtf").addEventListener("click", async () => {
     setStatus("Exporting RTF…");
     const data = await getExportData();
-    await exportRTF(data);
+    const mod = await import("./export.js");
+    await mod.exportRTF(data);
     setStatus("Exported RTF");
   });
 
@@ -498,6 +509,10 @@ async function boot() {
 
 
   setupMenus();
+
+  // Keep layout correct as the header wraps (iOS, orientation changes)
+  window.addEventListener("resize", () => updateHeaderHeight());
+  window.addEventListener("orientationchange", () => setTimeout(updateHeaderHeight, 50));
 
   // Online/offline status
   window.addEventListener("online", () => setStatus("Online"));
@@ -600,11 +615,13 @@ function setupMenus() {
         case "toggle-sidebar":
           state.sidebarHidden = !state.sidebarHidden;
           applyViewPrefs();
+  updateHeaderHeight();
           saveSettings();
           break;
         case "toggle-page":
           state.pageView = !state.pageView;
           applyViewPrefs();
+  updateHeaderHeight();
           saveSettings();
           break;
         case "hr":

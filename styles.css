@@ -144,7 +144,7 @@ body{
 
 /* Layout */
 .layout{
-  height:calc(100vh - 56px - 44px - 62px);
+  height:calc(100svh - var(--headerH, 180px));
   display:grid;
   grid-template-columns: 320px 1fr;
 }
@@ -347,7 +347,13 @@ body.sidebarHidden .sidebar{display:none}
 body.sidebarHidden .layout{grid-template-columns: 1fr}
 
 @media (max-width: 860px){
-  .layout{grid-template-columns: 1fr}
+  .layout{display:flex; flex-direction:column; height:calc(100svh - var(--headerH, 180px));}
+  .sidebar{max-height:38vh; overflow:auto}
+  .chapters{max-height: 160px}
+  .editorPane{flex:1; min-height:0}
+  .editor{padding:14px}
+  .grid{grid-template-columns:1fr}
+}
 
   .menubar{gap:4px}
   .menuBtn{padding:6px 8px}
