@@ -1,11 +1,13 @@
 // editor.js — Tiptap editor wrapper
 import { Editor } from "https://esm.sh/@tiptap/core@2.11.5";
 import StarterKit from "https://esm.sh/@tiptap/starter-kit@2.11.5";
+import Underline from "https://esm.sh/@tiptap/extension-underline@2.11.5";
+import HorizontalRule from "https://esm.sh/@tiptap/extension-horizontal-rule@2.11.5";
 
 export function createNovelEditor({ element, onUpdate }) {
   const editor = new Editor({
     element,
-    extensions: [StarterKit],
+    extensions: [StarterKit, Underline, HorizontalRule],
     content: { type: "doc", content: [{ type: "paragraph" }] },
     autofocus: "end",
     editorProps: {
@@ -30,6 +32,7 @@ export function bindToolbar(editor, toolbarEl) {
     q("bold")?.classList.toggle("is-active", editor.isActive("bold"));
     q("italic")?.classList.toggle("is-active", editor.isActive("italic"));
     q("strike")?.classList.toggle("is-active", editor.isActive("strike"));
+    q("underline")?.classList.toggle("is-active", editor.isActive("underline"));
     q("h1")?.classList.toggle("is-active", editor.isActive("heading", { level: 1 }));
     q("h2")?.classList.toggle("is-active", editor.isActive("heading", { level: 2 }));
     q("ul")?.classList.toggle("is-active", editor.isActive("bulletList"));
@@ -52,12 +55,14 @@ export function bindToolbar(editor, toolbarEl) {
       case "bold": chain.toggleBold().run(); break;
       case "italic": chain.toggleItalic().run(); break;
       case "strike": chain.toggleStrike().run(); break;
+      case "underline": chain.toggleUnderline().run(); break;
       case "h1": chain.toggleHeading({ level: 1 }).run(); break;
       case "h2": chain.toggleHeading({ level: 2 }).run(); break;
       case "p": chain.setParagraph().run(); break;
       case "ul": chain.toggleBulletList().run(); break;
       case "ol": chain.toggleOrderedList().run(); break;
       case "quote": chain.toggleBlockquote().run(); break;
+      case "hr": chain.setHorizontalRule().run(); break;
       case "undo": editor.commands.undo(); break;
       case "redo": editor.commands.redo(); break;
       default:

@@ -25,6 +25,108 @@ body{
   color:var(--text);
 }
 
+
+/* App header: topbar + menubar + ribbon (Word-like) */
+.appHeader{
+  position:sticky;
+  top:0;
+  z-index:20;
+  background:rgba(10,15,32,.88);
+  backdrop-filter: blur(8px);
+  border-bottom:1px solid var(--line);
+}
+.appHeader .topbar{
+  position:static;
+  border-bottom:none;
+  background:transparent;
+}
+.iconBtn--square{
+  width:36px;height:36px;
+  display:grid;place-items:center;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:12px;
+  background:rgba(255,255,255,.03);
+}
+.iconBtn--square:active{transform:translateY(1px)}
+.menubar{
+  display:flex;
+  gap:6px;
+  padding:6px 10px 8px;
+  border-top:1px solid rgba(255,255,255,.06);
+  border-bottom:1px solid rgba(255,255,255,.06);
+  align-items:center;
+  position:relative;
+}
+.menuBtn{
+  border:1px solid transparent;
+  background:transparent;
+  color:var(--text);
+  padding:6px 10px;
+  border-radius:10px;
+  cursor:pointer;
+  font-size:13px;
+}
+.menuBtn:hover{background:rgba(255,255,255,.05)}
+.menuBtn.is-open{border-color:rgba(96,165,250,.35); background:rgba(96,165,250,.12)}
+.menu{
+  position:absolute;
+  top:40px;
+  left:10px;
+  display:none;
+  min-width: 220px;
+  background:rgba(15,23,42,.98);
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:12px;
+  box-shadow: var(--shadow);
+  padding:6px;
+}
+.menu.is-open{display:block}
+.menuItem{
+  width:100%;
+  text-align:left;
+  border:none;
+  background:transparent;
+  color:var(--text);
+  padding:9px 10px;
+  border-radius:10px;
+  cursor:pointer;
+  font-size:13px;
+}
+.menuItem:hover{background:rgba(255,255,255,.06)}
+.menuSep{height:1px; background:rgba(255,255,255,.08); margin:6px}
+
+.ribbon{
+  display:flex;
+  gap:10px;
+  padding:8px 10px 10px;
+  background:rgba(17,27,51,.65);
+  overflow:auto;
+}
+.ribbonGroup{
+  border:1px solid rgba(255,255,255,.06);
+  background:rgba(0,0,0,.10);
+  border-radius:14px;
+  padding:8px 10px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  min-width:max-content;
+}
+.ribbonLabel{
+  font-size:11px;
+  color:var(--muted);
+}
+.ribbonRow{display:flex; gap:6px; flex-wrap:wrap}
+.select{
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.09);
+  color:var(--text);
+  border-radius:12px;
+  padding:8px 10px;
+  outline:none;
+}
+.select:focus{border-color:rgba(96,165,250,.65); box-shadow:0 0 0 4px rgba(96,165,250,.12)}
+
 /* Top bar */
 .topbar{
   position:sticky; top:0; z-index:10;
@@ -42,7 +144,7 @@ body{
 
 /* Layout */
 .layout{
-  height:calc(100vh - 56px);
+  height:calc(100vh - 56px - 44px - 62px);
   display:grid;
   grid-template-columns: 320px 1fr;
 }
@@ -104,6 +206,23 @@ body{
 }
 .editor .ProseMirror ul, .editor .ProseMirror ol{padding-left:22px}
 .editor .ProseMirror li{margin:4px 0}
+
+/* Word-like page view */
+body.pageView .editor{
+  background:rgba(0,0,0,.10);
+}
+body.pageView .editor .ProseMirror{
+  background: rgba(255,255,255,.96);
+  color: #111827;
+  border-radius: 10px;
+  padding: 48px 54px;
+  box-shadow: 0 16px 40px rgba(0,0,0,.35);
+  min-height: calc(100vh - 220px);
+}
+body.pageView .editor .ProseMirror blockquote{
+  background: rgba(96,165,250,.12);
+}
+
 
 /* Inputs & Buttons */
 .input{
@@ -181,22 +300,6 @@ body{
 }
 .chapterName{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .chapterMeta{font-size:12px;color:var(--muted)}
-.chapterActions{display:none; gap:6px; margin-left:6px}
-.miniBtn{
-  border:1px solid rgba(255,255,255,.10);
-  background:rgba(255,255,255,.04);
-  color:var(--text);
-  border-radius:10px;
-  padding:4px 8px;
-  font-size:12px;
-  line-height:1;
-  cursor:pointer;
-}
-.miniBtn:active{transform:translateY(1px)}
-@media (max-width: 760px){
-  .chapterActions{display:flex}
-  .dragHandle{display:none}
-}
 .chapterItem.is-dragover{outline:2px dashed rgba(96,165,250,.55); outline-offset:-2px}
 
 /* Modal */
@@ -238,10 +341,28 @@ body{
 
 code{font-family:var(--mono); font-size:12px}
 
+
+/* Sidebar toggle */
+body.sidebarHidden .sidebar{display:none}
+body.sidebarHidden .layout{grid-template-columns: 1fr}
+
 @media (max-width: 860px){
   .layout{grid-template-columns: 1fr}
+
+  .menubar{gap:4px}
+  .menuBtn{padding:6px 8px}
+  .ribbon{padding:8px}
+
   .sidebar{height:auto}
   .chapters{max-height: 220px}
   .editor{padding:14px}
   .grid{grid-template-columns:1fr}
+}
+
+@media (orientation: landscape) and (max-width: 980px){
+  .layout{
+    grid-template-columns: 280px 1fr;
+    height:calc(100vh - 56px - 44px - 62px);
+  }
+  .chapters{max-height:none}
 }

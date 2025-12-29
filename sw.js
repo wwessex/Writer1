@@ -19,20 +19,7 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
-
-      // IMPORTANT: cache.addAll() fails the entire install if *any* file 404s.
-      // We cache core files individually so missing optional assets (e.g. icons)
-      // don't brick the SW and leave users stuck on an old cache.
-      await Promise.all(
-        CORE_ASSETS.map(async (url) => {
-          try {
-            await cache.add(url);
-          } catch (e) {
-            // ignore missing assets
-          }
-        })
-      );
-
+      await cache.addAll(CORE_ASSETS);
       self.skipWaiting();
     })()
   );
@@ -57,11 +44,13 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith(
     (async () => {
+      // Prefer cache, then network, cache result
       const cached = await caches.match(req, { ignoreSearch: false });
       if (cached) return cached;
 
       try {
         const fresh = await fetch(req);
+        // Cache GET only
         if (req.method === "GET") {
           const cache = await caches.open(CACHE_NAME);
           cache.put(req, fresh.clone()).catch(() => {});

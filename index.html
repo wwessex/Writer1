@@ -10,8 +10,10 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header class="topbar">
+  <header class="appHeader">
+  <div class="topbar">
     <div class="brand">
+      <button class="iconBtn iconBtn--square" id="btnToggleSidebar" title="Toggle Chapters" aria-label="Toggle chapters">☰</button>
       <img src="assets/icon-192.png" alt="" class="brand__icon" />
       <div class="brand__text">
         <div class="brand__title">NovelWriter</div>
@@ -23,7 +25,96 @@
       <button class="btn btn--ghost" id="btnExport" title="Export">Export</button>
       <button class="btn btn--ghost" id="btnSettings" title="Settings">Settings</button>
     </div>
-  </header>
+  </div>
+
+  <nav class="menubar" aria-label="Menu">
+    <button class="menuBtn" data-menu="file">File</button>
+    <button class="menuBtn" data-menu="edit">Edit</button>
+    <button class="menuBtn" data-menu="view">View</button>
+    <button class="menuBtn" data-menu="insert">Insert</button>
+    <button class="menuBtn" data-menu="format">Format</button>
+    <button class="menuBtn" data-menu="help">Help</button>
+
+    <div class="menu" id="menu-file" role="menu">
+      <button class="menuItem" data-action="export">Export…</button>
+      <button class="menuItem" data-action="backup-export">Export Backup</button>
+      <button class="menuItem" data-action="backup-import">Import Backup…</button>
+      <div class="menuSep"></div>
+      <button class="menuItem" data-action="settings">Settings…</button>
+    </div>
+
+    <div class="menu" id="menu-edit" role="menu">
+      <button class="menuItem" data-action="undo">Undo</button>
+      <button class="menuItem" data-action="redo">Redo</button>
+      <div class="menuSep"></div>
+      <button class="menuItem" data-action="select-all">Select All</button>
+    </div>
+
+    <div class="menu" id="menu-view" role="menu">
+      <button class="menuItem" data-action="toggle-sidebar">Toggle Chapters</button>
+      <button class="menuItem" data-action="toggle-page">Toggle Page View</button>
+    </div>
+
+    <div class="menu" id="menu-insert" role="menu">
+      <button class="menuItem" data-action="hr">Horizontal Line</button>
+      <button class="menuItem" data-action="blockquote">Blockquote</button>
+    </div>
+
+    <div class="menu" id="menu-format" role="menu">
+      <button class="menuItem" data-action="bold">Bold</button>
+      <button class="menuItem" data-action="italic">Italic</button>
+      <button class="menuItem" data-action="underline">Underline</button>
+      <div class="menuSep"></div>
+      <button class="menuItem" data-action="h1">Heading 1</button>
+      <button class="menuItem" data-action="h2">Heading 2</button>
+      <button class="menuItem" data-action="p">Paragraph</button>
+    </div>
+
+    <div class="menu" id="menu-help" role="menu">
+      <button class="menuItem" data-action="about">About</button>
+    </div>
+  </nav>
+
+  <div class="ribbon" id="toolbar" aria-label="Toolbar">
+    <div class="ribbonGroup">
+      <label class="ribbonLabel">Style</label>
+      <select class="select" id="styleSelect" aria-label="Style">
+        <option value="p">Normal</option>
+        <option value="h1">Heading 1</option>
+        <option value="h2">Heading 2</option>
+        <option value="quote">Quote</option>
+      </select>
+    </div>
+
+    <div class="ribbonGroup">
+      <label class="ribbonLabel">Font</label>
+      <div class="ribbonRow">
+        <button class="tb" data-cmd="bold" title="Bold"><b>B</b></button>
+        <button class="tb" data-cmd="italic" title="Italic"><i>I</i></button>
+        <button class="tb" data-cmd="underline" title="Underline"><u>U</u></button>
+        <button class="tb" data-cmd="strike" title="Strike"><s>S</s></button>
+      </div>
+    </div>
+
+    <div class="ribbonGroup">
+      <label class="ribbonLabel">Paragraph</label>
+      <div class="ribbonRow">
+        <button class="tb" data-cmd="ul" title="Bullet list">• List</button>
+        <button class="tb" data-cmd="ol" title="Ordered list">1. List</button>
+        <button class="tb" data-cmd="quote" title="Blockquote">❝ ❞</button>
+        <button class="tb" data-cmd="hr" title="Horizontal line">―</button>
+      </div>
+    </div>
+
+    <div class="ribbonGroup">
+      <label class="ribbonLabel">History</label>
+      <div class="ribbonRow">
+        <button class="tb" data-cmd="undo" title="Undo">↶</button>
+        <button class="tb" data-cmd="redo" title="Redo">↷</button>
+      </div>
+    </div>
+  </div>
+</header>
 
   <main class="layout">
     <aside class="sidebar" aria-label="Chapters">
@@ -58,23 +149,6 @@
       </div>
 
       <div class="editorWrap">
-        <div class="toolbar" id="toolbar">
-          <button class="tb" data-cmd="bold" title="Bold"><b>B</b></button>
-          <button class="tb" data-cmd="italic" title="Italic"><i>I</i></button>
-          <button class="tb" data-cmd="strike" title="Strike"><s>S</s></button>
-          <span class="sep"></span>
-          <button class="tb" data-cmd="h1" title="Heading 1">H1</button>
-          <button class="tb" data-cmd="h2" title="Heading 2">H2</button>
-          <button class="tb" data-cmd="p" title="Paragraph">P</button>
-          <span class="sep"></span>
-          <button class="tb" data-cmd="ul" title="Bullet list">• List</button>
-          <button class="tb" data-cmd="ol" title="Ordered list">1. List</button>
-          <button class="tb" data-cmd="quote" title="Blockquote">❝ ❞</button>
-          <span class="sep"></span>
-          <button class="tb" data-cmd="undo" title="Undo">↶</button>
-          <button class="tb" data-cmd="redo" title="Redo">↷</button>
-        </div>
-
         <div id="editor" class="editor" aria-label="Editor"></div>
       </div>
     </section>
@@ -161,6 +235,30 @@
       </div>
     </form>
   </dialog>
+
+  
+  <!-- About modal -->
+  <dialog class="modal" id="aboutModal">
+    <form method="dialog" class="modal__card">
+      <div class="modal__header">
+        <div class="modal__title">About NovelWriter</div>
+        <button class="iconBtn" value="cancel" aria-label="Close">✕</button>
+      </div>
+      <div class="modal__body">
+        <p><strong>NovelWriter</strong> is an offline-first writing app.</p>
+        <ul>
+          <li>Chapters are isolated documents (editing one won't change the others).</li>
+          <li>Autosaves locally to your browser.</li>
+          <li>Exports to DOCX / PDF / RTF.</li>
+        </ul>
+        <p class="muted small">Tip: if the app ever looks out of date, open once with <code>?nosw=1</code> then reload.</p>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--ghost" value="cancel">Close</button>
+      </div>
+    </form>
+  </dialog>
+
 
   <script type="module" src="app.js"></script>
 </body>

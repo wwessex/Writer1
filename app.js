@@ -18,8 +18,6 @@ import { exportDOCX, exportPDF, exportRTF } from "./export.js";
 /* ---------------------------
   Small utilities
 --------------------------- */
-const APP_VERSION = "1.0.1";
-
 const $ = (sel) => document.querySelector(sel);
 
 function debounce(fn, ms) {
@@ -49,7 +47,12 @@ function nowStamp() {
 }
 
 function setStatus(text) {
-  $("#saveStatus").textContent = `${text} · v${APP_VERSION}`;
+  $("#saveStatus").textContent = text;
+}
+
+function applyViewPrefs() {
+  document.body.classList.toggle("pageView", !!state.pageView);
+  document.body.classList.toggle("sidebarHidden", !!state.sidebarHidden);
 }
 
 /* ---------------------------
@@ -80,6 +83,8 @@ function setStatus(text) {
 --------------------------- */
 const state = {
   novelId: "default",
+  pageView: true,
+  sidebarHidden: false,
   novelTitle: "Untitled Novel",
   chapters: [],
   activeChapterId: null,
@@ -99,10 +104,12 @@ function loadSettings() {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
     if (typeof s.autosaveMs === "number") state.autosaveMs = s.autosaveMs;
     if (s.sync) state.sync = { ...state.sync, ...s.sync };
+    if (typeof s.pageView === "boolean") state.pageView = s.pageView;
+    if (typeof s.sidebarHidden === "boolean") state.sidebarHidden = s.sidebarHidden;
   } catch {}
 }
 function saveSettings() {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ autosaveMs: state.autosaveMs, sync: state.sync }));
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ autosaveMs: state.autosaveMs, sync: state.sync, pageView: state.pageView, sidebarHidden: state.sidebarHidden }));
 }
 
 /* ---------------------------
@@ -158,43 +165,11 @@ function renderChapters() {
       <div class="dragHandle" title="Drag to reorder"></div>
       <div class="chapterName">${escapeHtml(ch.title || "Untitled")}</div>
       <div class="chapterMeta">${formatMiniDate(ch.updatedAt)}</div>
-      <div class="chapterActions" aria-label="Reorder">
-        <button class="miniBtn" type="button" data-move="up" title="Move up">▲</button>
-        <button class="miniBtn" type="button" data-move="down" title="Move down">▼</button>
-      </div>
     `;
 
     li.addEventListener("click", () => openChapter(ch.id));
-    // Mobile-friendly reorder buttons (drag & drop is unreliable on iOS)
-    li.querySelectorAll(".miniBtn").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const dir = btn.dataset.move;
-        const ids = state.chapters.map(c => c.id);
-        const idx = ids.indexOf(ch.id);
-        if (idx < 0) return;
-        const swapWith = dir === "up" ? idx - 1 : idx + 1;
-        if (swapWith < 0 || swapWith >= ids.length) return;
-        const tmp = ids[idx];
-        ids[idx] = ids[swapWith];
-        ids[swapWith] = tmp;
-        await persistChapterOrder(ids, "Chapters reordered");
-      });
-    });
     bindDragHandlers(li);
     ul.appendChild(li);
-  }
-}
-
-async function persistChapterOrder(ids, statusText = "Chapters reordered") {
-  state.chapters = ids.map(id => state.chapters.find(c => c.id === id)).filter(Boolean);
-  renderChapters();
-  try {
-    await reorderChapters(state.novelId, ids);
-    setStatus(statusText);
-  } catch (err) {
-    console.warn(err);
-    setStatus("Reorder failed");
   }
 }
 
@@ -231,7 +206,17 @@ function bindDragHandlers(li) {
     if (from < 0 || to < 0) return;
 
     ids.splice(to, 0, ids.splice(from, 1)[0]);
-    await persistChapterOrder(ids, "Chapters reordered");
+    // reorder state.chapters accordingly
+    state.chapters = ids.map(id => state.chapters.find(c => c.id === id));
+    renderChapters();
+
+    try {
+      await reorderChapters(state.novelId, ids);
+      setStatus("Chapters reordered");
+    } catch (err) {
+      console.warn(err);
+      setStatus("Reorder failed");
+    }
   });
 }
 
@@ -340,6 +325,7 @@ async function loadFromDB() {
 
 async function boot() {
   loadSettings();
+  applyViewPrefs();
 
   await ensureDefaultNovel();
 
@@ -351,9 +337,28 @@ async function boot() {
   bindToolbar(editor, $("#toolbar"));
   configureAutosave();
 
+  // Style dropdown (Word-ish)
+  $("#styleSelect")?.addEventListener("change", (e) => {
+    const v = e.target.value;
+    const btn = document.querySelector(`.tb[data-cmd="${v}"]`);
+    if (btn) btn.click();
+    // fallback actions
+    if (v === "h1") editor.chain().focus().toggleHeading({ level: 1 }).run();
+    if (v === "h2") editor.chain().focus().toggleHeading({ level: 2 }).run();
+    if (v === "p") editor.chain().focus().setParagraph().run();
+    if (v === "quote") editor.chain().focus().toggleBlockquote().run();
+  });
+
   await loadFromDB();
 
   setStatus(navigator.onLine ? "Ready" : "Ready (offline)");
+
+  // Header toggles
+  $("#btnToggleSidebar")?.addEventListener("click", () => {
+    state.sidebarHidden = !state.sidebarHidden;
+    applyViewPrefs();
+    saveSettings();
+  });
 
   // Events
   $("#novelTitle").addEventListener("input", debounce(async (e) => {
@@ -367,17 +372,11 @@ async function boot() {
   $("#chapterTitle").addEventListener("blur", flushChapterTitle);
 
   $("#btnNewChapter").addEventListener("click", async () => {
-    try {
-      const chap = await createChapter(state.novelId, `Chapter ${state.chapters.length + 1}`);
-      state.chapters.push(chap);
-      await openChapter(chap.id);
-      renderChapters();
-      setStatus("Chapter added");
-    } catch (e) {
-      console.warn(e);
-      alert("Could not create a chapter (storage unavailable?).");
-      setStatus("Create failed");
-    }
+    const chap = await createChapter(state.novelId, `Chapter ${state.chapters.length + 1}`);
+    state.chapters.push(chap);
+    await openChapter(chap.id);
+    renderChapters();
+    setStatus("Chapter added");
   });
 
   $("#btnDeleteChapter").addEventListener("click", async () => {
@@ -497,6 +496,9 @@ async function boot() {
     location.reload();
   });
 
+
+  setupMenus();
+
   // Online/offline status
   window.addEventListener("online", () => setStatus("Online"));
   window.addEventListener("offline", () => setStatus("Offline"));
@@ -519,6 +521,124 @@ function escapeHtml(s) {
 }
 function safeFilename(name) {
   return (name || "novel").replace(/[^a-z0-9\-\_\s]/gi, "").trim().replace(/\s+/g, "_").slice(0, 80) || "novel";
+}
+
+
+function setupMenus() {
+  const menus = {
+    file: $("#menu-file"),
+    edit: $("#menu-edit"),
+    view: $("#menu-view"),
+    insert: $("#menu-insert"),
+    format: $("#menu-format"),
+    help: $("#menu-help")
+  };
+
+  const closeAll = () => {
+    document.querySelectorAll(".menuBtn").forEach(b => b.classList.remove("is-open"));
+    Object.values(menus).forEach(m => m?.classList.remove("is-open"));
+  };
+
+  // Position menu under clicked button
+  const openMenu = (key, btn) => {
+    closeAll();
+    const menu = menus[key];
+    if (!menu) return;
+    btn.classList.add("is-open");
+    // compute left from button
+    const r = btn.getBoundingClientRect();
+    const parent = btn.closest(".menubar").getBoundingClientRect();
+    const left = Math.max(10, r.left - parent.left);
+    menu.style.left = `${left}px`;
+    menu.classList.add("is-open");
+  };
+
+  document.querySelectorAll(".menuBtn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const key = btn.dataset.menu;
+      const menu = menus[key];
+      const isOpen = menu?.classList.contains("is-open");
+      if (isOpen) closeAll();
+      else openMenu(key, btn);
+    });
+  });
+
+  document.addEventListener("click", (e) => {
+    const inMenu = e.target.closest(".menubar");
+    if (!inMenu) closeAll();
+  });
+
+  // Menu actions
+  document.querySelectorAll(".menuItem").forEach(item => {
+    item.addEventListener("click", async () => {
+      const a = item.dataset.action;
+      closeAll();
+
+      switch (a) {
+        case "export":
+          $("#exportModal").showModal();
+          break;
+        case "backup-export":
+          $("#btnBackup").click();
+          break;
+        case "backup-import":
+          // trigger existing file input (hidden inside sidebar label)
+          $("#importFile").click();
+          break;
+        case "settings":
+          $("#btnSettings").click();
+          break;
+        case "undo":
+          editor?.commands.undo();
+          break;
+        case "redo":
+          editor?.commands.redo();
+          break;
+        case "select-all":
+          document.getSelection()?.selectAllChildren(document.querySelector(".ProseMirror"));
+          break;
+        case "toggle-sidebar":
+          state.sidebarHidden = !state.sidebarHidden;
+          applyViewPrefs();
+          saveSettings();
+          break;
+        case "toggle-page":
+          state.pageView = !state.pageView;
+          applyViewPrefs();
+          saveSettings();
+          break;
+        case "hr":
+          editor?.chain().focus().setHorizontalRule().run();
+          break;
+        case "blockquote":
+          editor?.chain().focus().toggleBlockquote().run();
+          break;
+        case "bold":
+          editor?.chain().focus().toggleBold().run();
+          break;
+        case "italic":
+          editor?.chain().focus().toggleItalic().run();
+          break;
+        case "underline":
+          editor?.chain().focus().toggleUnderline().run();
+          break;
+        case "h1":
+          editor?.chain().focus().toggleHeading({ level: 1 }).run();
+          break;
+        case "h2":
+          editor?.chain().focus().toggleHeading({ level: 2 }).run();
+          break;
+        case "p":
+          editor?.chain().focus().setParagraph().run();
+          break;
+        case "about":
+          $("#aboutModal").showModal();
+          break;
+        default:
+          break;
+      }
+    });
+  });
 }
 
 boot().catch((e) => {
