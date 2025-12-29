@@ -395,6 +395,8 @@ async function boot() {
   applyViewPrefs();
   updateHeaderHeight();
   updateThemeButton();
+  requestAnimationFrame(() => updateHeaderHeight());
+  setTimeout(updateHeaderHeight, 250);
 
   await ensureDefaultNovel();
 
