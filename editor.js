@@ -1,13 +1,29 @@
 // editor.js — Tiptap editor wrapper
-import { Editor } from "https://esm.sh/@tiptap/core@2.11.5";
+import { Editor, Extension } from "https://esm.sh/@tiptap/core@2.11.5";
 import StarterKit from "https://esm.sh/@tiptap/starter-kit@2.11.5";
 import Underline from "https://esm.sh/@tiptap/extension-underline@2.11.5";
 import HorizontalRule from "https://esm.sh/@tiptap/extension-horizontal-rule@2.11.5";
 
+const ShortcutKeymap = Extension.create({
+  name: "shortcutKeymap",
+  addKeyboardShortcuts() {
+    return {
+      "Mod-b": () => this.editor.commands.toggleBold(),
+      "Mod-i": () => this.editor.commands.toggleItalic(),
+      "Mod-u": () => this.editor.commands.toggleUnderline(),
+      "Mod-z": () => this.editor.commands.undo(),
+      "Shift-Mod-z": () => this.editor.commands.redo(),
+      "Mod-y": () => this.editor.commands.redo(),
+      "Shift-Mod-7": () => this.editor.commands.toggleOrderedList(),
+      "Shift-Mod-8": () => this.editor.commands.toggleBulletList()
+    };
+  }
+});
+
 export function createNovelEditor({ element, onUpdate }) {
   const editor = new Editor({
     element,
-    extensions: [StarterKit, Underline, HorizontalRule],
+    extensions: [StarterKit, Underline, HorizontalRule, ShortcutKeymap],
     content: { type: "doc", content: [{ type: "paragraph" }] },
     autofocus: "end",
     editorProps: {

@@ -194,7 +194,10 @@ body{
 .menu.is-open{display:block}
 .menuItem{
   width:100%;
-  text-align:left;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
   border:none;
   background:transparent;
   color:var(--text);
@@ -202,6 +205,12 @@ body{
   border-radius:10px;
   cursor:pointer;
   font-size:13px;
+}
+.menuShortcut{
+  color:var(--muted);
+  font-size:11px;
+  letter-spacing:.02em;
+  white-space:nowrap;
 }
 .menuItem:hover{background:rgba(255,255,255,.06)}
 .menuSep{height:1px; background:rgba(255,255,255,.08); margin:6px}
