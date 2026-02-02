@@ -664,6 +664,7 @@ async function boot() {
 
 
   setupMenus();
+  setupGlobalShortcuts();
 
   // Keep layout correct as the header wraps (iOS, orientation changes)
   window.addEventListener("resize", () => updateHeaderHeight());
@@ -691,6 +692,41 @@ function escapeHtml(s) {
 }
 function safeFilename(name) {
   return (name || "novel").replace(/[^a-z0-9\-\_\s]/gi, "").trim().replace(/\s+/g, "_").slice(0, 80) || "novel";
+}
+
+function isTypingTarget(target) {
+  if (!target) return false;
+  const el = target.closest?.("input, textarea, select, [contenteditable='true']");
+  if (el) return true;
+  return !!target.isContentEditable;
+}
+
+function setupGlobalShortcuts() {
+  window.addEventListener("keydown", (e) => {
+    if (isTypingTarget(e.target)) return;
+    const mod = e.metaKey || e.ctrlKey;
+    if (!mod || e.altKey) return;
+
+    const key = e.key.toLowerCase();
+    if (e.shiftKey && key === "n") {
+      e.preventDefault();
+      $("#btnNewChapter")?.click();
+    }
+    if (e.shiftKey && key === "e") {
+      e.preventDefault();
+      $("#btnExport")?.click();
+    }
+    if (e.shiftKey && key === "b") {
+      e.preventDefault();
+      $("#btnToggleSidebar")?.click();
+    }
+    if (e.shiftKey && key === "t") {
+      e.preventDefault();
+      const title = $("#chapterTitle");
+      title?.focus();
+      title?.select?.();
+    }
+  });
 }
 
 
