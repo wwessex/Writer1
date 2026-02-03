@@ -35,6 +35,14 @@
         <span class="pillLabel">Total</span>
         <span class="pillValue" id="totalWords">0</span>
       </div>
+      <div class="pill" title="Progress toward today's goal">
+        <span class="pillLabel">Today</span>
+        <span class="pillValue" id="todayProgress">0/0</span>
+      </div>
+      <div class="pill" title="Progress toward your novel goal">
+        <span class="pillLabel">Novel</span>
+        <span class="pillValue" id="novelProgress">0/0</span>
+      </div>
     </div>
 
     <div class="topbar__actions">
@@ -283,6 +291,14 @@
         <label class="field">
           <span>Autosave interval (ms)</span>
           <input class="input" id="autosaveMs" type="number" min="250" step="50" />
+        </label>
+        <label class="field">
+          <span>Daily word goal</span>
+          <input class="input" id="dailyWordGoal" type="number" min="0" step="50" />
+        </label>
+        <label class="field">
+          <span>Novel word goal</span>
+          <input class="input" id="novelWordGoal" type="number" min="0" step="1000" />
         </label>
 
         <div class="row">

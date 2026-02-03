@@ -116,6 +116,7 @@ const updateCountsDebounced = debounce(() => {
     const totalWords = state.chapters.reduce((acc, c) => acc + (c.content ? countWordsFromJson(c.content) : 0), 0);
     $("#chapterWords") && ($("#chapterWords").textContent = chapterWords.toLocaleString());
     $("#totalWords") && ($("#totalWords").textContent = totalWords.toLocaleString());
+    updateGoalProgress(totalWords);
     const wc = document.getElementById("wordCountModal");
     if (wc && wc.open) {
       $("#wcChapter") && ($("#wcChapter").textContent = chapterWords.toLocaleString());
@@ -172,6 +173,41 @@ function updateHeaderHeight() {
   document.documentElement.style.setProperty('--headerH', `${h}px`);
 }
 
+function formatWordCountShort(value) {
+  const num = Number(value) || 0;
+  if (num >= 1000) {
+    const k = num / 1000;
+    const rounded = k >= 100 ? Math.round(k) : Math.round(k * 10) / 10;
+    return `${rounded}k`;
+  }
+  return num.toLocaleString();
+}
+
+function getDailyBaseline(totalWords) {
+  const today = new Date();
+  const stamp = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  try {
+    const stored = JSON.parse(localStorage.getItem(DAILY_BASELINE_KEY) || "{}");
+    if (stored.date === stamp && typeof stored.total === "number") {
+      return stored;
+    }
+  } catch {}
+  const baseline = { date: stamp, total: totalWords };
+  localStorage.setItem(DAILY_BASELINE_KEY, JSON.stringify(baseline));
+  return baseline;
+}
+
+function updateGoalProgress(totalWords) {
+  const baseline = getDailyBaseline(totalWords);
+  const todayWords = Math.max(0, totalWords - baseline.total);
+  const dailyGoal = Math.max(0, Number(state.dailyWordGoal || 0));
+  const novelGoal = Math.max(0, Number(state.novelWordGoal || 0));
+  const todayText = `${todayWords.toLocaleString()}/${dailyGoal.toLocaleString()}`;
+  const novelText = `${formatWordCountShort(totalWords)}/${formatWordCountShort(novelGoal)}`;
+  $("#todayProgress") && ($("#todayProgress").textContent = todayText);
+  $("#novelProgress") && ($("#novelProgress").textContent = novelText);
+}
+
 /* ---------------------------
   Service Worker
 --------------------------- */
@@ -207,6 +243,8 @@ const state = {
   chapters: [],
   activeChapterId: null,
   autosaveMs: 800,
+  dailyWordGoal: 0,
+  novelWordGoal: 0,
   sync: {
     novelId: "default",
     url: "",
@@ -218,11 +256,14 @@ let outlineSaveTimer = null;
 
 // Persist small settings (not content) in localStorage
 const SETTINGS_KEY = "novelwriter_settings_v1";
+const DAILY_BASELINE_KEY = "novelwriter_daily_baseline_v1";
 
 function loadSettings() {
   try {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
     if (typeof s.autosaveMs === "number") state.autosaveMs = s.autosaveMs;
+    if (typeof s.dailyWordGoal === "number") state.dailyWordGoal = s.dailyWordGoal;
+    if (typeof s.novelWordGoal === "number") state.novelWordGoal = s.novelWordGoal;
     if (s.sync) state.sync = { ...state.sync, ...s.sync };
     if (typeof s.pageView === "boolean") state.pageView = s.pageView;
     if (typeof s.sidebarHidden === "boolean") state.sidebarHidden = s.sidebarHidden;
@@ -230,7 +271,15 @@ function loadSettings() {
   } catch {}
 }
 function saveSettings() {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ autosaveMs: state.autosaveMs, sync: state.sync, pageView: state.pageView, sidebarHidden: state.sidebarHidden, theme: state.theme }));
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+    autosaveMs: state.autosaveMs,
+    dailyWordGoal: state.dailyWordGoal,
+    novelWordGoal: state.novelWordGoal,
+    sync: state.sync,
+    pageView: state.pageView,
+    sidebarHidden: state.sidebarHidden,
+    theme: state.theme
+  }));
 }
 
 /* ---------------------------
@@ -694,6 +743,8 @@ async function boot() {
     $("#syncUrl").value = state.sync.url || "";
     $("#syncAuth").value = state.sync.auth || "";
     $("#autosaveMs").value = String(state.autosaveMs);
+    $("#dailyWordGoal").value = String(state.dailyWordGoal || 0);
+    $("#novelWordGoal").value = String(state.novelWordGoal || 0);
     $("#syncStatus").textContent = "";
     settingsModal.showModal();
   });
@@ -703,6 +754,20 @@ async function boot() {
     state.autosaveMs = ms;
     configureAutosave();
     saveSettings();
+    setStatus("Settings saved");
+  });
+
+  $("#dailyWordGoal").addEventListener("change", (e) => {
+    state.dailyWordGoal = Math.max(0, Number(e.target.value || 0));
+    saveSettings();
+    updateCountsDebounced();
+    setStatus("Settings saved");
+  });
+
+  $("#novelWordGoal").addEventListener("change", (e) => {
+    state.novelWordGoal = Math.max(0, Number(e.target.value || 0));
+    saveSettings();
+    updateCountsDebounced();
     setStatus("Settings saved");
   });
 
