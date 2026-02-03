@@ -153,6 +153,44 @@
 
       <ul class="chapters" id="chaptersList" aria-label="Chapter list"></ul>
 
+      <div class="outlinePanel" aria-label="Outline panel">
+        <div class="outlineHeader">
+          <div class="outlineTitle">Outline</div>
+          <button class="btn btn--ghost btn--small" id="btnAddScene" type="button">+ Scene</button>
+        </div>
+
+        <div class="outlineSection">
+          <div class="outlineSection__title">Chapter details</div>
+          <label class="field">
+            <span>Summary</span>
+            <textarea id="chapterSummary" class="input input--area" rows="3" placeholder="What happens in this chapter?"></textarea>
+          </label>
+          <div class="outlineGrid">
+            <label class="field">
+              <span>POV</span>
+              <input id="chapterPov" class="input" placeholder="e.g. Maya" />
+            </label>
+            <label class="field">
+              <span>Status</span>
+              <select id="chapterStatus" class="select" aria-label="Chapter status"></select>
+            </label>
+            <label class="field">
+              <span>Tags</span>
+              <input id="chapterTags" class="input" placeholder="comma, separated, tags" />
+            </label>
+            <label class="field">
+              <span>Word goal</span>
+              <input id="chapterWordGoal" class="input" type="number" min="0" step="50" />
+            </label>
+          </div>
+        </div>
+
+        <div class="outlineSection">
+          <div class="outlineSection__title">Scenes</div>
+          <div class="sceneList" id="sceneList"></div>
+        </div>
+      </div>
+
       <div class="sidebar__footer">
         <button class="btn btn--ghost btn--small" id="btnBackup">Export Backup</button>
         <label class="btn btn--ghost btn--small fileLabel">
