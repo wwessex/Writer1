@@ -101,6 +101,9 @@
       <button class="menuItem" data-action="snapshot-save"><span>Save Snapshot</span></button>
       <button class="menuItem" data-action="snapshot-restore"><span>Restore Snapshot…</span></button>
       <div class="menuSep"></div>
+      <button class="menuItem" data-action="writing-analysis"><span>Writing analysis</span></button>
+      <button class="menuItem" data-action="grammar-check"><span>Grammar &amp; spell check</span></button>
+      <div class="menuSep"></div>
       <button class="menuItem" data-action="word-count"><span>Word count</span></button>
       <button class="menuItem" data-action="toggle-page"><span>Toggle Page View</span></button>
     </div>
@@ -324,6 +327,24 @@
 
         <hr class="hr" />
 
+        <h3 class="h3">Writing assistance</h3>
+        <p class="muted">Enable optional grammar and spelling suggestions via LanguageTool.</p>
+        <label class="check">
+          <input type="checkbox" id="assistEnabled" />
+          Enable LanguageTool suggestions
+        </label>
+        <label class="field">
+          <span>LanguageTool endpoint</span>
+          <input class="input" id="assistUrl" placeholder="https://api.languagetool.org/v2/check" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Language</span>
+          <input class="input" id="assistLanguage" placeholder="en-US" autocomplete="off" />
+        </label>
+        <p class="muted small">Tip: you can use a self-hosted LanguageTool server for full privacy.</p>
+
+        <hr class="hr" />
+
         <h3 class="h3">App</h3>
         <label class="field">
           <span>Autosave interval (ms)</span>
@@ -343,6 +364,70 @@
         </div>
 
         <p class="muted small">Tip: if caching gets weird after an update, open once with <code>?nosw=1</code>.</p>
+      </div>
+
+      <div class="modal__footer">
+        <button class="btn btn--ghost" value="cancel">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Writing analysis modal -->
+  <dialog class="modal" id="analysisModal">
+    <form method="dialog" class="modal__card modal__card--wide">
+      <div class="modal__header">
+        <div class="modal__title">Writing analysis</div>
+        <button class="iconBtn" value="cancel" aria-label="Close">✕</button>
+      </div>
+      <div class="modal__body">
+        <p class="muted">Insights are based on your current draft text. <span id="analysisScope">Current chapter</span>.</p>
+        <div class="row">
+          <button class="btn btn--primary" id="btnRunAnalysis" type="button">Refresh analysis</button>
+          <button class="btn btn--ghost" id="btnRunGrammar" type="button">Run grammar check</button>
+          <button class="btn btn--ghost" id="btnOpenAssistSettings" type="button">Writing settings</button>
+        </div>
+        <div class="muted small analysisEmpty" id="analysisEmpty">No draft text in this chapter yet.</div>
+
+        <div class="analysisGrid">
+          <div class="analysisCard">
+            <div class="analysisCard__title">Readability</div>
+            <div class="analysisMetrics">
+              <div class="analysisMetric">
+                <div class="analysisMetric__label">Words</div>
+                <div class="analysisMetric__value" id="analysisWords">0</div>
+              </div>
+              <div class="analysisMetric">
+                <div class="analysisMetric__label">Sentences</div>
+                <div class="analysisMetric__value" id="analysisSentences">0</div>
+              </div>
+              <div class="analysisMetric">
+                <div class="analysisMetric__label">Avg sentence length</div>
+                <div class="analysisMetric__value" id="analysisAvgSentence">0</div>
+              </div>
+            </div>
+            <div class="analysisScore">
+              <div class="analysisScore__value" id="analysisReadability">0</div>
+              <div class="analysisScore__label" id="analysisReadabilityLabel">Standard</div>
+            </div>
+          </div>
+
+          <div class="analysisCard">
+            <div class="analysisCard__title">Repetition highlights</div>
+            <div class="analysisTags" id="analysisRepetition"></div>
+          </div>
+
+          <div class="analysisCard">
+            <div class="analysisCard__title">Pacing</div>
+            <div class="analysisPacingSummary" id="analysisPacingSummary">No long sentences detected.</div>
+            <p class="muted small">Review long sentences to adjust pacing and cadence.</p>
+          </div>
+
+          <div class="analysisCard analysisCard--wide">
+            <div class="analysisCard__title">Grammar &amp; spell suggestions (LanguageTool)</div>
+            <div class="muted small" id="grammarStatus">Run a check to see suggestions.</div>
+            <div class="analysisList" id="grammarResults"></div>
+          </div>
+        </div>
       </div>
 
       <div class="modal__footer">
@@ -380,6 +465,11 @@
           <li><strong>Full version history:</strong> A timeline of every revision with diff previews and one-click restores.</li>
           <li><strong>Continuous cloud sync:</strong> Automatic, secure syncing across web, desktop, and mobile with offline editing and eventual sync.</li>
           <li><strong>Comments and inline feedback:</strong> Threaded discussions attached to text ranges for editor and beta-reader feedback.</li>
+        </ul>
+        <h3 class="h3">Writing quality insights</h3>
+        <ul>
+          <li><strong>Grammar and spelling suggestions:</strong> Optional LanguageTool integration to flag mistakes without leaving the editor.</li>
+          <li><strong>Style and pacing analysis:</strong> Spot repeated words, readability scores, and long-sentence pacing issues.</li>
         </ul>
         <h3 class="h3">Productivity and goal tracking</h3>
         <ul>
