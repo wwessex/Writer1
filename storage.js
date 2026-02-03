@@ -227,3 +227,42 @@ export async function getSnapshot(snapshotId) {
   if (!snapshotId) return null;
   return db.snapshots.get(snapshotId);
 }
+
+const WINDOW_STATE_KEY = "novelwriter_window_state_v1";
+
+export function loadWindowState(windowId) {
+  if (!windowId) return null;
+  try {
+    const raw = localStorage.getItem(WINDOW_STATE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed?.[windowId] || null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveWindowState(windowId, state) {
+  if (!windowId || !state) return;
+  try {
+    const raw = localStorage.getItem(WINDOW_STATE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    parsed[windowId] = state;
+    localStorage.setItem(WINDOW_STATE_KEY, JSON.stringify(parsed));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+export function clearWindowState(windowId) {
+  if (!windowId) return;
+  try {
+    const raw = localStorage.getItem(WINDOW_STATE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    if (parsed?.[windowId]) {
+      delete parsed[windowId];
+      localStorage.setItem(WINDOW_STATE_KEY, JSON.stringify(parsed));
+    }
+  } catch {
+    // ignore storage errors
+  }
+}

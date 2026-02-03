@@ -12,7 +12,10 @@ const {
   exportBackup,
   importBackup,
   resetAllData,
-  createSnapshot
+  createSnapshot,
+  loadWindowState,
+  saveWindowState,
+  clearWindowState
 } = storage;
 
 const listSnapshotsForChapter = storage.listSnapshotsForChapter || (async () => []);
@@ -89,6 +92,10 @@ function setStatus(text) {
   $("#saveStatus").textContent = text;
 }
 
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
 const STATUS_OPTIONS = [
   { value: "planned", label: "Planned" },
   { value: "draft", label: "Draft" },
@@ -116,6 +123,265 @@ const STOPWORDS = new Set([
 
 function tokenizeWords(text) {
   return (text.match(/[A-Za-z0-9]+(?:'[A-Za-z0-9]+)?/g) || []).map(word => word.toLowerCase());
+}
+
+/* ---------------------------
+  App windows
+--------------------------- */
+const WINDOW_HIDDEN_CLASS = "is-hidden";
+const WINDOW_ACTIVE_CLASS = "is-active";
+let windowZ = 2000;
+
+function getAppFrame() {
+  return document.querySelector(".layout");
+}
+
+function getWindowId(windowEl) {
+  return windowEl.dataset.windowId || windowEl.id;
+}
+
+function getWindowStateFromElement(windowEl, frameRect) {
+  const rect = windowEl.getBoundingClientRect();
+  return {
+    x: rect.left - frameRect.left,
+    y: rect.top - frameRect.top,
+    width: rect.width,
+    height: rect.height
+  };
+}
+
+function getDefaultWindowState(windowEl, frameRect) {
+  const defaultWidth = Number(windowEl.dataset.defaultWidth);
+  const defaultHeight = Number(windowEl.dataset.defaultHeight);
+  const width = Math.min(
+    Number.isFinite(defaultWidth) ? defaultWidth : Math.min(640, frameRect.width - 40),
+    frameRect.width - 12
+  );
+  const height = Math.min(
+    Number.isFinite(defaultHeight) ? defaultHeight : Math.min(560, frameRect.height - 40),
+    frameRect.height - 12
+  );
+  const defaultX = Number(windowEl.dataset.defaultX);
+  const defaultY = Number(windowEl.dataset.defaultY);
+  const x = clamp(
+    Number.isFinite(defaultX) ? defaultX : (frameRect.width - width) / 2,
+    0,
+    frameRect.width - width
+  );
+  const y = clamp(
+    Number.isFinite(defaultY) ? defaultY : (frameRect.height - height) / 2,
+    0,
+    frameRect.height - height
+  );
+  return { x, y, width, height };
+}
+
+function isWindowStateOutOfBounds(state, frameRect) {
+  return (
+    state.x < 0 ||
+    state.y < 0 ||
+    state.x + state.width > frameRect.width ||
+    state.y + state.height > frameRect.height
+  );
+}
+
+function constrainWindowState(state, frameRect) {
+  const width = Math.min(Math.max(state.width, 320), frameRect.width - 12);
+  const height = Math.min(Math.max(state.height, 240), frameRect.height - 12);
+  const x = clamp(state.x, 0, frameRect.width - width);
+  const y = clamp(state.y, 0, frameRect.height - height);
+  return { x, y, width, height };
+}
+
+function applyWindowState(windowEl, state) {
+  windowEl.style.left = `${state.x}px`;
+  windowEl.style.top = `${state.y}px`;
+  windowEl.style.width = `${state.width}px`;
+  windowEl.style.height = `${state.height}px`;
+}
+
+function restoreWindowState(windowEl) {
+  const frame = getAppFrame();
+  if (!frame) return;
+  const frameRect = frame.getBoundingClientRect();
+  const windowId = getWindowId(windowEl);
+  const saved = loadWindowState(windowId);
+  if (saved && !isWindowStateOutOfBounds(saved, frameRect)) {
+    applyWindowState(windowEl, constrainWindowState(saved, frameRect));
+    return;
+  }
+  const defaults = getDefaultWindowState(windowEl, frameRect);
+  applyWindowState(windowEl, defaults);
+  if (saved) clearWindowState(windowId);
+  saveWindowState(windowId, defaults);
+}
+
+function saveWindowStateFromElement(windowEl) {
+  const frame = getAppFrame();
+  if (!frame) return;
+  const frameRect = frame.getBoundingClientRect();
+  const state = constrainWindowState(getWindowStateFromElement(windowEl, frameRect), frameRect);
+  applyWindowState(windowEl, state);
+  saveWindowState(getWindowId(windowEl), state);
+}
+
+function bringWindowToFront(windowEl) {
+  windowZ += 1;
+  windowEl.style.zIndex = windowZ;
+  document.querySelectorAll(".appWindow").forEach(win => {
+    const isActive = win === windowEl;
+    win.classList.toggle(WINDOW_ACTIVE_CLASS, isActive);
+    win.classList.toggle("is-inactive", !isActive);
+  });
+}
+
+function getFocusableElements(container) {
+  return Array.from(container.querySelectorAll(
+    "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])"
+  )).filter(el => el.offsetParent !== null);
+}
+
+function focusFirstElement(windowEl) {
+  const focusable = getFocusableElements(windowEl);
+  if (focusable.length) {
+    focusable[0].focus();
+  } else {
+    windowEl.focus();
+  }
+}
+
+function handleWindowKeydown(windowEl, event) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeWindow(windowEl);
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const focusable = getFocusableElements(windowEl);
+  if (!focusable.length) {
+    event.preventDefault();
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function openWindow(windowId) {
+  const windowEl = document.getElementById(windowId);
+  if (!windowEl) return;
+  restoreWindowState(windowEl);
+  windowEl.classList.remove(WINDOW_HIDDEN_CLASS);
+  windowEl.setAttribute("aria-hidden", "false");
+  bringWindowToFront(windowEl);
+  focusFirstElement(windowEl);
+}
+
+function closeWindow(windowElOrId) {
+  const windowEl = typeof windowElOrId === "string" ? document.getElementById(windowElOrId) : windowElOrId;
+  if (!windowEl) return;
+  windowEl.classList.add(WINDOW_HIDDEN_CLASS);
+  windowEl.setAttribute("aria-hidden", "true");
+  windowEl.classList.remove(WINDOW_ACTIVE_CLASS);
+  windowEl.classList.remove("is-inactive");
+}
+
+function toggleWindow(windowId) {
+  const windowEl = document.getElementById(windowId);
+  if (!windowEl) return;
+  if (windowEl.classList.contains(WINDOW_HIDDEN_CLASS)) {
+    openWindow(windowId);
+  } else {
+    closeWindow(windowEl);
+  }
+}
+
+function setupAppWindows() {
+  const frame = getAppFrame();
+  if (!frame) return;
+  const windows = document.querySelectorAll(".appWindow");
+  const saveWindowStateDebounced = debounce((windowEl) => {
+    if (!windowEl || windowEl.classList.contains(WINDOW_HIDDEN_CLASS)) return;
+    saveWindowStateFromElement(windowEl);
+  }, 120);
+
+  windows.forEach(windowEl => {
+    const header = windowEl.querySelector(".appWindow__header");
+    const id = getWindowId(windowEl);
+
+    windowEl.addEventListener("pointerdown", () => bringWindowToFront(windowEl));
+    windowEl.addEventListener("focusin", () => bringWindowToFront(windowEl));
+    windowEl.addEventListener("keydown", (event) => handleWindowKeydown(windowEl, event));
+
+    windowEl.querySelectorAll("[data-window-close]").forEach(btn => {
+      btn.addEventListener("click", () => closeWindow(windowEl));
+    });
+
+    if (header) {
+      header.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) return;
+        if (event.target.closest("button, input, select, textarea")) return;
+        bringWindowToFront(windowEl);
+        const frameRect = frame.getBoundingClientRect();
+        const start = { x: event.clientX, y: event.clientY };
+        const startState = getWindowStateFromElement(windowEl, frameRect);
+        header.setPointerCapture(event.pointerId);
+
+        const onMove = (moveEvent) => {
+          const dx = moveEvent.clientX - start.x;
+          const dy = moveEvent.clientY - start.y;
+          const next = constrainWindowState({
+            x: startState.x + dx,
+            y: startState.y + dy,
+            width: startState.width,
+            height: startState.height
+          }, frameRect);
+          applyWindowState(windowEl, next);
+        };
+
+        const onUp = () => {
+          header.releasePointerCapture(event.pointerId);
+          header.removeEventListener("pointermove", onMove);
+          header.removeEventListener("pointerup", onUp);
+          header.removeEventListener("pointercancel", onUp);
+          saveWindowStateFromElement(windowEl);
+        };
+
+        header.addEventListener("pointermove", onMove);
+        header.addEventListener("pointerup", onUp);
+        header.addEventListener("pointercancel", onUp);
+      });
+    }
+
+    const resizeObserver = new ResizeObserver(() => saveWindowStateDebounced(windowEl));
+    resizeObserver.observe(windowEl);
+
+    if (!windowEl.classList.contains(WINDOW_HIDDEN_CLASS)) {
+      restoreWindowState(windowEl);
+      windowEl.setAttribute("aria-hidden", "false");
+      bringWindowToFront(windowEl);
+    } else {
+      windowEl.setAttribute("aria-hidden", "true");
+    }
+
+    if (id) {
+      windowEl.dataset.windowId = id;
+    }
+  });
+
+  window.addEventListener("resize", () => {
+    document.querySelectorAll(".appWindow").forEach(windowEl => {
+      if (!windowEl.classList.contains(WINDOW_HIDDEN_CLASS)) {
+        saveWindowStateFromElement(windowEl);
+      }
+    });
+  });
 }
 
 function countSyllables(word) {
@@ -762,6 +1028,8 @@ async function boot() {
 
   await loadFromDB();
 
+  setupAppWindows();
+
   setStatus(navigator.onLine ? "Ready" : "Ready (offline)");
   setConnectionPill();
 
@@ -978,8 +1246,7 @@ async function boot() {
     state.snapshotChapterId = null;
   });
 
-  // Settings modal
-  const settingsModal = $("#settingsModal");
+  // Settings window
   $("#btnSettings")?.addEventListener("click", () => {
     const syncNovelId = $("#syncNovelId");
     const syncUrl = $("#syncUrl");
@@ -1002,7 +1269,7 @@ async function boot() {
     if (assistUrl) assistUrl.value = state.assist.languageToolUrl || "";
     if (assistLanguage) assistLanguage.value = state.assist.languageToolLanguage || "en-US";
     if (syncStatus) syncStatus.textContent = "";
-    settingsModal?.showModal();
+    toggleWindow("settingsWindow");
   });
 
   $("#autosaveMs")?.addEventListener("change", (e) => {
@@ -1723,7 +1990,7 @@ function setupMenus() {
           openAnalysisModal({ runGrammar: true });
           break;
         case "about":
-          $("#aboutModal").showModal();
+          toggleWindow("aboutWindow");
           break;
         default:
           break;
