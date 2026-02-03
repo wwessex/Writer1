@@ -10,8 +10,27 @@
   --accent2:#93c5fd;
   --danger:#fb7185;
 
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
   --radius:14px;
-  --shadow:0 10px 30px rgba(0,0,0,.35);
+  --shadow-1: 0 1px 2px rgba(0,0,0,.22), 0 2px 6px rgba(0,0,0,.12);
+  --shadow-2: 0 10px 24px rgba(0,0,0,.30), 0 4px 10px rgba(0,0,0,.18);
+  --shadow-3: 0 18px 50px rgba(0,0,0,.45), 0 8px 18px rgba(0,0,0,.28);
+  --shadow: var(--shadow-3);
   --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
 }
@@ -38,6 +57,9 @@
   --line: rgba(0,0,0,.10);
   --accent: var(--m3-primary);
   --accent2: #669df6;
+  --shadow-1: 0 1px 2px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06);
+  --shadow-2: 0 10px 24px rgba(0,0,0,.16), 0 4px 10px rgba(0,0,0,.12);
+  --shadow-3: 0 18px 40px rgba(0,0,0,.20), 0 8px 16px rgba(0,0,0,.14);
 
   --glass: rgba(255,255,255,.80);
   --glass2: rgba(0,0,0,.06);
@@ -132,24 +154,24 @@ body{
   align-items:center;
   justify-content:space-between;
   gap: var(--uiGap);
-  padding: calc(var(--uiPad) + 2px) var(--uiPad);
+  padding: calc(var(--space-4) + 2px) var(--space-4);
   background:transparent;
 }
 .iconBtn--square{
   width:38px;height:38px;
   display:grid;place-items:center;
   border:1px solid var(--line);
-  border-radius:14px;
+  border-radius: var(--radius-md);
   background: rgba(255,255,255,.05);
-  box-shadow: var(--m3-elev1);
+  box-shadow: var(--shadow-1);
 }
 :root[data-theme="light"] .iconBtn--square{background: rgba(0,0,0,.03)}
-.iconBtn--square:hover{box-shadow: var(--m3-elev2)}
+.iconBtn--square:hover{box-shadow: var(--shadow-2)}
 .iconBtn--square:active{transform:translateY(1px)}
 .menubar{
   display:flex;
   gap:4px;
-  padding: 4px var(--uiPad) 6px;
+  padding: var(--space-1) var(--space-4) var(--space-2);
   align-items:center;
   position:relative;
 }
@@ -157,10 +179,10 @@ body{
   border:none;
   background:transparent;
   color:var(--text);
-  padding:8px 10px;
-  border-radius:12px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
   cursor:pointer;
-  font-size:13px;
+  font-size:var(--text-sm);
 }
 .menuBtn:hover{background:rgba(255,255,255,.06)}
 :root[data-theme="light"] .menuBtn:hover{background:rgba(0,0,0,.04)}
@@ -183,13 +205,13 @@ body{
   overflow:auto;
   -webkit-overflow-scrolling: touch;
   border:1px solid rgba(255,255,255,.14);
-  border-radius:14px;
+  border-radius: var(--radius-lg);
   background-color:#0f172a;
   opacity:1;
   backdrop-filter:none;
   -webkit-backdrop-filter:none;
   pointer-events:auto;
-  box-shadow: 0 14px 40px rgba(0,0,0,.35);
+  box-shadow: var(--shadow-2);
 }
 .menu.is-open{display:block}
 .menuItem{
@@ -201,19 +223,19 @@ body{
   border:none;
   background:transparent;
   color:var(--text);
-  padding:9px 10px;
-  border-radius:10px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
   cursor:pointer;
-  font-size:13px;
+  font-size:var(--text-sm);
 }
 .menuShortcut{
   color:var(--muted);
-  font-size:11px;
+  font-size:var(--text-xs);
   letter-spacing:.02em;
   white-space:nowrap;
 }
 .menuItem:hover{background:rgba(255,255,255,.06)}
-.menuSep{height:1px; background:rgba(255,255,255,.08); margin:6px}
+.menuSep{height:1px; background:rgba(255,255,255,.08); margin: var(--space-2)}
 
 .ribbon{
   position: relative;
@@ -221,7 +243,7 @@ body{
   display:flex;
   align-items:center;
   gap: var(--uiGap);
-  padding: 8px var(--uiPad) 10px;
+  padding: var(--space-2) var(--space-4) var(--space-3);
   background: transparent;
   overflow:auto;
 }
@@ -246,8 +268,8 @@ body{
   background:rgba(255,255,255,.04);
   border:1px solid rgba(255,255,255,.09);
   color:var(--text);
-  border-radius:12px;
-  padding:8px 10px;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
   outline:none;
 }
 .select:focus{border-color:rgba(96,165,250,.65); box-shadow:0 0 0 4px rgba(96,165,250,.12)}
@@ -256,7 +278,7 @@ body{
 .topbar{
   position:sticky; top:0; z-index:10;
   display:flex; align-items:center; justify-content:space-between;
-  padding:12px 14px;
+  padding: var(--space-3) var(--space-4);
   background:transparent;
 }
 .brand{display:flex; align-items:center; gap:10px}
@@ -307,8 +329,8 @@ body{
   background:rgba(15,23,42,.70);
   border-right:1px solid rgba(255,255,255,.08);
   display:flex; flex-direction:column;
-  padding:12px;
-  gap:12px;
+  padding: var(--space-3);
+  gap: var(--space-3);
   overflow:hidden;
 }
 .sidebar__header{display:flex; justify-content:space-between; align-items:center}
@@ -321,7 +343,7 @@ body{
 }
 .chapterBar{
   display:flex; align-items:center; justify-content:space-between;
-  padding:10px 12px;
+  padding: var(--space-2) var(--space-3);
   border-bottom:1px solid var(--line);
   background:rgba(15,27,51,.55);
 }
@@ -332,13 +354,13 @@ body{
 }
 .toolbar{
   display:flex; flex-wrap:wrap; gap:6px;
-  padding:10px 12px;
+  padding: var(--space-2) var(--space-3);
   border-bottom:1px solid var(--line);
   background:rgba(17,27,51,.65);
 }
 .sep{width:1px; background:var(--line); margin:0 6px}
 .editor{
-  padding:18px 22px;
+  padding: var(--space-4) var(--space-5);
   overflow:auto;
   flex:1;
 }
@@ -386,8 +408,9 @@ body.pageView .editor .ProseMirror blockquote{
   background:rgba(255,255,255,.04);
   border:1px solid rgba(255,255,255,.09);
   color:var(--text);
-  border-radius:12px;
-  padding:10px 12px;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  box-shadow: var(--shadow-1);
   outline:none;
 }
 .input:focus{border-color:rgba(96,165,250,.65); box-shadow:0 0 0 4px rgba(96,165,250,.12)}
@@ -397,12 +420,13 @@ body.pageView .editor .ProseMirror blockquote{
   border:1px solid rgba(255,255,255,.10);
   background:rgba(255,255,255,.05);
   color:var(--text);
-  padding:10px 12px;
-  border-radius: var(--m3-radius);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
   cursor:pointer;
   transition:transform .06s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
 }
-.btn:hover{background:rgba(255,255,255,.08); box-shadow: 0 0 0 4px rgba(96,165,250,.10)}
+.btn:hover{background:rgba(255,255,255,.08); box-shadow: 0 0 0 4px rgba(96,165,250,.10), var(--shadow-1)}
 .btn:active{transform:translateY(1px)}
 .btn--primary{
   background:rgba(96,165,250,.15);
@@ -410,16 +434,17 @@ body.pageView .editor .ProseMirror blockquote{
 }
 .btn--primary:hover{background:rgba(96,165,250,.22)}
 .btn--ghost{background:rgba(255,255,255,.03)}
-.btn--small{padding:8px 10px; border-radius:10px; font-size:13px}
+.btn--small{padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); font-size:var(--text-sm)}
 
 .tb{
   border:1px solid rgba(255,255,255,.10);
   background:rgba(255,255,255,.04);
   color:var(--text);
-  padding:8px 10px;
-  border-radius:10px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-1);
   cursor:pointer;
-  font-size:13px;
+  font-size:var(--text-sm);
 }
 .tb.is-active{border-color:rgba(96,165,250,.55); background:rgba(96,165,250,.18)}
 .tb:hover{background:rgba(255,255,255,.06)}
@@ -611,8 +636,8 @@ body.pageView .editor .ProseMirror blockquote{
   width:min(640px, 92vw);
   border:1px solid rgba(255,255,255,.10);
   background:rgba(15,23,42,.95);
-  border-radius:16px;
-  box-shadow:var(--shadow);
+  border-radius: var(--radius-lg);
+  box-shadow:var(--shadow-2);
   padding:0;
 }
 .modal__card--wide{
@@ -620,13 +645,13 @@ body.pageView .editor .ProseMirror blockquote{
 }
 .modal__header{
   display:flex; justify-content:space-between; align-items:center;
-  padding:14px 14px 10px;
+  padding: var(--space-4) var(--space-4) var(--space-2);
   border-bottom:1px solid var(--line);
 }
 .modal__title{font-weight:800}
-.modal__body{padding:14px}
+.modal__body{padding: var(--space-4)}
 .modal__footer{
-  padding:12px 14px;
+  padding: var(--space-3) var(--space-4);
   border-top:1px solid var(--line);
   display:flex; justify-content:flex-end;
 }
@@ -646,8 +671,8 @@ body.pageView .editor .ProseMirror blockquote{
   height:min(70vh, 600px);
   border:1px solid rgba(255,255,255,.12);
   background:rgba(15,23,42,.96);
-  border-radius:16px;
-  box-shadow: 0 18px 40px rgba(0,0,0,.45);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
   resize:both;
   overflow:hidden;
   min-width:320px;
@@ -668,14 +693,14 @@ body.pageView .editor .ProseMirror blockquote{
 .appWindow.is-hidden{display:none}
 .appWindow.is-active{
   border-color: rgba(96,165,250,.55);
-  box-shadow: 0 22px 48px rgba(0,0,0,.55);
+  box-shadow: var(--shadow-3);
 }
 .appWindow.is-inactive{opacity:.92}
 .appWindow__header{
   display:flex;
   justify-content:space-between;
   align-items:center;
-  padding:12px 14px 10px;
+  padding: var(--space-3) var(--space-4) var(--space-2);
   border-bottom:1px solid var(--line);
   cursor:move;
   user-select:none;
@@ -683,12 +708,12 @@ body.pageView .editor .ProseMirror blockquote{
 }
 .appWindow__title{font-weight:800}
 .appWindow__body{
-  padding:14px;
+  padding: var(--space-4);
   overflow:auto;
   flex:1;
 }
 .appWindow__footer{
-  padding:12px 14px;
+  padding: var(--space-3) var(--space-4);
   border-top:1px solid var(--line);
   display:flex;
   justify-content:flex-end;
@@ -1074,14 +1099,14 @@ body{padding-top: var(--safeTop);}
 
 /* Compact header when vertical space is tight */
 @media (max-height: 720px){
-  .topbar{padding: 8px var(--uiPad)}
+  .topbar{padding: var(--space-2) var(--space-4)}
   .brand__sub{display:none}
-  .menubar{padding:2px var(--uiPad) 4px; overflow:auto}
-  .ribbon{padding:6px var(--uiPad) 8px; gap:8px}
-  .ribbonGroup{padding:6px 8px}
+  .menubar{padding: var(--space-1) var(--space-4) var(--space-2); overflow:auto}
+  .ribbon{padding: var(--space-2) var(--space-4) var(--space-3); gap:var(--space-2)}
+  .ribbonGroup{padding: var(--space-2) var(--space-2)}
   .ribbonLabel{display:none}
-  .tb{height: var(--uiBtnH); padding: 0 10px}
-  .btn{padding: 8px 10px}
+  .tb{height: var(--uiBtnH); padding: 0 var(--space-3)}
+  .btn{padding: var(--space-2) var(--space-3)}
   .iconBtn--square{width: var(--uiBtnH); height: var(--uiBtnH)}
 }
 
@@ -1103,10 +1128,10 @@ body{padding-top: var(--safeTop);}
 @media (max-width: 520px){
   .brand__sub{display:none}
   .statusPills{display:none}
-  .topbar{padding:8px var(--uiPad)}
-  .menubar{padding:2px var(--uiPad) 4px}
-  .ribbon{padding:6px var(--uiPad) 8px}
-  .ribbonGroup{padding:6px 8px}
+  .topbar{padding: var(--space-2) var(--space-4)}
+  .menubar{padding: var(--space-1) var(--space-4) var(--space-2)}
+  .ribbon{padding: var(--space-2) var(--space-4) var(--space-3)}
+  .ribbonGroup{padding: var(--space-2) var(--space-2)}
 }
 
 
@@ -1131,7 +1156,7 @@ body{padding-top: var(--safeTop);}
     gap:8px;
   }
   .btn .btnLabel{display:none}
-  .btn{min-width: var(--uiBtnH); justify-content:center; padding:8px 10px}
+  .btn{min-width: var(--uiBtnH); justify-content:center; padding: var(--space-2) var(--space-3)}
   .docTitleInput{width:100%; max-width:none}
 }
 
@@ -1156,12 +1181,12 @@ body{padding-top: var(--safeTop);}
 :root[data-theme="light"] .modal__card{
   background: rgba(255,255,255,.98);
   border-color: rgba(0,0,0,.12);
-  box-shadow: 0 18px 55px rgba(0,0,0,.18);
+  box-shadow: var(--shadow-2);
 }
 :root[data-theme="light"] .appWindow{
   background: rgba(255,255,255,.96);
   border-color: rgba(0,0,0,.12);
-  box-shadow: 0 18px 40px rgba(0,0,0,.18);
+  box-shadow: var(--shadow-2);
 }
 :root[data-theme="light"] .appWindow::after{
   border-right-color: rgba(0,0,0,.25);
@@ -1171,7 +1196,7 @@ body{padding-top: var(--safeTop);}
   background-color:#ffffff;
   opacity:1;
   border-color: rgba(0,0,0,.12);
-  box-shadow: 0 14px 40px rgba(0,0,0,.16);
+  box-shadow: var(--shadow-2);
 }
 :root[data-theme="light"] .menuItem:hover{background:rgba(0,0,0,.04)}
 :root[data-theme="light"] .menuSep{background:rgba(0,0,0,.10)}
