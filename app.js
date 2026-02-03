@@ -9,10 +9,12 @@ import {
   reorderChapters,
   exportBackup,
   importBackup,
-  resetAllData
+  resetAllData,
+  createSnapshot,
+  listSnapshotsForChapter
 } from "./storage.js";
 
-import { createNovelEditor, setEditorDoc, bindToolbar } from "./editor.js";
+import { createNovelEditor, setEditorDoc, bindToolbar, editorToPlainText } from "./editor.js";
 
 
 async function replaceNovelWithImport(parsed) {
@@ -242,6 +244,8 @@ const state = {
   novelTitle: "Untitled Novel",
   chapters: [],
   activeChapterId: null,
+  contextChapterId: null,
+  snapshotChapterId: null,
   autosaveMs: 800,
   dailyWordGoal: 0,
   novelWordGoal: 0,
@@ -253,6 +257,7 @@ const state = {
 };
 
 let outlineSaveTimer = null;
+let openContextMenuAt = null;
 
 // Persist small settings (not content) in localStorage
 const SETTINGS_KEY = "novelwriter_settings_v1";
@@ -336,10 +341,23 @@ function renderChapters() {
       <div class="dragHandle" title="Drag to reorder"></div>
       <div class="chapterName">${escapeHtml(ch.title || "Untitled")}</div>
       <div class="chapterMeta">${formatMiniDate(ch.updatedAt)}</div>
+      <button class="chapterActionsBtn" type="button" title="Chapter actions" aria-label="Chapter actions">⋯</button>
     `;
 
     li.addEventListener("click", () => openChapter(ch.id));
+    li.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      state.contextChapterId = ch.id;
+      openContextMenuAt?.("chapter-context", { x: e.clientX, y: e.clientY });
+    });
     bindDragHandlers(li);
+    const actionBtn = li.querySelector(".chapterActionsBtn");
+    actionBtn?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      state.contextChapterId = ch.id;
+      const rect = actionBtn.getBoundingClientRect();
+      openContextMenuAt?.("chapter-context", { x: rect.left, y: rect.bottom + 6 });
+    });
     ul.appendChild(li);
   }
 }
@@ -650,7 +668,8 @@ async function boot() {
   // Backup export/import
   $("#btnBackup").addEventListener("click", async () => {
     await flushChapterTitle();
-    const payload = await exportBackup(state.novelId);
+    const includeSnapshots = confirm("Include snapshots in this backup file?");
+    const payload = await exportBackup(state.novelId, { includeSnapshots });
     downloadJSON(payload, `${safeFilename(state.novelTitle)}_backup_${nowStamp()}.json`);
   });
 
@@ -734,6 +753,18 @@ async function boot() {
     const mod = await import("./export.js");
     await mod.exportRTF(data);
     setStatus("Exported RTF");
+  });
+
+  // Snapshot modal
+  const snapshotModal = $("#snapshotModal");
+  $("#btnSnapshotSave")?.addEventListener("click", async () => {
+    const chapterId = state.snapshotChapterId || state.activeChapterId;
+    if (!chapterId) return;
+    await saveSnapshotForChapter(chapterId);
+    await renderSnapshotsModal(chapterId);
+  });
+  snapshotModal?.addEventListener("close", () => {
+    state.snapshotChapterId = null;
   });
 
   // Settings modal
@@ -825,6 +856,18 @@ function escapeHtml(s) {
 }
 function safeFilename(name) {
   return (name || "novel").replace(/[^a-z0-9\-\_\s]/gi, "").trim().replace(/\s+/g, "_").slice(0, 80) || "novel";
+}
+
+function formatSnapshotTimestamp(ts) {
+  if (!ts) return "Unknown time";
+  const d = new Date(ts);
+  return d.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 function normalizeTags(tags) {
@@ -1085,6 +1128,115 @@ function renderSceneList(chapter) {
   });
 }
 
+async function saveSnapshotForChapter(chapterId) {
+  if (!chapterId) return;
+  const chapter = state.chapters.find(c => c.id === chapterId);
+  if (!chapter?.content) return;
+  const docCopy = JSON.parse(JSON.stringify(chapter.content));
+  await createSnapshot(chapterId, docCopy);
+  setStatus("Snapshot saved");
+}
+
+function updateSnapshotPreview(snapshot) {
+  const preview = $("#snapshotPreviewText");
+  if (!preview) return;
+  if (!snapshot?.doc) {
+    preview.textContent = "Select a snapshot to preview.";
+    return;
+  }
+  const text = editorToPlainText(snapshot.doc);
+  preview.textContent = text ? text : "(Snapshot is empty.)";
+}
+
+async function restoreSnapshot(snapshot) {
+  if (!snapshot?.chapterId) return;
+  const chapter = state.chapters.find(c => c.id === snapshot.chapterId);
+  if (!chapter) return;
+  chapter.content = snapshot.doc;
+  chapter.updatedAt = Date.now();
+  await updateChapterMeta(snapshot.chapterId, { content: snapshot.doc });
+  if (state.activeChapterId === snapshot.chapterId) {
+    setEditorDoc(editor, snapshot.doc);
+  }
+  updateCountsDebounced();
+  setStatus("Snapshot restored");
+}
+
+async function renderSnapshotsModal(chapterId) {
+  const list = $("#snapshotList");
+  const title = $("#snapshotChapterTitle");
+  if (!list) return;
+  list.innerHTML = "";
+  updateSnapshotPreview(null);
+
+  const chapter = state.chapters.find(c => c.id === chapterId);
+  if (title) title.textContent = chapter?.title || "Untitled Chapter";
+
+  const snapshots = await listSnapshotsForChapter(chapterId);
+  if (!snapshots.length) {
+    const empty = document.createElement("div");
+    empty.className = "muted small";
+    empty.textContent = "No snapshots yet. Save one to capture this chapter.";
+    list.appendChild(empty);
+    return;
+  }
+
+  snapshots.forEach(snapshot => {
+    const item = document.createElement("div");
+    item.className = "snapshotItem";
+
+    const meta = document.createElement("div");
+    meta.className = "snapshotMeta";
+    const title = document.createElement("div");
+    title.className = "snapshotMeta__title";
+    title.textContent = formatSnapshotTimestamp(snapshot.createdAt);
+    const subtitle = document.createElement("div");
+    subtitle.className = "snapshotMeta__subtitle";
+    subtitle.textContent = "Snapshot";
+    meta.appendChild(title);
+    meta.appendChild(subtitle);
+
+    const actions = document.createElement("div");
+    actions.className = "snapshotActions";
+
+    const previewBtn = document.createElement("button");
+    previewBtn.className = "btn btn--ghost btn--small";
+    previewBtn.type = "button";
+    previewBtn.textContent = "Preview";
+
+    const restoreBtn = document.createElement("button");
+    restoreBtn.className = "btn btn--primary btn--small";
+    restoreBtn.type = "button";
+    restoreBtn.textContent = "Restore";
+
+    previewBtn.addEventListener("click", () => {
+      document.querySelectorAll(".snapshotItem").forEach(el => el.classList.remove("is-selected"));
+      item.classList.add("is-selected");
+      updateSnapshotPreview(snapshot);
+    });
+
+    restoreBtn.addEventListener("click", async () => {
+      const ok = confirm("Restore this snapshot? This replaces the current chapter content.");
+      if (!ok) return;
+      await restoreSnapshot(snapshot);
+    });
+
+    actions.appendChild(previewBtn);
+    actions.appendChild(restoreBtn);
+
+    item.appendChild(meta);
+    item.appendChild(actions);
+    list.appendChild(item);
+  });
+}
+
+async function openSnapshotsModal(chapterId) {
+  if (!chapterId) return;
+  state.snapshotChapterId = chapterId;
+  await renderSnapshotsModal(chapterId);
+  $("#snapshotModal")?.showModal();
+}
+
 function isTypingTarget(target) {
   if (!target) return false;
   const el = target.closest?.("input, textarea, select, [contenteditable='true']");
@@ -1129,7 +1281,8 @@ function setupMenus() {
     insert: $("#menu-insert"),
     format: $("#menu-format"),
     tools: $("#menu-tools"),
-    help: $("#menu-help")
+    help: $("#menu-help"),
+    "chapter-context": $("#menu-chapter-context")
   };
 
   const closeAllMenus = () => {
@@ -1142,6 +1295,20 @@ function setupMenus() {
       const menusRoot = document.querySelector(".menus");
       if (menusRoot && m.parentElement === document.body) menusRoot.appendChild(m);
     });
+  };
+
+  const positionMenu = (menu, left, top) => {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const mrect = menu.getBoundingClientRect();
+    let clampedLeft = left;
+    let clampedTop = top;
+    if (clampedLeft + mrect.width > vw - 8) clampedLeft = vw - mrect.width - 8;
+    if (clampedLeft < 8) clampedLeft = 8;
+    if (clampedTop + mrect.height > vh - 8) clampedTop = vh - mrect.height - 8;
+    if (clampedTop < 8) clampedTop = 8;
+    menu.style.left = Math.round(clampedLeft) + "px";
+    menu.style.top = Math.round(clampedTop) + "px";
   };
 
   // Position menu under clicked button
@@ -1164,37 +1331,40 @@ function setupMenus() {
     }
 
     const rect = btn.getBoundingClientRect();
-    // Measure after display
-    const mrect = menu.getBoundingClientRect();
-
     // Default placement: under the menubar button
     let left = rect.left;
     let top = rect.bottom + 6;
 
-    // Clamp within viewport
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-
-    if (left + mrect.width > vw - 8) left = vw - mrect.width - 8;
-    if (left < 8) left = 8;
-
     // If there's not enough space below, open upward
-    if (top + mrect.height > vh - 8 && rect.top > mrect.height + 8) {
+    const mrect = menu.getBoundingClientRect();
+    if (top + mrect.height > window.innerHeight - 8 && rect.top > mrect.height + 8) {
       top = rect.top - mrect.height - 6;
     }
-    if (top < 8) top = 8;
 
-    menu.style.left = Math.round(left) + "px";
-    menu.style.top = Math.round(top) + "px";
+    positionMenu(menu, left, top);
 
     btn.classList.add("is-open");
+  };
+
+  openContextMenuAt = (key, position) => {
+    closeAllMenus();
+    const menu = menus[key];
+    if (!menu) return;
+    menu.style.display = "block";
+    menu.classList.add("is-open");
+    menu.style.position = "fixed";
+    menu.style.zIndex = "10000";
+    if (menu.parentElement !== document.body) {
+      menu.dataset._home = "1";
+      document.body.appendChild(menu);
+    }
+    positionMenu(menu, position?.x ?? 8, position?.y ?? 8);
   };
 
   document.querySelectorAll(".menuBtn").forEach(btn => {
     btn.addEventListener("click", (e) => {
       const key = btn.dataset.menu;
       const menu = menus[key];
-    const menusRoot = document.querySelector(".menus");
       const isOpen = menu?.classList.contains("is-open");
       if (isOpen) closeAllMenus();
       else openMenu(key, btn);
@@ -1229,6 +1399,19 @@ function setupMenus() {
         case "settings":
           $("#btnSettings").click();
           break;
+        case "snapshot-save": {
+          const chapterId = state.contextChapterId || state.activeChapterId;
+          if (!chapterId) break;
+          await saveSnapshotForChapter(chapterId);
+          break;
+        }
+        case "snapshot-restore": {
+          const chapterId = state.contextChapterId || state.activeChapterId;
+          if (!chapterId) break;
+          if (chapterId !== state.activeChapterId) await openChapter(chapterId);
+          await openSnapshotsModal(chapterId);
+          break;
+        }
         case "undo":
           editor?.commands.undo();
           break;
@@ -1241,13 +1424,13 @@ function setupMenus() {
         case "toggle-sidebar":
           state.sidebarHidden = !state.sidebarHidden;
           applyViewPrefs();
-  updateHeaderHeight();
+          updateHeaderHeight();
           saveSettings();
           break;
         case "toggle-page":
           state.pageView = !state.pageView;
           applyViewPrefs();
-  updateHeaderHeight();
+          updateHeaderHeight();
           saveSettings();
           break;
         case "hr":
@@ -1286,6 +1469,7 @@ function setupMenus() {
         default:
           break;
       }
+      state.contextChapterId = null;
     });
   });
 }

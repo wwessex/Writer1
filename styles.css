@@ -465,6 +465,19 @@ body.pageView .editor .ProseMirror blockquote{
 .chapterName{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .chapterMeta{font-size:12px;color:var(--muted)}
 .chapterItem.is-dragover{outline:2px dashed rgba(96,165,250,.55); outline-offset:-2px}
+.chapterActionsBtn{
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(255,255,255,.04);
+  color:var(--text);
+  width:28px;
+  height:28px;
+  border-radius:8px;
+  display:grid;
+  place-items:center;
+  cursor:pointer;
+  flex:0 0 auto;
+}
+.chapterActionsBtn:hover{background:rgba(255,255,255,.08)}
 
 /* Outline panel */
 .outlinePanel{
@@ -601,6 +614,9 @@ body.pageView .editor .ProseMirror blockquote{
   box-shadow:var(--shadow);
   padding:0;
 }
+.modal__card--wide{
+  width:min(880px, 94vw);
+}
 .modal__header{
   display:flex; justify-content:space-between; align-items:center;
   padding:14px 14px 10px;
@@ -630,6 +646,82 @@ body.pageView .editor .ProseMirror blockquote{
 
 code{font-family:var(--mono); font-size:12px}
 
+/* Snapshots */
+.snapshotLayout{
+  display:grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--uiGap);
+  margin-top:10px;
+}
+.snapshotListWrap{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.snapshotListHeader{
+  font-weight:700;
+  font-size:13px;
+}
+.snapshotList{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  max-height:360px;
+  overflow:auto;
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:10px;
+  background: rgba(0,0,0,.12);
+}
+.snapshotItem{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:10px;
+  padding:8px;
+  background: rgba(255,255,255,.03);
+}
+.snapshotMeta{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.snapshotItem.is-selected{
+  border-color: rgba(96,165,250,.55);
+  background: rgba(96,165,250,.12);
+}
+.snapshotMeta__title{font-weight:600}
+.snapshotMeta__subtitle{font-size:12px; color:var(--muted)}
+.snapshotActions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.snapshotPreview{
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:10px;
+  background: rgba(0,0,0,.12);
+  display:flex;
+  flex-direction:column;
+  min-height:220px;
+}
+.snapshotPreview__header{
+  font-weight:700;
+  font-size:13px;
+  margin-bottom:6px;
+}
+.snapshotPreview__body{
+  flex:1;
+  margin:0;
+  white-space:pre-wrap;
+  font-family:var(--mono);
+  font-size:12px;
+  color:var(--text);
+  overflow:auto;
+}
 
 /* Sidebar toggle */
 body.sidebarHidden .sidebar{display:none}
@@ -643,6 +735,7 @@ body.sidebarHidden .layout{grid-template-columns: 1fr}
   .editorPane{flex:1; min-height:0}
   .editor{padding:14px}
   .grid{grid-template-columns:1fr}
+  .snapshotLayout{grid-template-columns:1fr}
 }
 
   .menubar{gap:4px}
@@ -753,6 +846,10 @@ body.sidebarHidden .layout{grid-template-columns: 1fr}
 }
 :root[data-theme="light"] .chapterItem{
   border-bottom:1px solid rgba(0,0,0,.06) !important;
+}
+:root[data-theme="light"] .chapterActionsBtn{
+  background: rgba(0,0,0,.02);
+  border-color: rgba(0,0,0,.12);
 }
 :root[data-theme="light"] .chapterItem:hover{background:rgba(0,0,0,.035) !important}
 :root[data-theme="light"] .chapterItem.is-active{background:rgba(26,115,232,.10) !important}
@@ -902,6 +999,16 @@ body{padding-top: var(--safeTop);}
 }
 :root[data-theme="light"] .menuItem:hover{background:rgba(0,0,0,.04)}
 :root[data-theme="light"] .menuSep{background:rgba(0,0,0,.10)}
+:root[data-theme="light"] .snapshotList{
+  background: rgba(0,0,0,.02);
+}
+:root[data-theme="light"] .snapshotItem{
+  border-color: rgba(0,0,0,.10);
+  background: rgba(0,0,0,.02);
+}
+:root[data-theme="light"] .snapshotPreview{
+  background: rgba(0,0,0,.02);
+}
 
 .menus{position:relative; z-index:10000}
 
