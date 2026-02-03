@@ -106,6 +106,163 @@ function countWordsInString(s) {
   const m = String(s).match(/[A-Za-z0-9]+(?:'[A-Za-z0-9]+)?/g);
   return m ? m.length : 0;
 }
+
+const STOPWORDS = new Set([
+  "the","and","for","with","that","this","from","your","you","but","not","are","was","were","have","has","had","into",
+  "its","it's","his","her","their","they","them","she","him","our","out","about","what","when","where","which","while",
+  "will","can","could","would","should","who","why","how","then","than","there","here","over","under","after","before",
+  "because","just","like","also","only","very","been","being","did","does","doing","each","every","some","more","most"
+]);
+
+function tokenizeWords(text) {
+  return (text.match(/[A-Za-z0-9]+(?:'[A-Za-z0-9]+)?/g) || []).map(word => word.toLowerCase());
+}
+
+function countSyllables(word) {
+  const cleaned = word.toLowerCase().replace(/[^a-z]/g, "");
+  if (!cleaned) return 0;
+  if (cleaned.length <= 3) return 1;
+  const stripped = cleaned.replace(/e$/g, "");
+  const groups = stripped.match(/[aeiouy]{1,2}/g);
+  return Math.max(1, groups ? groups.length : 1);
+}
+
+function splitSentences(text) {
+  return text.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map(s => s.trim()).filter(Boolean) || [];
+}
+
+function analyzeText(text) {
+  const words = tokenizeWords(text);
+  const sentences = splitSentences(text);
+  const wordCount = words.length;
+  const sentenceCount = sentences.length || 1;
+  const avgSentenceLength = wordCount ? wordCount / sentenceCount : 0;
+
+  const syllableCount = words.reduce((acc, word) => acc + countSyllables(word), 0);
+  const flesch = wordCount
+    ? 206.835 - 1.015 * (wordCount / sentenceCount) - 84.6 * (syllableCount / wordCount)
+    : 0;
+
+  const repeated = new Map();
+  words.forEach(word => {
+    if (word.length < 4 || STOPWORDS.has(word)) return;
+    repeated.set(word, (repeated.get(word) || 0) + 1);
+  });
+  const topRepeated = [...repeated.entries()]
+    .filter(([, count]) => count >= 3)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
+
+  const longSentenceThreshold = 30;
+  const longSentences = sentences.filter(sentence => tokenizeWords(sentence).length > longSentenceThreshold);
+
+  return {
+    wordCount,
+    sentenceCount,
+    avgSentenceLength,
+    flesch,
+    topRepeated,
+    longSentenceCount: longSentences.length,
+    longSentenceThreshold
+  };
+}
+
+function getActiveChapterText() {
+  const chapter = state.chapters.find(c => c.id === state.activeChapterId);
+  if (!chapter?.content) return "";
+  return editorToPlainText(chapter.content);
+}
+
+function formatScore(score) {
+  if (!Number.isFinite(score)) return "0";
+  const rounded = Math.max(0, Math.min(120, Math.round(score)));
+  return String(rounded);
+}
+
+function readabilityLabel(score) {
+  if (score >= 90) return "Very easy";
+  if (score >= 80) return "Easy";
+  if (score >= 70) return "Fairly easy";
+  if (score >= 60) return "Standard";
+  if (score >= 50) return "Fairly hard";
+  if (score >= 30) return "Hard";
+  return "Very hard";
+}
+
+function renderRepeatedWords(listEl, items) {
+  listEl.innerHTML = "";
+  if (!items.length) {
+    listEl.innerHTML = `<div class="muted small">No repeated words above the threshold.</div>`;
+    return;
+  }
+  items.forEach(([word, count]) => {
+    const chip = document.createElement("div");
+    chip.className = "analysisTag";
+    chip.textContent = `${word} (${count})`;
+    listEl.appendChild(chip);
+  });
+}
+
+function renderGrammarResults(listEl, matches) {
+  listEl.innerHTML = "";
+  if (!matches?.length) {
+    listEl.innerHTML = `<div class="muted small">No issues found for the current chapter.</div>`;
+    return;
+  }
+  matches.slice(0, 30).forEach(match => {
+    const item = document.createElement("div");
+    item.className = "analysisResult";
+    const contextText = match.context?.text || "";
+    const start = match.context?.offset ?? 0;
+    const length = match.context?.length ?? 0;
+    const before = contextText.slice(0, start);
+    const highlight = contextText.slice(start, start + length);
+    const after = contextText.slice(start + length);
+    item.innerHTML = `
+      <div class="analysisResult__title">${escapeHtml(match.message || "Suggestion")}</div>
+      <div class="analysisResult__meta">${escapeHtml(match.rule?.description || "Grammar suggestion")}</div>
+      <div class="analysisResult__context">${escapeHtml(before)}<mark>${escapeHtml(highlight)}</mark>${escapeHtml(after)}</div>
+    `;
+    listEl.appendChild(item);
+  });
+}
+
+async function runLanguageToolCheck({ text, statusEl, listEl }) {
+  if (!state.assist.languageToolEnabled) {
+    statusEl.textContent = "Enable LanguageTool in Settings to run grammar checks.";
+    renderGrammarResults(listEl, []);
+    return;
+  }
+  if (!state.assist.languageToolUrl) {
+    statusEl.textContent = "Set a LanguageTool endpoint in Settings.";
+    renderGrammarResults(listEl, []);
+    return;
+  }
+  if (!text.trim()) {
+    statusEl.textContent = "Add some text in the active chapter to run a check.";
+    renderGrammarResults(listEl, []);
+    return;
+  }
+  statusEl.textContent = "Running grammar and spell check…";
+  try {
+    const body = new URLSearchParams({
+      text,
+      language: state.assist.languageToolLanguage || "en-US"
+    });
+    const res = await fetch(state.assist.languageToolUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body
+    });
+    if (!res.ok) throw new Error(`LanguageTool error (${res.status})`);
+    const data = await res.json();
+    renderGrammarResults(listEl, data.matches || []);
+    statusEl.textContent = `Grammar check complete. ${data.matches?.length || 0} suggestion(s) found.`;
+  } catch (err) {
+    console.warn(err);
+    statusEl.textContent = "Unable to reach LanguageTool. Check the endpoint and network.";
+  }
+}
 function countWordsFromJson(node) {
   if (!node) return 0;
   if (node.type === "text") return countWordsInString(node.text || "");
@@ -129,6 +286,50 @@ const updateCountsDebounced = debounce(() => {
     }
   } catch {}
 }, 500);
+
+function refreshAnalysisModal() {
+  const text = getActiveChapterText();
+  const metrics = analyzeText(text);
+  const chapter = state.chapters.find(c => c.id === state.activeChapterId);
+
+  const scopeEl = $("#analysisScope");
+  const emptyEl = $("#analysisEmpty");
+  if (scopeEl) {
+    scopeEl.textContent = chapter?.title ? `Chapter: ${chapter.title}` : "Current chapter";
+  }
+  if (emptyEl) {
+    emptyEl.style.display = text.trim() ? "none" : "block";
+  }
+
+  $("#analysisWords") && ($("#analysisWords").textContent = metrics.wordCount.toLocaleString());
+  $("#analysisSentences") && ($("#analysisSentences").textContent = metrics.sentenceCount.toLocaleString());
+  $("#analysisAvgSentence") && ($("#analysisAvgSentence").textContent = metrics.avgSentenceLength.toFixed(1));
+  $("#analysisReadability") && ($("#analysisReadability").textContent = formatScore(metrics.flesch));
+  $("#analysisReadabilityLabel") && ($("#analysisReadabilityLabel").textContent = readabilityLabel(metrics.flesch));
+  $("#analysisPacingSummary") && ($("#analysisPacingSummary").textContent =
+    metrics.longSentenceCount
+      ? `${metrics.longSentenceCount} sentence(s) over ${metrics.longSentenceThreshold} words.`
+      : "No long sentences detected."
+  );
+
+  const repetitionList = $("#analysisRepetition");
+  if (repetitionList) renderRepeatedWords(repetitionList, metrics.topRepeated);
+}
+
+function openAnalysisModal({ runGrammar = false } = {}) {
+  const modal = $("#analysisModal");
+  if (!modal) return;
+  refreshAnalysisModal();
+  modal.showModal();
+  if (runGrammar) {
+    const statusEl = $("#grammarStatus");
+    const listEl = $("#grammarResults");
+    const text = getActiveChapterText();
+    if (statusEl && listEl) {
+      runLanguageToolCheck({ text, statusEl, listEl });
+    }
+  }
+}
 
 function setConnectionPill() {
   const online = navigator.onLine;
@@ -256,6 +457,11 @@ const state = {
     novelId: "default",
     url: "",
     auth: ""
+  },
+  assist: {
+    languageToolEnabled: false,
+    languageToolUrl: "https://api.languagetool.org/v2/check",
+    languageToolLanguage: "en-US"
   }
 };
 
@@ -273,6 +479,7 @@ function loadSettings() {
     if (typeof s.dailyWordGoal === "number") state.dailyWordGoal = s.dailyWordGoal;
     if (typeof s.novelWordGoal === "number") state.novelWordGoal = s.novelWordGoal;
     if (s.sync) state.sync = { ...state.sync, ...s.sync };
+    if (s.assist) state.assist = { ...state.assist, ...s.assist };
     if (typeof s.pageView === "boolean") state.pageView = s.pageView;
     if (typeof s.sidebarHidden === "boolean") state.sidebarHidden = s.sidebarHidden;
     if (typeof s.theme === "string") state.theme = s.theme;
@@ -284,6 +491,7 @@ function saveSettings() {
     dailyWordGoal: state.dailyWordGoal,
     novelWordGoal: state.novelWordGoal,
     sync: state.sync,
+    assist: state.assist,
     pageView: state.pageView,
     sidebarHidden: state.sidebarHidden,
     theme: state.theme
@@ -779,6 +987,9 @@ async function boot() {
     $("#autosaveMs").value = String(state.autosaveMs);
     $("#dailyWordGoal").value = String(state.dailyWordGoal || 0);
     $("#novelWordGoal").value = String(state.novelWordGoal || 0);
+    $("#assistEnabled").checked = !!state.assist.languageToolEnabled;
+    $("#assistUrl").value = state.assist.languageToolUrl || "";
+    $("#assistLanguage").value = state.assist.languageToolLanguage || "en-US";
     $("#syncStatus").textContent = "";
     settingsModal.showModal();
   });
@@ -818,6 +1029,20 @@ async function boot() {
     saveSettings();
   }, 200));
 
+  $("#assistEnabled").addEventListener("change", (e) => {
+    state.assist.languageToolEnabled = e.target.checked;
+    saveSettings();
+    setStatus("Settings saved");
+  });
+  $("#assistUrl").addEventListener("input", debounce((e) => {
+    state.assist.languageToolUrl = e.target.value.trim();
+    saveSettings();
+  }, 200));
+  $("#assistLanguage").addEventListener("input", debounce((e) => {
+    state.assist.languageToolLanguage = e.target.value.trim() || "en-US";
+    saveSettings();
+  }, 200));
+
   $("#btnSyncNow").addEventListener("click", async () => {
     await syncNow({ direction: "push" });
   });
@@ -827,6 +1052,21 @@ async function boot() {
     if (!ok) return;
     await resetAllData();
     location.reload();
+  });
+
+  const analysisModal = $("#analysisModal");
+  $("#btnRunAnalysis")?.addEventListener("click", () => refreshAnalysisModal());
+  $("#btnRunGrammar")?.addEventListener("click", () => {
+    const statusEl = $("#grammarStatus");
+    const listEl = $("#grammarResults");
+    const text = getActiveChapterText();
+    if (statusEl && listEl) {
+      runLanguageToolCheck({ text, statusEl, listEl });
+    }
+  });
+  $("#btnOpenAssistSettings")?.addEventListener("click", () => {
+    analysisModal?.close();
+    $("#btnSettings").click();
   });
 
 
@@ -1465,6 +1705,12 @@ function setupMenus() {
           $("#wcChapter") && ($("#wcChapter").textContent = $("#chapterWords")?.textContent || "0");
           $("#wcTotal") && ($("#wcTotal").textContent = $("#totalWords")?.textContent || "0");
           $("#wordCountModal").showModal();
+          break;
+        case "writing-analysis":
+          openAnalysisModal({ runGrammar: false });
+          break;
+        case "grammar-check":
+          openAnalysisModal({ runGrammar: true });
           break;
         case "about":
           $("#aboutModal").showModal();
