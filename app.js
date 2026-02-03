@@ -84,6 +84,17 @@ function setStatus(text) {
   $("#saveStatus").textContent = text;
 }
 
+const STATUS_OPTIONS = [
+  { value: "planned", label: "Planned" },
+  { value: "draft", label: "Draft" },
+  { value: "revised", label: "Revised" },
+  { value: "final", label: "Final" }
+];
+
+function getStatusLabel(value) {
+  return STATUS_OPTIONS.find(opt => opt.value === value)?.label || "Draft";
+}
+
 // Word counts (fast, no heavy deps)
 function countWordsInString(s) {
   if (!s) return 0;
@@ -132,6 +143,17 @@ function applyViewPrefs() {
 function applyTheme() {
   const t = (state.theme === "light") ? "light" : "dark";
   document.documentElement.setAttribute("data-theme", t);
+}
+
+function populateStatusSelect(select) {
+  if (!select) return;
+  select.innerHTML = "";
+  STATUS_OPTIONS.forEach(opt => {
+    const option = document.createElement("option");
+    option.value = opt.value;
+    option.textContent = opt.label;
+    select.appendChild(option);
+  });
 }
 
 function updateThemeButton() {
@@ -191,6 +213,8 @@ const state = {
     auth: ""
   }
 };
+
+let outlineSaveTimer = null;
 
 // Persist small settings (not content) in localStorage
 const SETTINGS_KEY = "novelwriter_settings_v1";
@@ -334,6 +358,7 @@ async function openChapter(id) {
   // Load content into editor (isolated per chapter)
   setEditorDoc(editor, ch?.content);
   renderChapters();
+  renderOutlinePanel();
   updateCountsDebounced();
 }
 
@@ -421,6 +446,7 @@ async function loadFromDB() {
   const active = state.chapters.find(c => c.id === state.activeChapterId);
   $("#chapterTitle").value = active?.title || "";
   setEditorDoc(editor, active?.content);
+  renderOutlinePanel();
   updateCountsDebounced();
 }
 
@@ -442,6 +468,7 @@ async function boot() {
 
   bindToolbar(editor, $("#toolbar"));
   configureAutosave();
+  populateStatusSelect($("#chapterStatus"));
 
   // Style dropdown (Word-ish)
   $("#styleSelect")?.addEventListener("change", (e) => {
@@ -507,6 +534,46 @@ async function boot() {
   $("#chapterTitle").addEventListener("input", () => autosaveDebounced?.());
   $("#chapterTitle").addEventListener("blur", flushChapterTitle);
 
+  $("#chapterSummary")?.addEventListener("input", (e) => {
+    const ch = state.chapters.find(c => c.id === state.activeChapterId);
+    if (!ch) return;
+    ch.summary = e.target.value;
+    scheduleOutlineSave(ch);
+  });
+  $("#chapterPov")?.addEventListener("input", (e) => {
+    const ch = state.chapters.find(c => c.id === state.activeChapterId);
+    if (!ch) return;
+    ch.pov = e.target.value;
+    scheduleOutlineSave(ch);
+  });
+  $("#chapterStatus")?.addEventListener("change", (e) => {
+    const ch = state.chapters.find(c => c.id === state.activeChapterId);
+    if (!ch) return;
+    ch.status = e.target.value;
+    scheduleOutlineSave(ch);
+  });
+  $("#chapterTags")?.addEventListener("input", (e) => {
+    const ch = state.chapters.find(c => c.id === state.activeChapterId);
+    if (!ch) return;
+    ch.tags = e.target.value;
+    scheduleOutlineSave(ch);
+  });
+  $("#chapterWordGoal")?.addEventListener("input", (e) => {
+    const ch = state.chapters.find(c => c.id === state.activeChapterId);
+    if (!ch) return;
+    ch.wordGoal = Number(e.target.value || 0);
+    scheduleOutlineSave(ch);
+  });
+  $("#btnAddScene")?.addEventListener("click", () => {
+    const ch = state.chapters.find(c => c.id === state.activeChapterId);
+    if (!ch) return;
+    ensureChapterOutline(ch);
+    const scene = ensureSceneOutline({ title: `Scene ${ch.scenes.length + 1}` }, ch.scenes.length);
+    ch.scenes.push(scene);
+    scheduleOutlineSave(ch);
+    renderSceneList(ch);
+  });
+
   $("#btnNewChapter").addEventListener("click", async () => {
     const chap = await createChapter(state.novelId, `Chapter ${state.chapters.length + 1}`);
     state.chapters.push(chap);
@@ -527,6 +594,7 @@ async function boot() {
     state.activeChapterId = state.chapters[0]?.id || null;
     renderChapters();
     if (state.activeChapterId) await openChapter(state.activeChapterId);
+    else renderOutlinePanel();
     setStatus("Chapter deleted");
   });
 
@@ -692,6 +760,264 @@ function escapeHtml(s) {
 }
 function safeFilename(name) {
   return (name || "novel").replace(/[^a-z0-9\-\_\s]/gi, "").trim().replace(/\s+/g, "_").slice(0, 80) || "novel";
+}
+
+function normalizeTags(tags) {
+  if (Array.isArray(tags)) {
+    return tags.map(t => String(t).trim()).filter(Boolean);
+  }
+  if (!tags) return [];
+  return String(tags)
+    .split(",")
+    .map(t => t.trim())
+    .filter(Boolean);
+}
+
+function formatTags(tags) {
+  return normalizeTags(tags).join(", ");
+}
+
+function ensureSceneOutline(scene, index = 0) {
+  if (!scene) return null;
+  if (!scene.id) scene.id = crypto.randomUUID();
+  if (!scene.title) scene.title = `Scene ${index + 1}`;
+  scene.summary ??= "";
+  scene.pov ??= "";
+  scene.status ??= "planned";
+  scene.tags = normalizeTags(scene.tags);
+  scene.wordGoal = Number.isFinite(scene.wordGoal) ? scene.wordGoal : 0;
+  return scene;
+}
+
+function ensureChapterOutline(chapter) {
+  if (!chapter) return null;
+  chapter.summary ??= "";
+  chapter.pov ??= "";
+  chapter.status ??= "draft";
+  chapter.tags = normalizeTags(chapter.tags);
+  chapter.wordGoal = Number.isFinite(chapter.wordGoal) ? chapter.wordGoal : 0;
+  chapter.scenes = Array.isArray(chapter.scenes) ? chapter.scenes.map(ensureSceneOutline) : [];
+  return chapter;
+}
+
+function scheduleOutlineSave(chapter) {
+  if (!chapter?.id) return;
+  if (outlineSaveTimer) clearTimeout(outlineSaveTimer);
+  outlineSaveTimer = setTimeout(async () => {
+    try {
+      await updateChapterMeta(chapter.id, {
+        summary: chapter.summary || "",
+        pov: chapter.pov || "",
+        status: chapter.status || "draft",
+        tags: normalizeTags(chapter.tags),
+        wordGoal: Number.isFinite(chapter.wordGoal) ? chapter.wordGoal : 0,
+        scenes: Array.isArray(chapter.scenes) ? chapter.scenes : []
+      });
+      setStatus(navigator.onLine ? "Saved (online)" : "Saved (offline)");
+    } catch (err) {
+      console.warn(err);
+      setStatus("Save failed (check storage)");
+    }
+  }, 300);
+}
+
+function setOutlineEnabled(enabled) {
+  const fields = [
+    "#chapterSummary",
+    "#chapterPov",
+    "#chapterStatus",
+    "#chapterTags",
+    "#chapterWordGoal",
+    "#btnAddScene"
+  ];
+  fields.forEach(sel => {
+    const el = $(sel);
+    if (el) el.disabled = !enabled;
+  });
+}
+
+function renderOutlinePanel() {
+  const chapter = state.chapters.find(c => c.id === state.activeChapterId);
+  const summary = $("#chapterSummary");
+  const pov = $("#chapterPov");
+  const status = $("#chapterStatus");
+  const tags = $("#chapterTags");
+  const wordGoal = $("#chapterWordGoal");
+
+  if (!chapter) {
+    if (summary) summary.value = "";
+    if (pov) pov.value = "";
+    if (status) status.value = "draft";
+    if (tags) tags.value = "";
+    if (wordGoal) wordGoal.value = "";
+    $("#sceneList") && ($("#sceneList").innerHTML = "");
+    setOutlineEnabled(false);
+    return;
+  }
+
+  ensureChapterOutline(chapter);
+  setOutlineEnabled(true);
+
+  if (summary) summary.value = chapter.summary || "";
+  if (pov) pov.value = chapter.pov || "";
+  if (status) status.value = chapter.status || "draft";
+  if (tags) tags.value = formatTags(chapter.tags);
+  if (wordGoal) wordGoal.value = chapter.wordGoal ? String(chapter.wordGoal) : "";
+
+  renderSceneList(chapter);
+}
+
+function renderSceneList(chapter) {
+  const list = $("#sceneList");
+  if (!list) return;
+  list.innerHTML = "";
+
+  chapter.scenes = Array.isArray(chapter.scenes) ? chapter.scenes.map(ensureSceneOutline) : [];
+
+  if (!chapter.scenes.length) {
+    const empty = document.createElement("div");
+    empty.className = "muted small";
+    empty.textContent = "No scenes yet. Add one to build your outline.";
+    list.appendChild(empty);
+    return;
+  }
+
+  chapter.scenes.forEach((scene, index) => {
+    const card = document.createElement("div");
+    card.className = "sceneCard";
+    card.dataset.sceneId = scene.id;
+
+    const titleInput = document.createElement("input");
+    titleInput.className = "input input--sm sceneTitle";
+    titleInput.placeholder = `Scene ${index + 1}`;
+    titleInput.value = scene.title || "";
+
+    const badge = document.createElement("span");
+    badge.className = "sceneStatusBadge";
+    badge.dataset.status = scene.status || "planned";
+    badge.textContent = getStatusLabel(scene.status || "planned");
+
+    const header = document.createElement("div");
+    header.className = "sceneCard__header";
+    header.appendChild(titleInput);
+    header.appendChild(badge);
+
+    const summaryLabel = document.createElement("label");
+    summaryLabel.className = "field";
+    const summarySpan = document.createElement("span");
+    summarySpan.textContent = "Summary";
+    const summaryInput = document.createElement("textarea");
+    summaryInput.className = "input input--area";
+    summaryInput.rows = 2;
+    summaryInput.value = scene.summary || "";
+    summaryLabel.appendChild(summarySpan);
+    summaryLabel.appendChild(summaryInput);
+
+    const sceneGrid = document.createElement("div");
+    sceneGrid.className = "sceneGrid";
+
+    const povLabel = document.createElement("label");
+    povLabel.className = "field";
+    const povSpan = document.createElement("span");
+    povSpan.textContent = "POV";
+    const povInput = document.createElement("input");
+    povInput.className = "input input--sm";
+    povInput.value = scene.pov || "";
+    povLabel.appendChild(povSpan);
+    povLabel.appendChild(povInput);
+
+    const statusLabel = document.createElement("label");
+    statusLabel.className = "field";
+    const statusSpan = document.createElement("span");
+    statusSpan.textContent = "Status";
+    const statusSelect = document.createElement("select");
+    statusSelect.className = "select";
+    STATUS_OPTIONS.forEach(opt => {
+      const option = document.createElement("option");
+      option.value = opt.value;
+      option.textContent = opt.label;
+      statusSelect.appendChild(option);
+    });
+    statusSelect.value = scene.status || "planned";
+    statusLabel.appendChild(statusSpan);
+    statusLabel.appendChild(statusSelect);
+
+    const tagsLabel = document.createElement("label");
+    tagsLabel.className = "field";
+    const tagsSpan = document.createElement("span");
+    tagsSpan.textContent = "Tags";
+    const tagsInput = document.createElement("input");
+    tagsInput.className = "input input--sm";
+    tagsInput.placeholder = "comma, tags";
+    tagsInput.value = formatTags(scene.tags);
+    tagsLabel.appendChild(tagsSpan);
+    tagsLabel.appendChild(tagsInput);
+
+    const wordLabel = document.createElement("label");
+    wordLabel.className = "field";
+    const wordSpan = document.createElement("span");
+    wordSpan.textContent = "Word goal";
+    const wordInput = document.createElement("input");
+    wordInput.className = "input input--sm";
+    wordInput.type = "number";
+    wordInput.min = "0";
+    wordInput.step = "50";
+    wordInput.value = scene.wordGoal ? String(scene.wordGoal) : "";
+    wordLabel.appendChild(wordSpan);
+    wordLabel.appendChild(wordInput);
+
+    sceneGrid.appendChild(povLabel);
+    sceneGrid.appendChild(statusLabel);
+    sceneGrid.appendChild(tagsLabel);
+    sceneGrid.appendChild(wordLabel);
+
+    const actions = document.createElement("div");
+    actions.className = "sceneActions";
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "btn btn--ghost btn--small";
+    deleteBtn.type = "button";
+    deleteBtn.textContent = "Delete";
+    actions.appendChild(deleteBtn);
+
+    const fields = document.createElement("div");
+    fields.className = "sceneFields";
+    fields.appendChild(summaryLabel);
+    fields.appendChild(sceneGrid);
+    fields.appendChild(actions);
+
+    card.appendChild(header);
+    card.appendChild(fields);
+
+    const updateScene = (patch) => {
+      Object.assign(scene, patch);
+      if ("status" in patch) {
+        badge.dataset.status = scene.status || "planned";
+        badge.textContent = getStatusLabel(scene.status || "planned");
+      }
+      if ("tags" in patch) {
+        scene.tags = normalizeTags(scene.tags);
+      }
+      if ("wordGoal" in patch) {
+        scene.wordGoal = Number.isFinite(scene.wordGoal) ? scene.wordGoal : 0;
+      }
+      scheduleOutlineSave(chapter);
+    };
+
+    titleInput.addEventListener("input", (e) => updateScene({ title: e.target.value }));
+    summaryInput.addEventListener("input", (e) => updateScene({ summary: e.target.value }));
+    povInput.addEventListener("input", (e) => updateScene({ pov: e.target.value }));
+    statusSelect.addEventListener("change", (e) => updateScene({ status: e.target.value }));
+    tagsInput.addEventListener("input", (e) => updateScene({ tags: e.target.value }));
+    wordInput.addEventListener("input", (e) => updateScene({ wordGoal: Number(e.target.value || 0) }));
+
+    deleteBtn.addEventListener("click", () => {
+      chapter.scenes = chapter.scenes.filter(s => s.id !== scene.id);
+      scheduleOutlineSave(chapter);
+      renderSceneList(chapter);
+    });
+
+    list.appendChild(card);
+  });
 }
 
 function isTypingTarget(target) {

@@ -25,6 +25,12 @@ export async function ensureDefaultNovel() {
     order: 1,
     title: "Chapter 1",
     updatedAt: now,
+    summary: "",
+    pov: "",
+    status: "draft",
+    tags: [],
+    wordGoal: 0,
+    scenes: [],
     // Tiptap JSON document (StarterKit)
     content: {
       type: "doc",
@@ -60,6 +66,12 @@ export async function createChapter(novelId, title = "New Chapter") {
     order: maxOrder + 1,
     title,
     updatedAt: now,
+    summary: "",
+    pov: "",
+    status: "draft",
+    tags: [],
+    wordGoal: 0,
+    scenes: [],
     content: { type: "doc", content: [{ type: "paragraph" }] }
   };
   await db.chapters.put(chap);
@@ -142,6 +154,12 @@ export async function replaceFromImport(novelId, novelTitle, chapters) {
         order: i + 1,
         title: ch.title || `Chapter ${i + 1}`,
         updatedAt: now,
+        summary: ch.summary || "",
+        pov: ch.pov || "",
+        status: ch.status || "draft",
+        tags: Array.isArray(ch.tags) ? ch.tags : [],
+        wordGoal: Number.isFinite(ch.wordGoal) ? ch.wordGoal : 0,
+        scenes: Array.isArray(ch.scenes) ? ch.scenes : [],
         content: ch.doc || { type: "doc", content: [{ type: "paragraph" }] }
       });
     }
