@@ -8,6 +8,12 @@ A lightweight, installable web app for writing novels:
 - Optional online sync (simple JSON REST endpoint)
 - Export: **DOCX**, **PDF**, **RTF** (client-side)
 
+## Collaboration and cloud features
+- **Real-time collaboration:** Invite co-authors with view, comment, or edit permissions.
+- **Full version history:** Track revisions with diff previews and restore earlier drafts.
+- **Continuous cloud sync:** Automatic syncing across devices with offline editing and eventual synchronization.
+- **Comments and inline feedback:** Threaded discussions attached to specific text ranges.
+
 ## Run
 This is a static site. Serve the folder with any static server (recommended for Service Worker):
 
@@ -38,4 +44,3 @@ If no server is configured, the app works fully offline.
 ## Notes
 - External libraries are loaded from CDN ESM endpoints. The Service Worker will cache them after first load.
 - If you update files and caching seems stuck, open once with `?nosw=1` to unregister the Service Worker.
-
