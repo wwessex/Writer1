@@ -8,6 +8,11 @@ db.version(1).stores({
   novels: "id, title, updatedAt",
   chapters: "id, novelId, order, title, updatedAt"
 });
+db.version(2).stores({
+  novels: "id, title, updatedAt",
+  chapters: "id, novelId, order, title, updatedAt",
+  snapshots: "id, chapterId, createdAt"
+});
 
 export async function ensureDefaultNovel() {
   const existing = await db.novels.get("default");
@@ -87,7 +92,10 @@ export async function updateChapterMeta(id, patch) {
 }
 
 export async function deleteChapter(id) {
-  await db.chapters.delete(id);
+  await db.transaction("rw", db.chapters, db.snapshots, async () => {
+    await db.chapters.delete(id);
+    await db.snapshots.where({ chapterId: id }).delete();
+  });
 }
 
 export async function reorderChapters(novelId, orderedIds) {
@@ -105,24 +113,43 @@ export async function reorderChapters(novelId, orderedIds) {
   });
 }
 
-export async function exportBackup(novelId = "default") {
+export async function exportBackup(novelId = "default", { includeSnapshots = false } = {}) {
   const payload = await getNovel(novelId);
   payload.exportedAt = new Date().toISOString();
   payload.schemaVersion = 1;
+  if (includeSnapshots) {
+    const chapterIds = (payload.chapters || []).map(ch => ch.id);
+    if (chapterIds.length) {
+      payload.snapshots = await db.snapshots.where("chapterId").anyOf(chapterIds).sortBy("createdAt");
+    } else {
+      payload.snapshots = [];
+    }
+  }
   return payload;
 }
 
 export async function importBackup(payload) {
   if (!payload || payload.schemaVersion !== 1) throw new Error("Unsupported backup format");
-  const { novel, chapters } = payload;
+  const { novel, chapters, snapshots } = payload;
   if (!novel?.id || !Array.isArray(chapters)) throw new Error("Invalid backup");
 
-  await db.transaction("rw", db.novels, db.chapters, async () => {
+  await db.transaction("rw", db.novels, db.chapters, db.snapshots, async () => {
     await db.novels.put({ ...novel, updatedAt: Date.now() });
     // remove existing chapters for that novel id
+    const existingChapters = await db.chapters.where({ novelId: novel.id }).toArray();
+    const existingIds = existingChapters.map(c => c.id);
+    if (existingIds.length) {
+      await db.snapshots.where("chapterId").anyOf(existingIds).delete();
+    }
     await db.chapters.where({ novelId: novel.id }).delete();
     for (const c of chapters) {
       await db.chapters.put({ ...c, novelId: novel.id, updatedAt: Date.now() });
+    }
+    if (Array.isArray(snapshots) && snapshots.length) {
+      for (const snapshot of snapshots) {
+        if (!snapshot?.chapterId) continue;
+        await db.snapshots.put({ ...snapshot, id: snapshot.id || crypto.randomUUID() });
+      }
     }
   });
   return true;
@@ -134,7 +161,7 @@ export async function replaceFromImport(novelId, novelTitle, chapters) {
   if (!Array.isArray(chapters) || !chapters.length) throw new Error("No chapters to import");
 
   const now = Date.now();
-  await db.transaction("rw", db.novels, db.chapters, async () => {
+  await db.transaction("rw", db.novels, db.chapters, db.snapshots, async () => {
     const n = await db.novels.get(novelId);
     if (!n) {
       await db.novels.put({ id: novelId, title: novelTitle || "Untitled Novel", updatedAt: now });
@@ -144,6 +171,11 @@ export async function replaceFromImport(novelId, novelTitle, chapters) {
       await db.novels.put(n);
     }
 
+    const existingChapters = await db.chapters.where({ novelId }).toArray();
+    const existingIds = existingChapters.map(c => c.id);
+    if (existingIds.length) {
+      await db.snapshots.where("chapterId").anyOf(existingIds).delete();
+    }
     await db.chapters.where({ novelId }).delete();
 
     for (let i = 0; i < chapters.length; i++) {
@@ -171,4 +203,27 @@ export async function resetAllData() {
   await db.delete();
   // Dexie needs re-open after delete
   db.open();
+}
+
+export async function createSnapshot(chapterId, doc) {
+  if (!chapterId || !doc) return null;
+  const snapshot = {
+    id: crypto.randomUUID(),
+    chapterId,
+    createdAt: Date.now(),
+    doc
+  };
+  await db.snapshots.put(snapshot);
+  return snapshot;
+}
+
+export async function listSnapshotsForChapter(chapterId) {
+  if (!chapterId) return [];
+  const snapshots = await db.snapshots.where({ chapterId }).sortBy("createdAt");
+  return snapshots.reverse();
+}
+
+export async function getSnapshot(snapshotId) {
+  if (!snapshotId) return null;
+  return db.snapshots.get(snapshotId);
 }

@@ -98,12 +98,20 @@
     </div>
 
     <div class="menu" id="menu-tools" role="menu">
+      <button class="menuItem" data-action="snapshot-save"><span>Save Snapshot</span></button>
+      <button class="menuItem" data-action="snapshot-restore"><span>Restore Snapshot…</span></button>
+      <div class="menuSep"></div>
       <button class="menuItem" data-action="word-count"><span>Word count</span></button>
       <button class="menuItem" data-action="toggle-page"><span>Toggle Page View</span></button>
     </div>
 
     <div class="menu" id="menu-help" role="menu">
       <button class="menuItem" data-action="about">About</button>
+    </div>
+
+    <div class="menu" id="menu-chapter-context" role="menu">
+      <button class="menuItem" data-action="snapshot-save"><span>Save Snapshot</span></button>
+      <button class="menuItem" data-action="snapshot-restore"><span>Restore Snapshot…</span></button>
     </div>
   </nav>
 
@@ -248,6 +256,35 @@
       </div>
 
       <div class="modal__footer">
+        <button class="btn btn--ghost" value="cancel">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Snapshot modal -->
+  <dialog class="modal" id="snapshotModal">
+    <form method="dialog" class="modal__card modal__card--wide">
+      <div class="modal__header">
+        <div class="modal__title">Chapter snapshots</div>
+        <button class="iconBtn" value="cancel" aria-label="Close">✕</button>
+      </div>
+
+      <div class="modal__body">
+        <p class="muted">Snapshots capture this chapter's content so you can restore or preview earlier versions.</p>
+        <div class="snapshotLayout">
+          <div class="snapshotListWrap">
+            <div class="snapshotListHeader">Snapshots for <span id="snapshotChapterTitle">Untitled Chapter</span></div>
+            <div class="snapshotList" id="snapshotList"></div>
+          </div>
+          <div class="snapshotPreview">
+            <div class="snapshotPreview__header">Preview</div>
+            <pre class="snapshotPreview__body" id="snapshotPreviewText">Select a snapshot to preview.</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal__footer">
+        <button class="btn btn--ghost" id="btnSnapshotSave" type="button">Save Snapshot</button>
         <button class="btn btn--ghost" value="cancel">Close</button>
       </div>
     </form>
