@@ -301,6 +301,7 @@ body{
   height:calc(100dvh - var(--headerH, 180px) - var(--safeBottom));
   display:grid;
   grid-template-columns: minmax(280px, 360px) 1fr;
+  position:relative;
 }
 .sidebar{
   background:rgba(15,23,42,.70);
@@ -634,6 +635,64 @@ body.pageView .editor .ProseMirror blockquote{
   font-size:18px; cursor:pointer;
 }
 .iconBtn:hover{color:var(--text)}
+
+/* App windows */
+.appWindow{
+  position:absolute;
+  display:flex;
+  flex-direction:column;
+  gap:0;
+  width:min(640px, 92vw);
+  height:min(70vh, 600px);
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(15,23,42,.96);
+  border-radius:16px;
+  box-shadow: 0 18px 40px rgba(0,0,0,.45);
+  resize:both;
+  overflow:hidden;
+  min-width:320px;
+  min-height:240px;
+  z-index:2000;
+}
+.appWindow::after{
+  content:"";
+  position:absolute;
+  right:10px;
+  bottom:10px;
+  width:14px;
+  height:14px;
+  border-right:2px solid rgba(255,255,255,.3);
+  border-bottom:2px solid rgba(255,255,255,.3);
+  pointer-events:none;
+}
+.appWindow.is-hidden{display:none}
+.appWindow.is-active{
+  border-color: rgba(96,165,250,.55);
+  box-shadow: 0 22px 48px rgba(0,0,0,.55);
+}
+.appWindow.is-inactive{opacity:.92}
+.appWindow__header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:12px 14px 10px;
+  border-bottom:1px solid var(--line);
+  cursor:move;
+  user-select:none;
+  touch-action:none;
+}
+.appWindow__title{font-weight:800}
+.appWindow__body{
+  padding:14px;
+  overflow:auto;
+  flex:1;
+}
+.appWindow__footer{
+  padding:12px 14px;
+  border-top:1px solid var(--line);
+  display:flex;
+  justify-content:flex-end;
+}
 .grid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px}
 .row{display:flex; align-items:center; gap: var(--uiGap); margin-top:10px}
 .field{display:grid; gap:6px; margin-top:10px}
@@ -1098,6 +1157,15 @@ body{padding-top: var(--safeTop);}
   background: rgba(255,255,255,.98);
   border-color: rgba(0,0,0,.12);
   box-shadow: 0 18px 55px rgba(0,0,0,.18);
+}
+:root[data-theme="light"] .appWindow{
+  background: rgba(255,255,255,.96);
+  border-color: rgba(0,0,0,.12);
+  box-shadow: 0 18px 40px rgba(0,0,0,.18);
+}
+:root[data-theme="light"] .appWindow::after{
+  border-right-color: rgba(0,0,0,.25);
+  border-bottom-color: rgba(0,0,0,.25);
 }
 :root[data-theme="light"] .menu{
   background-color:#ffffff;

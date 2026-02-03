@@ -233,75 +233,13 @@
         <div id="editor" class="editor" aria-label="Editor"></div>
       </div>
     </section>
-  </main>
 
-  <!-- Export modal -->
-  <dialog class="modal" id="exportModal">
-    <form method="dialog" class="modal__card">
-      <div class="modal__header">
-        <div class="modal__title">Export</div>
-        <button class="iconBtn" value="cancel" aria-label="Close">✕</button>
+    <div class="appWindow is-hidden" id="settingsWindow" data-window-id="settings" data-default-width="640" data-default-height="600" data-default-x="48" data-default-y="32" role="dialog" aria-labelledby="settingsWindowTitle" aria-hidden="true" tabindex="-1">
+      <div class="appWindow__header" id="settingsWindowTitle">
+        <div class="appWindow__title">Settings</div>
+        <button class="iconBtn" type="button" data-window-close="settingsWindow" aria-label="Close">✕</button>
       </div>
-
-      <div class="modal__body">
-        <p class="muted">Exports the whole novel (all chapters) in current order.</p>
-        <div class="grid">
-          <button class="btn btn--primary" id="exportDocx" type="button">Export DOCX</button>
-          <button class="btn btn--primary" id="exportPdf" type="button">Export PDF</button>
-          <button class="btn btn--primary" id="exportRtf" type="button">Export RTF</button>
-        </div>
-        <div class="row">
-          <label class="check">
-            <input type="checkbox" id="exportIncludeChapterHeadings" checked />
-            Include chapter headings
-          </label>
-        </div>
-      </div>
-
-      <div class="modal__footer">
-        <button class="btn btn--ghost" value="cancel">Close</button>
-      </div>
-    </form>
-  </dialog>
-
-  <!-- Snapshot modal -->
-  <dialog class="modal" id="snapshotModal">
-    <form method="dialog" class="modal__card modal__card--wide">
-      <div class="modal__header">
-        <div class="modal__title">Chapter snapshots</div>
-        <button class="iconBtn" value="cancel" aria-label="Close">✕</button>
-      </div>
-
-      <div class="modal__body">
-        <p class="muted">Snapshots capture this chapter's content so you can restore or preview earlier versions.</p>
-        <div class="snapshotLayout">
-          <div class="snapshotListWrap">
-            <div class="snapshotListHeader">Snapshots for <span id="snapshotChapterTitle">Untitled Chapter</span></div>
-            <div class="snapshotList" id="snapshotList"></div>
-          </div>
-          <div class="snapshotPreview">
-            <div class="snapshotPreview__header">Preview</div>
-            <pre class="snapshotPreview__body" id="snapshotPreviewText">Select a snapshot to preview.</pre>
-          </div>
-        </div>
-      </div>
-
-      <div class="modal__footer">
-        <button class="btn btn--ghost" id="btnSnapshotSave" type="button">Save Snapshot</button>
-        <button class="btn btn--ghost" value="cancel">Close</button>
-      </div>
-    </form>
-  </dialog>
-
-  <!-- Settings modal -->
-  <dialog class="modal" id="settingsModal">
-    <form method="dialog" class="modal__card">
-      <div class="modal__header">
-        <div class="modal__title">Settings</div>
-        <button class="iconBtn" value="cancel" aria-label="Close">✕</button>
-      </div>
-
-      <div class="modal__body">
+      <div class="appWindow__body">
         <h3 class="h3">Online Sync (optional)</h3>
         <p class="muted">If configured, the app can sync your novel to a server when online.</p>
 
@@ -365,12 +303,116 @@
 
         <p class="muted small">Tip: if caching gets weird after an update, open once with <code>?nosw=1</code>.</p>
       </div>
+      <div class="appWindow__footer">
+        <button class="btn btn--ghost" type="button" data-window-close="settingsWindow">Close</button>
+      </div>
+    </div>
+
+    <div class="appWindow is-hidden" id="aboutWindow" data-window-id="about" data-default-width="760" data-default-height="600" data-default-x="84" data-default-y="48" role="dialog" aria-labelledby="aboutWindowTitle" aria-hidden="true" tabindex="-1">
+      <div class="appWindow__header" id="aboutWindowTitle">
+        <div class="appWindow__title">About NovelWriter</div>
+        <button class="iconBtn" type="button" data-window-close="aboutWindow" aria-label="Close">✕</button>
+      </div>
+      <div class="appWindow__body">
+        <p><strong>NovelWriter</strong> is an offline-first writing app.</p>
+        <ul>
+          <li>Chapters are isolated documents (editing one won't change the others).</li>
+          <li>Autosaves locally to your browser.</li>
+          <li>Exports to DOCX / PDF / RTF.</li>
+        </ul>
+        <h3 class="h3">Advanced planning tools</h3>
+        <ul>
+          <li><strong>Character, location, and item database:</strong> Dedicated panels for biographies, motivations, relationships, and reference images so complex casts stay organised.</li>
+          <li><strong>Plot grid and timeline:</strong> A chapter-by-plotline grid to visualise arcs, move scenes, and balance pacing.</li>
+          <li><strong>Corkboard/board view:</strong> Optional index-card or Kanban layouts for rearranging chapters and scenes alongside the outline.</li>
+          <li><strong>Character relationship maps:</strong> Interactive graphs that highlight connections, alliances, and arcs at a glance.</li>
+          <li><strong>Name generators and templates:</strong> Built-in generators for names, places, and prompts plus reusable character, location, and plot templates.</li>
+        </ul>
+        <h3 class="h3">Collaboration and cloud features</h3>
+        <ul>
+          <li><strong>Real-time collaboration:</strong> Invite co-authors to work together with granular permissions (view, comment, edit).</li>
+          <li><strong>Full version history:</strong> A timeline of every revision with diff previews and one-click restores.</li>
+          <li><strong>Continuous cloud sync:</strong> Automatic, secure syncing across web, desktop, and mobile with offline editing and eventual sync.</li>
+          <li><strong>Comments and inline feedback:</strong> Threaded discussions attached to text ranges for editor and beta-reader feedback.</li>
+        </ul>
+        <h3 class="h3">Writing quality insights</h3>
+        <ul>
+          <li><strong>Grammar and spelling suggestions:</strong> Optional LanguageTool integration to flag mistakes without leaving the editor.</li>
+          <li><strong>Style and pacing analysis:</strong> Spot repeated words, readability scores, and long-sentence pacing issues.</li>
+        </ul>
+        <h3 class="h3">Productivity and goal tracking</h3>
+        <ul>
+          <li><strong>Detailed goal management:</strong> Expand word-goal settings with adjustable schedules, progress charts, milestone notifications, and motivational messages.</li>
+          <li><strong>Distraction-free focus mode:</strong> A toggle that hides the outline and menus so only the editor remains, fading the rest of the interface away.</li>
+          <li><strong>Dictation and read-back:</strong> Speech recognition for hands-free drafting plus a “Read to Me” playback option for editing and accessibility.</li>
+          <li><strong>Progress visualisations:</strong> Graphs for word-count progress per day, per chapter, and overall, plus metrics like chapter length distribution and character appearances.</li>
+        </ul>
+        <p class="muted small">Tip: if the app ever looks out of date, open once with <code>?nosw=1</code> then reload.</p>
+      </div>
+      <div class="appWindow__footer">
+        <button class="btn btn--ghost" type="button" data-window-close="aboutWindow">Close</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Export modal -->
+  <dialog class="modal" id="exportModal">
+    <form method="dialog" class="modal__card">
+      <div class="modal__header">
+        <div class="modal__title">Export</div>
+        <button class="iconBtn" value="cancel" aria-label="Close">✕</button>
+      </div>
+
+      <div class="modal__body">
+        <p class="muted">Exports the whole novel (all chapters) in current order.</p>
+        <div class="grid">
+          <button class="btn btn--primary" id="exportDocx" type="button">Export DOCX</button>
+          <button class="btn btn--primary" id="exportPdf" type="button">Export PDF</button>
+          <button class="btn btn--primary" id="exportRtf" type="button">Export RTF</button>
+        </div>
+        <div class="row">
+          <label class="check">
+            <input type="checkbox" id="exportIncludeChapterHeadings" checked />
+            Include chapter headings
+          </label>
+        </div>
+      </div>
 
       <div class="modal__footer">
         <button class="btn btn--ghost" value="cancel">Close</button>
       </div>
     </form>
   </dialog>
+
+  <!-- Snapshot modal -->
+  <dialog class="modal" id="snapshotModal">
+    <form method="dialog" class="modal__card modal__card--wide">
+      <div class="modal__header">
+        <div class="modal__title">Chapter snapshots</div>
+        <button class="iconBtn" value="cancel" aria-label="Close">✕</button>
+      </div>
+
+      <div class="modal__body">
+        <p class="muted">Snapshots capture this chapter's content so you can restore or preview earlier versions.</p>
+        <div class="snapshotLayout">
+          <div class="snapshotListWrap">
+            <div class="snapshotListHeader">Snapshots for <span id="snapshotChapterTitle">Untitled Chapter</span></div>
+            <div class="snapshotList" id="snapshotList"></div>
+          </div>
+          <div class="snapshotPreview">
+            <div class="snapshotPreview__header">Preview</div>
+            <pre class="snapshotPreview__body" id="snapshotPreviewText">Select a snapshot to preview.</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal__footer">
+        <button class="btn btn--ghost" id="btnSnapshotSave" type="button">Save Snapshot</button>
+        <button class="btn btn--ghost" value="cancel">Close</button>
+      </div>
+    </form>
+  </dialog>
+
 
   <!-- Writing analysis modal -->
   <dialog class="modal" id="analysisModal">
@@ -437,54 +479,6 @@
   </dialog>
 
   
-  <!-- About modal -->
-  <dialog class="modal" id="aboutModal">
-    <form method="dialog" class="modal__card">
-      <div class="modal__header">
-        <div class="modal__title">About NovelWriter</div>
-        <button class="iconBtn" value="cancel" aria-label="Close">✕</button>
-      </div>
-      <div class="modal__body">
-        <p><strong>NovelWriter</strong> is an offline-first writing app.</p>
-        <ul>
-          <li>Chapters are isolated documents (editing one won't change the others).</li>
-          <li>Autosaves locally to your browser.</li>
-          <li>Exports to DOCX / PDF / RTF.</li>
-        </ul>
-        <h3 class="h3">Advanced planning tools</h3>
-        <ul>
-          <li><strong>Character, location, and item database:</strong> Dedicated panels for biographies, motivations, relationships, and reference images so complex casts stay organised.</li>
-          <li><strong>Plot grid and timeline:</strong> A chapter-by-plotline grid to visualise arcs, move scenes, and balance pacing.</li>
-          <li><strong>Corkboard/board view:</strong> Optional index-card or Kanban layouts for rearranging chapters and scenes alongside the outline.</li>
-          <li><strong>Character relationship maps:</strong> Interactive graphs that highlight connections, alliances, and arcs at a glance.</li>
-          <li><strong>Name generators and templates:</strong> Built-in generators for names, places, and prompts plus reusable character, location, and plot templates.</li>
-        </ul>
-        <h3 class="h3">Collaboration and cloud features</h3>
-        <ul>
-          <li><strong>Real-time collaboration:</strong> Invite co-authors to work together with granular permissions (view, comment, edit).</li>
-          <li><strong>Full version history:</strong> A timeline of every revision with diff previews and one-click restores.</li>
-          <li><strong>Continuous cloud sync:</strong> Automatic, secure syncing across web, desktop, and mobile with offline editing and eventual sync.</li>
-          <li><strong>Comments and inline feedback:</strong> Threaded discussions attached to text ranges for editor and beta-reader feedback.</li>
-        </ul>
-        <h3 class="h3">Writing quality insights</h3>
-        <ul>
-          <li><strong>Grammar and spelling suggestions:</strong> Optional LanguageTool integration to flag mistakes without leaving the editor.</li>
-          <li><strong>Style and pacing analysis:</strong> Spot repeated words, readability scores, and long-sentence pacing issues.</li>
-        </ul>
-        <h3 class="h3">Productivity and goal tracking</h3>
-        <ul>
-          <li><strong>Detailed goal management:</strong> Expand word-goal settings with adjustable schedules, progress charts, milestone notifications, and motivational messages.</li>
-          <li><strong>Distraction-free focus mode:</strong> A toggle that hides the outline and menus so only the editor remains, fading the rest of the interface away.</li>
-          <li><strong>Dictation and read-back:</strong> Speech recognition for hands-free drafting plus a “Read to Me” playback option for editing and accessibility.</li>
-          <li><strong>Progress visualisations:</strong> Graphs for word-count progress per day, per chapter, and overall, plus metrics like chapter length distribution and character appearances.</li>
-        </ul>
-        <p class="muted small">Tip: if the app ever looks out of date, open once with <code>?nosw=1</code> then reload.</p>
-      </div>
-      <div class="modal__footer">
-        <button class="btn btn--ghost" value="cancel">Close</button>
-      </div>
-    </form>
-  </dialog>
 
 
   <!-- Word count modal -->
