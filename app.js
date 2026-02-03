@@ -792,7 +792,7 @@ async function boot() {
 
   // Events
 
-  $("#novelTitle").addEventListener("input", debounce(async (e) => {
+  $("#novelTitle")?.addEventListener("input", debounce(async (e) => {
     const title = e.target.value.trim() || "Untitled Novel";
     state.novelTitle = title;
     $("#docTitleTop") && ($("#docTitleTop").value = title);
@@ -809,8 +809,8 @@ async function boot() {
     setStatus("Saved locally");
   }, 250));
 
-  $("#chapterTitle").addEventListener("input", () => autosaveDebounced?.());
-  $("#chapterTitle").addEventListener("blur", flushChapterTitle);
+  $("#chapterTitle")?.addEventListener("input", () => autosaveDebounced?.());
+  $("#chapterTitle")?.addEventListener("blur", flushChapterTitle);
 
   $("#chapterSummary")?.addEventListener("input", (e) => {
     const ch = state.chapters.find(c => c.id === state.activeChapterId);
@@ -852,7 +852,7 @@ async function boot() {
     renderSceneList(ch);
   });
 
-  $("#btnNewChapter").addEventListener("click", async () => {
+  $("#btnNewChapter")?.addEventListener("click", async () => {
     const chap = await createChapter(state.novelId, `Chapter ${state.chapters.length + 1}`);
     state.chapters.push(chap);
     await openChapter(chap.id);
@@ -860,7 +860,7 @@ async function boot() {
     setStatus("Chapter added");
   });
 
-  $("#btnDeleteChapter").addEventListener("click", async () => {
+  $("#btnDeleteChapter")?.addEventListener("click", async () => {
     const id = state.activeChapterId;
     if (!id) return;
     const ch = state.chapters.find(c => c.id === id);
@@ -877,14 +877,14 @@ async function boot() {
   });
 
   // Backup export/import
-  $("#btnBackup").addEventListener("click", async () => {
+  $("#btnBackup")?.addEventListener("click", async () => {
     await flushChapterTitle();
     const includeSnapshots = confirm("Include snapshots in this backup file?");
     const payload = await exportBackup(state.novelId, { includeSnapshots });
     downloadJSON(payload, `${safeFilename(state.novelTitle)}_backup_${nowStamp()}.json`);
   });
 
-  $("#importFile").addEventListener("change", async (e) => {
+  $("#importFile")?.addEventListener("change", async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
@@ -904,7 +904,7 @@ async function boot() {
   });
 
 
-  $("#importDocRtf").addEventListener("change", async (e) => {
+  $("#importDocRtf")?.addEventListener("change", async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -932,17 +932,17 @@ async function boot() {
 
   // Export modal
   const exportModal = $("#exportModal");
-  $("#btnExport").addEventListener("click", () => exportModal.showModal());
+  $("#btnExport")?.addEventListener("click", () => exportModal?.showModal());
 
   const getExportData = async () => {
     await flushChapterTitle();
-    const includeHeadings = $("#exportIncludeChapterHeadings").checked;
+    const includeHeadings = $("#exportIncludeChapterHeadings")?.checked ?? true;
     // refresh chapters from DB to ensure latest order + titles
     const { novel, chapters } = await getNovel(state.novelId);
     return { novelTitle: novel?.title, chapters, includeHeadings };
   };
 
-  $("#exportDocx").addEventListener("click", async () => {
+  $("#exportDocx")?.addEventListener("click", async () => {
     setStatus("Exporting DOCX…");
     const data = await getExportData();
     const mod = await import("./export.js");
@@ -950,7 +950,7 @@ async function boot() {
     setStatus("Exported DOCX");
   });
 
-  $("#exportPdf").addEventListener("click", async () => {
+  $("#exportPdf")?.addEventListener("click", async () => {
     setStatus("Exporting PDF…");
     const data = await getExportData();
     const mod = await import("./export.js");
@@ -958,7 +958,7 @@ async function boot() {
     setStatus("Exported PDF");
   });
 
-  $("#exportRtf").addEventListener("click", async () => {
+  $("#exportRtf")?.addEventListener("click", async () => {
     setStatus("Exporting RTF…");
     const data = await getExportData();
     const mod = await import("./export.js");
@@ -980,21 +980,32 @@ async function boot() {
 
   // Settings modal
   const settingsModal = $("#settingsModal");
-  $("#btnSettings").addEventListener("click", () => {
-    $("#syncNovelId").value = state.sync.novelId || "default";
-    $("#syncUrl").value = state.sync.url || "";
-    $("#syncAuth").value = state.sync.auth || "";
-    $("#autosaveMs").value = String(state.autosaveMs);
-    $("#dailyWordGoal").value = String(state.dailyWordGoal || 0);
-    $("#novelWordGoal").value = String(state.novelWordGoal || 0);
-    $("#assistEnabled").checked = !!state.assist.languageToolEnabled;
-    $("#assistUrl").value = state.assist.languageToolUrl || "";
-    $("#assistLanguage").value = state.assist.languageToolLanguage || "en-US";
-    $("#syncStatus").textContent = "";
-    settingsModal.showModal();
+  $("#btnSettings")?.addEventListener("click", () => {
+    const syncNovelId = $("#syncNovelId");
+    const syncUrl = $("#syncUrl");
+    const syncAuth = $("#syncAuth");
+    const autosaveMs = $("#autosaveMs");
+    const dailyWordGoal = $("#dailyWordGoal");
+    const novelWordGoal = $("#novelWordGoal");
+    const assistEnabled = $("#assistEnabled");
+    const assistUrl = $("#assistUrl");
+    const assistLanguage = $("#assistLanguage");
+    const syncStatus = $("#syncStatus");
+
+    if (syncNovelId) syncNovelId.value = state.sync.novelId || "default";
+    if (syncUrl) syncUrl.value = state.sync.url || "";
+    if (syncAuth) syncAuth.value = state.sync.auth || "";
+    if (autosaveMs) autosaveMs.value = String(state.autosaveMs);
+    if (dailyWordGoal) dailyWordGoal.value = String(state.dailyWordGoal || 0);
+    if (novelWordGoal) novelWordGoal.value = String(state.novelWordGoal || 0);
+    if (assistEnabled) assistEnabled.checked = !!state.assist.languageToolEnabled;
+    if (assistUrl) assistUrl.value = state.assist.languageToolUrl || "";
+    if (assistLanguage) assistLanguage.value = state.assist.languageToolLanguage || "en-US";
+    if (syncStatus) syncStatus.textContent = "";
+    settingsModal?.showModal();
   });
 
-  $("#autosaveMs").addEventListener("change", (e) => {
+  $("#autosaveMs")?.addEventListener("change", (e) => {
     const ms = Math.max(250, Math.min(5000, Number(e.target.value || 800)));
     state.autosaveMs = ms;
     configureAutosave();
@@ -1002,52 +1013,52 @@ async function boot() {
     setStatus("Settings saved");
   });
 
-  $("#dailyWordGoal").addEventListener("change", (e) => {
+  $("#dailyWordGoal")?.addEventListener("change", (e) => {
     state.dailyWordGoal = Math.max(0, Number(e.target.value || 0));
     saveSettings();
     updateCountsDebounced();
     setStatus("Settings saved");
   });
 
-  $("#novelWordGoal").addEventListener("change", (e) => {
+  $("#novelWordGoal")?.addEventListener("change", (e) => {
     state.novelWordGoal = Math.max(0, Number(e.target.value || 0));
     saveSettings();
     updateCountsDebounced();
     setStatus("Settings saved");
   });
 
-  $("#syncNovelId").addEventListener("input", debounce((e) => {
+  $("#syncNovelId")?.addEventListener("input", debounce((e) => {
     state.sync.novelId = e.target.value.trim();
     saveSettings();
   }, 200));
-  $("#syncUrl").addEventListener("input", debounce((e) => {
+  $("#syncUrl")?.addEventListener("input", debounce((e) => {
     state.sync.url = e.target.value.trim();
     saveSettings();
   }, 200));
-  $("#syncAuth").addEventListener("input", debounce((e) => {
+  $("#syncAuth")?.addEventListener("input", debounce((e) => {
     state.sync.auth = e.target.value;
     saveSettings();
   }, 200));
 
-  $("#assistEnabled").addEventListener("change", (e) => {
+  $("#assistEnabled")?.addEventListener("change", (e) => {
     state.assist.languageToolEnabled = e.target.checked;
     saveSettings();
     setStatus("Settings saved");
   });
-  $("#assistUrl").addEventListener("input", debounce((e) => {
+  $("#assistUrl")?.addEventListener("input", debounce((e) => {
     state.assist.languageToolUrl = e.target.value.trim();
     saveSettings();
   }, 200));
-  $("#assistLanguage").addEventListener("input", debounce((e) => {
+  $("#assistLanguage")?.addEventListener("input", debounce((e) => {
     state.assist.languageToolLanguage = e.target.value.trim() || "en-US";
     saveSettings();
   }, 200));
 
-  $("#btnSyncNow").addEventListener("click", async () => {
+  $("#btnSyncNow")?.addEventListener("click", async () => {
     await syncNow({ direction: "push" });
   });
 
-  $("#btnResetApp").addEventListener("click", async () => {
+  $("#btnResetApp")?.addEventListener("click", async () => {
     const ok = confirm("Reset ALL local NovelWriter data on this device/browser?");
     if (!ok) return;
     await resetAllData();
@@ -1535,7 +1546,7 @@ function setupMenus() {
       m.classList.remove("is-open");
       // Ensure inline display doesn't keep it visible
       m.style.display = "none";
-      const menusRoot = document.querySelector(".menus");
+      const menusRoot = document.querySelector(".menubar");
       if (menusRoot && m.parentElement === document.body) menusRoot.appendChild(m);
     });
   };
@@ -1558,7 +1569,6 @@ function setupMenus() {
   const openMenu = (key, btn) => {
     closeAllMenus();
     const menu = menus[key];
-    const menusRoot = document.querySelector(".menus");
     if (!menu) return;
 
     // Make it visible for measurement/positioning
