@@ -52,108 +52,116 @@
     </div>
   </div>
 
-  <nav class="menubar" aria-label="Menu">
-    <button class="menuBtn" data-menu="file">File</button>
-    <button class="menuBtn" data-menu="edit">Edit</button>
-    <button class="menuBtn" data-menu="view">View</button>
-    <button class="menuBtn" data-menu="insert">Insert</button>
-    <button class="menuBtn" data-menu="format">Format</button>
-    <button class="menuBtn" data-menu="tools">Tools</button>
-    <button class="menuBtn" data-menu="help">Help</button>
+  <div class="headerTools" id="headerTools">
+    <button class="btn btn--ghost headerTools__toggle" id="btnToggleTools" aria-expanded="false" aria-controls="headerToolsPanel">
+      <span class="material-symbols-rounded" aria-hidden="true">menu</span>
+      <span class="btnLabel">Tools</span>
+    </button>
+    <div class="headerTools__panel" id="headerToolsPanel">
+      <nav class="menubar" aria-label="Menu">
+        <button class="menuBtn" data-menu="file">File</button>
+        <button class="menuBtn" data-menu="edit">Edit</button>
+        <button class="menuBtn" data-menu="view">View</button>
+        <button class="menuBtn" data-menu="insert">Insert</button>
+        <button class="menuBtn" data-menu="format">Format</button>
+        <button class="menuBtn" data-menu="tools">Tools</button>
+        <button class="menuBtn" data-menu="help">Help</button>
 
-    <div class="menu" id="menu-file" role="menu">
-      <button class="menuItem" data-action="export"><span>Export…</span><span class="menuShortcut">Ctrl/Cmd+Shift+E</span></button>
-      <button class="menuItem" data-action="backup-export">Export Backup</button>
-      <button class="menuItem" data-action="backup-import">Import Backup…</button>
-      <button class="menuItem" data-action="import-docrtf">Import Word/RTF…</button>
-      <div class="menuSep"></div>
-      <button class="menuItem" data-action="settings">Settings…</button>
-    </div>
+        <div class="menu" id="menu-file" role="menu">
+          <button class="menuItem" data-action="export"><span>Export…</span><span class="menuShortcut">Ctrl/Cmd+Shift+E</span></button>
+          <button class="menuItem" data-action="backup-export">Export Backup</button>
+          <button class="menuItem" data-action="backup-import">Import Backup…</button>
+          <button class="menuItem" data-action="import-docrtf">Import Word/RTF…</button>
+          <div class="menuSep"></div>
+          <button class="menuItem" data-action="settings">Settings…</button>
+        </div>
 
-    <div class="menu" id="menu-edit" role="menu">
-      <button class="menuItem" data-action="undo"><span>Undo</span><span class="menuShortcut">Ctrl/Cmd+Z</span></button>
-      <button class="menuItem" data-action="redo"><span>Redo</span><span class="menuShortcut">Ctrl/Cmd+Shift+Z</span></button>
-      <div class="menuSep"></div>
-      <button class="menuItem" data-action="select-all"><span>Select All</span><span class="menuShortcut">Ctrl/Cmd+A</span></button>
-    </div>
+        <div class="menu" id="menu-edit" role="menu">
+          <button class="menuItem" data-action="undo"><span>Undo</span><span class="menuShortcut">Ctrl/Cmd+Z</span></button>
+          <button class="menuItem" data-action="redo"><span>Redo</span><span class="menuShortcut">Ctrl/Cmd+Shift+Z</span></button>
+          <div class="menuSep"></div>
+          <button class="menuItem" data-action="select-all"><span>Select All</span><span class="menuShortcut">Ctrl/Cmd+A</span></button>
+        </div>
 
-    <div class="menu" id="menu-view" role="menu">
-      <button class="menuItem" data-action="toggle-sidebar"><span>Toggle Chapters</span><span class="menuShortcut">Ctrl/Cmd+Shift+B</span></button>
-      <button class="menuItem" data-action="toggle-page"><span>Toggle Page View</span></button>
-    </div>
+        <div class="menu" id="menu-view" role="menu">
+          <button class="menuItem" data-action="toggle-sidebar"><span>Toggle Chapters</span><span class="menuShortcut">Ctrl/Cmd+Shift+B</span></button>
+          <button class="menuItem" data-action="toggle-page"><span>Toggle Page View</span></button>
+        </div>
 
-    <div class="menu" id="menu-insert" role="menu">
-      <button class="menuItem" data-action="hr"><span>Horizontal Line</span></button>
-      <button class="menuItem" data-action="blockquote"><span>Blockquote</span></button>
-    </div>
+        <div class="menu" id="menu-insert" role="menu">
+          <button class="menuItem" data-action="hr"><span>Horizontal Line</span></button>
+          <button class="menuItem" data-action="blockquote"><span>Blockquote</span></button>
+        </div>
 
-    <div class="menu" id="menu-format" role="menu">
-      <button class="menuItem" data-action="bold"><span>Bold</span><span class="menuShortcut">Ctrl/Cmd+B</span></button>
-      <button class="menuItem" data-action="italic"><span>Italic</span><span class="menuShortcut">Ctrl/Cmd+I</span></button>
-      <button class="menuItem" data-action="underline"><span>Underline</span><span class="menuShortcut">Ctrl/Cmd+U</span></button>
-      <div class="menuSep"></div>
-      <button class="menuItem" data-action="h1"><span>Heading 1</span></button>
-      <button class="menuItem" data-action="h2"><span>Heading 2</span></button>
-      <button class="menuItem" data-action="p"><span>Paragraph</span></button>
-    </div>
+        <div class="menu" id="menu-format" role="menu">
+          <button class="menuItem" data-action="bold"><span>Bold</span><span class="menuShortcut">Ctrl/Cmd+B</span></button>
+          <button class="menuItem" data-action="italic"><span>Italic</span><span class="menuShortcut">Ctrl/Cmd+I</span></button>
+          <button class="menuItem" data-action="underline"><span>Underline</span><span class="menuShortcut">Ctrl/Cmd+U</span></button>
+          <div class="menuSep"></div>
+          <button class="menuItem" data-action="h1"><span>Heading 1</span></button>
+          <button class="menuItem" data-action="h2"><span>Heading 2</span></button>
+          <button class="menuItem" data-action="p"><span>Paragraph</span></button>
+        </div>
 
-    <div class="menu" id="menu-tools" role="menu">
-      <button class="menuItem" data-action="snapshot-save"><span>Save Snapshot</span></button>
-      <button class="menuItem" data-action="snapshot-restore"><span>Restore Snapshot…</span></button>
-      <div class="menuSep"></div>
-      <button class="menuItem" data-action="writing-analysis"><span>Writing analysis</span></button>
-      <button class="menuItem" data-action="grammar-check"><span>Grammar &amp; spell check</span></button>
-      <div class="menuSep"></div>
-      <button class="menuItem" data-action="word-count"><span>Word count</span></button>
-      <button class="menuItem" data-action="toggle-page"><span>Toggle Page View</span></button>
-    </div>
+        <div class="menu" id="menu-tools" role="menu">
+          <button class="menuItem" data-action="snapshot-save"><span>Save Snapshot</span></button>
+          <button class="menuItem" data-action="snapshot-restore"><span>Restore Snapshot…</span></button>
+          <div class="menuSep"></div>
+          <button class="menuItem" data-action="writing-analysis"><span>Writing analysis</span></button>
+          <button class="menuItem" data-action="grammar-check"><span>Grammar &amp; spell check</span></button>
+          <div class="menuSep"></div>
+          <button class="menuItem" data-action="word-count"><span>Word count</span></button>
+          <button class="menuItem" data-action="toggle-page"><span>Toggle Page View</span></button>
+        </div>
 
-    <div class="menu" id="menu-help" role="menu">
-      <button class="menuItem" data-action="about">About</button>
-    </div>
+        <div class="menu" id="menu-help" role="menu">
+          <button class="menuItem" data-action="about">About</button>
+        </div>
 
-    <div class="menu" id="menu-chapter-context" role="menu">
-      <button class="menuItem" data-action="snapshot-save"><span>Save Snapshot</span></button>
-      <button class="menuItem" data-action="snapshot-restore"><span>Restore Snapshot…</span></button>
-    </div>
-  </nav>
+        <div class="menu" id="menu-chapter-context" role="menu">
+          <button class="menuItem" data-action="snapshot-save"><span>Save Snapshot</span></button>
+          <button class="menuItem" data-action="snapshot-restore"><span>Restore Snapshot…</span></button>
+        </div>
+      </nav>
 
-  <div class="ribbon" id="toolbar" aria-label="Toolbar">
-    <div class="ribbonGroup">
-      <label class="ribbonLabel">Style</label>
-      <select class="select" id="styleSelect" aria-label="Style">
-        <option value="p">Normal</option>
-        <option value="h1">Heading 1</option>
-        <option value="h2">Heading 2</option>
-        <option value="quote">Quote</option>
-      </select>
-    </div>
+      <div class="ribbon" id="toolbar" aria-label="Toolbar">
+        <div class="ribbonGroup">
+          <label class="ribbonLabel">Style</label>
+          <select class="select" id="styleSelect" aria-label="Style">
+            <option value="p">Normal</option>
+            <option value="h1">Heading 1</option>
+            <option value="h2">Heading 2</option>
+            <option value="quote">Quote</option>
+          </select>
+        </div>
 
-    <div class="ribbonGroup">
-      <label class="ribbonLabel">Font</label>
-      <div class="ribbonRow">
-        <button class="tb" data-cmd="bold" title="Bold (Ctrl/Cmd+B)"><b>B</b></button>
-        <button class="tb" data-cmd="italic" title="Italic (Ctrl/Cmd+I)"><i>I</i></button>
-        <button class="tb" data-cmd="underline" title="Underline (Ctrl/Cmd+U)"><u>U</u></button>
-        <button class="tb" data-cmd="strike" title="Strike"><s>S</s></button>
-      </div>
-    </div>
+        <div class="ribbonGroup">
+          <label class="ribbonLabel">Font</label>
+          <div class="ribbonRow">
+            <button class="tb" data-cmd="bold" title="Bold (Ctrl/Cmd+B)"><b>B</b></button>
+            <button class="tb" data-cmd="italic" title="Italic (Ctrl/Cmd+I)"><i>I</i></button>
+            <button class="tb" data-cmd="underline" title="Underline (Ctrl/Cmd+U)"><u>U</u></button>
+            <button class="tb" data-cmd="strike" title="Strike"><s>S</s></button>
+          </div>
+        </div>
 
-    <div class="ribbonGroup">
-      <label class="ribbonLabel">Paragraph</label>
-      <div class="ribbonRow">
-        <button class="tb" data-cmd="ul" title="Bullet list (Ctrl/Cmd+Shift+8)">• List</button>
-        <button class="tb" data-cmd="ol" title="Ordered list (Ctrl/Cmd+Shift+7)">1. List</button>
-        <button class="tb" data-cmd="quote" title="Blockquote">❝ ❞</button>
-        <button class="tb" data-cmd="hr" title="Horizontal line">―</button>
-      </div>
-    </div>
+        <div class="ribbonGroup">
+          <label class="ribbonLabel">Paragraph</label>
+          <div class="ribbonRow">
+            <button class="tb" data-cmd="ul" title="Bullet list (Ctrl/Cmd+Shift+8)">• List</button>
+            <button class="tb" data-cmd="ol" title="Ordered list (Ctrl/Cmd+Shift+7)">1. List</button>
+            <button class="tb" data-cmd="quote" title="Blockquote">❝ ❞</button>
+            <button class="tb" data-cmd="hr" title="Horizontal line">―</button>
+          </div>
+        </div>
 
-    <div class="ribbonGroup">
-      <label class="ribbonLabel">History</label>
-      <div class="ribbonRow">
-        <button class="tb" data-cmd="undo" title="Undo (Ctrl/Cmd+Z)">↶</button>
-        <button class="tb" data-cmd="redo" title="Redo (Ctrl/Cmd+Shift+Z)">↷</button>
+        <div class="ribbonGroup">
+          <label class="ribbonLabel">History</label>
+          <div class="ribbonRow">
+            <button class="tb" data-cmd="undo" title="Undo (Ctrl/Cmd+Z)">↶</button>
+            <button class="tb" data-cmd="redo" title="Redo (Ctrl/Cmd+Shift+Z)">↷</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>

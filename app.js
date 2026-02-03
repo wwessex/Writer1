@@ -1805,6 +1805,16 @@ function setupMenus() {
     help: $("#menu-help"),
     "chapter-context": $("#menu-chapter-context")
   };
+  const toolsRoot = document.querySelector(".headerTools");
+  const toolsToggle = $("#btnToggleTools");
+
+  const setToolsOpen = (isOpen) => {
+    if (!toolsRoot || !toolsToggle) return;
+    toolsRoot.classList.toggle("is-open", isOpen);
+    toolsToggle.setAttribute("aria-expanded", String(isOpen));
+    if (!isOpen) closeAllMenus();
+    updateHeaderHeight();
+  };
 
   const closeAllMenus = () => {
     document.querySelectorAll(".menuBtn").forEach(b => b.classList.remove("is-open"));
@@ -1891,9 +1901,22 @@ function setupMenus() {
     });
   });
 
+  toolsToggle?.addEventListener("click", (e) => {
+    e.preventDefault();
+    setToolsOpen(!toolsRoot?.classList.contains("is-open"));
+  });
+
   document.addEventListener("click", (e) => {
     const inMenu = e.target.closest(".menubar") || e.target.closest(".menu");
     if (!inMenu) closeAllMenus();
+    const inTools = e.target.closest(".headerTools") || e.target.closest(".menu");
+    if (!inTools) setToolsOpen(false);
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    closeAllMenus();
+    setToolsOpen(false);
   });
 
   // Menu actions
