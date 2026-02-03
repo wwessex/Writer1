@@ -1,5 +1,7 @@
 // app.js — main UI + state
-import {
+import * as storage from "./storage.js";
+
+const {
   ensureDefaultNovel,
   getNovel,
   updateNovelTitle,
@@ -10,9 +12,10 @@ import {
   exportBackup,
   importBackup,
   resetAllData,
-  createSnapshot,
-  listSnapshotsForChapter
-} from "./storage.js";
+  createSnapshot
+} = storage;
+
+const listSnapshotsForChapter = storage.listSnapshotsForChapter || (async () => []);
 
 import { createNovelEditor, setEditorDoc, bindToolbar, editorToPlainText } from "./editor.js";
 
