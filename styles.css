@@ -33,6 +33,9 @@
   --shadow: var(--shadow-3);
   --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  --transition-bg: 180ms ease;
+  --transition-border: 180ms ease;
+  --transition-transform: 120ms ease;
 }
 
 /* Theme tokens (Material-ish) */
@@ -248,6 +251,7 @@ body{
   border-radius: var(--radius-sm);
   cursor:pointer;
   font-size:var(--text-sm);
+  transition: background var(--transition-bg), border-color var(--transition-border), transform var(--transition-transform);
 }
 .menuShortcut{
   color:var(--muted);
@@ -256,6 +260,7 @@ body{
   white-space:nowrap;
 }
 .menuItem:hover{background:rgba(255,255,255,.06)}
+.menuItem:active{transform:translateY(1px)}
 .menuItem:focus-visible{
   outline:2px solid var(--accent);
   outline-offset:2px;
@@ -331,6 +336,7 @@ body{
   box-shadow: 0 8px 24px rgba(0,0,0,.25);
   font-size:12px;
   color: var(--text);
+  transition: background var(--transition-bg), border-color var(--transition-border), transform var(--transition-transform);
 }
 .pillLabel{color:var(--muted)}
 .pillValue{font-weight:800}
@@ -341,6 +347,8 @@ body{
 }
 .pill.is-offline .dot{background: rgba(251,113,133,.90); box-shadow: 0 0 0 3px rgba(251,113,133,.14)}
 .pill.is-online .dot{background: rgba(34,211,238,.85)}
+.pill:hover{background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.18)}
+.pill:active{transform:translateY(1px)}
 
 .topbar__actions{display:flex; gap:8px}
 
@@ -489,7 +497,7 @@ body.pageView .editor .ProseMirror blockquote{
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-1);
   cursor:pointer;
-  transition:transform .06s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+  transition: background var(--transition-bg), border-color var(--transition-border), box-shadow var(--transition-bg), transform var(--transition-transform);
 }
 .btn:hover{background:rgba(255,255,255,.08); box-shadow: 0 0 0 4px rgba(96,165,250,.10), var(--shadow-1)}
 .btn:active{transform:translateY(1px)}
@@ -733,8 +741,11 @@ body.pageView .editor .ProseMirror blockquote{
 .iconBtn{
   border:none; background:transparent; color:var(--muted);
   font-size:18px; cursor:pointer;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-bg), background var(--transition-bg), transform var(--transition-transform);
 }
-.iconBtn:hover{color:var(--text)}
+.iconBtn:hover{color:var(--text); background: rgba(255,255,255,.08)}
+.iconBtn:active{transform:translateY(1px)}
 .iconBtn:focus-visible{
   outline:2px solid var(--accent);
   outline-offset:2px;
@@ -798,6 +809,21 @@ body.pageView .editor .ProseMirror blockquote{
   border-top:1px solid var(--line);
   display:flex;
   justify-content:flex-end;
+}
+
+.tab{
+  transition: background var(--transition-bg), border-color var(--transition-border), transform var(--transition-transform), box-shadow var(--transition-bg);
+}
+.tab:hover{background: rgba(255,255,255,.08)}
+.tab:active{transform:translateY(1px)}
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 .grid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px}
 .row{display:flex; align-items:center; gap: var(--uiGap); margin-top:10px}
