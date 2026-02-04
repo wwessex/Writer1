@@ -130,7 +130,7 @@ function tokenizeWords(text) {
 --------------------------- */
 const WINDOW_HIDDEN_CLASS = "is-hidden";
 const WINDOW_ACTIVE_CLASS = "is-active";
-let windowZ = 2000;
+let windowZ = 10001;
 const windowFocusMemory = new Map();
 
 function getAppFrame() {
