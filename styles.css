@@ -769,7 +769,7 @@ body.pageView .editor .ProseMirror blockquote{
   overflow:hidden;
   min-width:320px;
   min-height:240px;
-  z-index:2000;
+  z-index:10001;
 }
 .appWindow::after{
   content:"";
