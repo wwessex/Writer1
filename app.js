@@ -134,7 +134,7 @@ let windowZ = 2000;
 const windowFocusMemory = new Map();
 
 function getAppFrame() {
-  return document.querySelector(".layout");
+  return document.querySelector(".layout") || document.body;
 }
 
 function getWindowId(windowEl) {
@@ -143,54 +143,78 @@ function getWindowId(windowEl) {
 
 function getWindowStateFromElement(windowEl, frameRect) {
   const rect = windowEl.getBoundingClientRect();
+  // Windows are now position:fixed, so use viewport coordinates directly
   return {
-    x: rect.left - frameRect.left,
-    y: rect.top - frameRect.top,
+    x: rect.left,
+    y: rect.top,
     width: rect.width,
     height: rect.height
   };
 }
 
 function getDefaultWindowState(windowEl, frameRect) {
+  // Use viewport dimensions for fixed positioned windows
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
   const defaultWidth = Number(windowEl.dataset.defaultWidth);
   const defaultHeight = Number(windowEl.dataset.defaultHeight);
   const width = Math.min(
-    Number.isFinite(defaultWidth) ? defaultWidth : Math.min(640, frameRect.width - 40),
-    frameRect.width - 12
+    Number.isFinite(defaultWidth) ? defaultWidth : Math.min(640, vw - 40),
+    vw - 24
   );
   const height = Math.min(
-    Number.isFinite(defaultHeight) ? defaultHeight : Math.min(560, frameRect.height - 40),
-    frameRect.height - 12
+    Number.isFinite(defaultHeight) ? defaultHeight : Math.min(560, vh - 40),
+    vh - 24
   );
   const defaultX = Number(windowEl.dataset.defaultX);
   const defaultY = Number(windowEl.dataset.defaultY);
   const x = clamp(
-    Number.isFinite(defaultX) ? defaultX : (frameRect.width - width) / 2,
-    0,
-    frameRect.width - width
+    Number.isFinite(defaultX) ? defaultX : (vw - width) / 2,
+    12,
+    Math.max(vw - width - 12, 12)
   );
   const y = clamp(
-    Number.isFinite(defaultY) ? defaultY : (frameRect.height - height) / 2,
-    0,
-    frameRect.height - height
+    Number.isFinite(defaultY) ? defaultY : (vh - height) / 2,
+    12,
+    Math.max(vh - height - 12, 12)
   );
   return { x, y, width, height };
 }
 
 function isWindowStateOutOfBounds(state, frameRect) {
+  // Use viewport for fixed positioned windows
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  // Check for invalid/NaN values first
+  if (!state || !Number.isFinite(state.x) || !Number.isFinite(state.y) ||
+      !Number.isFinite(state.width) || !Number.isFinite(state.height)) {
+    return true;
+  }
   return (
     state.x < 0 ||
     state.y < 0 ||
-    state.x + state.width > frameRect.width ||
-    state.y + state.height > frameRect.height
+    state.x + state.width > vw ||
+    state.y + state.height > vh
   );
 }
 
 function constrainWindowState(state, frameRect) {
-  const width = Math.min(Math.max(state.width, 320), frameRect.width - 12);
-  const height = Math.min(Math.max(state.height, 240), frameRect.height - 12);
-  const x = clamp(state.x, 0, frameRect.width - width);
-  const y = clamp(state.y, 0, frameRect.height - height);
+  // Use viewport for fixed positioned windows
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  // Ensure valid numeric values with fallbacks
+  const inputWidth = Number.isFinite(state?.width) ? state.width : 480;
+  const inputHeight = Number.isFinite(state?.height) ? state.height : 400;
+  const inputX = Number.isFinite(state?.x) ? state.x : 48;
+  const inputY = Number.isFinite(state?.y) ? state.y : 32;
+
+  const width = Math.min(Math.max(inputWidth, 320), Math.max(vw - 24, 320));
+  const height = Math.min(Math.max(inputHeight, 240), Math.max(vh - 24, 240));
+  const x = clamp(inputX, 12, Math.max(vw - width - 12, 12));
+  const y = clamp(inputY, 12, Math.max(vh - height - 12, 12));
   return { x, y, width, height };
 }
 
@@ -280,9 +304,26 @@ function openWindow(windowId) {
   if (document.activeElement instanceof HTMLElement) {
     windowFocusMemory.set(windowEl, document.activeElement);
   }
-  restoreWindowState(windowEl);
+
+  // First make visible so we can measure/position properly
   windowEl.classList.remove(WINDOW_HIDDEN_CLASS);
   windowEl.setAttribute("aria-hidden", "false");
+
+  // Now position it (needs to be visible for measurements)
+  restoreWindowState(windowEl);
+
+  // Ensure minimum visibility with fallback positioning
+  const rect = windowEl.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0 || rect.right < 10 || rect.bottom < 10) {
+    // Fallback: position in center of viewport
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    windowEl.style.left = `${Math.max(20, (vw - 500) / 2)}px`;
+    windowEl.style.top = `${Math.max(20, (vh - 400) / 2)}px`;
+    windowEl.style.width = `${Math.min(500, vw - 40)}px`;
+    windowEl.style.height = `${Math.min(400, vh - 40)}px`;
+  }
+
   bringWindowToFront(windowEl);
   focusFirstElement(windowEl);
 }
