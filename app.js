@@ -131,6 +131,7 @@ function tokenizeWords(text) {
 const WINDOW_HIDDEN_CLASS = "is-hidden";
 const WINDOW_ACTIVE_CLASS = "is-active";
 let windowZ = 2000;
+const windowFocusMemory = new Map();
 
 function getAppFrame() {
   return document.querySelector(".layout");
@@ -276,6 +277,9 @@ function handleWindowKeydown(windowEl, event) {
 function openWindow(windowId) {
   const windowEl = document.getElementById(windowId);
   if (!windowEl) return;
+  if (document.activeElement instanceof HTMLElement) {
+    windowFocusMemory.set(windowEl, document.activeElement);
+  }
   restoreWindowState(windowEl);
   windowEl.classList.remove(WINDOW_HIDDEN_CLASS);
   windowEl.setAttribute("aria-hidden", "false");
@@ -290,6 +294,11 @@ function closeWindow(windowElOrId) {
   windowEl.setAttribute("aria-hidden", "true");
   windowEl.classList.remove(WINDOW_ACTIVE_CLASS);
   windowEl.classList.remove("is-inactive");
+  const previousFocus = windowFocusMemory.get(windowEl);
+  if (previousFocus?.isConnected) {
+    previousFocus.focus();
+  }
+  windowFocusMemory.delete(windowEl);
 }
 
 function toggleWindow(windowId) {
@@ -1805,8 +1814,15 @@ function setupMenus() {
     help: $("#menu-help"),
     "chapter-context": $("#menu-chapter-context")
   };
+  const menuButtons = Array.from(document.querySelectorAll(".menuBtn"));
   const toolsRoot = document.querySelector(".headerTools");
   const toolsToggle = $("#btnToggleTools");
+  let activeMenuButton = null;
+
+  const setMenuButtonExpanded = (btn, isOpen) => {
+    if (!btn) return;
+    btn.setAttribute("aria-expanded", String(isOpen));
+  };
 
   const setToolsOpen = (isOpen) => {
     if (!toolsRoot || !toolsToggle) return;
@@ -1817,7 +1833,10 @@ function setupMenus() {
   };
 
   const closeAllMenus = () => {
-    document.querySelectorAll(".menuBtn").forEach(b => b.classList.remove("is-open"));
+    menuButtons.forEach(b => {
+      b.classList.remove("is-open");
+      setMenuButtonExpanded(b, false);
+    });
     Object.values(menus).forEach(m => {
       if (!m) return;
       m.classList.remove("is-open");
@@ -1826,6 +1845,7 @@ function setupMenus() {
       const menusRoot = document.querySelector(".menubar");
       if (menusRoot && m.parentElement === document.body) menusRoot.appendChild(m);
     });
+    activeMenuButton = null;
   };
 
   const positionMenu = (menu, left, top) => {
@@ -1840,6 +1860,15 @@ function setupMenus() {
     if (clampedTop < 8) clampedTop = 8;
     menu.style.left = Math.round(clampedLeft) + "px";
     menu.style.top = Math.round(clampedTop) + "px";
+  };
+
+  const getMenuItems = (menu) => Array.from(menu.querySelectorAll(".menuItem")).filter(item => !item.disabled);
+
+  const focusMenuItem = (menu, index) => {
+    const items = getMenuItems(menu);
+    if (!items.length) return;
+    const clampedIndex = (index + items.length) % items.length;
+    items[clampedIndex].focus();
   };
 
   // Position menu under clicked button
@@ -1874,6 +1903,9 @@ function setupMenus() {
     positionMenu(menu, left, top);
 
     btn.classList.add("is-open");
+    setMenuButtonExpanded(btn, true);
+    activeMenuButton = btn;
+    focusMenuItem(menu, 0);
   };
 
   openContextMenuAt = (key, position) => {
@@ -1891,7 +1923,7 @@ function setupMenus() {
     positionMenu(menu, position?.x ?? 8, position?.y ?? 8);
   };
 
-  document.querySelectorAll(".menuBtn").forEach(btn => {
+  menuButtons.forEach(btn => {
     btn.addEventListener("click", (e) => {
       const key = btn.dataset.menu;
       const menu = menus[key];
@@ -1917,6 +1949,27 @@ function setupMenus() {
     if (e.key !== "Escape") return;
     closeAllMenus();
     setToolsOpen(false);
+  });
+
+  Object.values(menus).forEach(menu => {
+    if (!menu) return;
+    menu.addEventListener("keydown", (event) => {
+      if (!menu.classList.contains("is-open")) return;
+      const items = getMenuItems(menu);
+      if (!items.length) return;
+      const currentIndex = items.indexOf(document.activeElement);
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        focusMenuItem(menu, currentIndex < 0 ? 0 : currentIndex + 1);
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        focusMenuItem(menu, currentIndex < 0 ? items.length - 1 : currentIndex - 1);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        closeAllMenus();
+        activeMenuButton?.focus();
+      }
+    });
   });
 
   // Menu actions
