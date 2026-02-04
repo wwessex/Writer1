@@ -299,33 +299,40 @@ function handleWindowKeydown(windowEl, event) {
 }
 
 function openWindow(windowId) {
-  const windowEl = document.getElementById(windowId);
-  if (!windowEl) return;
-  if (document.activeElement instanceof HTMLElement) {
-    windowFocusMemory.set(windowEl, document.activeElement);
+  try {
+    const windowEl = document.getElementById(windowId);
+    if (!windowEl) {
+      console.warn("openWindow: element not found:", windowId);
+      return;
+    }
+    if (document.activeElement instanceof HTMLElement) {
+      windowFocusMemory.set(windowEl, document.activeElement);
+    }
+
+    // First make visible so we can measure/position properly
+    windowEl.classList.remove(WINDOW_HIDDEN_CLASS);
+    windowEl.setAttribute("aria-hidden", "false");
+
+    // Now position it (needs to be visible for measurements)
+    restoreWindowState(windowEl);
+
+    // Ensure minimum visibility with fallback positioning
+    const rect = windowEl.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0 || rect.right < 10 || rect.bottom < 10) {
+      // Fallback: position in center of viewport
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      windowEl.style.left = `${Math.max(20, (vw - 500) / 2)}px`;
+      windowEl.style.top = `${Math.max(20, (vh - 400) / 2)}px`;
+      windowEl.style.width = `${Math.min(500, vw - 40)}px`;
+      windowEl.style.height = `${Math.min(400, vh - 40)}px`;
+    }
+
+    bringWindowToFront(windowEl);
+    focusFirstElement(windowEl);
+  } catch (err) {
+    console.error("Failed to open window:", windowId, err);
   }
-
-  // First make visible so we can measure/position properly
-  windowEl.classList.remove(WINDOW_HIDDEN_CLASS);
-  windowEl.setAttribute("aria-hidden", "false");
-
-  // Now position it (needs to be visible for measurements)
-  restoreWindowState(windowEl);
-
-  // Ensure minimum visibility with fallback positioning
-  const rect = windowEl.getBoundingClientRect();
-  if (rect.width === 0 || rect.height === 0 || rect.right < 10 || rect.bottom < 10) {
-    // Fallback: position in center of viewport
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    windowEl.style.left = `${Math.max(20, (vw - 500) / 2)}px`;
-    windowEl.style.top = `${Math.max(20, (vh - 400) / 2)}px`;
-    windowEl.style.width = `${Math.min(500, vw - 40)}px`;
-    windowEl.style.height = `${Math.min(400, vh - 40)}px`;
-  }
-
-  bringWindowToFront(windowEl);
-  focusFirstElement(windowEl);
 }
 
 function closeWindow(windowElOrId) {
@@ -343,12 +350,19 @@ function closeWindow(windowElOrId) {
 }
 
 function toggleWindow(windowId) {
-  const windowEl = document.getElementById(windowId);
-  if (!windowEl) return;
-  if (windowEl.classList.contains(WINDOW_HIDDEN_CLASS)) {
-    openWindow(windowId);
-  } else {
-    closeWindow(windowEl);
+  try {
+    const windowEl = document.getElementById(windowId);
+    if (!windowEl) {
+      console.warn("Window not found:", windowId);
+      return;
+    }
+    if (windowEl.classList.contains(WINDOW_HIDDEN_CLASS)) {
+      openWindow(windowId);
+    } else {
+      closeWindow(windowEl);
+    }
+  } catch (err) {
+    console.error("Failed to toggle window:", windowId, err);
   }
 }
 
@@ -432,6 +446,59 @@ function setupAppWindows() {
       }
     });
   });
+}
+
+/**
+ * Safely open a modal dialog with fallback for browsers that don't support showModal
+ * @param {string|HTMLDialogElement} modalOrId - The modal element or its ID
+ * @returns {boolean} - Whether the modal was successfully opened
+ */
+function safeShowModal(modalOrId) {
+  try {
+    const modal = typeof modalOrId === "string" ? document.getElementById(modalOrId) : modalOrId;
+    if (!modal) {
+      console.warn("Modal not found:", modalOrId);
+      return false;
+    }
+
+    // Check if the browser supports the dialog element and showModal
+    if (typeof modal.showModal === "function") {
+      // Close if already open to prevent InvalidStateError
+      if (modal.open) {
+        modal.close();
+      }
+      modal.showModal();
+      return true;
+    }
+
+    // Fallback for browsers without showModal support
+    // Make the dialog visible manually
+    modal.setAttribute("open", "");
+    modal.style.display = "block";
+    modal.style.position = "fixed";
+    modal.style.top = "50%";
+    modal.style.left = "50%";
+    modal.style.transform = "translate(-50%, -50%)";
+    modal.style.zIndex = "100000";
+
+    // Create and add a backdrop
+    let backdrop = document.getElementById("modal-fallback-backdrop");
+    if (!backdrop) {
+      backdrop = document.createElement("div");
+      backdrop.id = "modal-fallback-backdrop";
+      backdrop.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999";
+      backdrop.addEventListener("click", () => {
+        modal.removeAttribute("open");
+        modal.style.display = "";
+        backdrop.remove();
+      });
+      document.body.appendChild(backdrop);
+    }
+    return true;
+  } catch (err) {
+    console.error("Failed to open modal:", err);
+    return false;
+  }
 }
 
 function countSyllables(word) {
@@ -636,7 +703,7 @@ function openAnalysisModal({ runGrammar = false } = {}) {
   const modal = $("#analysisModal");
   if (!modal) return;
   refreshAnalysisModal();
-  modal.showModal();
+  safeShowModal(modal);
   if (runGrammar) {
     const statusEl = $("#grammarStatus");
     const listEl = $("#grammarResults");
@@ -1250,7 +1317,7 @@ async function boot() {
 
   // Export modal
   const exportModal = $("#exportModal");
-  $("#btnExport")?.addEventListener("click", () => exportModal?.showModal());
+  $("#btnExport")?.addEventListener("click", () => safeShowModal(exportModal));
 
   const getExportData = async () => {
     await flushChapterTitle();
@@ -1805,7 +1872,7 @@ async function openSnapshotsModal(chapterId) {
   if (!chapterId) return;
   state.snapshotChapterId = chapterId;
   await renderSnapshotsModal(chapterId);
-  $("#snapshotModal")?.showModal();
+  safeShowModal("snapshotModal");
 }
 
 function isTypingTarget(target) {
@@ -2021,7 +2088,7 @@ function setupMenus() {
 
       switch (a) {
         case "export":
-          $("#exportModal").showModal();
+          safeShowModal("exportModal");
           break;
         case "backup-export":
           $("#btnBackup").click();
@@ -2098,7 +2165,7 @@ function setupMenus() {
           // Populate modal from pills (already updated)
           $("#wcChapter") && ($("#wcChapter").textContent = $("#chapterWords")?.textContent || "0");
           $("#wcTotal") && ($("#wcTotal").textContent = $("#totalWords")?.textContent || "0");
-          $("#wordCountModal").showModal();
+          safeShowModal("wordCountModal");
           break;
         case "writing-analysis":
           openAnalysisModal({ runGrammar: false });
