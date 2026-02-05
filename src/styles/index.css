@@ -62,15 +62,14 @@ body {
   color: var(--text);
   line-height: 1.5;
   overflow: hidden;
-  /* Prevent iOS bounce/overscroll */
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
 }
 
 html, body {
   height: 100%;
-  /* iOS safe area handling */
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  margin: 0;
+  padding: 0;
 }
 
 #root {
@@ -78,6 +77,9 @@ html, body {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  /* iOS safe area handling - only on the container, not html/body */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* Scrollbar styles */

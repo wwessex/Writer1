@@ -20,7 +20,7 @@ export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
   };
 
   const sidebarClass = `${styles.sidebar} ${isHidden ? styles['sidebar--hidden'] : ''}`;
-  const backdropClass = `${styles.backdrop} ${isHidden ? styles['backdrop--hidden'] : ''}`;
+  const backdropClass = `${styles.backdrop} ${isHidden ? styles['backdrop--hidden'] : styles['backdrop--visible']}`;
 
   return (
     <>
