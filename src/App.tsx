@@ -27,6 +27,7 @@ const extensions = [
 
 function AppContent() {
   const { state, loadNovel, createChapter: createNewChapter, updateChapter, activeChapter, dispatch } = useApp();
+  const [isLoading, setIsLoading] = useState(true);
 
   // Modal states
   const [exportOpen, setExportOpen] = useState(false);
@@ -41,7 +42,7 @@ function AppContent() {
 
   // Load novel on mount
   useEffect(() => {
-    loadNovel();
+    loadNovel().then(() => setIsLoading(false));
   }, [loadNovel]);
 
   // Handle menu actions
@@ -159,12 +160,22 @@ function AppContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [createNewChapter, dispatch]);
 
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className={styles.loading}>
+        <div className={styles.loadingSpinner} />
+        <p>Loading NovelWriter...</p>
+      </div>
+    );
+  }
+
   const layoutClass = `${styles.layout} ${state.settings.sidebarHidden ? styles['layout--sidebarHidden'] : ''}`;
 
   return (
     <EditorProvider
       extensions={extensions}
-      content={activeChapter?.content || ''}
+      content={activeChapter?.content || { type: 'doc', content: [{ type: 'paragraph' }] }}
       onUpdate={({ editor }) => {
         if (activeChapter) {
           updateChapter(activeChapter.id, { content: editor.getJSON() });
