@@ -1,5 +1,5 @@
 import { useApp } from '@/context/AppContext';
-import { Input } from '@/components/UI';
+import { Input, IconButton } from '@/components/UI';
 import { Pill, StatusDot } from '@/components/UI/Pill';
 import { MenuBar } from '@/components/Menu/MenuBar';
 import { Toolbar } from './Toolbar';
@@ -11,7 +11,7 @@ interface HeaderProps {
 }
 
 export function Header({ onAction }: HeaderProps) {
-  const { state, updateNovelTitle } = useApp();
+  const { state, dispatch, updateNovelTitle } = useApp();
 
   // Calculate word counts
   const totalWords = state.chapters.reduce((sum, ch) => {
@@ -24,10 +24,18 @@ export function Header({ onAction }: HeaderProps) {
     ? countWords(editorToPlainText(activeChapter.content))
     : 0;
 
+  const toggleSidebar = () => dispatch({ type: 'TOGGLE_SIDEBAR' });
+
   return (
     <header className={styles.header}>
       <div className={styles.topbar}>
         <div className={styles.topbar__brand}>
+          <IconButton
+            icon="menu"
+            label="Toggle sidebar"
+            onClick={toggleSidebar}
+            className={styles.menuBtn}
+          />
           <span className={styles.logo}>NW</span>
           <Input
             variant="title"

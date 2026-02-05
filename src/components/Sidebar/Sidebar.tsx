@@ -10,28 +10,37 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
+  const isHidden = state.settings.sidebarHidden;
 
-  if (state.settings.sidebarHidden) {
-    return null;
-  }
+  const closeSidebar = () => {
+    if (!isHidden) {
+      dispatch({ type: 'TOGGLE_SIDEBAR' });
+    }
+  };
+
+  const sidebarClass = `${styles.sidebar} ${isHidden ? styles['sidebar--hidden'] : ''}`;
+  const backdropClass = `${styles.backdrop} ${isHidden ? styles['backdrop--hidden'] : ''}`;
 
   return (
-    <aside className={styles.sidebar}>
-      <div className={styles.sidebar__content}>
-        <ChapterList />
-        <OutlinePanel />
-      </div>
-      <div className={styles.sidebar__footer}>
-        <Button variant="ghost" onClick={onExportBackup}>
-          <span className="material-symbols-rounded">download</span>
-          Export Backup
-        </Button>
-        <Button variant="ghost" onClick={onImportBackup}>
-          <span className="material-symbols-rounded">upload</span>
-          Import Backup
-        </Button>
-      </div>
-    </aside>
+    <>
+      <div className={backdropClass} onClick={closeSidebar} aria-hidden="true" />
+      <aside className={sidebarClass}>
+        <div className={styles.sidebar__content}>
+          <ChapterList />
+          <OutlinePanel />
+        </div>
+        <div className={styles.sidebar__footer}>
+          <Button variant="ghost" onClick={onExportBackup}>
+            <span className="material-symbols-rounded">download</span>
+            Export Backup
+          </Button>
+          <Button variant="ghost" onClick={onImportBackup}>
+            <span className="material-symbols-rounded">upload</span>
+            Import Backup
+          </Button>
+        </div>
+      </aside>
+    </>
   );
 }
