@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, Component, type ReactNode } from 'react';
-import { EditorProvider } from '@tiptap/react';
+import { EditorProvider, useCurrentEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import HorizontalRule from '@tiptap/extension-horizontal-rule';
@@ -87,7 +87,8 @@ const extensions = [
 ];
 
 function AppContent() {
-  const { state, loadNovel, createChapter: createNewChapter, updateChapter, activeChapter, dispatch } = useApp();
+  const { state, loadNovel, createChapter: createNewChapter, dispatch } = useApp();
+  const { editor } = useCurrentEditor();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -113,44 +114,8 @@ function AppContent() {
       });
   }, [loadNovel]);
 
-  // Handle menu actions
-  const handleMenuAction = useCallback((action: string) => {
-    switch (action) {
-      case 'newChapter':
-        createNewChapter();
-        break;
-      case 'export':
-        setExportOpen(true);
-        break;
-      case 'importDocument':
-        importInputRef.current?.click();
-        break;
-      case 'exportBackup':
-        handleExportBackup();
-        break;
-      case 'importBackup':
-        fileInputRef.current?.click();
-        break;
-      case 'settings':
-        setSettingsOpen(true);
-        break;
-      case 'snapshots':
-        setSnapshotOpen(true);
-        break;
-      case 'analysis':
-        setAnalysisOpen(true);
-        break;
-      case 'wordCount':
-        setWordCountOpen(true);
-        break;
-      case 'about':
-        setAboutOpen(true);
-        break;
-    }
-  }, [createNewChapter]);
-
   // Export backup
-  const handleExportBackup = async () => {
+  const handleExportBackup = useCallback(async () => {
     try {
       const backup = await exportBackup(state.novelId, true);
       const json = JSON.stringify(backup, null, 2);
@@ -159,7 +124,7 @@ function AppContent() {
       console.error('Backup export failed:', error);
       alert('Failed to export backup');
     }
-  };
+  }, [state.novelId, state.novelTitle]);
 
   // Import backup
   const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -202,6 +167,75 @@ function AppContent() {
 
     e.target.value = '';
   };
+
+  // Handle menu actions
+  const handleMenuAction = useCallback((action: string) => {
+    switch (action) {
+      case 'newChapter':
+        createNewChapter();
+        break;
+      case 'export':
+        setExportOpen(true);
+        break;
+      case 'importDocument':
+        importInputRef.current?.click();
+        break;
+      case 'exportBackup':
+        handleExportBackup();
+        break;
+      case 'importBackup':
+        fileInputRef.current?.click();
+        break;
+      case 'settings':
+        setSettingsOpen(true);
+        break;
+      case 'snapshots':
+        setSnapshotOpen(true);
+        break;
+      case 'analysis':
+        setAnalysisOpen(true);
+        break;
+      case 'wordCount':
+        setWordCountOpen(true);
+        break;
+      case 'about':
+        setAboutOpen(true);
+        break;
+      case 'undo':
+        editor?.chain().focus().undo().run();
+        break;
+      case 'redo':
+        editor?.chain().focus().redo().run();
+        break;
+      case 'selectAll':
+        editor?.commands.selectAll();
+        break;
+      case 'insertHr':
+        editor?.chain().focus().setHorizontalRule().run();
+        break;
+      case 'insertBlockquote':
+        editor?.chain().focus().toggleBlockquote().run();
+        break;
+      case 'formatBold':
+        editor?.chain().focus().toggleBold().run();
+        break;
+      case 'formatItalic':
+        editor?.chain().focus().toggleItalic().run();
+        break;
+      case 'formatUnderline':
+        editor?.chain().focus().toggleUnderline().run();
+        break;
+      case 'formatH1':
+        editor?.chain().focus().toggleHeading({ level: 1 }).run();
+        break;
+      case 'formatH2':
+        editor?.chain().focus().toggleHeading({ level: 2 }).run();
+        break;
+      case 'formatP':
+        editor?.chain().focus().setParagraph().run();
+        break;
+    }
+  }, [createNewChapter, editor, handleExportBackup]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -263,6 +297,49 @@ function AppContent() {
   const layoutClass = `${styles.layout} ${state.settings.sidebarHidden ? styles['layout--sidebarHidden'] : ''}`;
 
   return (
+    <div className={styles.app}>
+      <Header onAction={handleMenuAction} />
+      <main className={layoutClass}>
+        <Sidebar
+          onExportBackup={handleExportBackup}
+          onImportBackup={() => fileInputRef.current?.click()}
+        />
+        <Editor />
+      </main>
+
+      {/* Modals */}
+      <ExportModal open={exportOpen} onClose={() => setExportOpen(false)} />
+      <SnapshotModal open={snapshotOpen} onClose={() => setSnapshotOpen(false)} />
+      <AnalysisModal open={analysisOpen} onClose={() => setAnalysisOpen(false)} />
+      <WordCountModal open={wordCountOpen} onClose={() => setWordCountOpen(false)} />
+
+      {/* Windows */}
+      <SettingsWindow open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <AboutWindow open={aboutOpen} onClose={() => setAboutOpen(false)} />
+
+      {/* Hidden file inputs */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        onChange={handleImportBackup}
+        style={{ display: 'none' }}
+      />
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".docx,.rtf,.txt"
+        onChange={handleImportDocument}
+        style={{ display: 'none' }}
+      />
+    </div>
+  );
+}
+
+function AppShell() {
+  const { activeChapter, updateChapter } = useApp();
+
+  return (
     <EditorProvider
       extensions={extensions}
       content={activeChapter?.content || { type: 'doc', content: [{ type: 'paragraph' }] }}
@@ -272,42 +349,7 @@ function AppContent() {
         }
       }}
     >
-      <div className={styles.app}>
-        <Header onAction={handleMenuAction} />
-        <main className={layoutClass}>
-          <Sidebar
-            onExportBackup={handleExportBackup}
-            onImportBackup={() => fileInputRef.current?.click()}
-          />
-          <Editor />
-        </main>
-
-        {/* Modals */}
-        <ExportModal open={exportOpen} onClose={() => setExportOpen(false)} />
-        <SnapshotModal open={snapshotOpen} onClose={() => setSnapshotOpen(false)} />
-        <AnalysisModal open={analysisOpen} onClose={() => setAnalysisOpen(false)} />
-        <WordCountModal open={wordCountOpen} onClose={() => setWordCountOpen(false)} />
-
-        {/* Windows */}
-        <SettingsWindow open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-        <AboutWindow open={aboutOpen} onClose={() => setAboutOpen(false)} />
-
-        {/* Hidden file inputs */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json"
-          onChange={handleImportBackup}
-          style={{ display: 'none' }}
-        />
-        <input
-          ref={importInputRef}
-          type="file"
-          accept=".docx,.rtf,.txt"
-          onChange={handleImportDocument}
-          style={{ display: 'none' }}
-        />
-      </div>
+      <AppContent />
     </EditorProvider>
   );
 }
@@ -316,7 +358,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AppProvider>
-        <AppContent />
+        <AppShell />
       </AppProvider>
     </ErrorBoundary>
   );
