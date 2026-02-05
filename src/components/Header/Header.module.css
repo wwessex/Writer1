@@ -1,9 +1,10 @@
 .header {
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 200;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .topbar {
@@ -21,7 +22,7 @@
 }
 
 .menuBtn {
-  display: none;
+  display: none !important;
 }
 
 .logo {
@@ -62,7 +63,7 @@
 
 @media (max-width: 820px) {
   .menuBtn {
-    display: flex;
+    display: flex !important;
   }
 
   .topbar {
@@ -76,5 +77,9 @@
 
   .novelTitle {
     max-width: 200px;
+  }
+
+  .logo {
+    display: none;
   }
 }

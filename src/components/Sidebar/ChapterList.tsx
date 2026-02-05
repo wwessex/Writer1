@@ -11,12 +11,21 @@ interface DragState {
 }
 
 export function ChapterList() {
-  const { state, setActiveChapter, createChapter, reorderChapters } = useApp();
+  const { state, dispatch, setActiveChapter, createChapter, reorderChapters } = useApp();
   const [dragState, setDragState] = useState<DragState>({
     dragging: false,
     draggedId: null,
     dropTargetId: null
   });
+
+  // Close sidebar on mobile when selecting a chapter
+  const handleChapterSelect = useCallback((id: string) => {
+    setActiveChapter(id);
+    // Close sidebar on mobile
+    if (window.matchMedia('(max-width: 820px)').matches && !state.settings.sidebarHidden) {
+      dispatch({ type: 'TOGGLE_SIDEBAR' });
+    }
+  }, [setActiveChapter, dispatch, state.settings.sidebarHidden]);
 
   const handleDragStart = useCallback((e: React.DragEvent, id: string) => {
     e.dataTransfer.effectAllowed = 'move';
@@ -80,7 +89,7 @@ export function ChapterList() {
               onDragOver={e => handleDragOver(e, chapter.id)}
               onDragEnd={handleDragEnd}
               onDrop={e => handleDrop(e, chapter.id)}
-              onClick={() => setActiveChapter(chapter.id)}
+              onClick={() => handleChapterSelect(chapter.id)}
             >
               <span className={styles.chapterItem__drag}>
                 <span className="material-symbols-rounded">drag_indicator</span>

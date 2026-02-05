@@ -10,6 +10,9 @@ import type { Chapter, Novel, AppSettings, AppState, Scene } from '@/types';
 import * as storage from '@/lib/storage';
 import { debounce } from '@/lib/utils';
 
+// Check if mobile viewport (matches the CSS breakpoint)
+const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches;
+
 // Default settings
 const defaultSettings: AppSettings = {
   autosaveMs: 800,
@@ -26,7 +29,7 @@ const defaultSettings: AppSettings = {
     languageToolLanguage: 'en-US'
   },
   theme: 'dark',
-  sidebarHidden: false,
+  sidebarHidden: isMobile, // Hidden by default on mobile
   pageView: true
 };
 
