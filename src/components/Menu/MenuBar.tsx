@@ -1,0 +1,170 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useApp } from '@/context/AppContext';
+import styles from './Menu.module.css';
+
+interface MenuItem {
+  label?: string;
+  action?: string;
+  shortcut?: string;
+  divider?: boolean;
+  disabled?: boolean;
+}
+
+interface MenuConfig {
+  label: string;
+  items: MenuItem[];
+}
+
+const MENUS: MenuConfig[] = [
+  {
+    label: 'File',
+    items: [
+      { label: 'New Chapter', action: 'newChapter', shortcut: 'Ctrl+Shift+N' },
+      { divider: true },
+      { label: 'Export...', action: 'export', shortcut: 'Ctrl+Shift+E' },
+      { label: 'Import Document...', action: 'importDocument' },
+      { divider: true },
+      { label: 'Export Backup', action: 'exportBackup' },
+      { label: 'Import Backup', action: 'importBackup' },
+      { divider: true },
+      { label: 'Settings', action: 'settings' }
+    ]
+  },
+  {
+    label: 'Edit',
+    items: [
+      { label: 'Undo', action: 'undo', shortcut: 'Ctrl+Z' },
+      { label: 'Redo', action: 'redo', shortcut: 'Ctrl+Y' },
+      { divider: true },
+      { label: 'Select All', action: 'selectAll', shortcut: 'Ctrl+A' }
+    ]
+  },
+  {
+    label: 'View',
+    items: [
+      { label: 'Toggle Sidebar', action: 'toggleSidebar', shortcut: 'Ctrl+Shift+B' },
+      { label: 'Toggle Page View', action: 'togglePageView' },
+      { divider: true },
+      { label: 'Dark Theme', action: 'themeDark' },
+      { label: 'Light Theme', action: 'themeLight' }
+    ]
+  },
+  {
+    label: 'Insert',
+    items: [
+      { label: 'Horizontal Rule', action: 'insertHr' },
+      { label: 'Blockquote', action: 'insertBlockquote' }
+    ]
+  },
+  {
+    label: 'Format',
+    items: [
+      { label: 'Bold', action: 'formatBold', shortcut: 'Ctrl+B' },
+      { label: 'Italic', action: 'formatItalic', shortcut: 'Ctrl+I' },
+      { label: 'Underline', action: 'formatUnderline', shortcut: 'Ctrl+U' },
+      { divider: true },
+      { label: 'Heading 1', action: 'formatH1' },
+      { label: 'Heading 2', action: 'formatH2' },
+      { label: 'Paragraph', action: 'formatP' }
+    ]
+  },
+  {
+    label: 'Tools',
+    items: [
+      { label: 'Snapshots...', action: 'snapshots' },
+      { label: 'Writing Analysis...', action: 'analysis' },
+      { label: 'Word Count...', action: 'wordCount' }
+    ]
+  },
+  {
+    label: 'Help',
+    items: [
+      { label: 'About NovelWriter', action: 'about' }
+    ]
+  }
+];
+
+interface MenuBarProps {
+  onAction?: (action: string) => void;
+}
+
+export function MenuBar({ onAction }: MenuBarProps) {
+  const { dispatch } = useApp();
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const menuBarRef = useRef<HTMLDivElement>(null);
+
+  const handleMenuClick = (menuLabel: string) => {
+    setOpenMenu(prev => (prev === menuLabel ? null : menuLabel));
+  };
+
+  const handleItemClick = (action: string) => {
+    setOpenMenu(null);
+
+    // Handle built-in actions
+    switch (action) {
+      case 'toggleSidebar':
+        dispatch({ type: 'TOGGLE_SIDEBAR' });
+        break;
+      case 'togglePageView':
+        dispatch({ type: 'TOGGLE_PAGE_VIEW' });
+        break;
+      case 'themeDark':
+        dispatch({ type: 'SET_THEME', payload: 'dark' });
+        break;
+      case 'themeLight':
+        dispatch({ type: 'SET_THEME', payload: 'light' });
+        break;
+      default:
+        onAction?.(action);
+    }
+  };
+
+  const handleClickOutside = useCallback((e: MouseEvent) => {
+    if (menuBarRef.current && !menuBarRef.current.contains(e.target as Node)) {
+      setOpenMenu(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (openMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [openMenu, handleClickOutside]);
+
+  return (
+    <div className={styles.menuBar} ref={menuBarRef}>
+      {MENUS.map(menu => (
+        <div key={menu.label} className={styles.menuWrapper}>
+          <button
+            className={`${styles.menuBtn} ${openMenu === menu.label ? styles['menuBtn--active'] : ''}`}
+            onClick={() => handleMenuClick(menu.label)}
+          >
+            {menu.label}
+          </button>
+          {openMenu === menu.label && (
+            <div className={styles.menu}>
+              {menu.items.map((item, idx) =>
+                item.divider ? (
+                  <div key={idx} className={styles.menuDivider} />
+                ) : (
+                  <button
+                    key={idx}
+                    className={styles.menuItem}
+                    onClick={() => item.action && handleItemClick(item.action)}
+                    disabled={item.disabled}
+                  >
+                    <span className={styles.menuItem__label}>{item.label}</span>
+                    {item.shortcut && (
+                      <span className={styles.menuItem__shortcut}>{item.shortcut}</span>
+                    )}
+                  </button>
+                )
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
