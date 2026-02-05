@@ -32,8 +32,7 @@
 
 @media (max-width: 820px) {
   .toolbar {
-    flex-wrap: wrap;
-    justify-content: center;
+    display: none;
   }
 
   .toolbar__spacer {
