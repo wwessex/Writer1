@@ -52,7 +52,7 @@
   height: 100%;
 }
 
-.proseMirror {
+.editorWrapper :global(.ProseMirror) {
   height: 100%;
   padding: 1.5rem;
   outline: none;
@@ -61,37 +61,37 @@
   color: var(--text);
 }
 
-.proseMirror:focus {
+.editorWrapper :global(.ProseMirror):focus {
   outline: none;
 }
 
-.proseMirror p {
+.editorWrapper :global(.ProseMirror) p {
   margin: 0 0 1em;
 }
 
-.proseMirror h1 {
+.editorWrapper :global(.ProseMirror) h1 {
   font-size: 1.75rem;
   font-weight: 700;
   margin: 1.5em 0 0.5em;
 }
 
-.proseMirror h2 {
+.editorWrapper :global(.ProseMirror) h2 {
   font-size: 1.375rem;
   font-weight: 600;
   margin: 1.25em 0 0.5em;
 }
 
-.proseMirror ul,
-.proseMirror ol {
+.editorWrapper :global(.ProseMirror) ul,
+.editorWrapper :global(.ProseMirror) ol {
   margin: 0 0 1em;
   padding-left: 1.5em;
 }
 
-.proseMirror li {
+.editorWrapper :global(.ProseMirror) li {
   margin: 0.25em 0;
 }
 
-.proseMirror blockquote {
+.editorWrapper :global(.ProseMirror) blockquote {
   margin: 1em 0;
   padding-left: 1em;
   border-left: 3px solid var(--accent);
@@ -99,29 +99,29 @@
   font-style: italic;
 }
 
-.proseMirror hr {
+.editorWrapper :global(.ProseMirror) hr {
   border: none;
   border-top: 1px solid var(--border);
   margin: 2em 0;
 }
 
-.proseMirror strong {
+.editorWrapper :global(.ProseMirror) strong {
   font-weight: 600;
 }
 
-.proseMirror em {
+.editorWrapper :global(.ProseMirror) em {
   font-style: italic;
 }
 
-.proseMirror u {
+.editorWrapper :global(.ProseMirror) u {
   text-decoration: underline;
 }
 
-.proseMirror s {
+.editorWrapper :global(.ProseMirror) s {
   text-decoration: line-through;
 }
 
-.proseMirror p.is-editor-empty:first-child::before {
+.editorWrapper :global(.ProseMirror) p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: var(--text-muted);
   pointer-events: none;
@@ -182,7 +182,7 @@
     min-height: 200px;
   }
 
-  .proseMirror {
+  .editorWrapper :global(.ProseMirror) {
     padding: 1rem;
     min-height: 200px;
   }
