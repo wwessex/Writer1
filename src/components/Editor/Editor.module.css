@@ -157,6 +157,7 @@
   .editorPane {
     min-height: 0;
     flex: 1;
+    width: auto;
   }
 
   .editorPane--pageView {
@@ -190,5 +191,20 @@
   .editorWrapper :global(.ProseMirror) {
     padding: 1rem;
     min-height: 200px;
+  }
+}
+
+@media (max-width: 480px) {
+  .editorHeader {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .chapterTitle {
+    font-size: 1rem;
+  }
+
+  .editorWrapper :global(.ProseMirror) {
+    padding: 0.75rem;
+    font-size: 0.9375rem;
   }
 }

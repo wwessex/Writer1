@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import styles from './Windows.module.css';
 
 interface AboutWindowProps {
@@ -10,9 +10,38 @@ export function AboutWindow({ open, onClose }: AboutWindowProps) {
   const windowRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isMobile, setIsMobile] = useState(false);
 
-  // Handle drag
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // Detect mobile
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 820);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [open, onClose]);
+
+  // Reset position when reopened
+  useEffect(() => {
+    if (open && windowRef.current) {
+      windowRef.current.style.left = '';
+      windowRef.current.style.top = '';
+      windowRef.current.style.transform = '';
+    }
+  }, [open]);
+
+  // Handle drag (desktop only)
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (isMobile) return;
     if ((e.target as HTMLElement).closest(`.${styles.window__header}`)) {
       setIsDragging(true);
       const rect = windowRef.current?.getBoundingClientRect();
@@ -20,7 +49,7 @@ export function AboutWindow({ open, onClose }: AboutWindowProps) {
         setDragOffset({ x: e.clientX - rect.left, y: e.clientY - rect.top });
       }
     }
-  };
+  }, [isMobile]);
 
   useEffect(() => {
     if (!isDragging) return;
@@ -48,70 +77,76 @@ export function AboutWindow({ open, onClose }: AboutWindowProps) {
   if (!open) return null;
 
   return (
-    <div
-      ref={windowRef}
-      className={styles.window}
-      onMouseDown={handleMouseDown}
-    >
-      <div className={styles.window__header}>
-        <h3>About NovelWriter</h3>
-        <button className={styles.closeBtn} onClick={onClose}>
-          <span className="material-symbols-rounded">close</span>
-        </button>
-      </div>
-
-      <div className={styles.window__body}>
-        <div className={styles.aboutLogo}>
-          <span className={styles.logoIcon}>NW</span>
-          <h2>NovelWriter</h2>
-          <p className={styles.version}>Version 2.0.0</p>
+    <>
+      <div
+        className={`${styles.backdrop} ${styles['backdrop--visible']}`}
+        onClick={onClose}
+      />
+      <div
+        ref={windowRef}
+        className={styles.window}
+        onMouseDown={handleMouseDown}
+      >
+        <div className={styles.window__header}>
+          <h3>About NovelWriter</h3>
+          <button className={styles.closeBtn} onClick={onClose} aria-label="Close">
+            <span className="material-symbols-rounded">close</span>
+          </button>
         </div>
 
-        <p className={styles.aboutDescription}>
-          A lightweight, offline-first Progressive Web Application for writing novels.
-          All your data is stored locally in your browser.
-        </p>
+        <div className={styles.window__body}>
+          <div className={styles.aboutLogo}>
+            <span className={styles.logoIcon}>NW</span>
+            <h2>NovelWriter</h2>
+            <p className={styles.version}>Version 2.0.0</p>
+          </div>
 
-        <h4>Features</h4>
-        <ul className={styles.featureList}>
-          <li>
-            <span className="material-symbols-rounded">edit_note</span>
-            Rich text editing with formatting
-          </li>
-          <li>
-            <span className="material-symbols-rounded">folder</span>
-            Chapter management with drag-to-reorder
-          </li>
-          <li>
-            <span className="material-symbols-rounded">history</span>
-            Snapshot version history
-          </li>
-          <li>
-            <span className="material-symbols-rounded">analytics</span>
-            Writing analysis and readability scores
-          </li>
-          <li>
-            <span className="material-symbols-rounded">download</span>
-            Export to DOCX, PDF, RTF
-          </li>
-          <li>
-            <span className="material-symbols-rounded">upload</span>
-            Import from DOCX, RTF
-          </li>
-          <li>
-            <span className="material-symbols-rounded">cloud_off</span>
-            Works completely offline
-          </li>
-          <li>
-            <span className="material-symbols-rounded">dark_mode</span>
-            Dark and light themes
-          </li>
-        </ul>
+          <p className={styles.aboutDescription}>
+            A lightweight, offline-first Progressive Web Application for writing novels.
+            All your data is stored locally in your browser.
+          </p>
 
-        <p className={styles.aboutCredits}>
-          Built with React, TypeScript, and Tiptap.
-        </p>
+          <h4>Features</h4>
+          <ul className={styles.featureList}>
+            <li>
+              <span className="material-symbols-rounded">edit_note</span>
+              Rich text editing with formatting
+            </li>
+            <li>
+              <span className="material-symbols-rounded">folder</span>
+              Chapter management with drag-to-reorder
+            </li>
+            <li>
+              <span className="material-symbols-rounded">history</span>
+              Snapshot version history
+            </li>
+            <li>
+              <span className="material-symbols-rounded">analytics</span>
+              Writing analysis and readability scores
+            </li>
+            <li>
+              <span className="material-symbols-rounded">download</span>
+              Export to DOCX, PDF, RTF
+            </li>
+            <li>
+              <span className="material-symbols-rounded">upload</span>
+              Import from DOCX, RTF
+            </li>
+            <li>
+              <span className="material-symbols-rounded">cloud_off</span>
+              Works completely offline
+            </li>
+            <li>
+              <span className="material-symbols-rounded">dark_mode</span>
+              Dark and light themes
+            </li>
+          </ul>
+
+          <p className={styles.aboutCredits}>
+            Built with React, TypeScript, and Tiptap.
+          </p>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
