@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, Component, type ReactNode } from 'react';
-import { EditorProvider, useCurrentEditor } from '@tiptap/react';
+import { EditorContext, useCurrentEditor, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import HorizontalRule from '@tiptap/extension-horizontal-rule';
@@ -339,18 +339,20 @@ function AppContent() {
 function AppShell() {
   const { activeChapter, updateChapter } = useApp();
 
+  const editor = useEditor({
+    extensions,
+    content: activeChapter?.content || { type: 'doc', content: [{ type: 'paragraph' }] },
+    onUpdate: ({ editor: ed }) => {
+      if (activeChapter) {
+        updateChapter(activeChapter.id, { content: ed.getJSON() });
+      }
+    },
+  });
+
   return (
-    <EditorProvider
-      extensions={extensions}
-      content={activeChapter?.content || { type: 'doc', content: [{ type: 'paragraph' }] }}
-      onUpdate={({ editor }) => {
-        if (activeChapter) {
-          updateChapter(activeChapter.id, { content: editor.getJSON() });
-        }
-      }}
-    >
+    <EditorContext.Provider value={{ editor }}>
       <AppContent />
-    </EditorProvider>
+    </EditorContext.Provider>
   );
 }
 
