@@ -3,7 +3,7 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 100;
+  z-index: 1000;
   width: 400px;
   max-width: calc(100vw - 2rem);
   max-height: calc(100vh - 2rem);
@@ -53,6 +53,7 @@
 
 .window__body {
   flex: 1;
+  min-height: 0;
   padding: 1.25rem;
   overflow-y: auto;
 }
@@ -201,7 +202,7 @@
   display: none;
   position: fixed;
   inset: 0;
-  z-index: 99;
+  z-index: 999;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
@@ -238,6 +239,7 @@
   .window__header {
     cursor: default;
     padding: 0.75rem 1rem;
+    flex-shrink: 0;
   }
 
   .closeBtn {
@@ -254,11 +256,14 @@
 
   .window__body {
     padding: 1rem;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   .window__footer {
     padding: 0.75rem 1rem;
     padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    flex-shrink: 0;
   }
 
   .fieldRow {
@@ -283,5 +288,6 @@
     transform: none;
     border-radius: 0;
     height: 100dvh;
+    padding-top: env(safe-area-inset-top, 0px);
   }
 }
