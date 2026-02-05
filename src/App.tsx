@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, Component, type ReactNode } from 'react';
 import { EditorProvider } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -15,6 +15,67 @@ import { downloadFile } from '@/lib/utils';
 import './styles/index.css';
 import styles from './App.module.css';
 
+// Error Boundary to catch render errors
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('React Error Boundary caught:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          gap: '1rem',
+          padding: '2rem',
+          fontFamily: 'system-ui, sans-serif',
+          background: '#0b1020',
+          color: '#e5e7eb'
+        }}>
+          <h1 style={{ color: '#ef4444', margin: 0 }}>Something went wrong</h1>
+          <p style={{ color: '#9ca3af', maxWidth: '400px', textAlign: 'center' }}>
+            {this.state.error?.message || 'An unexpected error occurred'}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              padding: '10px 20px',
+              background: '#60a5fa',
+              border: 'none',
+              borderRadius: '6px',
+              color: 'white',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            Reload Page
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 const extensions = [
   StarterKit.configure({
     heading: {
@@ -28,6 +89,7 @@ const extensions = [
 function AppContent() {
   const { state, loadNovel, createChapter: createNewChapter, updateChapter, activeChapter, dispatch } = useApp();
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Modal states
   const [exportOpen, setExportOpen] = useState(false);
@@ -42,7 +104,13 @@ function AppContent() {
 
   // Load novel on mount
   useEffect(() => {
-    loadNovel().then(() => setIsLoading(false));
+    loadNovel()
+      .then(() => setIsLoading(false))
+      .catch((err) => {
+        console.error('Failed to load novel:', err);
+        setError(`Failed to load: ${err.message || 'Unknown error'}`);
+        setIsLoading(false);
+      });
   }, [loadNovel]);
 
   // Handle menu actions
@@ -160,6 +228,28 @@ function AppContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [createNewChapter, dispatch]);
 
+  // Show error state
+  if (error) {
+    return (
+      <div className={styles.loading}>
+        <p style={{ color: '#ef4444' }}>Error: {error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            padding: '8px 16px',
+            background: 'var(--accent)',
+            border: 'none',
+            borderRadius: '4px',
+            color: 'white',
+            cursor: 'pointer'
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   // Show loading state
   if (isLoading) {
     return (
@@ -224,8 +314,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </ErrorBoundary>
   );
 }
