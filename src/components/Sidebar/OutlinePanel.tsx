@@ -81,7 +81,7 @@ export function OutlinePanel() {
               <div className={styles.field}>
                 <label className={styles.field__label}>Tags</label>
                 <Input
-                  value={activeChapter.tags.join(', ')}
+                  value={(activeChapter.tags || []).join(', ')}
                   onChange={e => handleFieldChange('tags', e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
                   placeholder="action, romance"
                 />
@@ -109,11 +109,11 @@ export function OutlinePanel() {
           <span className="material-symbols-rounded">
             {expandedSections.scenes ? 'expand_more' : 'chevron_right'}
           </span>
-          <span>Scenes ({activeChapter.scenes.length})</span>
+          <span>Scenes ({(activeChapter.scenes || []).length})</span>
         </button>
         {expandedSections.scenes && (
           <div className={styles.section__content}>
-            {activeChapter.scenes.map(scene => (
+            {(activeChapter.scenes || []).map(scene => (
               <div key={scene.id} className={styles.sceneCard}>
                 <div className={styles.sceneCard__header}>
                   <Input
