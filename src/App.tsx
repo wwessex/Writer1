@@ -1,0 +1,220 @@
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { EditorProvider } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Underline from '@tiptap/extension-underline';
+import HorizontalRule from '@tiptap/extension-horizontal-rule';
+import { useApp, AppProvider } from '@/context/AppContext';
+import { Header } from '@/components/Header';
+import { Sidebar } from '@/components/Sidebar';
+import { Editor } from '@/components/Editor';
+import { ExportModal, SnapshotModal, AnalysisModal, WordCountModal } from '@/components/Modals';
+import { SettingsWindow, AboutWindow } from '@/components/Windows';
+import { exportBackup, importBackup, createChapter, addChapter } from '@/lib/storage';
+import { importFile } from '@/lib/import';
+import { downloadFile } from '@/lib/utils';
+import './styles/index.css';
+import styles from './App.module.css';
+
+const extensions = [
+  StarterKit.configure({
+    heading: {
+      levels: [1, 2]
+    }
+  }),
+  Underline,
+  HorizontalRule
+];
+
+function AppContent() {
+  const { state, loadNovel, createChapter: createNewChapter, updateChapter, activeChapter, dispatch } = useApp();
+
+  // Modal states
+  const [exportOpen, setExportOpen] = useState(false);
+  const [snapshotOpen, setSnapshotOpen] = useState(false);
+  const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [wordCountOpen, setWordCountOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  // Load novel on mount
+  useEffect(() => {
+    loadNovel();
+  }, [loadNovel]);
+
+  // Handle menu actions
+  const handleMenuAction = useCallback((action: string) => {
+    switch (action) {
+      case 'newChapter':
+        createNewChapter();
+        break;
+      case 'export':
+        setExportOpen(true);
+        break;
+      case 'importDocument':
+        importInputRef.current?.click();
+        break;
+      case 'exportBackup':
+        handleExportBackup();
+        break;
+      case 'importBackup':
+        fileInputRef.current?.click();
+        break;
+      case 'settings':
+        setSettingsOpen(true);
+        break;
+      case 'snapshots':
+        setSnapshotOpen(true);
+        break;
+      case 'analysis':
+        setAnalysisOpen(true);
+        break;
+      case 'wordCount':
+        setWordCountOpen(true);
+        break;
+      case 'about':
+        setAboutOpen(true);
+        break;
+    }
+  }, [createNewChapter]);
+
+  // Export backup
+  const handleExportBackup = async () => {
+    try {
+      const backup = await exportBackup(state.novelId, true);
+      const json = JSON.stringify(backup, null, 2);
+      downloadFile(json, `${state.novelTitle}-backup.json`);
+    } catch (error) {
+      console.error('Backup export failed:', error);
+      alert('Failed to export backup');
+    }
+  };
+
+  // Import backup
+  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const backup = JSON.parse(text);
+      await importBackup(backup);
+      window.location.reload();
+    } catch (error) {
+      console.error('Backup import failed:', error);
+      alert('Failed to import backup. Please check the file format.');
+    }
+
+    e.target.value = '';
+  };
+
+  // Import document
+  const handleImportDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const chapters = await importFile(file);
+
+      for (let i = 0; i < chapters.length; i++) {
+        const chapter = createChapter(state.novelId, state.chapters.length + i, chapters[i].title);
+        chapter.content = chapters[i].content;
+        await addChapter(chapter);
+      }
+
+      // Reload to show imported chapters
+      loadNovel();
+    } catch (error) {
+      console.error('Document import failed:', error);
+      alert('Failed to import document. Please check the file format.');
+    }
+
+    e.target.value = '';
+  };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
+        switch (e.key.toLowerCase()) {
+          case 'n':
+            e.preventDefault();
+            createNewChapter();
+            break;
+          case 'e':
+            e.preventDefault();
+            setExportOpen(true);
+            break;
+          case 'b':
+            e.preventDefault();
+            dispatch({ type: 'TOGGLE_SIDEBAR' });
+            break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [createNewChapter, dispatch]);
+
+  const layoutClass = `${styles.layout} ${state.settings.sidebarHidden ? styles['layout--sidebarHidden'] : ''}`;
+
+  return (
+    <EditorProvider
+      extensions={extensions}
+      content={activeChapter?.content || ''}
+      onUpdate={({ editor }) => {
+        if (activeChapter) {
+          updateChapter(activeChapter.id, { content: editor.getJSON() });
+        }
+      }}
+    >
+      <div className={styles.app}>
+        <Header onAction={handleMenuAction} />
+        <main className={layoutClass}>
+          <Sidebar
+            onExportBackup={handleExportBackup}
+            onImportBackup={() => fileInputRef.current?.click()}
+          />
+          <Editor />
+        </main>
+
+        {/* Modals */}
+        <ExportModal open={exportOpen} onClose={() => setExportOpen(false)} />
+        <SnapshotModal open={snapshotOpen} onClose={() => setSnapshotOpen(false)} />
+        <AnalysisModal open={analysisOpen} onClose={() => setAnalysisOpen(false)} />
+        <WordCountModal open={wordCountOpen} onClose={() => setWordCountOpen(false)} />
+
+        {/* Windows */}
+        <SettingsWindow open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+        <AboutWindow open={aboutOpen} onClose={() => setAboutOpen(false)} />
+
+        {/* Hidden file inputs */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          onChange={handleImportBackup}
+          style={{ display: 'none' }}
+        />
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".docx,.rtf,.txt"
+          onChange={handleImportDocument}
+          style={{ display: 'none' }}
+        />
+      </div>
+    </EditorProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <AppProvider>
+      <AppContent />
+    </AppProvider>
+  );
+}

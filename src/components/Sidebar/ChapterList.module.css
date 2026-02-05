@@ -1,0 +1,133 @@
+.chapterList {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.chapterList__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.chapterList__title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.chapterList__items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.chapterItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: transparent;
+}
+
+.chapterItem:hover {
+  background: var(--btn-bg);
+}
+
+.chapterItem--active {
+  background: var(--accent-alpha);
+}
+
+.chapterItem--active:hover {
+  background: var(--accent-alpha);
+}
+
+.chapterItem--dragging {
+  opacity: 0.5;
+}
+
+.chapterItem--dropTarget {
+  background: var(--accent-alpha);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.chapterItem__drag {
+  display: flex;
+  color: var(--text-muted);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.chapterItem:hover .chapterItem__drag {
+  opacity: 1;
+}
+
+.chapterItem__drag .material-symbols-rounded {
+  font-size: 1.125rem;
+}
+
+.chapterItem__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.chapterItem__title {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chapterItem__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.125rem;
+}
+
+.chapterItem__status {
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.chapterItem__status--draft {
+  background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+}
+
+.chapterItem__status--revised {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.chapterItem__status--final {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.chapterList__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+}

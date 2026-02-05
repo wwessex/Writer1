@@ -1,0 +1,22 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.layout--sidebarHidden {
+  /* Sidebar will be hidden via component logic */
+}
+
+@media (max-width: 820px) {
+  .layout {
+    position: relative;
+  }
+}
