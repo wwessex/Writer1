@@ -149,6 +149,11 @@
 }
 
 @media (max-width: 820px) {
+  .editorPane {
+    min-height: 0;
+    flex: 1;
+  }
+
   .editorPane--pageView {
     padding: 0;
   }
@@ -172,7 +177,13 @@
     font-size: 1.125rem;
   }
 
+  .editorContent {
+    flex: 1;
+    min-height: 200px;
+  }
+
   .proseMirror {
     padding: 1rem;
+    min-height: 200px;
   }
 }

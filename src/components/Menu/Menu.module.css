@@ -82,6 +82,14 @@
 
 @media (max-width: 820px) {
   .menuBar {
-    display: none;
+    flex-wrap: wrap;
+    row-gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .menuBtn {
+    white-space: nowrap;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
   }
 }
