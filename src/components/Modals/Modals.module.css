@@ -358,6 +358,7 @@
 @media (max-width: 820px) {
   .snapshotLayout {
     grid-template-columns: 1fr;
+    min-height: auto;
   }
 
   .snapshotList {
@@ -369,5 +370,31 @@
 
   .analysisGrid {
     grid-template-columns: 1fr;
+  }
+
+  .wordCountCard {
+    padding: 1rem;
+  }
+
+  .wordCountValue {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .snapshotLayout {
+    gap: 1rem;
+  }
+
+  .snapshotPreview__content {
+    max-height: 200px;
+  }
+
+  .stat__value {
+    font-size: 1.25rem;
+  }
+
+  .wordCountValue {
+    font-size: 1.75rem;
   }
 }
