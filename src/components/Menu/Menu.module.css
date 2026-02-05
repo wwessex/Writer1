@@ -82,8 +82,8 @@
 
 @media (max-width: 820px) {
   .menuBar {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    flex-wrap: wrap;
+    row-gap: 0.25rem;
   }
 
   .menuBtn {
