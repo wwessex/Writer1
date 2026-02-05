@@ -4,9 +4,14 @@
   width: 320px;
   min-width: 280px;
   max-width: 360px;
+  flex-shrink: 0;
   background: var(--panel);
   border-right: 1px solid var(--border);
   overflow: hidden;
+}
+
+.sidebar--hidden {
+  display: none;
 }
 
 .sidebar__content {
@@ -39,12 +44,14 @@
 
 @media (max-width: 820px) {
   .sidebar {
+    display: flex;
     position: fixed;
     left: 0;
     top: 0;
     bottom: 0;
     z-index: 100;
     width: 85%;
+    min-width: 0;
     max-width: 320px;
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
     transform: translateX(0);
@@ -52,6 +59,7 @@
   }
 
   .sidebar--hidden {
+    display: flex;
     transform: translateX(-100%);
     box-shadow: none;
   }
