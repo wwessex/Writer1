@@ -305,9 +305,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const chapter = state.chapters.find(ch => ch.id === chapterId);
     if (!chapter) return;
 
+    const existingScenes = chapter.scenes || [];
     const newScene: Scene = {
       id: crypto.randomUUID(),
-      title: `Scene ${chapter.scenes.length + 1}`,
+      title: `Scene ${existingScenes.length + 1}`,
       summary: '',
       pov: '',
       status: 'planned',
@@ -315,7 +316,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       wordGoal: 0
     };
 
-    const updates = { scenes: [...chapter.scenes, newScene] };
+    const updates = { scenes: [...existingScenes, newScene] };
     dispatch({ type: 'UPDATE_CHAPTER', payload: { id: chapterId, updates } });
     storage.updateChapter(chapterId, updates);
   }, [state.chapters]);
@@ -325,7 +326,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const chapter = state.chapters.find(ch => ch.id === chapterId);
     if (!chapter) return;
 
-    const scenes = chapter.scenes.map(scene =>
+    const scenes = (chapter.scenes || []).map(scene =>
       scene.id === sceneId ? { ...scene, ...updates } : scene
     );
 
@@ -338,7 +339,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const chapter = state.chapters.find(ch => ch.id === chapterId);
     if (!chapter) return;
 
-    const scenes = chapter.scenes.filter(scene => scene.id !== sceneId);
+    const scenes = (chapter.scenes || []).filter(scene => scene.id !== sceneId);
     dispatch({ type: 'UPDATE_CHAPTER', payload: { id: chapterId, updates: { scenes } } });
     storage.updateChapter(chapterId, { scenes });
   }, [state.chapters]);
