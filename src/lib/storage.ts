@@ -1,5 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Novel, Chapter, Snapshot, BackupData } from '@/types';
+import type { Novel, Chapter, Snapshot, BackupData, BackupDataV3, LegacyBackupData, ProjectType } from '@/types';
+
+const CURRENT_BACKUP_VERSION = 3;
 
 class NovelWriterDB extends Dexie {
   novels!: EntityTable<Novel, 'id'>;
@@ -13,20 +15,69 @@ class NovelWriterDB extends Dexie {
       chapters: 'id, novelId, order, title, updatedAt',
       snapshots: 'id, chapterId, createdAt'
     });
+
+    this.version(3)
+      .stores({
+        novels: 'id, title, projectType, updatedAt',
+        chapters: 'id, novelId, order, title, updatedAt',
+        snapshots: 'id, chapterId, createdAt'
+      })
+      .upgrade(async tx => {
+        await tx.table('novels').toCollection().modify((novel: Novel) => {
+          if (!novel.projectType) {
+            novel.projectType = 'book';
+          }
+        });
+      });
   }
 }
 
 export const db = new NovelWriterDB();
 
-// Novel operations
-export async function getNovel(id: string): Promise<Novel | undefined> {
-  return db.novels.get(id);
+function normalizeProjectType(projectType?: ProjectType): ProjectType {
+  return projectType === 'screenplay' ? 'screenplay' : 'book';
 }
 
-export async function createNovel(title: string = 'Untitled Novel'): Promise<Novel> {
+function normalizeNovel(novel: Novel): Novel {
+  return {
+    ...novel,
+    projectType: normalizeProjectType(novel.projectType)
+  };
+}
+
+function upgradeBackup(backup: BackupData): BackupDataV3 {
+  if (backup.version === 3 && 'project' in backup && 'sections' in backup) {
+    return {
+      ...backup,
+      version: 3,
+      projectType: normalizeProjectType(backup.projectType),
+      project: normalizeNovel(backup.project)
+    };
+  }
+
+  const legacy = backup as LegacyBackupData;
+  const project = normalizeNovel(legacy.novel);
+  return {
+    version: CURRENT_BACKUP_VERSION,
+    projectType: project.projectType || 'book',
+    project,
+    sections: legacy.chapters,
+    snapshots: legacy.snapshots,
+    exportedAt: legacy.exportedAt || Date.now()
+  };
+}
+
+// Novel operations
+export async function getNovel(id: string): Promise<Novel | undefined> {
+  const novel = await db.novels.get(id);
+  return novel ? normalizeNovel(novel) : undefined;
+}
+
+export async function createNovel(title: string = 'Untitled Novel', projectType: ProjectType = 'book'): Promise<Novel> {
   const novel: Novel = {
     id: crypto.randomUUID(),
     title,
+    projectType,
     updatedAt: Date.now()
   };
   await db.novels.add(novel);
@@ -34,7 +85,10 @@ export async function createNovel(title: string = 'Untitled Novel'): Promise<Nov
 }
 
 export async function updateNovel(id: string, updates: Partial<Novel>): Promise<void> {
-  await db.novels.update(id, { ...updates, updatedAt: Date.now() });
+  const normalizedUpdates = 'projectType' in updates
+    ? { ...updates, projectType: normalizeProjectType(updates.projectType) }
+    : updates;
+  await db.novels.update(id, { ...normalizedUpdates, updatedAt: Date.now() });
 }
 
 export async function deleteNovel(id: string): Promise<void> {
@@ -51,9 +105,15 @@ export async function deleteNovel(id: string): Promise<void> {
 export async function getOrCreateDefaultNovel(): Promise<Novel> {
   let novel = await db.novels.orderBy('updatedAt').last();
   if (!novel) {
-    novel = await createNovel('My Novel');
+    novel = await createNovel('My Novel', 'book');
   }
-  return novel;
+
+  if (!novel.projectType) {
+    await updateNovel(novel.id, { projectType: 'book' });
+    novel.projectType = 'book';
+  }
+
+  return normalizeNovel(novel);
 }
 
 // Chapter operations
@@ -68,12 +128,17 @@ export async function getChapter(id: string): Promise<Chapter | undefined> {
   return db.chapters.get(id);
 }
 
-export function createChapter(novelId: string, order: number, title?: string): Chapter {
+export function createChapter(
+  novelId: string,
+  order: number,
+  title?: string,
+  projectType: ProjectType = 'book'
+): Chapter {
   return {
     id: crypto.randomUUID(),
     novelId,
     order,
-    title: title || `Chapter ${order + 1}`,
+    title: title || (projectType === 'screenplay' ? `Scene ${order + 1}` : `Chapter ${order + 1}`),
     updatedAt: Date.now(),
     content: null,
     summary: '',
@@ -134,7 +199,7 @@ export async function deleteSnapshot(id: string): Promise<void> {
 }
 
 // Backup operations
-export async function exportBackup(novelId: string, includeSnapshots: boolean = true): Promise<BackupData> {
+export async function exportBackup(novelId: string, includeSnapshots: boolean = true): Promise<BackupDataV3> {
   const novel = await getNovel(novelId);
   if (!novel) {
     throw new Error('Novel not found');
@@ -149,26 +214,29 @@ export async function exportBackup(novelId: string, includeSnapshots: boolean = 
   }
 
   return {
-    version: 2,
-    novel,
-    chapters,
+    version: CURRENT_BACKUP_VERSION,
+    projectType: novel.projectType || 'book',
+    project: novel,
+    sections: chapters,
     snapshots: includeSnapshots ? snapshots : undefined,
     exportedAt: Date.now()
   };
 }
 
 export async function importBackup(backup: BackupData): Promise<Novel> {
+  const normalizedBackup = upgradeBackup(backup);
   const newNovelId = crypto.randomUUID();
   const idMap = new Map<string, string>();
-  idMap.set(backup.novel.id, newNovelId);
+  idMap.set(normalizedBackup.project.id, newNovelId);
 
   const novel: Novel = {
-    ...backup.novel,
+    ...normalizedBackup.project,
     id: newNovelId,
+    projectType: normalizedBackup.projectType,
     updatedAt: Date.now()
   };
 
-  const chapters: Chapter[] = backup.chapters.map(chapter => {
+  const chapters: Chapter[] = normalizedBackup.sections.map(chapter => {
     const newId = crypto.randomUUID();
     idMap.set(chapter.id, newId);
     return {
@@ -179,7 +247,7 @@ export async function importBackup(backup: BackupData): Promise<Novel> {
     };
   });
 
-  const snapshots: Snapshot[] = (backup.snapshots || []).map(snapshot => ({
+  const snapshots: Snapshot[] = (normalizedBackup.snapshots || []).map(snapshot => ({
     ...snapshot,
     id: crypto.randomUUID(),
     chapterId: idMap.get(snapshot.chapterId) || snapshot.chapterId
