@@ -4,6 +4,7 @@ import {
   useReducer,
   useEffect,
   useCallback,
+  useRef,
   type ReactNode
 } from 'react';
 import type { Chapter, Novel, AppSettings, AppState, Scene } from '@/types';
@@ -179,6 +180,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
   }
 }
 
+// Chapter order history for undo/redo
+const MAX_UNDO_STACK = 20;
+
 // Context type
 interface AppContextType {
   state: AppState;
@@ -192,11 +196,16 @@ interface AppContextType {
   updateChapterImmediate: (id: string, updates: Partial<Chapter>) => Promise<void>;
   setActiveChapter: (id: string) => void;
   reorderChapters: (ids: string[]) => Promise<void>;
+  undoReorder: () => Promise<void>;
+  redoReorder: () => Promise<void>;
+  canUndoReorder: boolean;
+  canRedoReorder: boolean;
   updateNovelTitle: (title: string) => void;
   updateSettings: (settings: Partial<AppSettings>) => void;
   addScene: (chapterId: string) => void;
   updateScene: (chapterId: string, sceneId: string, updates: Partial<Scene>) => void;
   deleteScene: (chapterId: string, sceneId: string) => void;
+  reorderScenes: (chapterId: string, sceneIds: string[]) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -207,6 +216,10 @@ const SETTINGS_KEY = 'novelwriter_settings_v1';
 // Provider component
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
+
+  // Undo/redo stack for chapter reordering
+  const reorderUndoStack = useRef<string[][]>([]);
+  const reorderRedoStack = useRef<string[][]>([]);
 
   // Load settings from localStorage
   useEffect(() => {
@@ -303,11 +316,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_ACTIVE_CHAPTER', payload: id });
   }, []);
 
-  // Reorder chapters
+  // Reorder chapters with undo support
   const reorderChapters = useCallback(async (ids: string[]) => {
+    // Save current order to undo stack
+    const currentOrder = state.chapters.map(ch => ch.id);
+    reorderUndoStack.current.push(currentOrder);
+    if (reorderUndoStack.current.length > MAX_UNDO_STACK) {
+      reorderUndoStack.current.shift();
+    }
+    // Clear redo stack on new action
+    reorderRedoStack.current = [];
+
     dispatch({ type: 'REORDER_CHAPTERS', payload: ids });
     await storage.reorderChapters(state.novelId, ids);
-  }, [state.novelId]);
+  }, [state.novelId, state.chapters]);
+
+  // Undo chapter reorder
+  const undoReorder = useCallback(async () => {
+    const previousOrder = reorderUndoStack.current.pop();
+    if (!previousOrder) return;
+
+    // Save current order to redo stack
+    const currentOrder = state.chapters.map(ch => ch.id);
+    reorderRedoStack.current.push(currentOrder);
+
+    dispatch({ type: 'REORDER_CHAPTERS', payload: previousOrder });
+    await storage.reorderChapters(state.novelId, previousOrder);
+  }, [state.novelId, state.chapters]);
+
+  // Redo chapter reorder
+  const redoReorder = useCallback(async () => {
+    const nextOrder = reorderRedoStack.current.pop();
+    if (!nextOrder) return;
+
+    // Save current order to undo stack
+    const currentOrder = state.chapters.map(ch => ch.id);
+    reorderUndoStack.current.push(currentOrder);
+
+    dispatch({ type: 'REORDER_CHAPTERS', payload: nextOrder });
+    await storage.reorderChapters(state.novelId, nextOrder);
+  }, [state.novelId, state.chapters]);
 
   // Update novel title
   const updateNovelTitle = useCallback((title: string) => {
@@ -364,6 +412,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     storage.updateChapter(chapterId, { scenes });
   }, [state.chapters]);
 
+  // Reorder scenes within a chapter
+  const reorderScenes = useCallback((chapterId: string, sceneIds: string[]) => {
+    const chapter = state.chapters.find(ch => ch.id === chapterId);
+    if (!chapter) return;
+
+    const scenes = sceneIds
+      .map(id => (chapter.scenes || []).find(s => s.id === id))
+      .filter((s): s is Scene => s !== null && s !== undefined);
+
+    dispatch({ type: 'UPDATE_CHAPTER', payload: { id: chapterId, updates: { scenes } } });
+    storage.updateChapter(chapterId, { scenes });
+  }, [state.chapters]);
+
   // Get active chapter
   const activeChapter = state.chapters.find(ch => ch.id === state.activeChapterId) || null;
 
@@ -378,11 +439,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateChapterImmediate,
     setActiveChapter,
     reorderChapters,
+    undoReorder,
+    redoReorder,
+    canUndoReorder: reorderUndoStack.current.length > 0,
+    canRedoReorder: reorderRedoStack.current.length > 0,
     updateNovelTitle,
     updateSettings,
     addScene,
     updateScene,
-    deleteScene
+    deleteScene,
+    reorderScenes
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

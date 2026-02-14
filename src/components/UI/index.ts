@@ -4,3 +4,4 @@ export { Select } from './Select';
 export { Dialog } from './Dialog';
 export { Pill, StatusDot } from './Pill';
 export { ToastProvider, useToast } from './Toast';
+export { Tooltip, HelpTooltip } from './Tooltip';

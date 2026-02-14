@@ -1,6 +1,7 @@
-import { useCallback } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useCurrentEditor } from '@tiptap/react';
 import { IconButton } from '@/components/UI';
+import { Tooltip } from '@/components/UI/Tooltip';
 import { Select } from '@/components/UI/Select';
 import styles from './Toolbar.module.css';
 
@@ -12,6 +13,14 @@ const STYLE_OPTIONS = [
 
 export function Toolbar() {
   const { editor } = useCurrentEditor();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 820);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   const getCurrentStyle = useCallback(() => {
     if (!editor) return 'p';
@@ -36,15 +45,15 @@ export function Toolbar() {
   };
 
   const formatCommands = [
-    { icon: 'format_bold', cmd: 'bold', label: 'Bold (Ctrl+B)' },
-    { icon: 'format_italic', cmd: 'italic', label: 'Italic (Ctrl+I)' },
-    { icon: 'format_underlined', cmd: 'underline', label: 'Underline (Ctrl+U)' },
-    { icon: 'strikethrough_s', cmd: 'strike', label: 'Strikethrough' }
+    { icon: 'format_bold', cmd: 'bold', label: 'Bold', shortcut: 'Ctrl+B' },
+    { icon: 'format_italic', cmd: 'italic', label: 'Italic', shortcut: 'Ctrl+I' },
+    { icon: 'format_underlined', cmd: 'underline', label: 'Underline', shortcut: 'Ctrl+U' },
+    { icon: 'strikethrough_s', cmd: 'strike', label: 'Strikethrough', shortcut: '' }
   ];
 
   const listCommands = [
-    { icon: 'format_list_bulleted', cmd: 'bulletList', label: 'Bullet List' },
-    { icon: 'format_list_numbered', cmd: 'orderedList', label: 'Numbered List' }
+    { icon: 'format_list_bulleted', cmd: 'bulletList', label: 'Bullet List', shortcut: '' },
+    { icon: 'format_list_numbered', cmd: 'orderedList', label: 'Numbered List', shortcut: '' }
   ];
 
   const handleFormatClick = (cmd: string) => {
@@ -89,6 +98,71 @@ export function Toolbar() {
     return editor.isActive(cmd);
   };
 
+  // Mobile: show only essential formatting buttons
+  if (isMobile) {
+    const mobileCommands = formatCommands.slice(0, 3); // Bold, Italic, Underline only
+
+    return (
+      <div className={styles.toolbar}>
+        <div className={styles.toolbar__group}>
+          <Select
+            options={STYLE_OPTIONS}
+            value={getCurrentStyle()}
+            onChange={e => handleStyleChange(e.target.value)}
+            className={styles.styleSelect}
+          />
+        </div>
+
+        <div className={styles.toolbar__divider} />
+
+        <div className={styles.toolbar__group}>
+          {mobileCommands.map(({ icon, cmd, label }) => (
+            <IconButton
+              key={cmd}
+              icon={icon}
+              label={label}
+              variant="ghost"
+              active={isActive(cmd)}
+              onClick={() => handleFormatClick(cmd)}
+            />
+          ))}
+        </div>
+
+        <div className={styles.toolbar__divider} />
+
+        <div className={styles.toolbar__group}>
+          <IconButton
+            icon="format_list_bulleted"
+            label="Bullet List"
+            variant="ghost"
+            active={isActive('bulletList')}
+            onClick={() => handleFormatClick('bulletList')}
+          />
+        </div>
+
+        <div className={styles.toolbar__spacer} />
+
+        <div className={styles.toolbar__group}>
+          <IconButton
+            icon="undo"
+            label="Undo"
+            variant="ghost"
+            onClick={() => handleFormatClick('undo')}
+            disabled={!editor?.can().undo()}
+          />
+          <IconButton
+            icon="redo"
+            label="Redo"
+            variant="ghost"
+            onClick={() => handleFormatClick('redo')}
+            disabled={!editor?.can().redo()}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop: full toolbar with tooltips
   return (
     <div className={styles.toolbar}>
       <div className={styles.toolbar__group}>
@@ -103,15 +177,16 @@ export function Toolbar() {
       <div className={styles.toolbar__divider} />
 
       <div className={styles.toolbar__group}>
-        {formatCommands.map(({ icon, cmd, label }) => (
-          <IconButton
-            key={cmd}
-            icon={icon}
-            label={label}
-            variant="ghost"
-            active={isActive(cmd)}
-            onClick={() => handleFormatClick(cmd)}
-          />
+        {formatCommands.map(({ icon, cmd, label, shortcut }) => (
+          <Tooltip key={cmd} content={shortcut ? `${label} (${shortcut})` : label} position="bottom">
+            <IconButton
+              icon={icon}
+              label={shortcut ? `${label} (${shortcut})` : label}
+              variant="ghost"
+              active={isActive(cmd)}
+              onClick={() => handleFormatClick(cmd)}
+            />
+          </Tooltip>
         ))}
       </div>
 
@@ -119,52 +194,61 @@ export function Toolbar() {
 
       <div className={styles.toolbar__group}>
         {listCommands.map(({ icon, cmd, label }) => (
-          <IconButton
-            key={cmd}
-            icon={icon}
-            label={label}
-            variant="ghost"
-            active={isActive(cmd)}
-            onClick={() => handleFormatClick(cmd)}
-          />
+          <Tooltip key={cmd} content={label} position="bottom">
+            <IconButton
+              icon={icon}
+              label={label}
+              variant="ghost"
+              active={isActive(cmd)}
+              onClick={() => handleFormatClick(cmd)}
+            />
+          </Tooltip>
         ))}
       </div>
 
       <div className={styles.toolbar__divider} />
 
       <div className={styles.toolbar__group}>
-        <IconButton
-          icon="format_quote"
-          label="Blockquote"
-          variant="ghost"
-          active={isActive('blockquote')}
-          onClick={() => handleFormatClick('blockquote')}
-        />
-        <IconButton
-          icon="horizontal_rule"
-          label="Horizontal Rule"
-          variant="ghost"
-          onClick={() => handleFormatClick('horizontalRule')}
-        />
+        <Tooltip content="Blockquote" position="bottom">
+          <IconButton
+            icon="format_quote"
+            label="Blockquote"
+            variant="ghost"
+            active={isActive('blockquote')}
+            onClick={() => handleFormatClick('blockquote')}
+          />
+        </Tooltip>
+        <Tooltip content="Horizontal Rule" position="bottom">
+          <IconButton
+            icon="horizontal_rule"
+            label="Horizontal Rule"
+            variant="ghost"
+            onClick={() => handleFormatClick('horizontalRule')}
+          />
+        </Tooltip>
       </div>
 
       <div className={styles.toolbar__spacer} />
 
       <div className={styles.toolbar__group}>
-        <IconButton
-          icon="undo"
-          label="Undo (Ctrl+Z)"
-          variant="ghost"
-          onClick={() => handleFormatClick('undo')}
-          disabled={!editor?.can().undo()}
-        />
-        <IconButton
-          icon="redo"
-          label="Redo (Ctrl+Y)"
-          variant="ghost"
-          onClick={() => handleFormatClick('redo')}
-          disabled={!editor?.can().redo()}
-        />
+        <Tooltip content="Undo (Ctrl+Z)" position="bottom">
+          <IconButton
+            icon="undo"
+            label="Undo (Ctrl+Z)"
+            variant="ghost"
+            onClick={() => handleFormatClick('undo')}
+            disabled={!editor?.can().undo()}
+          />
+        </Tooltip>
+        <Tooltip content="Redo (Ctrl+Y)" position="bottom">
+          <IconButton
+            icon="redo"
+            label="Redo (Ctrl+Y)"
+            variant="ghost"
+            onClick={() => handleFormatClick('redo')}
+            disabled={!editor?.can().redo()}
+          />
+        </Tooltip>
       </div>
     </div>
   );
