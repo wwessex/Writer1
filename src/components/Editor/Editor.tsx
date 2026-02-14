@@ -1,14 +1,21 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useMemo } from 'react';
 import { useCurrentEditor, EditorContent } from '@tiptap/react';
 import { useApp } from '@/context/AppContext';
 import { Input, IconButton } from '@/components/UI';
 import styles from './Editor.module.css';
 
+const FONT_MAP: Record<string, string> = {
+  system: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  serif: 'Georgia, "Times New Roman", Times, serif',
+  mono: '"Courier New", Courier, monospace',
+  merriweather: 'Merriweather, Georgia, serif',
+  lora: 'Lora, Georgia, serif',
+};
+
 export function Editor() {
-  const { state, activeChapter, updateChapterImmediate, deleteChapter } = useApp();
+  const { state, activeChapter, updateChapterImmediate, deleteChapter, dispatch } = useApp();
   const { editor } = useCurrentEditor();
 
-  // Update editor content when chapter changes
   useEffect(() => {
     if (editor && activeChapter) {
       const currentContent = JSON.stringify(editor.getJSON());
@@ -32,6 +39,21 @@ export function Editor() {
     }
   }, [activeChapter, deleteChapter]);
 
+  const exitFocusMode = useCallback(() => {
+    if (state.settings.focusMode) {
+      dispatch({ type: 'TOGGLE_FOCUS_MODE' });
+    }
+  }, [state.settings.focusMode, dispatch]);
+
+  const typographyStyles = useMemo(() => {
+    const typo = state.settings.typography;
+    return {
+      '--editor-font-family': FONT_MAP[typo.fontFamily] || FONT_MAP.system,
+      '--editor-font-size': `${typo.fontSize}px`,
+      '--editor-line-height': String(typo.lineHeight),
+    } as React.CSSProperties;
+  }, [state.settings.typography]);
+
   if (!activeChapter) {
     return (
       <div className={styles.editorPane}>
@@ -43,28 +65,44 @@ export function Editor() {
     );
   }
 
-  const editorClass = `${styles.editorPane} ${state.settings.pageView ? styles['editorPane--pageView'] : ''}`;
+  const isFocusMode = state.settings.focusMode;
+  const editorClass = [
+    styles.editorPane,
+    state.settings.pageView ? styles['editorPane--pageView'] : '',
+    isFocusMode ? styles['editorPane--focusMode'] : '',
+  ].filter(Boolean).join(' ');
 
   return (
-    <div className={editorClass}>
-      <div className={styles.editorHeader}>
-        <Input
-          variant="title"
-          value={activeChapter.title}
-          onChange={handleTitleChange}
-          placeholder="Chapter Title"
-          className={styles.chapterTitle}
-        />
-        <IconButton
-          icon="delete"
-          label="Delete chapter"
-          variant="ghost"
-          onClick={handleDelete}
-        />
-      </div>
+    <div className={editorClass} style={typographyStyles}>
+      {!isFocusMode && (
+        <div className={styles.editorHeader}>
+          <Input
+            variant="title"
+            value={activeChapter.title}
+            onChange={handleTitleChange}
+            placeholder="Chapter Title"
+            className={styles.chapterTitle}
+            aria-label="Chapter title"
+          />
+          <IconButton
+            icon="delete"
+            label="Delete chapter"
+            variant="ghost"
+            onClick={handleDelete}
+          />
+        </div>
+      )}
       <div className={styles.editorContent}>
         <EditorContent editor={editor} className={styles.editorWrapper} />
       </div>
+      {isFocusMode && (
+        <div className={styles.focusModeBar}>
+          <button className={styles.focusModeExit} onClick={exitFocusMode} aria-label="Exit focus mode">
+            <span className="material-symbols-rounded">fullscreen_exit</span>
+            <span>Exit Focus Mode</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

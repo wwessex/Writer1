@@ -30,7 +30,14 @@ const defaultSettings: AppSettings = {
   },
   theme: 'dark',
   sidebarHidden: isMobile, // Hidden by default on mobile
-  pageView: true
+  pageView: true,
+  focusMode: false,
+  typography: {
+    fontFamily: 'system',
+    fontSize: 16,
+    lineHeight: 1.75
+  },
+  onboardingComplete: false
 };
 
 // Initial state
@@ -59,7 +66,8 @@ type AppAction =
   | { type: 'SET_SAVING'; payload: boolean }
   | { type: 'TOGGLE_SIDEBAR' }
   | { type: 'TOGGLE_PAGE_VIEW' }
-  | { type: 'SET_THEME'; payload: 'dark' | 'light' };
+  | { type: 'SET_THEME'; payload: 'dark' | 'light' | 'high-contrast' }
+  | { type: 'TOGGLE_FOCUS_MODE' };
 
 // Reducer
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -155,6 +163,15 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         settings: { ...state.settings, theme: action.payload }
+      };
+
+    case 'TOGGLE_FOCUS_MODE':
+      return {
+        ...state,
+        settings: {
+          ...state.settings,
+          focusMode: !state.settings.focusMode
+        }
       };
 
     default:

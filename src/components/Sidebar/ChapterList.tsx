@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useApp } from '@/context/AppContext';
 import { IconButton, Button } from '@/components/UI';
-import { countWords, editorToPlainText } from '@/lib/utils';
+import { countWords, editorToPlainText, formatRelativeTime } from '@/lib/utils';
 import styles from './ChapterList.module.css';
 
 interface DragState {
@@ -18,10 +18,8 @@ export function ChapterList() {
     dropTargetId: null
   });
 
-  // Close sidebar on mobile when selecting a chapter
   const handleChapterSelect = useCallback((id: string) => {
     setActiveChapter(id);
-    // Close sidebar on mobile
     if (window.matchMedia('(max-width: 820px)').matches && !state.settings.sidebarHidden) {
       dispatch({ type: 'TOGGLE_SIDEBAR' });
     }
@@ -63,7 +61,7 @@ export function ChapterList() {
   }, [state.chapters, reorderChapters]);
 
   return (
-    <section className={styles.chapterList}>
+    <section className={styles.chapterList} role="navigation" aria-label="Chapters">
       <div className={styles.chapterList__header}>
         <h3 className={styles.chapterList__title}>Chapters</h3>
         <IconButton
@@ -73,12 +71,13 @@ export function ChapterList() {
           onClick={createChapter}
         />
       </div>
-      <div className={styles.chapterList__items}>
-        {state.chapters.map(chapter => {
+      <div className={styles.chapterList__items} role="listbox" aria-label="Chapter list">
+        {state.chapters.map((chapter, index) => {
           const wordCount = countWords(editorToPlainText(chapter.content));
           const isActive = chapter.id === state.activeChapterId;
           const isDragging = dragState.draggedId === chapter.id;
           const isDropTarget = dragState.dropTargetId === chapter.id;
+          const goalPercent = chapter.wordGoal > 0 ? Math.min(100, Math.round((wordCount / chapter.wordGoal) * 100)) : -1;
 
           return (
             <div
@@ -90,21 +89,32 @@ export function ChapterList() {
               onDragEnd={handleDragEnd}
               onDrop={e => handleDrop(e, chapter.id)}
               onClick={() => handleChapterSelect(chapter.id)}
+              role="option"
+              aria-selected={isActive}
+              tabIndex={0}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleChapterSelect(chapter.id); } }}
             >
-              <span className={styles.chapterItem__drag}>
-                <span className="material-symbols-rounded">drag_indicator</span>
-              </span>
+              <span className={styles.chapterItem__number}>{index + 1}</span>
               <div className={styles.chapterItem__content}>
                 <span className={styles.chapterItem__title}>{chapter.title}</span>
                 <span className={styles.chapterItem__meta}>
-                  {wordCount.toLocaleString()} words
+                  <span className={styles.chapterItem__words}>{wordCount.toLocaleString()} words</span>
                   {chapter.status !== 'planned' && (
                     <span className={`${styles.chapterItem__status} ${styles[`chapterItem__status--${chapter.status}`]}`}>
                       {chapter.status}
                     </span>
                   )}
+                  <span className={styles.chapterItem__time}>{formatRelativeTime(chapter.updatedAt)}</span>
                 </span>
+                {goalPercent >= 0 && (
+                  <div className={styles.chapterItem__progress}>
+                    <div className={styles.chapterItem__progressFill} style={{ width: `${goalPercent}%` }} />
+                  </div>
+                )}
               </div>
+              <span className={styles.chapterItem__drag}>
+                <span className="material-symbols-rounded">drag_indicator</span>
+              </span>
             </div>
           );
         })}

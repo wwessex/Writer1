@@ -23,6 +23,32 @@ const LANGUAGE_OPTIONS = [
   { value: 'ru-RU', label: 'Russian' }
 ];
 
+const FONT_OPTIONS = [
+  { value: 'system', label: 'System Default' },
+  { value: 'serif', label: 'Serif (Georgia)' },
+  { value: 'mono', label: 'Monospace' },
+  { value: 'merriweather', label: 'Merriweather' },
+  { value: 'lora', label: 'Lora' }
+];
+
+const FONT_SIZE_OPTIONS = [
+  { value: '14', label: '14px' },
+  { value: '15', label: '15px' },
+  { value: '16', label: '16px' },
+  { value: '17', label: '17px' },
+  { value: '18', label: '18px' },
+  { value: '20', label: '20px' },
+  { value: '22', label: '22px' }
+];
+
+const LINE_HEIGHT_OPTIONS = [
+  { value: '1.5', label: 'Compact (1.5)' },
+  { value: '1.625', label: 'Normal (1.625)' },
+  { value: '1.75', label: 'Relaxed (1.75)' },
+  { value: '2', label: 'Spacious (2.0)' },
+  { value: '2.25', label: 'Wide (2.25)' }
+];
+
 export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   const { state, updateSettings } = useApp();
   const windowRef = useRef<HTMLDivElement>(null);
@@ -30,7 +56,6 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isMobile, setIsMobile] = useState(false);
 
-  // Detect mobile
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 820);
     check();
@@ -38,7 +63,6 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  // Close on Escape
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
@@ -48,7 +72,6 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
     return () => window.removeEventListener('keydown', handleKey);
   }, [open, onClose]);
 
-  // Reset position when reopened
   useEffect(() => {
     if (open && windowRef.current) {
       windowRef.current.style.left = '';
@@ -57,7 +80,6 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
     }
   }, [open]);
 
-  // Handle drag (desktop only)
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (isMobile) return;
     if ((e.target as HTMLElement).closest(`.${styles.window__header}`)) {
@@ -111,15 +133,57 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
         ref={windowRef}
         className={styles.window}
         onMouseDown={handleMouseDown}
+        role="dialog"
+        aria-label="Settings"
       >
         <div className={styles.window__header}>
           <h3>Settings</h3>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="Close">
+          <button className={styles.closeBtn} onClick={onClose} aria-label="Close settings">
             <span className="material-symbols-rounded">close</span>
           </button>
         </div>
 
         <div className={styles.window__body}>
+          {/* Typography Section */}
+          <section className={styles.section}>
+            <h4>
+              <span className="material-symbols-rounded">text_format</span>
+              Typography
+            </h4>
+            <div className={styles.field}>
+              <label>Font Family</label>
+              <Select
+                options={FONT_OPTIONS}
+                value={state.settings.typography.fontFamily}
+                onChange={e => updateSettings({
+                  typography: { ...state.settings.typography, fontFamily: e.target.value }
+                })}
+              />
+            </div>
+            <div className={styles.fieldRow}>
+              <div className={styles.field}>
+                <label>Font Size</label>
+                <Select
+                  options={FONT_SIZE_OPTIONS}
+                  value={String(state.settings.typography.fontSize)}
+                  onChange={e => updateSettings({
+                    typography: { ...state.settings.typography, fontSize: parseInt(e.target.value) }
+                  })}
+                />
+              </div>
+              <div className={styles.field}>
+                <label>Line Height</label>
+                <Select
+                  options={LINE_HEIGHT_OPTIONS}
+                  value={String(state.settings.typography.lineHeight)}
+                  onChange={e => updateSettings({
+                    typography: { ...state.settings.typography, lineHeight: parseFloat(e.target.value) }
+                  })}
+                />
+              </div>
+            </div>
+          </section>
+
           {/* Online Sync Section */}
           <section className={styles.section}>
             <h4>
