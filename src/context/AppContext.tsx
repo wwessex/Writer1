@@ -394,7 +394,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         pov: '',
         status: 'draft',
         tags: ['slugLine', 'action', 'characterCue', 'parenthetical', 'dialogue'],
-        wordGoal: 0
+        wordGoal: 0,
+        slugLine: '',
+        location: '',
+        interiorExterior: 'INT',
+        timeOfDay: 'DAY',
+        pageEstimate: 1,
+        productionTags: []
       }
       : {
         id: crypto.randomUUID(),

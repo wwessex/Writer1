@@ -1,5 +1,6 @@
 import { useCallback, useState, useEffect } from 'react';
 import { useCurrentEditor } from '@tiptap/react';
+import { useApp } from '@/context/AppContext';
 import { IconButton } from '@/components/UI';
 import { Tooltip } from '@/components/UI/Tooltip';
 import { Select } from '@/components/UI/Select';
@@ -13,6 +14,7 @@ const STYLE_OPTIONS = [
 
 export function Toolbar() {
   const { editor } = useCurrentEditor();
+  const { state, createChapter } = useApp();
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -140,7 +142,21 @@ export function Toolbar() {
           />
         </div>
 
-        <div className={styles.toolbar__spacer} />
+  
+      <div className={styles.toolbar__divider} />
+
+      <div className={styles.toolbar__group}>
+        <Tooltip content={state.projectType === 'screenplay' ? 'New Scene' : 'New Chapter'} position="bottom">
+          <IconButton
+            icon="note_add"
+            label={state.projectType === 'screenplay' ? 'New Scene' : 'New Chapter'}
+            variant="ghost"
+            onClick={createChapter}
+          />
+        </Tooltip>
+      </div>
+
+      <div className={styles.toolbar__spacer} />
 
         <div className={styles.toolbar__group}>
           <IconButton

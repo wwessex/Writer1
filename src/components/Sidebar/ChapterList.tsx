@@ -74,17 +74,17 @@ export function ChapterList() {
   }, [state.chapters, reorderChapters, dragState.dropPosition]);
 
   return (
-    <section className={styles.chapterList} role="navigation" aria-label="Chapters">
+    <section className={styles.chapterList} role="navigation" aria-label={state.projectType === 'screenplay' ? 'Scenes' : 'Chapters'}>
       <div className={styles.chapterList__header}>
-        <h3 className={styles.chapterList__title}>Chapters</h3>
+        <h3 className={styles.chapterList__title}>{state.projectType === 'screenplay' ? 'Scenes' : 'Chapters'}</h3>
         <IconButton
           icon="add"
-          label="New Chapter"
+          label={state.projectType === 'screenplay' ? 'New Scene' : 'New Chapter'}
           variant="ghost"
           onClick={createChapter}
         />
       </div>
-      <div className={styles.chapterList__items} role="listbox" aria-label="Chapter list">
+      <div className={styles.chapterList__items} role="listbox" aria-label={state.projectType === 'screenplay' ? 'Scene list' : 'Chapter list'}>
         {state.chapters.map((chapter, index) => {
           const wordCount = countWords(editorToPlainText(chapter.content));
           const isActive = chapter.id === state.activeChapterId;
@@ -122,7 +122,11 @@ export function ChapterList() {
               <div className={styles.chapterItem__content}>
                 <span className={styles.chapterItem__title}>{chapter.title}</span>
                 <span className={styles.chapterItem__meta}>
-                  <span className={styles.chapterItem__words}>{wordCount.toLocaleString()} words</span>
+                  {state.projectType === 'screenplay' ? (
+                    <span>Act {chapter.act || Math.max(1, Math.ceil((index + 1) / 12))} · Seq {chapter.sequence || Math.max(1, Math.ceil((index + 1) / 4))} · Scene {index + 1}</span>
+                  ) : (
+                    <span className={styles.chapterItem__words}>{wordCount.toLocaleString()} words</span>
+                  )}
                   {chapter.status !== 'planned' && (
                     <span className={`${styles.chapterItem__status} ${styles[`chapterItem__status--${chapter.status}`]}`}>
                       {chapter.status}
@@ -145,9 +149,9 @@ export function ChapterList() {
       </div>
       {state.chapters.length === 0 && (
         <div className={styles.chapterList__empty}>
-          <p>No chapters yet</p>
+          <p>No {state.projectType === 'screenplay' ? 'scenes' : 'chapters'} yet</p>
           <Button variant="primary" onClick={createChapter}>
-            Create First Chapter
+            Create First {state.projectType === 'screenplay' ? 'Scene' : 'Chapter'}
           </Button>
         </div>
       )}

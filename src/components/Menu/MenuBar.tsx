@@ -101,7 +101,7 @@ interface MenuBarProps {
 }
 
 export function MenuBar({ onAction }: MenuBarProps) {
-  const { dispatch } = useApp();
+  const { state, dispatch } = useApp();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const menuBarRef = useRef<HTMLDivElement>(null);
 
@@ -151,7 +151,14 @@ export function MenuBar({ onAction }: MenuBarProps) {
 
   return (
     <nav className={styles.menuBar} ref={menuBarRef} role="menubar" aria-label="Main menu">
-      {MENUS.map(menu => (
+      {MENUS.map(menu => {
+        const items = menu.label === 'File'
+          ? menu.items.map(item => item.action === 'newChapter'
+            ? { ...item, label: state.projectType === 'screenplay' ? 'New Scene' : 'New Chapter' }
+            : item)
+          : menu.items;
+
+        return (
         <div key={menu.label} className={styles.menuWrapper}>
           <button
             className={`${styles.menuBtn} ${openMenu === menu.label ? styles['menuBtn--active'] : ''}`}
@@ -164,7 +171,7 @@ export function MenuBar({ onAction }: MenuBarProps) {
           </button>
           {openMenu === menu.label && (
             <div className={styles.menu} role="menu">
-              {menu.items.map((item, idx) =>
+              {items.map((item, idx) =>
                 item.divider ? (
                   <div key={idx} className={styles.menuDivider} role="separator" />
                 ) : (
@@ -185,7 +192,8 @@ export function MenuBar({ onAction }: MenuBarProps) {
             </div>
           )}
         </div>
-      ))}
+        );
+      })}
     </nav>
   );
 }
