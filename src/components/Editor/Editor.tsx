@@ -2,6 +2,7 @@ import { useEffect, useCallback, useMemo } from 'react';
 import { useCurrentEditor, EditorContent } from '@tiptap/react';
 import { useApp } from '@/context/AppContext';
 import { Input, IconButton } from '@/components/UI';
+import type { ScreenplayBlockType } from './screenplayExtension';
 import styles from './Editor.module.css';
 
 const FONT_MAP: Record<string, string> = {
@@ -12,7 +13,21 @@ const FONT_MAP: Record<string, string> = {
   lora: 'Lora, Georgia, serif',
 };
 
-export function Editor() {
+const SCREENPLAY_CONTROLS: { label: string; type: ScreenplayBlockType }[] = [
+  { label: 'Scene Heading', type: 'scene-heading' },
+  { label: 'Action', type: 'action' },
+  { label: 'Character', type: 'character' },
+  { label: 'Parenthetical', type: 'parenthetical' },
+  { label: 'Dialogue', type: 'dialogue' },
+  { label: 'Transition', type: 'transition' },
+];
+
+interface EditorProps {
+  screenplayMode: boolean;
+  onToggleScreenplayMode: () => void;
+}
+
+export function Editor({ screenplayMode, onToggleScreenplayMode }: EditorProps) {
   const { state, activeChapter, updateChapterImmediate, deleteChapter, dispatch } = useApp();
   const { editor } = useCurrentEditor();
 
@@ -25,7 +40,7 @@ export function Editor() {
         editor.commands.setContent(activeChapter.content || '');
       }
     }
-  }, [editor, activeChapter?.id]);
+  }, [editor, activeChapter]);
 
   const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (activeChapter) {
@@ -48,11 +63,15 @@ export function Editor() {
   const typographyStyles = useMemo(() => {
     const typo = state.settings.typography;
     return {
-      '--editor-font-family': FONT_MAP[typo.fontFamily] || FONT_MAP.system,
+      '--editor-font-family': screenplayMode ? FONT_MAP.mono : FONT_MAP[typo.fontFamily] || FONT_MAP.system,
       '--editor-font-size': `${typo.fontSize}px`,
-      '--editor-line-height': String(typo.lineHeight),
+      '--editor-line-height': screenplayMode ? '1.5' : String(typo.lineHeight),
     } as React.CSSProperties;
-  }, [state.settings.typography]);
+  }, [screenplayMode, state.settings.typography]);
+
+  const handleSetScreenplayBlock = useCallback((blockType: ScreenplayBlockType) => {
+    editor?.chain().focus().setScreenplayBlock(blockType).run();
+  }, [editor]);
 
   if (!activeChapter) {
     return (
@@ -70,6 +89,7 @@ export function Editor() {
     styles.editorPane,
     state.settings.pageView ? styles['editorPane--pageView'] : '',
     isFocusMode ? styles['editorPane--focusMode'] : '',
+    screenplayMode ? styles['editorPane--screenplay'] : '',
   ].filter(Boolean).join(' ');
 
   return (
@@ -84,12 +104,38 @@ export function Editor() {
             className={styles.chapterTitle}
             aria-label="Chapter title"
           />
-          <IconButton
-            icon="delete"
-            label="Delete chapter"
-            variant="ghost"
-            onClick={handleDelete}
-          />
+          <div className={styles.editorHeaderActions}>
+            {state.projectType === 'screenplay' && (
+              <button
+                type="button"
+                onClick={onToggleScreenplayMode}
+                className={`${styles.modeToggle} ${screenplayMode ? styles['modeToggle--active'] : ''}`}
+                aria-pressed={screenplayMode}
+              >
+                Screenplay Mode
+              </button>
+            )}
+            <IconButton
+              icon="delete"
+              label="Delete chapter"
+              variant="ghost"
+              onClick={handleDelete}
+            />
+          </div>
+        </div>
+      )}
+      {screenplayMode && (
+        <div className={styles.screenplayToolbar}>
+          {SCREENPLAY_CONTROLS.map(control => (
+            <button
+              key={control.type}
+              type="button"
+              className={styles.screenplayButton}
+              onClick={() => handleSetScreenplayBlock(control.type)}
+            >
+              {control.label}
+            </button>
+          ))}
         </div>
       )}
       <div className={styles.editorContent}>
