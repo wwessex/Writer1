@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { IconButton, Button } from '@/components/UI';
+import { Select } from '@/components/UI/Select';
 import { countWords, editorToPlainText, formatRelativeTime } from '@/lib/utils';
 import styles from './ChapterList.module.css';
 
@@ -14,11 +15,6 @@ interface DragState {
   dropPosition: 'above' | 'below' | null;
 }
 
-/**
- * Virtualized chapter list for large novel projects.
- * Only renders visible chapters plus a small overscan buffer.
- * Falls back to regular rendering if fewer than 30 chapters.
- */
 export function VirtualChapterList() {
   const { state, dispatch, setActiveChapter, createChapter, reorderChapters } = useApp();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -26,6 +22,12 @@ export function VirtualChapterList() {
   const [containerHeight, setContainerHeight] = useState(300);
   const [justMovedId, setJustMovedId] = useState<string | null>(null);
   const animRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'planned' | 'draft' | 'revised' | 'final'>('all');
+  const [productionTagFilter, setProductionTagFilter] = useState('all');
+
+  const isScreenplay = state.projectType === 'screenplay';
+  const sectionLabel = isScreenplay ? 'Scenes' : 'Chapters';
+  const singularLabel = isScreenplay ? 'Scene' : 'Chapter';
 
   const [dragState, setDragState] = useState<DragState>({
     dragging: false,
@@ -34,7 +36,24 @@ export function VirtualChapterList() {
     dropPosition: null
   });
 
-  // Measure container
+  const filteredChapters = useMemo(() => {
+    if (!isScreenplay) return state.chapters;
+
+    return state.chapters.filter(chapter => {
+      const scenes = chapter.scenes || [];
+      const passesStatus = statusFilter === 'all' || scenes.some(scene => scene.status === statusFilter);
+      const passesTag = productionTagFilter === 'all'
+        || scenes.some(scene => (scene.productionTags || []).includes(productionTagFilter));
+      return passesStatus && passesTag;
+    });
+  }, [state.chapters, isScreenplay, statusFilter, productionTagFilter]);
+
+  const productionTags = useMemo(() => {
+    const tags = new Set<string>();
+    state.chapters.forEach(ch => (ch.scenes || []).forEach(scene => (scene.productionTags || []).forEach(tag => tags.add(tag))));
+    return Array.from(tags).sort();
+  }, [state.chapters]);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -54,20 +73,18 @@ export function VirtualChapterList() {
     }
   }, []);
 
-  // Calculate visible range
-  const totalHeight = state.chapters.length * ITEM_HEIGHT;
+  const totalHeight = filteredChapters.length * ITEM_HEIGHT;
   const startIndex = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - OVERSCAN);
   const endIndex = Math.min(
-    state.chapters.length,
+    filteredChapters.length,
     Math.ceil((scrollTop + containerHeight) / ITEM_HEIGHT) + OVERSCAN
   );
   const visibleChapters = useMemo(
-    () => state.chapters.slice(startIndex, endIndex),
-    [state.chapters, startIndex, endIndex]
+    () => filteredChapters.slice(startIndex, endIndex),
+    [filteredChapters, startIndex, endIndex]
   );
 
-  // If fewer than 30 chapters, don't virtualize (regular list is fine)
-  const shouldVirtualize = state.chapters.length >= 30;
+  const shouldVirtualize = filteredChapters.length >= 30;
 
   const handleChapterSelect = useCallback((id: string) => {
     setActiveChapter(id);
@@ -136,6 +153,9 @@ export function VirtualChapterList() {
       isJustMoved && styles['chapterItem--justMoved'],
     ].filter(Boolean).join(' ');
 
+    const act = chapter.act || Math.max(1, Math.ceil((index + 1) / 12));
+    const sequence = chapter.sequence || Math.max(1, Math.ceil((index + 1) / 4));
+
     return (
       <div
         key={chapter.id}
@@ -162,7 +182,15 @@ export function VirtualChapterList() {
         <div className={styles.chapterItem__content}>
           <span className={styles.chapterItem__title}>{chapter.title}</span>
           <span className={styles.chapterItem__meta}>
-            <span className={styles.chapterItem__words}>{wordCount.toLocaleString()} words</span>
+            {isScreenplay ? (
+              <>
+                <span>Act {act}</span>
+                <span>· Seq {sequence}</span>
+                <span>· Scene {index + 1}</span>
+              </>
+            ) : (
+              <span className={styles.chapterItem__words}>{wordCount.toLocaleString()} words</span>
+            )}
             {chapter.status !== 'planned' && (
               <span className={`${styles.chapterItem__status} ${styles[`chapterItem__status--${chapter.status}`]}`}>
                 {chapter.status}
@@ -170,7 +198,7 @@ export function VirtualChapterList() {
             )}
             <span className={styles.chapterItem__time}>{formatRelativeTime(chapter.updatedAt)}</span>
           </span>
-          {goalPercent >= 0 && (
+          {goalPercent >= 0 && !isScreenplay && (
             <div className={styles.chapterItem__progress}>
               <div className={styles.chapterItem__progressFill} style={{ width: `${goalPercent}%` }} />
             </div>
@@ -184,26 +212,50 @@ export function VirtualChapterList() {
   };
 
   return (
-    <section className={styles.chapterList} role="navigation" aria-label="Chapters">
+    <section className={styles.chapterList} role="navigation" aria-label={sectionLabel}>
       <div className={styles.chapterList__header}>
         <h3 className={styles.chapterList__title}>
-          Chapters
-          {state.chapters.length > 0 && ` (${state.chapters.length})`}
+          {sectionLabel}
+          {filteredChapters.length > 0 && ` (${filteredChapters.length})`}
         </h3>
         <IconButton
           icon="add"
-          label="New Chapter"
+          label={`New ${singularLabel}`}
           variant="ghost"
           onClick={createChapter}
         />
       </div>
+
+      {isScreenplay && (
+        <div className={styles.chapterList__items} style={{ maxHeight: 'unset', overflow: 'visible', marginBottom: '0.5rem' }}>
+          <Select
+            options={[
+              { value: 'all', label: 'All statuses' },
+              { value: 'planned', label: 'Planned' },
+              { value: 'draft', label: 'Draft' },
+              { value: 'revised', label: 'Revised' },
+              { value: 'final', label: 'Final' },
+            ]}
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
+          />
+          <Select
+            options={[
+              { value: 'all', label: 'All production tags' },
+              ...productionTags.map(tag => ({ value: tag, label: tag }))
+            ]}
+            value={productionTagFilter}
+            onChange={e => setProductionTagFilter(e.target.value)}
+          />
+        </div>
+      )}
 
       {shouldVirtualize ? (
         <div
           ref={containerRef}
           className={styles.chapterList__items}
           role="listbox"
-          aria-label="Chapter list"
+          aria-label={`${sectionLabel} list`}
           onScroll={handleScroll}
           style={{ position: 'relative', overflow: 'auto' }}
         >
@@ -214,16 +266,16 @@ export function VirtualChapterList() {
           </div>
         </div>
       ) : (
-        <div className={styles.chapterList__items} role="listbox" aria-label="Chapter list">
-          {state.chapters.map((chapter, index) => renderChapterItem(chapter, index))}
+        <div className={styles.chapterList__items} role="listbox" aria-label={`${sectionLabel} list`}>
+          {filteredChapters.map((chapter, index) => renderChapterItem(chapter, index))}
         </div>
       )}
 
-      {state.chapters.length === 0 && (
+      {filteredChapters.length === 0 && (
         <div className={styles.chapterList__empty}>
-          <p>No chapters yet</p>
+          <p>No {sectionLabel.toLowerCase()} yet</p>
           <Button variant="primary" onClick={createChapter}>
-            Create First Chapter
+            Create First {singularLabel}
           </Button>
         </div>
       )}

@@ -37,8 +37,17 @@ export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
               </Button>
             </div>
           )}
-          <ScenePlanner />
-          <OutlinePanel />
+          {state.projectType === 'screenplay' ? (
+            <>
+              <OutlinePanel />
+              <ScenePlanner />
+            </>
+          ) : (
+            <>
+              <ScenePlanner />
+              <OutlinePanel />
+            </>
+          )}
         </div>
         <div className={styles.sidebar__footer}>
           <Button variant="ghost" onClick={onExportBackup}>

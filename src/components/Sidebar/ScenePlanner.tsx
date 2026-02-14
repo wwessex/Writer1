@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { IconButton, Button, Input, Textarea } from '@/components/UI';
 import { Select } from '@/components/UI/Select';
@@ -13,8 +13,10 @@ const STATUS_OPTIONS = [
 ];
 
 export function ScenePlanner() {
-  const { activeChapter, addScene, updateScene, deleteScene, reorderScenes } = useApp();
+  const { state, activeChapter, addScene, updateScene, deleteScene, reorderScenes } = useApp();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'planned' | 'draft' | 'revised' | 'final'>('all');
+  const [productionTagFilter, setProductionTagFilter] = useState('all');
   const [dragState, setDragState] = useState<{
     dragging: boolean;
     draggedId: string | null;
@@ -27,7 +29,22 @@ export function ScenePlanner() {
   const [justMovedId, setJustMovedId] = useState<string | null>(null);
   const animRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const scenes = activeChapter?.scenes || [];
+  const isScreenplay = state.projectType === 'screenplay';
+  const scenes = useMemo(() => activeChapter?.scenes || [], [activeChapter?.scenes]);
+
+  const productionTags = useMemo(() => {
+    const tags = new Set<string>();
+    scenes.forEach(scene => (scene.productionTags || []).forEach(tag => tags.add(tag)));
+    return Array.from(tags).sort();
+  }, [scenes]);
+
+  const filteredScenes = useMemo(() => {
+    return scenes.filter(scene => {
+      const statusOk = statusFilter === 'all' || scene.status === statusFilter;
+      const tagOk = productionTagFilter === 'all' || (scene.productionTags || []).includes(productionTagFilter);
+      return statusOk && tagOk;
+    });
+  }, [scenes, statusFilter, productionTagFilter]);
 
   const handleDragStart = useCallback((e: React.DragEvent, id: string) => {
     e.dataTransfer.effectAllowed = 'move';
@@ -93,7 +110,7 @@ export function ScenePlanner() {
         <div className={styles.scenePlanner__header}>
           <h3 className={styles.scenePlanner__title}>Scene Planner</h3>
         </div>
-        <p className={styles.scenePlanner__empty}>Select a chapter first</p>
+        <p className={styles.scenePlanner__empty}>Select a {isScreenplay ? 'scene group' : 'chapter'} first</p>
       </section>
     );
   }
@@ -102,14 +119,24 @@ export function ScenePlanner() {
     <section className={styles.scenePlanner}>
       <div className={styles.scenePlanner__header}>
         <h3 className={styles.scenePlanner__title}>
-          Scenes
-          {scenes.length > 0 && <span className={styles.scenePlanner__count}>{scenes.length}</span>}
+          {isScreenplay ? 'Scene Planner' : 'Scenes'}
+          {filteredScenes.length > 0 && <span className={styles.scenePlanner__count}>{filteredScenes.length}</span>}
         </h3>
         <IconButton icon="add" label="Add Scene" variant="ghost" onClick={handleAddScene} />
       </div>
 
       <div className={styles.scenePlanner__items}>
-        {scenes.map((scene, index) => {
+        <Select
+          options={[{ value: 'all', label: 'All statuses' }, ...STATUS_OPTIONS]}
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
+        />
+        <Select
+          options={[{ value: 'all', label: 'All production tags' }, ...productionTags.map(tag => ({ value: tag, label: tag }))]}
+          value={productionTagFilter}
+          onChange={e => setProductionTagFilter(e.target.value)}
+        />
+        {filteredScenes.map((scene, index) => {
           const isDragging = dragState.draggedId === scene.id;
           const isDropTarget = dragState.dropTargetId === scene.id && dragState.draggedId !== scene.id;
           const isExpanded = expandedId === scene.id;
@@ -165,14 +192,6 @@ export function ScenePlanner() {
                   </div>
                   <div className={styles.sceneCard__fieldRow}>
                     <div className={styles.sceneCard__field}>
-                      <label>POV</label>
-                      <Input
-                        value={scene.pov}
-                        onChange={e => handleUpdate(scene.id, { pov: e.target.value })}
-                        placeholder="Character"
-                      />
-                    </div>
-                    <div className={styles.sceneCard__field}>
                       <label>Status</label>
                       <Select
                         options={STATUS_OPTIONS}
@@ -180,16 +199,75 @@ export function ScenePlanner() {
                         onChange={e => handleUpdate(scene.id, { status: e.target.value as Scene['status'] })}
                       />
                     </div>
+                    <div className={styles.sceneCard__field}>
+                      <label>Production Tag</label>
+                      <Input
+                        value={(scene.productionTags || []).join(', ')}
+                        onChange={e => handleUpdate(scene.id, { productionTags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })}
+                        placeholder="vfx, stunt"
+                      />
+                    </div>
                   </div>
-                  <div className={styles.sceneCard__field}>
-                    <label>Word Goal</label>
-                    <Input
-                      type="number"
-                      value={scene.wordGoal || ''}
-                      onChange={e => handleUpdate(scene.id, { wordGoal: parseInt(e.target.value) || 0 })}
-                      placeholder="0"
-                    />
-                  </div>
+
+                  {isScreenplay && (
+                    <>
+                      <div className={styles.sceneCard__fieldRow}>
+                        <div className={styles.sceneCard__field}>
+                          <label>Slug Line</label>
+                          <Input
+                            value={scene.slugLine || ''}
+                            onChange={e => handleUpdate(scene.id, { slugLine: e.target.value })}
+                            placeholder="INT. OFFICE - DAY"
+                          />
+                        </div>
+                        <div className={styles.sceneCard__field}>
+                          <label>Location</label>
+                          <Input
+                            value={scene.location || ''}
+                            onChange={e => handleUpdate(scene.id, { location: e.target.value })}
+                            placeholder="Office"
+                          />
+                        </div>
+                      </div>
+                      <div className={styles.sceneCard__fieldRow}>
+                        <div className={styles.sceneCard__field}>
+                          <label>INT/EXT</label>
+                          <Select
+                            options={[
+                              { value: 'INT', label: 'INT' },
+                              { value: 'EXT', label: 'EXT' },
+                              { value: 'INT/EXT', label: 'INT/EXT' }
+                            ]}
+                            value={scene.interiorExterior || 'INT'}
+                            onChange={e => handleUpdate(scene.id, { interiorExterior: e.target.value as Scene['interiorExterior'] })}
+                          />
+                        </div>
+                        <div className={styles.sceneCard__field}>
+                          <label>Time</label>
+                          <Select
+                            options={[
+                              { value: 'DAY', label: 'DAY' },
+                              { value: 'NIGHT', label: 'NIGHT' },
+                              { value: 'DAWN', label: 'DAWN' },
+                              { value: 'DUSK', label: 'DUSK' }
+                            ]}
+                            value={scene.timeOfDay || 'DAY'}
+                            onChange={e => handleUpdate(scene.id, { timeOfDay: e.target.value as Scene['timeOfDay'] })}
+                          />
+                        </div>
+                      </div>
+                      <div className={styles.sceneCard__field}>
+                        <label>Page Estimate</label>
+                        <Input
+                          type="number"
+                          value={scene.pageEstimate || ''}
+                          onChange={e => handleUpdate(scene.id, { pageEstimate: parseInt(e.target.value) || 0 })}
+                          placeholder="1"
+                        />
+                      </div>
+                    </>
+                  )}
+
                   <div className={styles.sceneCard__actions}>
                     <Button variant="danger" size="small" onClick={() => handleDelete(scene.id)}>
                       <span className="material-symbols-rounded">delete</span>
@@ -203,9 +281,9 @@ export function ScenePlanner() {
         })}
       </div>
 
-      {scenes.length === 0 && (
+      {filteredScenes.length === 0 && (
         <p className={styles.scenePlanner__empty}>
-          No scenes yet. Add scenes to plan your chapter structure.
+          No matching scenes. Adjust filters or add scenes.
         </p>
       )}
     </section>

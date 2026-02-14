@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Input, Textarea, Button, IconButton } from '@/components/UI';
 import { Select } from '@/components/UI/Select';
-import type { ChapterStatus } from '@/types';
+import type { ChapterStatus, Scene } from '@/types';
 import styles from './OutlinePanel.module.css';
 
 const STATUS_OPTIONS = [
@@ -13,16 +13,25 @@ const STATUS_OPTIONS = [
 ];
 
 export function OutlinePanel() {
-  const { activeChapter, updateChapterImmediate, addScene, updateScene, deleteScene } = useApp();
+  const { state, activeChapter, updateChapterImmediate, addScene, updateScene, deleteScene } = useApp();
   const [expandedSections, setExpandedSections] = useState({
     details: true,
     scenes: false
   });
 
+  const isScreenplay = state.projectType === 'screenplay';
+  const sectionLabel = isScreenplay ? 'Scene Details' : 'Chapter Details';
+
+  const productionTags = useMemo(() => {
+    const tags = new Set<string>();
+    state.chapters.forEach(ch => (ch.scenes || []).forEach(scene => (scene.productionTags || []).forEach(tag => tags.add(tag))));
+    return Array.from(tags).sort();
+  }, [state.chapters]);
+
   if (!activeChapter) {
     return (
       <section className={styles.outline}>
-        <p className={styles.outline__empty}>Select a chapter to view outline</p>
+        <p className={styles.outline__empty}>Select a {isScreenplay ? 'scene group' : 'chapter'} to view outline</p>
       </section>
     );
   }
@@ -35,9 +44,12 @@ export function OutlinePanel() {
     updateChapterImmediate(activeChapter.id, { [field]: value });
   };
 
+  const handleSceneChange = (sceneId: string, updates: Partial<Scene>) => {
+    updateScene(activeChapter.id, sceneId, updates);
+  };
+
   return (
     <section className={styles.outline}>
-      {/* Chapter Details */}
       <div className={styles.section}>
         <button
           className={styles.section__header}
@@ -46,7 +58,7 @@ export function OutlinePanel() {
           <span className="material-symbols-rounded">
             {expandedSections.details ? 'expand_more' : 'chevron_right'}
           </span>
-          <span>Chapter Details</span>
+          <span>{sectionLabel}</span>
         </button>
         {expandedSections.details && (
           <div className={styles.section__content}>
@@ -55,26 +67,36 @@ export function OutlinePanel() {
               <Textarea
                 value={activeChapter.summary}
                 onChange={e => handleFieldChange('summary', e.target.value)}
-                placeholder="Brief chapter summary..."
+                placeholder={`Brief ${isScreenplay ? 'sequence' : 'chapter'} summary...`}
                 rows={3}
               />
             </div>
             <div className={styles.fieldRow}>
               <div className={styles.field}>
-                <label className={styles.field__label}>POV</label>
+                <label className={styles.field__label}>{isScreenplay ? 'Act' : 'POV'}</label>
                 <Input
-                  value={activeChapter.pov}
-                  onChange={e => handleFieldChange('pov', e.target.value)}
-                  placeholder="Point of view"
+                  type={isScreenplay ? 'number' : 'text'}
+                  value={isScreenplay ? (activeChapter.act || '') : activeChapter.pov}
+                  onChange={e => handleFieldChange(isScreenplay ? 'act' : 'pov', isScreenplay ? (parseInt(e.target.value) || 1) : e.target.value)}
+                  placeholder={isScreenplay ? '1' : 'Point of view'}
                 />
               </div>
               <div className={styles.field}>
-                <label className={styles.field__label}>Status</label>
-                <Select
-                  options={STATUS_OPTIONS}
-                  value={activeChapter.status}
-                  onChange={e => handleFieldChange('status', e.target.value as ChapterStatus)}
-                />
+                <label className={styles.field__label}>{isScreenplay ? 'Sequence' : 'Status'}</label>
+                {isScreenplay ? (
+                  <Input
+                    type="number"
+                    value={activeChapter.sequence || ''}
+                    onChange={e => handleFieldChange('sequence', parseInt(e.target.value) || 1)}
+                    placeholder="1"
+                  />
+                ) : (
+                  <Select
+                    options={STATUS_OPTIONS}
+                    value={activeChapter.status}
+                    onChange={e => handleFieldChange('status', e.target.value as ChapterStatus)}
+                  />
+                )}
               </div>
             </div>
             <div className={styles.fieldRow}>
@@ -83,16 +105,16 @@ export function OutlinePanel() {
                 <Input
                   value={(activeChapter.tags || []).join(', ')}
                   onChange={e => handleFieldChange('tags', e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
-                  placeholder="action, romance"
+                  placeholder={isScreenplay ? 'setpiece, flashback' : 'action, romance'}
                 />
               </div>
               <div className={styles.field}>
-                <label className={styles.field__label}>Word Goal</label>
+                <label className={styles.field__label}>{isScreenplay ? 'Page Goal' : 'Word Goal'}</label>
                 <Input
                   type="number"
                   value={activeChapter.wordGoal || ''}
                   onChange={e => handleFieldChange('wordGoal', parseInt(e.target.value) || 0)}
-                  placeholder="2000"
+                  placeholder={isScreenplay ? '5' : '2000'}
                 />
               </div>
             </div>
@@ -100,7 +122,6 @@ export function OutlinePanel() {
         )}
       </div>
 
-      {/* Scenes */}
       <div className={styles.section}>
         <button
           className={styles.section__header}
@@ -109,7 +130,7 @@ export function OutlinePanel() {
           <span className="material-symbols-rounded">
             {expandedSections.scenes ? 'expand_more' : 'chevron_right'}
           </span>
-          <span>Scenes ({(activeChapter.scenes || []).length})</span>
+          <span>{isScreenplay ? 'Act / Sequence / Scene' : 'Scenes'} ({(activeChapter.scenes || []).length})</span>
         </button>
         {expandedSections.scenes && (
           <div className={styles.section__content}>
@@ -118,8 +139,9 @@ export function OutlinePanel() {
                 <div className={styles.sceneCard__header}>
                   <Input
                     value={scene.title}
-                    onChange={e => updateScene(activeChapter.id, scene.id, { title: e.target.value })}
+                    onChange={e => handleSceneChange(scene.id, { title: e.target.value })}
                     className={styles.sceneCard__title}
+                    placeholder={isScreenplay ? 'Scene heading' : 'Scene title'}
                   />
                   <IconButton
                     icon="delete"
@@ -130,22 +152,68 @@ export function OutlinePanel() {
                 </div>
                 <Textarea
                   value={scene.summary}
-                  onChange={e => updateScene(activeChapter.id, scene.id, { summary: e.target.value })}
+                  onChange={e => handleSceneChange(scene.id, { summary: e.target.value })}
                   placeholder="Scene summary..."
                   rows={2}
                 />
                 <div className={styles.fieldRow}>
-                  <Input
-                    value={scene.pov}
-                    onChange={e => updateScene(activeChapter.id, scene.id, { pov: e.target.value })}
-                    placeholder="POV"
-                  />
                   <Select
                     options={STATUS_OPTIONS}
                     value={scene.status}
-                    onChange={e => updateScene(activeChapter.id, scene.id, { status: e.target.value as ChapterStatus })}
+                    onChange={e => handleSceneChange(scene.id, { status: e.target.value as ChapterStatus })}
+                  />
+                  <Select
+                    options={[
+                      { value: 'all', label: 'No production tag' },
+                      ...productionTags.map(tag => ({ value: tag, label: tag }))
+                    ]}
+                    value={(scene.productionTags && scene.productionTags[0]) || 'all'}
+                    onChange={e => handleSceneChange(scene.id, { productionTags: e.target.value === 'all' ? [] : [e.target.value] })}
                   />
                 </div>
+                {isScreenplay && (
+                  <>
+                    <div className={styles.fieldRow}>
+                      <Input
+                        value={scene.slugLine || ''}
+                        onChange={e => handleSceneChange(scene.id, { slugLine: e.target.value })}
+                        placeholder="Slug line"
+                      />
+                      <Input
+                        value={scene.location || ''}
+                        onChange={e => handleSceneChange(scene.id, { location: e.target.value })}
+                        placeholder="Location"
+                      />
+                    </div>
+                    <div className={styles.fieldRow}>
+                      <Select
+                        options={[
+                          { value: 'INT', label: 'INT' },
+                          { value: 'EXT', label: 'EXT' },
+                          { value: 'INT/EXT', label: 'INT/EXT' }
+                        ]}
+                        value={scene.interiorExterior || 'INT'}
+                        onChange={e => handleSceneChange(scene.id, { interiorExterior: e.target.value as Scene['interiorExterior'] })}
+                      />
+                      <Select
+                        options={[
+                          { value: 'DAY', label: 'DAY' },
+                          { value: 'NIGHT', label: 'NIGHT' },
+                          { value: 'DAWN', label: 'DAWN' },
+                          { value: 'DUSK', label: 'DUSK' }
+                        ]}
+                        value={scene.timeOfDay || 'DAY'}
+                        onChange={e => handleSceneChange(scene.id, { timeOfDay: e.target.value as Scene['timeOfDay'] })}
+                      />
+                    </div>
+                    <Input
+                      type="number"
+                      value={scene.pageEstimate || ''}
+                      onChange={e => handleSceneChange(scene.id, { pageEstimate: parseInt(e.target.value) || 0 })}
+                      placeholder="Page estimate"
+                    />
+                  </>
+                )}
               </div>
             ))}
             <Button

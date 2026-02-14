@@ -12,6 +12,12 @@ export interface Scene {
   status: ChapterStatus;
   tags: string[];
   wordGoal: number;
+  slugLine?: string;
+  location?: string;
+  interiorExterior?: 'INT' | 'EXT' | 'INT/EXT';
+  timeOfDay?: 'DAY' | 'NIGHT' | 'DAWN' | 'DUSK';
+  pageEstimate?: number;
+  productionTags?: string[];
 }
 
 export type ScreenplayElementType = 'slugLine' | 'action' | 'characterCue' | 'parenthetical' | 'dialogue';
@@ -54,6 +60,8 @@ export interface Chapter {
   tags: string[];
   wordGoal: number;
   scenes: Scene[];
+  act?: number;
+  sequence?: number;
 }
 
 export interface Novel {
