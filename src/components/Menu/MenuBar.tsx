@@ -21,7 +21,7 @@ const MENUS: MenuConfig[] = [
     items: [
       { label: 'New Chapter', action: 'newChapter', shortcut: 'Ctrl+Shift+N' },
       { divider: true },
-      { label: 'Export...', action: 'export', shortcut: 'Ctrl+Shift+E' },
+      { label: 'Export Novel...', action: 'export', shortcut: 'Ctrl+Shift+E' },
       { label: 'Import Document...', action: 'importDocument' },
       { divider: true },
       { label: 'Export Backup', action: 'exportBackup' },
@@ -44,9 +44,13 @@ const MENUS: MenuConfig[] = [
     items: [
       { label: 'Toggle Sidebar', action: 'toggleSidebar', shortcut: 'Ctrl+Shift+B' },
       { label: 'Toggle Page View', action: 'togglePageView' },
+      { label: 'Focus Mode', action: 'toggleFocusMode', shortcut: 'Ctrl+Shift+F' },
       { divider: true },
       { label: 'Dark Theme', action: 'themeDark' },
-      { label: 'Light Theme', action: 'themeLight' }
+      { label: 'Light Theme', action: 'themeLight' },
+      { label: 'High Contrast', action: 'themeHighContrast' },
+      { divider: true },
+      { label: 'Project Dashboard', action: 'dashboard' }
     ]
   },
   {
@@ -79,6 +83,7 @@ const MENUS: MenuConfig[] = [
   {
     label: 'Help',
     items: [
+      { label: 'Getting Started', action: 'onboarding' },
       { label: 'About NovelWriter', action: 'about' }
     ]
   }
@@ -100,7 +105,6 @@ export function MenuBar({ onAction }: MenuBarProps) {
   const handleItemClick = (action: string) => {
     setOpenMenu(null);
 
-    // Handle built-in actions
     switch (action) {
       case 'toggleSidebar':
         dispatch({ type: 'TOGGLE_SIDEBAR' });
@@ -108,11 +112,17 @@ export function MenuBar({ onAction }: MenuBarProps) {
       case 'togglePageView':
         dispatch({ type: 'TOGGLE_PAGE_VIEW' });
         break;
+      case 'toggleFocusMode':
+        dispatch({ type: 'TOGGLE_FOCUS_MODE' });
+        break;
       case 'themeDark':
         dispatch({ type: 'SET_THEME', payload: 'dark' });
         break;
       case 'themeLight':
         dispatch({ type: 'SET_THEME', payload: 'light' });
+        break;
+      case 'themeHighContrast':
+        dispatch({ type: 'SET_THEME', payload: 'high-contrast' });
         break;
       default:
         onAction?.(action);
@@ -133,26 +143,30 @@ export function MenuBar({ onAction }: MenuBarProps) {
   }, [openMenu, handleClickOutside]);
 
   return (
-    <div className={styles.menuBar} ref={menuBarRef}>
+    <nav className={styles.menuBar} ref={menuBarRef} role="menubar" aria-label="Main menu">
       {MENUS.map(menu => (
         <div key={menu.label} className={styles.menuWrapper}>
           <button
             className={`${styles.menuBtn} ${openMenu === menu.label ? styles['menuBtn--active'] : ''}`}
             onClick={() => handleMenuClick(menu.label)}
+            role="menuitem"
+            aria-haspopup="true"
+            aria-expanded={openMenu === menu.label}
           >
             {menu.label}
           </button>
           {openMenu === menu.label && (
-            <div className={styles.menu}>
+            <div className={styles.menu} role="menu">
               {menu.items.map((item, idx) =>
                 item.divider ? (
-                  <div key={idx} className={styles.menuDivider} />
+                  <div key={idx} className={styles.menuDivider} role="separator" />
                 ) : (
                   <button
                     key={idx}
                     className={styles.menuItem}
                     onClick={() => item.action && handleItemClick(item.action)}
                     disabled={item.disabled}
+                    role="menuitem"
                   >
                     <span className={styles.menuItem__label}>{item.label}</span>
                     {item.shortcut && (
@@ -165,6 +179,6 @@ export function MenuBar({ onAction }: MenuBarProps) {
           )}
         </div>
       ))}
-    </div>
+    </nav>
   );
 }

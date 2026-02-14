@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Dialog, Button, IconButton } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
 import { getSnapshots, createSnapshot, deleteSnapshot } from '@/lib/storage';
@@ -15,7 +15,9 @@ export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
   const { activeChapter, updateChapter } = useApp();
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [selectedSnapshot, setSelectedSnapshot] = useState<Snapshot | null>(null);
+  const [compareSnapshot, setCompareSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
 
   const loadSnapshots = useCallback(async () => {
     if (!activeChapter) return;
@@ -24,6 +26,8 @@ export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
       const loaded = await getSnapshots(activeChapter.id);
       setSnapshots(loaded);
       setSelectedSnapshot(null);
+      setCompareSnapshot(null);
+      setShowDiff(false);
     } finally {
       setLoading(false);
     }
@@ -60,6 +64,29 @@ export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
     await loadSnapshots();
   };
 
+  const handleCompare = () => {
+    if (selectedSnapshot && snapshots.length >= 1) {
+      const selectedIndex = snapshots.findIndex(s => s.id === selectedSnapshot.id);
+      const olderSnapshot = snapshots[selectedIndex + 1] || null;
+      setCompareSnapshot(olderSnapshot);
+      setShowDiff(true);
+    }
+  };
+
+  const diffLines = useMemo(() => {
+    if (!showDiff || !selectedSnapshot) return null;
+
+    const newText = editorToPlainText(selectedSnapshot.doc);
+    const oldText = compareSnapshot
+      ? editorToPlainText(compareSnapshot.doc)
+      : (activeChapter ? editorToPlainText(activeChapter.content) : '');
+
+    const newLines = newText.split('\n');
+    const oldLines = oldText.split('\n');
+
+    return { newLines, oldLines };
+  }, [showDiff, selectedSnapshot, compareSnapshot, activeChapter]);
+
   if (!activeChapter) {
     return (
       <Dialog open={open} onClose={onClose} title="Snapshots" size="medium">
@@ -76,7 +103,7 @@ export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
             <h4>Saved Snapshots</h4>
             <Button variant="primary" size="small" onClick={handleSaveSnapshot} disabled={loading}>
               <span className="material-symbols-rounded">save</span>
-              Save Snapshot
+              Save Now
             </Button>
           </div>
 
@@ -91,7 +118,11 @@ export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
               <div
                 key={snapshot.id}
                 className={`${styles.snapshotItem} ${selectedSnapshot?.id === snapshot.id ? styles['snapshotItem--selected'] : ''}`}
-                onClick={() => setSelectedSnapshot(snapshot)}
+                onClick={() => { setSelectedSnapshot(snapshot); setShowDiff(false); }}
+                role="button"
+                tabIndex={0}
+                aria-label={`Snapshot from ${formatDateTime(snapshot.createdAt)}`}
+                onKeyDown={e => { if (e.key === 'Enter') { setSelectedSnapshot(snapshot); setShowDiff(false); } }}
               >
                 <div className={styles.snapshotItem__info}>
                   <span className={styles.snapshotItem__date}>
@@ -119,15 +150,78 @@ export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
           <h4>Preview</h4>
           {selectedSnapshot ? (
             <>
-              <div className={styles.snapshotPreview__content}>
-                {editorToPlainText(selectedSnapshot.doc)}
-              </div>
-              <div className={styles.snapshotPreview__actions}>
-                <Button variant="primary" onClick={handleRestoreSnapshot}>
-                  <span className="material-symbols-rounded">restore</span>
-                  Restore This Snapshot
-                </Button>
-              </div>
+              {!showDiff ? (
+                <>
+                  <div className={styles.snapshotPreview__content}>
+                    {editorToPlainText(selectedSnapshot.doc)}
+                  </div>
+                  <div className={styles.snapshotPreview__actions}>
+                    <Button variant="primary" onClick={handleRestoreSnapshot}>
+                      <span className="material-symbols-rounded">restore</span>
+                      Restore
+                    </Button>
+                    {snapshots.length >= 1 && (
+                      <Button variant="default" onClick={handleCompare}>
+                        <span className="material-symbols-rounded">compare_arrows</span>
+                        Compare
+                      </Button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className={styles.diffToggle}>
+                    <Button variant="ghost" size="small" onClick={() => setShowDiff(false)}>
+                      <span className="material-symbols-rounded">visibility</span>
+                      Preview
+                    </Button>
+                    <Button variant="primary" size="small" onClick={() => setShowDiff(true)}>
+                      <span className="material-symbols-rounded">compare_arrows</span>
+                      Diff
+                    </Button>
+                  </div>
+                  <div className={styles.diffView}>
+                    <div className={styles.diffPane}>
+                      <div className={styles.diffPane__header}>
+                        {compareSnapshot ? `Older (${formatDateTime(compareSnapshot.createdAt)})` : 'Current Content'}
+                      </div>
+                      <div className={styles.diffPane__content}>
+                        {diffLines?.oldLines.map((line, i) => (
+                          <div key={i} className={
+                            diffLines.newLines[i] !== line
+                              ? `${styles.diffLine} ${styles['diffLine--removed']}`
+                              : styles.diffLine
+                          }>
+                            {line || '\u00A0'}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className={styles.diffPane}>
+                      <div className={styles.diffPane__header}>
+                        Selected ({formatDateTime(selectedSnapshot.createdAt)})
+                      </div>
+                      <div className={styles.diffPane__content}>
+                        {diffLines?.newLines.map((line, i) => (
+                          <div key={i} className={
+                            diffLines.oldLines[i] !== line
+                              ? `${styles.diffLine} ${styles['diffLine--added']}`
+                              : styles.diffLine
+                          }>
+                            {line || '\u00A0'}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className={styles.snapshotPreview__actions}>
+                    <Button variant="primary" onClick={handleRestoreSnapshot}>
+                      <span className="material-symbols-rounded">restore</span>
+                      Restore Selected
+                    </Button>
+                  </div>
+                </>
+              )}
             </>
           ) : (
             <p className={styles.emptyMessage}>Select a snapshot to preview</p>

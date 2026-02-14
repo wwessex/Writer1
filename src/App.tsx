@@ -7,8 +7,9 @@ import { useApp, AppProvider } from '@/context/AppContext';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
 import { Editor } from '@/components/Editor';
-import { ExportModal, SnapshotModal, AnalysisModal, WordCountModal } from '@/components/Modals';
+import { ExportModal, SnapshotModal, AnalysisModal, WordCountModal, DashboardModal, OnboardingModal } from '@/components/Modals';
 import { SettingsWindow, AboutWindow } from '@/components/Windows';
+import { ToastProvider, useToast } from '@/components/UI';
 import { exportBackup, importBackup, createChapter, addChapter } from '@/lib/storage';
 import { importFile } from '@/lib/import';
 import { downloadFile } from '@/lib/utils';
@@ -87,8 +88,9 @@ const extensions = [
 ];
 
 function AppContent() {
-  const { state, loadNovel, createChapter: createNewChapter, dispatch } = useApp();
+  const { state, loadNovel, createChapter: createNewChapter, dispatch, updateSettings } = useApp();
   const { editor } = useCurrentEditor();
+  const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -99,6 +101,8 @@ function AppContent() {
   const [wordCountOpen, setWordCountOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [dashboardOpen, setDashboardOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -114,17 +118,31 @@ function AppContent() {
       });
   }, [loadNovel]);
 
+  // Show onboarding on first visit
+  useEffect(() => {
+    if (!isLoading && !state.settings.onboardingComplete) {
+      setOnboardingOpen(true);
+    }
+  }, [isLoading, state.settings.onboardingComplete]);
+
+  // Apply focus mode body class
+  useEffect(() => {
+    document.body.classList.toggle('focus-mode', state.settings.focusMode);
+    return () => document.body.classList.remove('focus-mode');
+  }, [state.settings.focusMode]);
+
   // Export backup
   const handleExportBackup = useCallback(async () => {
     try {
       const backup = await exportBackup(state.novelId, true);
       const json = JSON.stringify(backup, null, 2);
       downloadFile(json, `${state.novelTitle}-backup.json`);
-    } catch (error) {
-      console.error('Backup export failed:', error);
-      alert('Failed to export backup');
+      showToast('Backup exported successfully', 'success', 'download_done');
+    } catch (err) {
+      console.error('Backup export failed:', err);
+      showToast('Failed to export backup', 'error');
     }
-  }, [state.novelId, state.novelTitle]);
+  }, [state.novelId, state.novelTitle, showToast]);
 
   // Import backup
   const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -135,10 +153,11 @@ function AppContent() {
       const text = await file.text();
       const backup = JSON.parse(text);
       await importBackup(backup);
-      window.location.reload();
-    } catch (error) {
-      console.error('Backup import failed:', error);
-      alert('Failed to import backup. Please check the file format.');
+      showToast('Backup imported successfully. Reloading...', 'success');
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (err) {
+      console.error('Backup import failed:', err);
+      showToast('Failed to import backup. Check the file format.', 'error');
     }
 
     e.target.value = '';
@@ -158,21 +177,27 @@ function AppContent() {
         await addChapter(chapter);
       }
 
-      // Reload to show imported chapters
+      showToast(`Imported ${chapters.length} chapter${chapters.length > 1 ? 's' : ''}`, 'success', 'upload_file');
       loadNovel();
-    } catch (error) {
-      console.error('Document import failed:', error);
-      alert('Failed to import document. Please check the file format.');
+    } catch (err) {
+      console.error('Document import failed:', err);
+      showToast('Failed to import document. Check the file format.', 'error');
     }
 
     e.target.value = '';
   };
+
+  const handleOnboardingClose = useCallback(() => {
+    setOnboardingOpen(false);
+    updateSettings({ onboardingComplete: true });
+  }, [updateSettings]);
 
   // Handle menu actions
   const handleMenuAction = useCallback((action: string) => {
     switch (action) {
       case 'newChapter':
         createNewChapter();
+        showToast('New chapter created', 'success', 'add');
         break;
       case 'export':
         setExportOpen(true);
@@ -197,6 +222,12 @@ function AppContent() {
         break;
       case 'wordCount':
         setWordCountOpen(true);
+        break;
+      case 'dashboard':
+        setDashboardOpen(true);
+        break;
+      case 'onboarding':
+        setOnboardingOpen(true);
         break;
       case 'about':
         setAboutOpen(true);
@@ -235,7 +266,7 @@ function AppContent() {
         editor?.chain().focus().setParagraph().run();
         break;
     }
-  }, [createNewChapter, editor, handleExportBackup]);
+  }, [createNewChapter, editor, handleExportBackup, showToast]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -254,13 +285,21 @@ function AppContent() {
             e.preventDefault();
             dispatch({ type: 'TOGGLE_SIDEBAR' });
             break;
+          case 'f':
+            e.preventDefault();
+            dispatch({ type: 'TOGGLE_FOCUS_MODE' });
+            break;
         }
+      }
+      // Escape to exit focus mode
+      if (e.key === 'Escape' && state.settings.focusMode) {
+        dispatch({ type: 'TOGGLE_FOCUS_MODE' });
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [createNewChapter, dispatch]);
+  }, [createNewChapter, dispatch, state.settings.focusMode]);
 
   // Show error state
   if (error) {
@@ -297,9 +336,9 @@ function AppContent() {
   const layoutClass = `${styles.layout} ${state.settings.sidebarHidden ? styles['layout--sidebarHidden'] : ''}`;
 
   return (
-    <div className={styles.app}>
+    <div className={styles.app} role="application" aria-label="NovelWriter">
       <Header onAction={handleMenuAction} />
-      <main className={layoutClass}>
+      <main className={layoutClass} role="main">
         <Sidebar
           onExportBackup={handleExportBackup}
           onImportBackup={() => fileInputRef.current?.click()}
@@ -312,6 +351,8 @@ function AppContent() {
       <SnapshotModal open={snapshotOpen} onClose={() => setSnapshotOpen(false)} />
       <AnalysisModal open={analysisOpen} onClose={() => setAnalysisOpen(false)} />
       <WordCountModal open={wordCountOpen} onClose={() => setWordCountOpen(false)} />
+      <DashboardModal open={dashboardOpen} onClose={() => setDashboardOpen(false)} />
+      <OnboardingModal open={onboardingOpen} onClose={handleOnboardingClose} />
 
       {/* Windows */}
       <SettingsWindow open={settingsOpen} onClose={() => setSettingsOpen(false)} />
@@ -324,6 +365,7 @@ function AppContent() {
         accept=".json"
         onChange={handleImportBackup}
         style={{ display: 'none' }}
+        aria-hidden="true"
       />
       <input
         ref={importInputRef}
@@ -331,6 +373,7 @@ function AppContent() {
         accept=".docx,.rtf,.txt"
         onChange={handleImportDocument}
         style={{ display: 'none' }}
+        aria-hidden="true"
       />
     </div>
   );
@@ -360,7 +403,9 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AppProvider>
-        <AppShell />
+        <ToastProvider>
+          <AppShell />
+        </ToastProvider>
       </AppProvider>
     </ErrorBoundary>
   );

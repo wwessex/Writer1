@@ -52,15 +52,24 @@ export interface AssistConfig {
   languageToolLanguage: string;
 }
 
+export interface TypographySettings {
+  fontFamily: string;
+  fontSize: number;
+  lineHeight: number;
+}
+
 export interface AppSettings {
   autosaveMs: number;
   dailyWordGoal: number;
   novelWordGoal: number;
   sync: SyncConfig;
   assist: AssistConfig;
-  theme: 'dark' | 'light';
+  theme: 'dark' | 'light' | 'high-contrast';
   sidebarHidden: boolean;
   pageView: boolean;
+  focusMode: boolean;
+  typography: TypographySettings;
+  onboardingComplete: boolean;
 }
 
 export interface AppState {
