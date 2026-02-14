@@ -165,7 +165,7 @@ export interface DailyBaseline {
   words: number;
 }
 
-export type ExportFormat = 'docx' | 'pdf' | 'rtf';
+export type ExportFormat = 'docx' | 'pdf' | 'screenplayPdf' | 'rtf' | 'fountain';
 
 export interface LegacyBackupData {
   version?: 1 | 2;
