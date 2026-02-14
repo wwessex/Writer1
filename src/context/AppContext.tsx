@@ -7,7 +7,7 @@ import {
   useRef,
   type ReactNode
 } from 'react';
-import type { Chapter, Novel, AppSettings, AppState, Scene } from '@/types';
+import type { Chapter, Novel, AppSettings, AppState, Scene, ProjectType } from '@/types';
 import * as storage from '@/lib/storage';
 import { debounce } from '@/lib/utils';
 
@@ -43,6 +43,7 @@ const defaultSettings: AppSettings = {
 
 // Initial state
 const initialState: AppState = {
+  projectType: 'book',
   novelId: '',
   novelTitle: 'My Novel',
   chapters: [],
@@ -55,6 +56,7 @@ const initialState: AppState = {
 // Action types
 type AppAction =
   | { type: 'SET_NOVEL'; payload: { novel: Novel; chapters: Chapter[] } }
+  | { type: 'SET_PROJECT_TYPE'; payload: ProjectType }
   | { type: 'SET_CHAPTERS'; payload: Chapter[] }
   | { type: 'SET_ACTIVE_CHAPTER'; payload: string | null }
   | { type: 'UPDATE_CHAPTER'; payload: { id: string; updates: Partial<Chapter> } }
@@ -76,11 +78,16 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'SET_NOVEL':
       return {
         ...state,
+        projectType: action.payload.novel.projectType || 'book',
         novelId: action.payload.novel.id,
         novelTitle: action.payload.novel.title,
         chapters: action.payload.chapters,
         activeChapterId: action.payload.chapters[0]?.id || null
       };
+
+
+    case 'SET_PROJECT_TYPE':
+      return { ...state, projectType: action.payload };
 
     case 'SET_CHAPTERS':
       return { ...state, chapters: action.payload };
@@ -265,7 +272,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     // Create first chapter if none exist
     if (chapters.length === 0) {
-      const firstChapter = storage.createChapter(novel.id, 0);
+      const firstChapter = storage.createChapter(novel.id, 0, undefined, novel.projectType || 'book');
       await storage.addChapter(firstChapter);
       chapters.push(firstChapter);
     }
@@ -286,10 +293,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Create chapter
   const createChapter = useCallback(async () => {
     const order = state.chapters.length;
-    const chapter = storage.createChapter(state.novelId, order);
+    const chapter = storage.createChapter(
+      state.novelId,
+      order,
+      undefined,
+      state.projectType
+    );
     await storage.addChapter(chapter);
     dispatch({ type: 'ADD_CHAPTER', payload: chapter });
-  }, [state.novelId, state.chapters.length]);
+  }, [state.novelId, state.chapters.length, state.projectType]);
 
   // Delete chapter
   const deleteChapter = useCallback(async (id: string) => {
@@ -374,20 +386,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!chapter) return;
 
     const existingScenes = chapter.scenes || [];
-    const newScene: Scene = {
-      id: crypto.randomUUID(),
-      title: `Scene ${existingScenes.length + 1}`,
-      summary: '',
-      pov: '',
-      status: 'planned',
-      tags: [],
-      wordGoal: 0
-    };
+    const newScene: Scene = state.projectType === 'screenplay'
+      ? {
+        id: crypto.randomUUID(),
+        title: `Scene ${existingScenes.length + 1}`,
+        summary: '',
+        pov: '',
+        status: 'draft',
+        tags: ['slugLine', 'action', 'characterCue', 'parenthetical', 'dialogue'],
+        wordGoal: 0
+      }
+      : {
+        id: crypto.randomUUID(),
+        title: `Scene ${existingScenes.length + 1}`,
+        summary: '',
+        pov: '',
+        status: 'planned',
+        tags: [],
+        wordGoal: 0
+      };
 
     const updates = { scenes: [...existingScenes, newScene] };
     dispatch({ type: 'UPDATE_CHAPTER', payload: { id: chapterId, updates } });
     storage.updateChapter(chapterId, updates);
-  }, [state.chapters]);
+  }, [state.chapters, state.projectType]);
 
   // Update scene
   const updateScene = useCallback((chapterId: string, sceneId: string, updates: Partial<Scene>) => {

@@ -1,5 +1,7 @@
 import type { JSONContent } from '@tiptap/core';
 
+export type ProjectType = 'book' | 'screenplay';
+
 export type ChapterStatus = 'planned' | 'draft' | 'revised' | 'final';
 
 export interface Scene {
@@ -10,6 +12,33 @@ export interface Scene {
   status: ChapterStatus;
   tags: string[];
   wordGoal: number;
+}
+
+export type ScreenplayElementType = 'slugLine' | 'action' | 'characterCue' | 'parenthetical' | 'dialogue';
+
+export interface ScreenplayElement {
+  id: string;
+  type: ScreenplayElementType;
+  text: string;
+}
+
+export interface ScreenplayScene {
+  id: string;
+  title: string;
+  summary: string;
+  order: number;
+  elements: ScreenplayElement[];
+}
+
+export interface ScreenplaySection {
+  id: string;
+  novelId: string;
+  order: number;
+  title: string;
+  updatedAt: number;
+  content: JSONContent | null;
+  summary: string;
+  scenes: ScreenplayScene[];
 }
 
 export interface Chapter {
@@ -30,8 +59,12 @@ export interface Chapter {
 export interface Novel {
   id: string;
   title: string;
+  projectType?: ProjectType;
   updatedAt: number;
 }
+
+export type Project = Novel;
+export type Section = Chapter;
 
 export interface Snapshot {
   id: string;
@@ -73,6 +106,7 @@ export interface AppSettings {
 }
 
 export interface AppState {
+  projectType: ProjectType;
   novelId: string;
   novelTitle: string;
   chapters: Chapter[];
@@ -125,13 +159,24 @@ export interface DailyBaseline {
 
 export type ExportFormat = 'docx' | 'pdf' | 'rtf';
 
-export interface BackupData {
-  version: number;
+export interface LegacyBackupData {
+  version?: 1 | 2;
   novel: Novel;
   chapters: Chapter[];
   snapshots?: Snapshot[];
   exportedAt: number;
 }
+
+export interface BackupDataV3 {
+  version: 3;
+  projectType: ProjectType;
+  project: Project;
+  sections: Section[];
+  snapshots?: Snapshot[];
+  exportedAt: number;
+}
+
+export type BackupData = LegacyBackupData | BackupDataV3;
 
 // Character and World Bible types
 export interface CharacterEntity {
