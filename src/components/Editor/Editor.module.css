@@ -45,6 +45,54 @@
   border-bottom: 1px solid var(--border);
   background: var(--panel);
   flex-shrink: 0;
+  gap: 0.75rem;
+}
+
+.editorHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.modeToggle {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+
+.modeToggle--active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.screenplayToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-elevated, var(--panel));
+}
+
+.screenplayButton {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0.35rem 0.6rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.screenplayButton:hover {
+  color: var(--text);
+  border-color: var(--accent);
 }
 
 .editorPane--pageView .editorHeader {
@@ -82,6 +130,12 @@
   color: var(--text);
 }
 
+.editorPane--screenplay .editorWrapper :global(.ProseMirror) {
+  max-width: 860px;
+  margin: 0 auto;
+  letter-spacing: 0.01em;
+}
+
 .editorWrapper :global(.ProseMirror):focus {
   outline: none;
 }
@@ -100,6 +154,42 @@
 
 .editorWrapper :global(.ProseMirror) p {
   margin: 0 0 1em;
+}
+
+.editorPane--screenplay .editorWrapper :global(.ProseMirror p[data-screenplay-type='scene-heading']) {
+  text-transform: uppercase;
+  font-weight: 700;
+  margin: 1.4em 0 0.5em;
+}
+
+.editorPane--screenplay .editorWrapper :global(.ProseMirror p[data-screenplay-type='action']) {
+  margin: 0 0 1em;
+}
+
+.editorPane--screenplay .editorWrapper :global(.ProseMirror p[data-screenplay-type='character']) {
+  text-transform: uppercase;
+  margin: 1em 0 0.15em;
+  margin-left: 38%;
+  max-width: 28ch;
+}
+
+.editorPane--screenplay .editorWrapper :global(.ProseMirror p[data-screenplay-type='parenthetical']) {
+  margin: 0 0 0.15em;
+  margin-left: 31%;
+  max-width: 30ch;
+}
+
+.editorPane--screenplay .editorWrapper :global(.ProseMirror p[data-screenplay-type='dialogue']) {
+  margin: 0 0 0.6em;
+  margin-left: 26%;
+  max-width: 36ch;
+}
+
+.editorPane--screenplay .editorWrapper :global(.ProseMirror p[data-screenplay-type='transition']) {
+  text-transform: uppercase;
+  text-align: right;
+  font-weight: 700;
+  margin: 1.2em 0;
 }
 
 .editorWrapper :global(.ProseMirror) h1 {

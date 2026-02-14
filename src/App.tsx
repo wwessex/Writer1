@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback, useRef, Component, type ReactNode } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo, Component, type ReactNode } from 'react';
 import { EditorContext, useCurrentEditor, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import HorizontalRule from '@tiptap/extension-horizontal-rule';
+import { ScreenplayParagraph } from '@/components/Editor/screenplayExtension';
 import { useApp, AppProvider } from '@/context/AppContext';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
@@ -80,17 +81,19 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   }
 }
 
-const extensions = [
+const createExtensions = (screenplayMode: boolean) => [
   StarterKit.configure({
     heading: {
       levels: [1, 2]
-    }
+    },
+    paragraph: false
   }),
+  ScreenplayParagraph.configure({ screenplayMode }),
   Underline,
   HorizontalRule
 ];
 
-function AppContent() {
+function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode: boolean; onToggleScreenplayMode: () => void }) {
   const { state, loadNovel, createChapter: createNewChapter, dispatch, updateSettings } = useApp();
   const { editor } = useCurrentEditor();
   const { showToast } = useToast();
@@ -366,7 +369,7 @@ function AppContent() {
           onExportBackup={handleExportBackup}
           onImportBackup={() => fileInputRef.current?.click()}
         />
-        <Editor />
+        <Editor screenplayMode={screenplayMode} onToggleScreenplayMode={onToggleScreenplayMode} />
       </main>
 
       {/* Modals */}
@@ -408,7 +411,14 @@ function AppContent() {
 }
 
 function AppShell() {
-  const { activeChapter, updateChapter } = useApp();
+  const { activeChapter, updateChapter, state } = useApp();
+  const [screenplayMode, setScreenplayMode] = useState(state.projectType === 'screenplay');
+
+  useEffect(() => {
+    setScreenplayMode(state.projectType === 'screenplay');
+  }, [state.projectType]);
+
+  const extensions = useMemo(() => createExtensions(screenplayMode), [screenplayMode]);
 
   const editor = useEditor({
     extensions,
@@ -422,7 +432,10 @@ function AppShell() {
 
   return (
     <EditorContext.Provider value={{ editor }}>
-      <AppContent />
+      <AppContent
+        screenplayMode={screenplayMode}
+        onToggleScreenplayMode={() => setScreenplayMode(mode => !mode)}
+      />
     </EditorContext.Provider>
   );
 }
