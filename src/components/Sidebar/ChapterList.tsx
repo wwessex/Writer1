@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useApp } from '@/context/AppContext';
 import { IconButton, Button } from '@/components/UI';
 import { countWords, editorToPlainText, formatRelativeTime } from '@/lib/utils';
@@ -8,6 +8,7 @@ interface DragState {
   dragging: boolean;
   draggedId: string | null;
   dropTargetId: string | null;
+  dropPosition: 'above' | 'below' | null;
 }
 
 export function ChapterList() {
@@ -15,8 +16,11 @@ export function ChapterList() {
   const [dragState, setDragState] = useState<DragState>({
     dragging: false,
     draggedId: null,
-    dropTargetId: null
+    dropTargetId: null,
+    dropPosition: null
   });
+  const [justMovedId, setJustMovedId] = useState<string | null>(null);
+  const animTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const handleChapterSelect = useCallback((id: string) => {
     setActiveChapter(id);
@@ -28,17 +32,20 @@ export function ChapterList() {
   const handleDragStart = useCallback((e: React.DragEvent, id: string) => {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', id);
-    setDragState({ dragging: true, draggedId: id, dropTargetId: null });
+    setDragState({ dragging: true, draggedId: id, dropTargetId: null, dropPosition: null });
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent, id: string) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    setDragState(prev => ({ ...prev, dropTargetId: id }));
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const position = e.clientY < midY ? 'above' : 'below';
+    setDragState(prev => ({ ...prev, dropTargetId: id, dropPosition: position }));
   }, []);
 
   const handleDragEnd = useCallback(() => {
-    setDragState({ dragging: false, draggedId: null, dropTargetId: null });
+    setDragState({ dragging: false, draggedId: null, dropTargetId: null, dropPosition: null });
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent, targetId: string) => {
@@ -52,13 +59,19 @@ export function ChapterList() {
 
       if (draggedIndex !== -1 && targetIndex !== -1) {
         const [dragged] = chapters.splice(draggedIndex, 1);
-        chapters.splice(targetIndex, 0, dragged);
+        const insertIndex = dragState.dropPosition === 'below' ? targetIndex : targetIndex;
+        chapters.splice(insertIndex, 0, dragged);
         reorderChapters(chapters.map(ch => ch.id));
+
+        // Trigger animation on the moved item
+        setJustMovedId(draggedId);
+        clearTimeout(animTimeoutRef.current);
+        animTimeoutRef.current = setTimeout(() => setJustMovedId(null), 300);
       }
     }
 
-    setDragState({ dragging: false, draggedId: null, dropTargetId: null });
-  }, [state.chapters, reorderChapters]);
+    setDragState({ dragging: false, draggedId: null, dropTargetId: null, dropPosition: null });
+  }, [state.chapters, reorderChapters, dragState.dropPosition]);
 
   return (
     <section className={styles.chapterList} role="navigation" aria-label="Chapters">
@@ -76,13 +89,24 @@ export function ChapterList() {
           const wordCount = countWords(editorToPlainText(chapter.content));
           const isActive = chapter.id === state.activeChapterId;
           const isDragging = dragState.draggedId === chapter.id;
-          const isDropTarget = dragState.dropTargetId === chapter.id;
+          const isDropTarget = dragState.dropTargetId === chapter.id && dragState.draggedId !== chapter.id;
+          const isJustMoved = justMovedId === chapter.id;
           const goalPercent = chapter.wordGoal > 0 ? Math.min(100, Math.round((wordCount / chapter.wordGoal) * 100)) : -1;
+
+          const itemClasses = [
+            styles.chapterItem,
+            isActive && styles['chapterItem--active'],
+            isDragging && styles['chapterItem--dragging'],
+            isDropTarget && styles['chapterItem--dropTarget'],
+            isDropTarget && dragState.dropPosition === 'above' && styles['chapterItem--dropAbove'],
+            isDropTarget && dragState.dropPosition === 'below' && styles['chapterItem--dropBelow'],
+            isJustMoved && styles['chapterItem--justMoved'],
+          ].filter(Boolean).join(' ');
 
           return (
             <div
               key={chapter.id}
-              className={`${styles.chapterItem} ${isActive ? styles['chapterItem--active'] : ''} ${isDragging ? styles['chapterItem--dragging'] : ''} ${isDropTarget ? styles['chapterItem--dropTarget'] : ''}`}
+              className={itemClasses}
               draggable
               onDragStart={e => handleDragStart(e, chapter.id)}
               onDragOver={e => handleDragOver(e, chapter.id)}

@@ -132,3 +132,109 @@ export interface BackupData {
   snapshots?: Snapshot[];
   exportedAt: number;
 }
+
+// Character and World Bible types
+export interface CharacterEntity {
+  id: string;
+  novelId: string;
+  name: string;
+  aliases: string[];
+  description: string;
+  role: 'protagonist' | 'antagonist' | 'supporting' | 'minor' | 'other';
+  traits: string[];
+  notes: string;
+  relationships: { targetId: string; type: string }[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface WorldEntry {
+  id: string;
+  novelId: string;
+  category: 'location' | 'lore' | 'item' | 'event' | 'organization' | 'other';
+  name: string;
+  description: string;
+  tags: string[];
+  linkedCharacters: string[];
+  notes: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+// Comment types
+export interface Comment {
+  id: string;
+  chapterId: string;
+  anchorOffset: number;
+  anchorLength: number;
+  text: string;
+  author: string;
+  resolved: boolean;
+  createdAt: number;
+  updatedAt: number;
+  replies: CommentReply[];
+}
+
+export interface CommentReply {
+  id: string;
+  text: string;
+  author: string;
+  createdAt: number;
+}
+
+// Advanced analytics types
+export interface SentimentResult {
+  score: number;
+  label: 'positive' | 'negative' | 'neutral';
+}
+
+export interface SentenceDistribution {
+  range: string;
+  count: number;
+}
+
+export interface AdvancedAnalytics {
+  sentenceDistribution: SentenceDistribution[];
+  paragraphLengths: number[];
+  dialoguePercentage: number;
+  avgParagraphLength: number;
+  vocabularyRichness: number;
+  sentimentByParagraph: SentimentResult[];
+}
+
+// Plugin API types
+export interface PluginManifest {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  author: string;
+  hooks: string[];
+}
+
+export interface PluginHook {
+  event: string;
+  handler: (...args: unknown[]) => void;
+}
+
+// Conflict resolution
+export interface ConflictInfo {
+  chapterId: string;
+  localVersion: number;
+  remoteVersion: number;
+  localContent: JSONContent | null;
+  remoteContent: JSONContent | null;
+  localUpdatedAt: number;
+  remoteUpdatedAt: number;
+}
+
+// Integration types
+export type IntegrationType = 'dropbox' | 'google-drive' | 'scrivener';
+
+export interface IntegrationConfig {
+  type: IntegrationType;
+  enabled: boolean;
+  accessToken?: string;
+  folderId?: string;
+  lastSyncAt?: number;
+}

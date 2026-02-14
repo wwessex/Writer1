@@ -77,7 +77,14 @@ const MENUS: MenuConfig[] = [
     items: [
       { label: 'Snapshots...', action: 'snapshots' },
       { label: 'Writing Analysis...', action: 'analysis' },
-      { label: 'Word Count...', action: 'wordCount' }
+      { label: 'Advanced Analytics...', action: 'advancedAnalytics' },
+      { label: 'Word Count...', action: 'wordCount' },
+      { divider: true },
+      { label: 'Character & World Bible...', action: 'characterBible' },
+      { label: 'AI Writing Tools...', action: 'aiWriting' },
+      { label: 'Comments...', action: 'comments' },
+      { divider: true },
+      { label: 'Integrations...', action: 'integrations' }
     ]
   },
   {

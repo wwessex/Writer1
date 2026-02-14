@@ -7,7 +7,10 @@ import { useApp, AppProvider } from '@/context/AppContext';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
 import { Editor } from '@/components/Editor';
-import { ExportModal, SnapshotModal, AnalysisModal, WordCountModal, DashboardModal, OnboardingModal } from '@/components/Modals';
+import {
+  ExportModal, SnapshotModal, AnalysisModal, WordCountModal, DashboardModal, OnboardingModal,
+  AIWritingModal, CharacterBibleModal, CommentModal, AdvancedAnalyticsModal, IntegrationsModal
+} from '@/components/Modals';
 import { SettingsWindow, AboutWindow } from '@/components/Windows';
 import { ToastProvider, useToast } from '@/components/UI';
 import { exportBackup, importBackup, createChapter, addChapter } from '@/lib/storage';
@@ -103,6 +106,11 @@ function AppContent() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [characterBibleOpen, setCharacterBibleOpen] = useState(false);
+  const [aiWritingOpen, setAiWritingOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [advancedAnalyticsOpen, setAdvancedAnalyticsOpen] = useState(false);
+  const [integrationsOpen, setIntegrationsOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -232,6 +240,21 @@ function AppContent() {
       case 'about':
         setAboutOpen(true);
         break;
+      case 'characterBible':
+        setCharacterBibleOpen(true);
+        break;
+      case 'aiWriting':
+        setAiWritingOpen(true);
+        break;
+      case 'comments':
+        setCommentsOpen(true);
+        break;
+      case 'advancedAnalytics':
+        setAdvancedAnalyticsOpen(true);
+        break;
+      case 'integrations':
+        setIntegrationsOpen(true);
+        break;
       case 'undo':
         editor?.chain().focus().undo().run();
         break;
@@ -353,6 +376,11 @@ function AppContent() {
       <WordCountModal open={wordCountOpen} onClose={() => setWordCountOpen(false)} />
       <DashboardModal open={dashboardOpen} onClose={() => setDashboardOpen(false)} />
       <OnboardingModal open={onboardingOpen} onClose={handleOnboardingClose} />
+      <CharacterBibleModal open={characterBibleOpen} onClose={() => setCharacterBibleOpen(false)} />
+      <AIWritingModal open={aiWritingOpen} onClose={() => setAiWritingOpen(false)} />
+      <CommentModal open={commentsOpen} onClose={() => setCommentsOpen(false)} />
+      <AdvancedAnalyticsModal open={advancedAnalyticsOpen} onClose={() => setAdvancedAnalyticsOpen(false)} />
+      <IntegrationsModal open={integrationsOpen} onClose={() => setIntegrationsOpen(false)} />
 
       {/* Windows */}
       <SettingsWindow open={settingsOpen} onClose={() => setSettingsOpen(false)} />

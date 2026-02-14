@@ -1,6 +1,7 @@
 import { useApp } from '@/context/AppContext';
-import { ChapterList } from './ChapterList';
+import { VirtualChapterList } from './VirtualChapterList';
 import { OutlinePanel } from './OutlinePanel';
+import { ScenePlanner } from './ScenePlanner';
 import { Button } from '@/components/UI';
 import styles from './Sidebar.module.css';
 
@@ -10,7 +11,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, undoReorder, canUndoReorder } = useApp();
   const isHidden = state.settings.sidebarHidden;
 
   const closeSidebar = () => {
@@ -27,7 +28,16 @@ export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
       <div className={backdropClass} onClick={closeSidebar} aria-hidden="true" />
       <aside className={sidebarClass}>
         <div className={styles.sidebar__content}>
-          <ChapterList />
+          <VirtualChapterList />
+          {canUndoReorder && (
+            <div className={styles.sidebar__undoBar}>
+              <Button variant="ghost" size="small" onClick={undoReorder}>
+                <span className="material-symbols-rounded">undo</span>
+                Undo Reorder
+              </Button>
+            </div>
+          )}
+          <ScenePlanner />
           <OutlinePanel />
         </div>
         <div className={styles.sidebar__footer}>
