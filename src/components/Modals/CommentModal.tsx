@@ -91,7 +91,6 @@ export function CommentModal({ open, onClose }: CommentModalProps) {
   const [newCollabName, setNewCollabName] = useState('');
   const [newCollabRole, setNewCollabRole] = useState<CollabRole>('reviewer');
 
-  const permissions = ROLE_PERMISSIONS[activeUser.role];
 
   const handleAddCollaborator = useCallback(() => {
     if (!newCollabName.trim()) return;

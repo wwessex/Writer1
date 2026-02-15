@@ -186,9 +186,6 @@ export function SceneTemplatesModal({ open, onClose }: SceneTemplatesModalProps)
 
     addScene(activeChapter.id);
 
-    // Get the newly added scene (last one) and update it
-    const scenes = activeChapter.scenes || [];
-    const newSceneId = scenes.length > 0 ? undefined : undefined; // Will be updated after addScene triggers re-render
 
     // We apply updates through a brief timeout to let the state update
     setTimeout(() => {

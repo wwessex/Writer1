@@ -368,8 +368,12 @@ export function AdvancedAnalyticsModal({ open, onClose }: AdvancedAnalyticsModal
 
   // Word repetition detection
   const repetitions = useMemo(() => {
-    if (!text.trim()) return [];
-    return findRepetitions(text, 3);
+    if (!text.trim()) return [] as Array<{ word: string; count: number }>;
+
+    return [...findRepetitions(text, 3).entries()].map(([word, count]) => ({
+      word,
+      count,
+    }));
   }, [text]);
 
   const totalWords = useMemo(() => countWords(text), [text]);

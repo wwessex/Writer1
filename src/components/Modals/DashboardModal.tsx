@@ -3,7 +3,6 @@ import { Dialog } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
 import { countWords, editorToPlainText } from '@/lib/utils';
 import {
-  getProgressData,
   recordDailyWords,
   getWeeklyHistory,
   getMonthlyHistory,

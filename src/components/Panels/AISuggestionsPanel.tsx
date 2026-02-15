@@ -1,5 +1,4 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Button } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
 import { editorToPlainText } from '@/lib/utils';
 import { recordTelemetryEvent, isTelemetryOptedIn } from '@/lib/telemetry';
