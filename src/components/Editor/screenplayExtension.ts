@@ -1,6 +1,5 @@
 import Paragraph from '@tiptap/extension-paragraph';
-
-type ScreenplayBlockType = 'scene-heading' | 'action' | 'character' | 'parenthetical' | 'dialogue' | 'transition';
+import type { ScreenplayBlockType } from '@/types';
 
 const BLOCK_FLOW: ScreenplayBlockType[] = ['scene-heading', 'action', 'character', 'parenthetical', 'dialogue', 'transition'];
 
@@ -136,4 +135,4 @@ export const ScreenplayParagraph = Paragraph.extend<{ screenplayMode: boolean }>
   },
 });
 
-export type { ScreenplayBlockType };
+export type { ScreenplayBlockType } from '@/types';

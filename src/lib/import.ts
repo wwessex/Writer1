@@ -1,5 +1,5 @@
 import type { JSONContent } from '@tiptap/core';
-import type { ProjectType } from '@/types';
+import type { ProjectType, ScreenplayBlockType } from '@/types';
 
 interface ParsedChapter {
   title: string;
@@ -104,8 +104,6 @@ function splitIntoChapters(lines: string[]): ParsedChapter[] {
 
   return chapters;
 }
-
-type ScreenplayBlockType = 'scene-heading' | 'action' | 'character' | 'parenthetical' | 'dialogue' | 'transition';
 
 function screenplayBlocksToDoc(blocks: Array<{ type: ScreenplayBlockType; text: string }>): JSONContent {
   return {

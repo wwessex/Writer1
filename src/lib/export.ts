@@ -1,8 +1,6 @@
 import type { JSONContent } from '@tiptap/core';
-import type { Chapter } from '@/types';
+import type { Chapter, ScreenplayBlockType } from '@/types';
 import { editorToPlainText, downloadFile } from './utils';
-
-type ScreenplayBlockType = 'scene-heading' | 'action' | 'character' | 'parenthetical' | 'dialogue' | 'transition';
 
 export interface ScreenplayBlock {
   type: ScreenplayBlockType;
