@@ -186,6 +186,15 @@
   margin: 0 auto 0.75rem;
 }
 
+.brandLogo {
+  display: block;
+  width: 100%;
+  max-width: 280px;
+  height: auto;
+  object-fit: contain;
+  margin: 0 auto 0.75rem;
+}
+
 .aboutLogo h2 {
   margin: 0;
   font-size: 1.5rem;
