@@ -34,6 +34,26 @@
   display: none;
 }
 
+.sidebar__collapseBar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 4px 0;
+  flex-shrink: 0;
+}
+
+.collapseBtn {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  border-radius: var(--radius-sm, 6px) !important;
+  opacity: 0.5;
+  transition: opacity var(--transition-fast, 120ms ease);
+}
+
+.collapseBtn:hover {
+  opacity: 1;
+}
+
 .sidebar__content {
   flex: 1;
   overflow-y: auto;

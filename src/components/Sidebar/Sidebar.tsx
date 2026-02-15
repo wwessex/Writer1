@@ -3,7 +3,7 @@ import { useApp } from '@/context/AppContext';
 import { VirtualChapterList } from './VirtualChapterList';
 import { OutlinePanel } from './OutlinePanel';
 import { ScenePlanner } from './ScenePlanner';
-import { Button } from '@/components/UI';
+import { Button, IconButton } from '@/components/UI';
 import { useResizable } from '@/hooks/useResizable';
 import styles from './Sidebar.module.css';
 
@@ -49,6 +49,17 @@ export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
         className={sidebarClass}
         style={!isMobile && !isHidden ? { width: size } : undefined}
       >
+        {!isMobile && !isHidden && (
+          <div className={styles.sidebar__collapseBar}>
+            <IconButton
+              icon="chevron_left"
+              label="Collapse sidebar (Ctrl+Shift+B)"
+              variant="ghost"
+              onClick={closeSidebar}
+              className={styles.collapseBtn}
+            />
+          </div>
+        )}
         <div className={styles.sidebar__content}>
           <VirtualChapterList />
           {canUndoReorder && (
