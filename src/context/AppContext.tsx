@@ -4,6 +4,7 @@ import {
   useReducer,
   useEffect,
   useCallback,
+  useMemo,
   useRef,
   type ReactNode
 } from 'react';
@@ -231,6 +232,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const reorderUndoStack = useRef<string[][]>([]);
   const reorderRedoStack = useRef<string[][]>([]);
 
+  const runWithSavingState = useCallback(async (operation: () => Promise<void>) => {
+    dispatch({ type: 'SET_SAVING', payload: true });
+    try {
+      await operation();
+    } finally {
+      dispatch({ type: 'SET_SAVING', payload: false });
+    }
+  }, []);
+
+  const getChapterById = useCallback((chapterId: string) => {
+    return state.chapters.find(chapter => chapter.id === chapterId);
+  }, [state.chapters]);
+
   // Load settings from localStorage
   useEffect(() => {
     const saved = localStorage.getItem(SETTINGS_KEY);
@@ -319,14 +333,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [state.novelId, loadNovel]);
 
   // Debounced save for content updates
-  const debouncedSave = useCallback(
-    debounce(async (id: string, updates: Partial<Chapter>) => {
-      dispatch({ type: 'SET_SAVING', payload: true });
+  const debouncedSave = useMemo(() => debounce(async (id: string, updates: Partial<Chapter>) => {
+    await runWithSavingState(async () => {
       await storage.updateChapter(id, updates);
-      dispatch({ type: 'SET_SAVING', payload: false });
-    }, state.settings.autosaveMs),
-    [state.settings.autosaveMs]
-  );
+    });
+  }, state.settings.autosaveMs), [state.settings.autosaveMs, runWithSavingState]);
 
   // Create chapter
   const createChapter = useCallback(async () => {
@@ -356,10 +367,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Update chapter immediately (for title, metadata)
   const updateChapterImmediate = useCallback(async (id: string, updates: Partial<Chapter>) => {
     dispatch({ type: 'UPDATE_CHAPTER', payload: { id, updates } });
-    dispatch({ type: 'SET_SAVING', payload: true });
-    await storage.updateChapter(id, updates);
-    dispatch({ type: 'SET_SAVING', payload: false });
-  }, []);
+    await runWithSavingState(async () => {
+      await storage.updateChapter(id, updates);
+    });
+  }, [runWithSavingState]);
 
   // Set active chapter
   const setActiveChapter = useCallback((id: string) => {
@@ -420,7 +431,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Add scene to chapter
   const addScene = useCallback((chapterId: string) => {
-    const chapter = state.chapters.find(ch => ch.id === chapterId);
+    const chapter = getChapterById(chapterId);
     if (!chapter) return;
 
     const existingScenes = chapter.scenes || [];
@@ -453,11 +464,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const updates = { scenes: [...existingScenes, newScene] };
     dispatch({ type: 'UPDATE_CHAPTER', payload: { id: chapterId, updates } });
     storage.updateChapter(chapterId, updates);
-  }, [state.chapters, state.projectType]);
+  }, [getChapterById, state.projectType]);
 
   // Update scene
   const updateScene = useCallback((chapterId: string, sceneId: string, updates: Partial<Scene>) => {
-    const chapter = state.chapters.find(ch => ch.id === chapterId);
+    const chapter = getChapterById(chapterId);
     if (!chapter) return;
 
     const scenes = (chapter.scenes || []).map(scene =>
@@ -466,21 +477,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     dispatch({ type: 'UPDATE_CHAPTER', payload: { id: chapterId, updates: { scenes } } });
     storage.updateChapter(chapterId, { scenes });
-  }, [state.chapters]);
+  }, [getChapterById]);
 
   // Delete scene
   const deleteScene = useCallback((chapterId: string, sceneId: string) => {
-    const chapter = state.chapters.find(ch => ch.id === chapterId);
+    const chapter = getChapterById(chapterId);
     if (!chapter) return;
 
     const scenes = (chapter.scenes || []).filter(scene => scene.id !== sceneId);
     dispatch({ type: 'UPDATE_CHAPTER', payload: { id: chapterId, updates: { scenes } } });
     storage.updateChapter(chapterId, { scenes });
-  }, [state.chapters]);
+  }, [getChapterById]);
 
   // Reorder scenes within a chapter
   const reorderScenes = useCallback((chapterId: string, sceneIds: string[]) => {
-    const chapter = state.chapters.find(ch => ch.id === chapterId);
+    const chapter = getChapterById(chapterId);
     if (!chapter) return;
 
     const scenes = sceneIds
@@ -489,7 +500,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     dispatch({ type: 'UPDATE_CHAPTER', payload: { id: chapterId, updates: { scenes } } });
     storage.updateChapter(chapterId, { scenes });
-  }, [state.chapters]);
+  }, [getChapterById]);
 
   // Get active chapter
   const activeChapter = state.chapters.find(ch => ch.id === state.activeChapterId) || null;
