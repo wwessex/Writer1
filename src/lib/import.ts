@@ -134,7 +134,30 @@ function isCharacterCue(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed || trimmed.length > 40) return false;
   if (isSceneHeading(trimmed) || isTransition(trimmed)) return false;
+  if (/[.!?]$/.test(trimmed)) return false;
   return /^[A-Z0-9 '.\-()]+$/.test(trimmed) && /[A-Z]/.test(trimmed);
+}
+
+function hasDialogueFollowingLine(lines: string[], index: number): boolean {
+  for (let nextIndex = index + 1; nextIndex < lines.length; nextIndex++) {
+    const nextLine = lines[nextIndex].trim();
+
+    if (!nextLine) {
+      continue;
+    }
+
+    if (isSceneHeading(nextLine) || isTransition(nextLine)) {
+      return false;
+    }
+
+    if (nextLine.startsWith('#') || nextLine.startsWith('=') || nextLine.startsWith('[[')) {
+      return false;
+    }
+
+    return true;
+  }
+
+  return false;
 }
 
 function normalizeFountainCue(line: string): string {
@@ -216,7 +239,7 @@ function parseFountain(text: string): ImportResult {
       continue;
     }
 
-    if (isCharacterCue(trimmed) || trimmed.startsWith('@')) {
+    if (trimmed.startsWith('@') || (isCharacterCue(trimmed) && hasDialogueFollowingLine(lines, index))) {
       currentBlocks.push({ type: 'character', text: normalizeFountainCue(trimmed) });
       pendingDialogue = true;
       continue;

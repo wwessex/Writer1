@@ -48,4 +48,20 @@ describe('screenplay import', () => {
     expect(screenplayContent.content?.[0]).toMatchObject({ attrs: { screenplayType: 'action' } });
     expect(bookContent.content?.[0]).toMatchObject({ attrs: undefined });
   });
+
+  it('keeps uppercase action lines as action instead of character/dialogue', async () => {
+    const file = new File([
+      'INT. APARTMENT - NIGHT\n\nTHE PHONE RINGS.\nJohn looks up.\n\nJANE\nHello?\n'
+    ], 'uppercase-action.fountain', { type: 'text/plain' });
+
+    const result = await importFountain(file);
+
+    expect(result.sections).toHaveLength(1);
+    const nodes = result.sections[0].content.content || [];
+
+    expect(nodes[1]).toMatchObject({ type: 'paragraph', attrs: { screenplayType: 'action' } });
+    expect(nodes[2]).toMatchObject({ type: 'paragraph', attrs: { screenplayType: 'action' } });
+    expect(nodes[3]).toMatchObject({ type: 'paragraph', attrs: { screenplayType: 'character' } });
+    expect(nodes[4]).toMatchObject({ type: 'paragraph', attrs: { screenplayType: 'dialogue' } });
+  });
 });
