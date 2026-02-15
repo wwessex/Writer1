@@ -390,6 +390,40 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
       <SettingsWindow open={modals.settings} onClose={() => closeModal('settings')} />
       <AboutWindow open={modals.about} onClose={() => closeModal('about')} />
 
+      {/* Mobile bottom navigation: Outline | Write | Inspector */}
+      <nav className={styles.mobileNav} aria-label="Mobile navigation">
+        <button
+          className={`${styles.mobileNav__tab} ${!state.settings.sidebarHidden ? styles['mobileNav__tab--active'] : ''}`}
+          onClick={() => {
+            if (state.settings.sidebarHidden) dispatch({ type: 'TOGGLE_SIDEBAR' });
+            setInspectorOpen(false);
+          }}
+        >
+          <span className="material-symbols-rounded">list</span>
+          <span>Outline</span>
+        </button>
+        <button
+          className={`${styles.mobileNav__tab} ${state.settings.sidebarHidden && !inspectorOpen ? styles['mobileNav__tab--active'] : ''}`}
+          onClick={() => {
+            if (!state.settings.sidebarHidden) dispatch({ type: 'TOGGLE_SIDEBAR' });
+            setInspectorOpen(false);
+          }}
+        >
+          <span className="material-symbols-rounded">edit</span>
+          <span>Write</span>
+        </button>
+        <button
+          className={`${styles.mobileNav__tab} ${inspectorOpen ? styles['mobileNav__tab--active'] : ''}`}
+          onClick={() => {
+            if (!state.settings.sidebarHidden) dispatch({ type: 'TOGGLE_SIDEBAR' });
+            setInspectorOpen(prev => !prev);
+          }}
+        >
+          <span className="material-symbols-rounded">info</span>
+          <span>Inspector</span>
+        </button>
+      </nav>
+
       {/* Hidden file inputs */}
       <input
         ref={fileInputRef}

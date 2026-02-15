@@ -20,6 +20,43 @@
   margin: 0;
 }
 
+.chapterList__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Collapsible filter panel */
+.chapterList__filters {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-1, 8px);
+  margin-bottom: var(--space-1, 8px);
+  background: var(--btn-bg);
+  border-radius: var(--radius-md, 10px);
+  animation: filtersSlideIn 0.15s ease-out;
+}
+
+@keyframes filtersSlideIn {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 120px; }
+}
+
+.chapterList__clearFilters {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.6875rem;
+  cursor: pointer;
+  padding: 2px 0;
+  text-align: left;
+}
+
+.chapterList__clearFilters:hover {
+  text-decoration: underline;
+}
+
 .chapterList__items {
   display: flex;
   flex-direction: column;

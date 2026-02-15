@@ -1,9 +1,9 @@
-/* Menu bar — clean, not heavy */
+/* Menu bar — subdued, doesn't compete with the writing area */
 .menuBar {
   display: flex;
   align-items: center;
-  padding: 4px var(--space-2, 16px);
-  gap: 2px;
+  padding: 2px var(--space-2, 16px);
+  gap: 1px;
   border-top: 1px solid var(--border-subtle, var(--border));
 }
 
@@ -12,12 +12,12 @@
 }
 
 .menuBtn {
-  padding: 5px var(--space-1, 8px);
+  padding: 3px 7px;
   border: none;
   border-radius: var(--radius-sm, 8px);
   background: transparent;
   color: var(--text-muted);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   cursor: pointer;
   transition: all var(--transition-fast, 120ms ease);
 }
@@ -25,7 +25,7 @@
 .menuBtn:hover,
 .menuBtn--active {
   background: var(--btn-bg);
-  color: var(--text);
+  color: var(--text-secondary, var(--text));
 }
 
 .menu {
@@ -52,7 +52,7 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: var(--space-1, 8px) var(--space-2, 16px);
+  padding: 6px var(--space-2, 16px);
   border: none;
   background: transparent;
   color: var(--text);
@@ -86,6 +86,5 @@
 }
 
 @media (max-width: 820px) {
-  .menuBar { flex-wrap: wrap; row-gap: 2px; padding: 4px var(--space-1, 8px); }
-  .menuBtn { white-space: nowrap; padding: 4px 6px; font-size: 0.75rem; }
+  .menuBar { display: none; }
 }
