@@ -1,8 +1,8 @@
-# Test Coverage Analysis for NovelWriter
+# Test Coverage Analysis for DraftHarbour Studio
 
 ## Executive Summary
 
-NovelWriter currently has **zero automated tests**. The CLAUDE.md explicitly states: "This project has no test framework. Test manually in browser." This analysis identifies critical areas where tests would provide the highest value and proposes a testing strategy.
+DraftHarbour Studio currently has **zero automated tests**. The CLAUDE.md explicitly states: "This project has no test framework. Test manually in browser." This analysis identifies critical areas where tests would provide the highest value and proposes a testing strategy.
 
 ---
 
@@ -218,7 +218,7 @@ node --test tests/*.test.js
 ## Suggested Test File Structure
 
 ```
-NovelWriter/
+DraftHarbourStudio/
 ├── tests/
 │   ├── unit/
 │   │   ├── text-analysis.test.js    # analyzeText, countSyllables, etc.

@@ -867,8 +867,8 @@ let outlineSaveTimer = null;
 let openContextMenuAt = null;
 
 // Persist small settings (not content) in localStorage
-const SETTINGS_KEY = "novelwriter_settings_v1";
-const DAILY_BASELINE_KEY = "novelwriter_daily_baseline_v1";
+const SETTINGS_KEY = "draftharbour_settings_v1";
+const DAILY_BASELINE_KEY = "draftharbour_daily_baseline_v1";
 
 function loadSettings() {
   try {
@@ -1483,7 +1483,7 @@ async function boot() {
   });
 
   $("#btnResetApp")?.addEventListener("click", async () => {
-    const ok = confirm("Reset ALL local NovelWriter data on this device/browser?");
+    const ok = confirm("Reset ALL local DraftHarbour Studio data on this device/browser?");
     if (!ok) return;
     await resetAllData();
     location.reload();
@@ -2228,5 +2228,5 @@ function setupMenus() {
 boot().catch((e) => {
   console.error(e);
   setStatus("App error");
-  alert("NovelWriter hit an error. Open DevTools Console for details.");
+  alert("DraftHarbour Studio hit an error. Open DevTools Console for details.");
 });

@@ -394,7 +394,7 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                   <span className="material-symbols-rounded">info</span>
                   <div>
                     <p className={styles.privacyNotice__text}>
-                      <strong>Your writing stays private by default.</strong> NovelWriter stores everything in
+                      <strong>Your writing stays private by default.</strong> DraftHarbour Studio stores everything in
                       your browser's local storage (IndexedDB). No data leaves your device unless you
                       explicitly enable cloud sync below.
                     </p>

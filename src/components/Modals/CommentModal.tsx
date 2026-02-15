@@ -35,8 +35,8 @@ const ROLE_LABELS: Record<CollabRole, string> = {
   viewer: 'Viewer',
 };
 
-const COLLAB_STORAGE_KEY = 'novelwriter_collaborators';
-const ACTIVE_USER_KEY = 'novelwriter_active_user';
+const COLLAB_STORAGE_KEY = 'draftharbour_collaborators';
+const ACTIVE_USER_KEY = 'draftharbour_active_user';
 
 function loadCollaborators(): Collaborator[] {
   try {
@@ -59,7 +59,7 @@ function getActiveUser(): Collaborator {
   return collabs[0];
 }
 
-const STORAGE_PREFIX = 'novelwriter_comments_';
+const STORAGE_PREFIX = 'draftharbour_comments_';
 
 function loadComments(chapterId: string): Comment[] {
   try {

@@ -217,5 +217,5 @@ adapterRegistry.register(dropboxAdapter);
 
 // Expose registry to window for community plugins
 if (typeof window !== 'undefined') {
-  (window as unknown as { NovelWriterAdapters: AdapterRegistry }).NovelWriterAdapters = adapterRegistry;
+  (window as unknown as { DraftHarbourAdapters: AdapterRegistry }).DraftHarbourAdapters = adapterRegistry;
 }

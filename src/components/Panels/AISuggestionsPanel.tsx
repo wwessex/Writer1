@@ -16,7 +16,7 @@ interface Suggestion {
   loading: boolean;
 }
 
-const AI_CONFIG_KEY = 'novelwriter_ai_config';
+const AI_CONFIG_KEY = 'draftharbour_ai_config';
 
 function getAIConfig(): { endpoint: string; apiKey: string } {
   try {

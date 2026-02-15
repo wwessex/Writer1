@@ -3,7 +3,7 @@
  * All data is stored in localStorage for offline-first behavior.
  */
 
-const STORAGE_KEY = 'novelwriter_progress_v1';
+const STORAGE_KEY = 'draftharbour_progress_v1';
 
 export interface DailyProgress {
   date: string; // YYYY-MM-DD

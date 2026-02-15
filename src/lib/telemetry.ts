@@ -4,8 +4,8 @@
  * Context length estimates are redacted to character counts only.
  */
 
-const STORAGE_KEY = 'novelwriter_ai_telemetry_v1';
-const OPT_IN_KEY = 'novelwriter_ai_telemetry_optin';
+const STORAGE_KEY = 'draftharbour_ai_telemetry_v1';
+const OPT_IN_KEY = 'draftharbour_ai_telemetry_optin';
 const MAX_RECORDS = 200;
 
 export interface TelemetryEvent {

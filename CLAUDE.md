@@ -1,8 +1,8 @@
-# CLAUDE.md - AI Assistant Guide for NovelWriter
+# CLAUDE.md - AI Assistant Guide for DraftHarbour Studio
 
 ## Project Overview
 
-NovelWriter is an **offline-first Progressive Web Application (PWA)** for writing novels. It's a lightweight, browser-based word processor with rich text editing, chapter management, and optional cloud sync.
+DraftHarbour Studio is an **offline-first Progressive Web Application (PWA)** for writing novels. It's a lightweight, browser-based word processor with rich text editing, chapter management, and optional cloud sync.
 
 **Key characteristics:**
 - Static site (no backend required for core functionality)
@@ -15,7 +15,7 @@ NovelWriter is an **offline-first Progressive Web Application (PWA)** for writin
 ## Architecture
 
 ```
-NovelWriter/
+DraftHarbourStudio/
 ├── index.html          # Main HTML structure, modals, UI scaffold
 ├── app.js              # Core application logic, UI state management (~1,740 lines)
 ├── editor.js           # Tiptap/ProseMirror editor wrapper (~109 lines)
@@ -83,7 +83,7 @@ NovelWriter/
 ## Data Schema (IndexedDB)
 
 ```javascript
-// Database: NovelWriterDB
+// Database: DraftHarbourDB
 db.version(2).stores({
   novels: "id, title, updatedAt",
   chapters: "id, novelId, order, title, updatedAt",

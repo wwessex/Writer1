@@ -3,13 +3,13 @@ import type { Novel, Chapter, Snapshot, BackupData, BackupDataV3, LegacyBackupDa
 
 const CURRENT_BACKUP_VERSION = 3;
 
-class NovelWriterDB extends Dexie {
+class DraftHarbourDB extends Dexie {
   novels!: EntityTable<Novel, 'id'>;
   chapters!: EntityTable<Chapter, 'id'>;
   snapshots!: EntityTable<Snapshot, 'id'>;
 
   constructor() {
-    super('NovelWriterDB');
+    super('DraftHarbourDB');
     this.version(2).stores({
       novels: 'id, title, updatedAt',
       chapters: 'id, novelId, order, title, updatedAt',
@@ -32,7 +32,7 @@ class NovelWriterDB extends Dexie {
   }
 }
 
-export const db = new NovelWriterDB();
+export const db = new DraftHarbourDB();
 
 function normalizeProjectType(projectType?: ProjectType): ProjectType {
   return projectType === 'screenplay' ? 'screenplay' : 'book';
