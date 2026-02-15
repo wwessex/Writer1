@@ -23,7 +23,7 @@ const MENUS: MenuConfig[] = [
       { divider: true },
       { label: 'New Chapter', action: 'newChapter', shortcut: 'Ctrl+Shift+N' },
       { divider: true },
-      { label: 'Export Novel...', action: 'export', shortcut: 'Ctrl+Shift+E' },
+      { label: 'Export...', action: 'export', shortcut: 'Ctrl+Shift+E' },
       { label: 'Import Document...', action: 'importDocument' },
       { divider: true },
       { label: 'Export Backup', action: 'exportBackup' },
