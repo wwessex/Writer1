@@ -27,17 +27,11 @@
 }
 
 .logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: 1.625rem;
   height: 1.625rem;
   border-radius: 6px;
-  background: var(--accent);
-  color: white;
-  font-weight: 700;
-  font-size: 0.6875rem;
-  letter-spacing: 0.02em;
+  object-fit: contain;
 }
 
 .novelTitle {

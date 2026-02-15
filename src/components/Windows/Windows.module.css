@@ -178,17 +178,12 @@
 }
 
 .logoIcon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: 4rem;
   height: 4rem;
   border-radius: 16px;
-  background: linear-gradient(135deg, var(--accent), #a855f7);
-  color: white;
-  font-weight: 700;
-  font-size: 1.5rem;
-  margin-bottom: 0.75rem;
+  object-fit: contain;
+  margin: 0 auto 0.75rem;
 }
 
 .aboutLogo h2 {

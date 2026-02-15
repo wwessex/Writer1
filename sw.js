@@ -10,6 +10,7 @@ const CORE_ASSETS = [
   "./export.js",
   "./importer.js",
   "./manifest.webmanifest",
+  "./assets/icon.svg",
   "./assets/icon-192.png",
   "./assets/icon-512.png",
 ];
