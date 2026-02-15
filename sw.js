@@ -1,5 +1,5 @@
 /* DraftHarbour Studio Service Worker — offline cache */
-const CACHE_NAME = "draftharbour-v21";
+const CACHE_NAME = "draftharbour-v22";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -11,17 +11,17 @@ const CORE_ASSETS = [
   "./importer.js",
   "./manifest.webmanifest",
   "./assets/favicon.ico",
-  "./assets/icon.svg",
-  "./assets/icon-192.png",
-  "./assets/icon-512.png",
+  "./assets/icon-blue-32.png",
+  "./assets/icon-blue-48.png",
+  "./assets/icon-blue-64.png",
+  "./assets/icon-blue-192.png",
+  "./assets/icon-blue-512.png",
+  "./assets/icon-black-64.png",
   "./assets/apple-touch-icon.png",
   "./assets/pwa-192.png",
   "./assets/pwa-512.png",
-  "./assets/icon-blue-48.png",
-  "./assets/icon-blue-192.png",
-  "./assets/icon-blue-512.png",
-  "./brand/logo.svg",
-  "./brand/logo-light.svg",
+  "./assets/logo-blue.png",
+  "./assets/logo-black.png",
 ];
 
 // External ESM/CDN modules are cached on-demand via runtime caching.
