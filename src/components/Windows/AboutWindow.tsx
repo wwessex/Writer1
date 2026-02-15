@@ -109,7 +109,7 @@ export function AboutWindow({ open, onClose }: AboutWindowProps) {
 
         <div className={styles.window__body}>
           <div className={styles.aboutLogo}>
-            <span className={styles.logoIcon}>DH</span>
+            <img src="/assets/icon.svg" alt="DraftHarbour" className={styles.logoIcon} />
             <h2>DraftHarbour Studio</h2>
             <p className={styles.version}>Version 2.0.0</p>
           </div>

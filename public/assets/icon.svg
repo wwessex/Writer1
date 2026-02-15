@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="beacon-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#fbbf24" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="nib-grad" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#e2e8f0"/>
+      <stop offset="100%" stop-color="#94a3b8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#0f172a"/>
+
+  <!-- Beacon glow -->
+  <ellipse cx="256" cy="128" rx="70" ry="55" fill="url(#beacon-glow)"/>
+
+  <!-- Pen nib / lighthouse body - left tine -->
+  <path d="
+    M 256 395
+    C 248 360, 228 290, 218 230
+    C 212 195, 215 168, 224 152
+    L 232 142
+    L 244 142
+    C 248 158, 250 180, 252 210
+    L 256 320
+    Z
+  " fill="url(#nib-grad)"/>
+
+  <!-- Pen nib / lighthouse body - right tine -->
+  <path d="
+    M 256 395
+    C 264 360, 284 290, 294 230
+    C 300 195, 297 168, 288 152
+    L 280 142
+    L 268 142
+    C 264 158, 262 180, 260 210
+    L 256 320
+    Z
+  " fill="url(#nib-grad)"/>
+
+  <!-- Nib slit -->
+  <line x1="256" y1="315" x2="256" y2="210" stroke="#0f172a" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- Breather hole -->
+  <circle cx="256" cy="295" r="7" fill="#0f172a"/>
+
+  <!-- Lighthouse beacon -->
+  <circle cx="256" cy="125" r="16" fill="#fbbf24"/>
+  <circle cx="256" cy="125" r="10" fill="#fde68a"/>
+
+  <!-- Light rays -->
+  <g stroke="#fbbf24" stroke-width="3" stroke-linecap="round" opacity="0.7">
+    <line x1="256" y1="98" x2="256" y2="84"/>
+    <line x1="234" y1="106" x2="224" y2="95"/>
+    <line x1="278" y1="106" x2="288" y2="95"/>
+    <line x1="228" y1="122" x2="216" y2="118"/>
+    <line x1="284" y1="122" x2="296" y2="118"/>
+  </g>
+
+  <!-- Waves -->
+  <path d="M 96 380 Q 140 362, 176 380 Q 216 398, 256 380 Q 296 362, 336 380 Q 376 398, 416 380"
+        stroke="#06b6d4" stroke-width="7" fill="none" stroke-linecap="round" opacity="0.9"/>
+  <path d="M 96 404 Q 140 386, 176 404 Q 216 422, 256 404 Q 296 386, 336 404 Q 376 422, 416 404"
+        stroke="#0ea5e9" stroke-width="6" fill="none" stroke-linecap="round" opacity="0.6"/>
+  <path d="M 112 426 Q 152 410, 188 426 Q 224 442, 256 426 Q 288 410, 324 426 Q 360 442, 400 426"
+        stroke="#38bdf8" stroke-width="5" fill="none" stroke-linecap="round" opacity="0.35"/>
+</svg>
