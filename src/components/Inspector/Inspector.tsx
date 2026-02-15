@@ -104,7 +104,7 @@ export function Inspector({ open, onClose }: InspectorProps) {
               </button>
             ))}
           </div>
-          <IconButton icon="close" label="Close inspector" variant="ghost" onClick={onClose} />
+          <IconButton icon="chevron_right" label="Collapse inspector" variant="ghost" onClick={onClose} className={styles.closeBtn} />
         </div>
 
         <div className={styles.body}>
