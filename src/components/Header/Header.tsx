@@ -8,9 +8,11 @@ import styles from './Header.module.css';
 
 interface HeaderProps {
   onAction?: (action: string) => void;
+  onToggleInspector?: () => void;
+  inspectorOpen?: boolean;
 }
 
-export function Header({ onAction }: HeaderProps) {
+export function Header({ onAction, onToggleInspector, inspectorOpen }: HeaderProps) {
   const { state, dispatch, updateNovelTitle } = useApp();
 
   // Calculate word counts
@@ -59,6 +61,14 @@ export function Header({ onAction }: HeaderProps) {
           {state.isSaving && (
             <span className={styles.savingStatus}>Saving...</span>
           )}
+          <IconButton
+            icon="info"
+            label="Toggle inspector (Ctrl+Shift+I)"
+            variant="ghost"
+            active={inspectorOpen}
+            onClick={onToggleInspector}
+            className={styles.inspectorBtn}
+          />
         </div>
       </div>
       <MenuBar onAction={onAction} />
