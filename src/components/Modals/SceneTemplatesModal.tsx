@@ -150,7 +150,7 @@ const TEMPLATES: SceneTemplate[] = [
 ];
 
 export function SceneTemplatesModal({ open, onClose }: SceneTemplatesModalProps) {
-  const { state, activeChapter, addScene, updateScene } = useApp();
+  const { state, activeChapter, addScene } = useApp();
   const { showToast } = useToast();
   const [selectedTemplate, setSelectedTemplate] = useState<SceneTemplate | null>(null);
   const [activeCategory, setActiveCategory] = useState<'all' | 'structure' | 'genre' | 'pacing'>('all');
@@ -184,22 +184,12 @@ export function SceneTemplatesModal({ open, onClose }: SceneTemplatesModalProps)
       ].join('\n'),
     };
 
-    addScene(activeChapter.id);
+    const createdSceneId = addScene(activeChapter.id, sceneData);
 
-    // Get the newly added scene (last one) and update it
-    const scenes = activeChapter.scenes || [];
-    const newSceneId = scenes.length > 0 ? undefined : undefined; // Will be updated after addScene triggers re-render
-
-    // We apply updates through a brief timeout to let the state update
-    setTimeout(() => {
-      const updatedChapter = document.querySelector('[data-chapter-id]');
-      if (updatedChapter) return;
-      // Fallback: update the last scene
-      const lastScene = activeChapter.scenes?.[activeChapter.scenes.length];
-      if (lastScene) {
-        updateScene(activeChapter.id, lastScene.id, sceneData);
-      }
-    }, 100);
+    if (!createdSceneId) {
+      showToast('Unable to apply template. Please try again.', 'error', 'error');
+      return;
+    }
 
     showToast(`Applied "${selectedTemplate.name}" template`, 'success', 'auto_awesome');
     onClose();

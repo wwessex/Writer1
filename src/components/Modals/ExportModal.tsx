@@ -108,28 +108,39 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
 
   const totalWords = state.chapters.reduce((sum, ch) => sum + countWords(editorToPlainText(ch.content)), 0);
 
-  const handleExport = async (format: ExportFormat, presetId?: string) => {
+  const handleExport = async (
+    format: ExportFormat,
+    presetId?: string,
+    options?: {
+      includeHeadings?: boolean;
+      fountainOptions?: Partial<FountainExportOptions>;
+    }
+  ) => {
     setExporting(true);
+
+    const exportIncludeHeadings = options?.includeHeadings ?? includeHeadings;
+    const exportFountainOptions = {
+      includeSectionTitles: options?.fountainOptions?.includeSectionTitles ?? includeSectionTitles,
+      includeMetadataBlock: options?.fountainOptions?.includeMetadataBlock ?? includeMetadataBlock,
+      filenameConvention: options?.fountainOptions?.filenameConvention ?? filenameConvention,
+    };
+
     try {
       switch (format) {
         case 'docx':
-          await exportToDocx(state.chapters, state.novelTitle, includeHeadings);
+          await exportToDocx(state.chapters, state.novelTitle, exportIncludeHeadings);
           break;
         case 'pdf':
-          await exportToPdf(state.chapters, state.novelTitle, includeHeadings);
+          await exportToPdf(state.chapters, state.novelTitle, exportIncludeHeadings);
           break;
         case 'screenplayPdf':
           await exportToScreenplayPdf(state.chapters, state.novelTitle);
           break;
         case 'fountain':
-          await exportToFountain(state.chapters, state.novelTitle, {
-            includeSectionTitles,
-            includeMetadataBlock,
-            filenameConvention,
-          });
+          await exportToFountain(state.chapters, state.novelTitle, exportFountainOptions);
           break;
         case 'rtf':
-          await exportToRtf(state.chapters, state.novelTitle, includeHeadings);
+          await exportToRtf(state.chapters, state.novelTitle, exportIncludeHeadings);
           break;
       }
 
@@ -156,7 +167,7 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
 
   const handlePresetExport = async (preset: ExportPreset) => {
     if (preset.fountainOptions) {
-      // Apply preset fountain options before exporting
+      // Keep UI controls in sync with preset selections
       setIncludeSectionTitles(preset.fountainOptions.includeSectionTitles ?? true);
       setIncludeMetadataBlock(preset.fountainOptions.includeMetadataBlock ?? true);
       if (preset.fountainOptions.filenameConvention) {
@@ -164,7 +175,11 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
       }
     }
     setIncludeHeadings(preset.includeHeadings);
-    await handleExport(preset.format, preset.id);
+
+    await handleExport(preset.format, preset.id, {
+      includeHeadings: preset.includeHeadings,
+      fountainOptions: preset.fountainOptions,
+    });
   };
 
   const filteredPresets = EXPORT_PRESETS.filter(p => p.projectTypes.includes(state.projectType));

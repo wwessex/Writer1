@@ -212,7 +212,7 @@ interface AppContextType {
   canRedoReorder: boolean;
   updateNovelTitle: (title: string) => void;
   updateSettings: (settings: Partial<AppSettings>) => void;
-  addScene: (chapterId: string) => void;
+  addScene: (chapterId: string, initialScene?: Partial<Scene>) => string | null;
   updateScene: (chapterId: string, sceneId: string, updates: Partial<Scene>) => void;
   deleteScene: (chapterId: string, sceneId: string) => void;
   reorderScenes: (chapterId: string, sceneIds: string[]) => void;
@@ -419,12 +419,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Add scene to chapter
-  const addScene = useCallback((chapterId: string) => {
+  const addScene = useCallback((chapterId: string, initialScene?: Partial<Scene>) => {
     const chapter = state.chapters.find(ch => ch.id === chapterId);
-    if (!chapter) return;
+    if (!chapter) return null;
 
     const existingScenes = chapter.scenes || [];
-    const newScene: Scene = state.projectType === 'screenplay'
+    const defaultScene: Scene = state.projectType === 'screenplay'
       ? {
         id: crypto.randomUUID(),
         title: `Scene ${existingScenes.length + 1}`,
@@ -450,9 +450,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
         wordGoal: 0
       };
 
+    const newScene: Scene = {
+      ...defaultScene,
+      ...initialScene,
+      id: defaultScene.id,
+    };
+
     const updates = { scenes: [...existingScenes, newScene] };
     dispatch({ type: 'UPDATE_CHAPTER', payload: { id: chapterId, updates } });
     storage.updateChapter(chapterId, updates);
+    return newScene.id;
   }, [state.chapters, state.projectType]);
 
   // Update scene
