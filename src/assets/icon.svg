@@ -1,3 +1,74 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <image width="512" height="512" href="icon-512.png" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="40" x2="440" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0C1928"/>
+      <stop offset="1" stop-color="#070E18"/>
+    </linearGradient>
+
+    <linearGradient id="fg" x1="170" y1="120" x2="350" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8FE9FF"/>
+      <stop offset="0.5" stop-color="#5DD8F8"/>
+      <stop offset="1" stop-color="#2EC6FF"/>
+    </linearGradient>
+
+    <linearGradient id="fgFill" x1="170" y1="120" x2="350" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8FE9FF"/>
+      <stop offset="1" stop-color="#2EC6FF"/>
+    </linearGradient>
+
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feComposite in="blur" in2="SourceGraphic" operator="over"/>
+    </filter>
+
+    <filter id="outerGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="glow"/>
+      <feColorMatrix in="glow" type="matrix" values="0 0 0 0 0.36  0 0 0 0 0.85  0 0 0 0 1  0 0 0 0.25 0" result="coloredGlow"/>
+      <feMerge>
+        <feMergeNode in="coloredGlow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect x="40" y="40" width="432" height="432" rx="96" fill="url(#bg)"/>
+
+  <!-- Emblem with outer glow -->
+  <g filter="url(#outerGlow)">
+    <g stroke="url(#fg)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <!-- Arc / harbour horizon -->
+      <path d="M155 235c30-75 90-118 148-118s118 43 148 118" opacity="0.7"/>
+
+      <!-- Pen-nib lighthouse body -->
+      <path d="M256 160
+               c32 0 58 26 58 58
+               v112
+               c0 16-7 28-18 39
+               l-40 44
+               l-40-44
+               c-11-11-18-23-18-39
+               V218
+               c0-32 26-58 58-58z"/>
+
+      <!-- Nib slit -->
+      <path d="M256 214v88" opacity="0.8"/>
+
+      <!-- Lighthouse cap -->
+      <path d="M234 134h44l-9 24h-26l-9-24z"/>
+      <path d="M214 170h84" opacity="0.75"/>
+
+      <!-- Light beams -->
+      <path d="M190 152l-26-10" opacity="0.65"/>
+      <path d="M322 152l26-10" opacity="0.65"/>
+
+      <!-- Waves -->
+      <path d="M152 330c26 15 52 15 78 0s52-15 78 0 52 15 78 0 52-15 78 0" opacity="0.9"/>
+      <path d="M152 364c26 15 52 15 78 0s52-15 78 0 52 15 78 0 52-15 78 0" opacity="0.8"/>
+      <path d="M152 398c26 15 52 15 78 0s52-15 78 0 52 15 78 0 52-15 78 0" opacity="0.7"/>
+    </g>
+
+    <!-- Breather hole (filled) -->
+    <circle cx="256" cy="254" r="9" fill="url(#fgFill)"/>
+  </g>
 </svg>
