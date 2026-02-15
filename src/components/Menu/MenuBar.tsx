@@ -19,6 +19,8 @@ const MENUS: MenuConfig[] = [
   {
     label: 'File',
     items: [
+      { label: 'Projects...', action: 'projects' },
+      { divider: true },
       { label: 'New Chapter', action: 'newChapter', shortcut: 'Ctrl+Shift+N' },
       { divider: true },
       { label: 'Export Novel...', action: 'export', shortcut: 'Ctrl+Shift+E' },

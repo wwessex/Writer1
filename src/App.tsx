@@ -10,7 +10,8 @@ import { Sidebar } from '@/components/Sidebar';
 import { Editor } from '@/components/Editor';
 import {
   ExportModal, SnapshotModal, AnalysisModal, WordCountModal, DashboardModal, OnboardingModal,
-  AIWritingModal, CharacterBibleModal, CommentModal, AdvancedAnalyticsModal, IntegrationsModal
+  AIWritingModal, CharacterBibleModal, CommentModal, AdvancedAnalyticsModal, IntegrationsModal,
+  ProjectsModal
 } from '@/components/Modals';
 import { SettingsWindow, AboutWindow } from '@/components/Windows';
 import { ToastProvider, useToast } from '@/components/UI';
@@ -114,6 +115,7 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [advancedAnalyticsOpen, setAdvancedAnalyticsOpen] = useState(false);
   const [integrationsOpen, setIntegrationsOpen] = useState(false);
+  const [projectsOpen, setProjectsOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -278,6 +280,9 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
       case 'integrations':
         setIntegrationsOpen(true);
         break;
+      case 'projects':
+        setProjectsOpen(true);
+        break;
       case 'undo':
         editor?.chain().focus().undo().run();
         break;
@@ -407,6 +412,7 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
       <CommentModal open={commentsOpen} onClose={() => setCommentsOpen(false)} />
       <AdvancedAnalyticsModal open={advancedAnalyticsOpen} onClose={() => setAdvancedAnalyticsOpen(false)} />
       <IntegrationsModal open={integrationsOpen} onClose={() => setIntegrationsOpen(false)} />
+      <ProjectsModal open={projectsOpen} onClose={() => setProjectsOpen(false)} />
 
       {/* Windows */}
       <SettingsWindow open={settingsOpen} onClose={() => setSettingsOpen(false)} />

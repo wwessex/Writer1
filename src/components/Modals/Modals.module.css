@@ -2253,3 +2253,198 @@
   color: var(--text-muted);
   line-height: 1.4;
 }
+
+/* ===== Projects Modal ===== */
+.projectsLayout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.projectsCurrent {
+  padding: 1rem;
+  background: var(--accent-alpha);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+}
+
+.projectsCurrentInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.projectsCurrentIcon {
+  font-size: 1.75rem;
+  color: var(--accent);
+}
+
+.projectsCurrentTitle {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.projectsCurrentMeta {
+  margin: 0.125rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.projectsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.projectsListHeading {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.projectItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.projectItem:hover {
+  background: var(--btn-bg);
+}
+
+.projectItem--active {
+  background: var(--accent-alpha);
+}
+
+.projectItem__main {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+.projectItem__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.projectItem__title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.projectItem__meta {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.projectItem__deleteBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0.25rem;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.projectItem:hover .projectItem__deleteBtn {
+  opacity: 1;
+}
+
+.projectItem__deleteBtn:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.projectItem__deleteBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.projectItem__confirmDelete {
+  display: flex;
+  gap: 0.375rem;
+  flex-shrink: 0;
+}
+
+.projectsCreate {
+  padding: 1rem;
+  background: var(--btn-bg);
+  border-radius: 10px;
+}
+
+.projectsCreateFields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.projectsCreateInput {
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.projectsCreateInput:focus {
+  border-color: var(--accent);
+}
+
+.projectsCreateTypeRow {
+  display: flex;
+  gap: 1rem;
+}
+
+.projectsTypeOption {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.projectsTypeOption input[type="radio"] {
+  accent-color: var(--accent);
+}
+
+.projectsCreateActions {
+  display: flex;
+  gap: 0.5rem;
+}

@@ -197,6 +197,9 @@ interface AppContextType {
   activeChapter: Chapter | null;
   // Actions
   loadNovel: () => Promise<void>;
+  loadNovelById: (id: string) => Promise<void>;
+  createNewNovel: (title: string, projectType: ProjectType) => Promise<Novel>;
+  deleteCurrentNovel: () => Promise<void>;
   createChapter: () => Promise<void>;
   deleteChapter: (id: string) => Promise<void>;
   updateChapter: (id: string, updates: Partial<Chapter>) => void;
@@ -279,6 +282,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     dispatch({ type: 'SET_NOVEL', payload: { novel, chapters } });
   }, []);
+
+  // Load a specific novel by ID
+  const loadNovelById = useCallback(async (id: string) => {
+    const novel = await storage.getNovel(id);
+    if (!novel) return;
+
+    const chapters = await storage.getChapters(novel.id);
+
+    if (chapters.length === 0) {
+      const firstChapter = storage.createChapter(novel.id, 0, undefined, novel.projectType || 'book');
+      await storage.addChapter(firstChapter);
+      chapters.push(firstChapter);
+    }
+
+    dispatch({ type: 'SET_NOVEL', payload: { novel, chapters } });
+  }, []);
+
+  // Create a new novel/project
+  const createNewNovel = useCallback(async (title: string, projectType: ProjectType): Promise<Novel> => {
+    const novel = await storage.createNovel(title, projectType);
+    const firstChapter = storage.createChapter(novel.id, 0, undefined, projectType);
+    await storage.addChapter(firstChapter);
+
+    dispatch({ type: 'SET_NOVEL', payload: { novel, chapters: [firstChapter] } });
+    return novel;
+  }, []);
+
+  // Delete the current novel and switch to another
+  const deleteCurrentNovel = useCallback(async () => {
+    const currentId = state.novelId;
+    await storage.deleteNovel(currentId);
+
+    // Load next available novel or create a new one
+    await loadNovel();
+  }, [state.novelId, loadNovel]);
 
   // Debounced save for content updates
   const debouncedSave = useCallback(
@@ -461,6 +499,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dispatch,
     activeChapter,
     loadNovel,
+    loadNovelById,
+    createNewNovel,
+    deleteCurrentNovel,
     createChapter,
     deleteChapter,
     updateChapter,

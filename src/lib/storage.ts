@@ -68,6 +68,11 @@ function upgradeBackup(backup: BackupData): BackupDataV3 {
 }
 
 // Novel operations
+export async function getAllNovels(): Promise<Novel[]> {
+  const novels = await db.novels.orderBy('updatedAt').reverse().toArray();
+  return novels.map(normalizeNovel);
+}
+
 export async function getNovel(id: string): Promise<Novel | undefined> {
   const novel = await db.novels.get(id);
   return novel ? normalizeNovel(novel) : undefined;
