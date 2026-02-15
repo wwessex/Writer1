@@ -146,7 +146,13 @@ export function createChapter(
     status: 'planned',
     tags: [],
     wordGoal: 0,
-    scenes: []
+    scenes: [],
+    sync: {
+      providerRevisionIds: {},
+      lastPushedHash: undefined,
+      lastPulledAt: undefined,
+      lastSyncedContent: null,
+    }
   };
 }
 
