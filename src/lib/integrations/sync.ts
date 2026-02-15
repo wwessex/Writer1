@@ -172,6 +172,7 @@ export function mergeChapterFromRemote({ chapter, remoteDocument, context }: Thr
   }
 
   const nextContent = remoteChanged ? remoteContent : localContent;
+  const nextSyncedContent = remoteChanged ? remoteContent : baseContent;
 
   const chapterUpdate: Chapter = {
     ...chapter,
@@ -180,7 +181,7 @@ export function mergeChapterFromRemote({ chapter, remoteDocument, context }: Thr
     updatedAt: remoteChanged ? remoteDocument.updatedAt : chapter.updatedAt,
     content: nextContent,
     summary: docToText(nextContent).slice(0, 200),
-    sync: buildSyncMetadata(chapter, context.provider, context.remoteRevision, nextContent, {
+    sync: buildSyncMetadata(chapter, context.provider, context.remoteRevision, nextSyncedContent, {
       lastPulledAt: now,
       lastPushedHash: remoteChanged ? hashContent(nextContent) : chapter.sync?.lastPushedHash,
     }),
