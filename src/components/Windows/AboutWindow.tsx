@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useWindowResize } from '@/hooks/useResizable';
 import styles from './Windows.module.css';
 
 interface AboutWindowProps {
@@ -11,6 +12,15 @@ export function AboutWindow({ open, onClose }: AboutWindowProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isMobile, setIsMobile] = useState(false);
+  const { width, height, startResize, reset: resetSize } = useWindowResize({
+    initialWidth: 400,
+    initialHeight: 480,
+    minWidth: 300,
+    maxWidth: 600,
+    minHeight: 300,
+    maxHeight: 700,
+    disabled: isMobile,
+  });
 
   // Detect mobile
   useEffect(() => {
@@ -36,12 +46,14 @@ export function AboutWindow({ open, onClose }: AboutWindowProps) {
       windowRef.current.style.left = '';
       windowRef.current.style.top = '';
       windowRef.current.style.transform = '';
+      resetSize();
     }
-  }, [open]);
+  }, [open, resetSize]);
 
   // Handle drag (desktop only)
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (isMobile) return;
+    if ((e.target as HTMLElement).closest(`.${styles.resizeHandle}`) || (e.target as HTMLElement).closest(`.${styles.resizeCorner}`)) return;
     if ((e.target as HTMLElement).closest(`.${styles.window__header}`)) {
       setIsDragging(true);
       const rect = windowRef.current?.getBoundingClientRect();
@@ -86,6 +98,7 @@ export function AboutWindow({ open, onClose }: AboutWindowProps) {
         ref={windowRef}
         className={styles.window}
         onMouseDown={handleMouseDown}
+        style={!isMobile ? { width, height } : undefined}
       >
         <div className={styles.window__header}>
           <h3>About DraftHarbour Studio</h3>
@@ -146,6 +159,13 @@ export function AboutWindow({ open, onClose }: AboutWindowProps) {
             Built with React, TypeScript, and Tiptap.
           </p>
         </div>
+        {!isMobile && (
+          <>
+            <div className={`${styles.resizeHandle} ${styles['resizeHandle--right']}`} onMouseDown={startResize('right')} />
+            <div className={`${styles.resizeHandle} ${styles['resizeHandle--bottom']}`} onMouseDown={startResize('bottom')} />
+            <div className={styles.resizeCorner} onMouseDown={startResize('bottom-right')} />
+          </>
+        )}
       </div>
     </>
   );

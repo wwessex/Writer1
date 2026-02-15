@@ -1,8 +1,10 @@
+import { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { VirtualChapterList } from './VirtualChapterList';
 import { OutlinePanel } from './OutlinePanel';
 import { ScenePlanner } from './ScenePlanner';
 import { Button } from '@/components/UI';
+import { useResizable } from '@/hooks/useResizable';
 import styles from './Sidebar.module.css';
 
 interface SidebarProps {
@@ -13,6 +15,23 @@ interface SidebarProps {
 export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
   const { state, dispatch, undoReorder, canUndoReorder } = useApp();
   const isHidden = state.settings.sidebarHidden;
+
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 820);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  const { size, isResizing, handleProps } = useResizable({
+    initialSize: 280,
+    minSize: 200,
+    maxSize: 480,
+    direction: 'right',
+    persistKey: 'dh-sidebar-width',
+    disabled: isMobile,
+  });
 
   const closeSidebar = () => {
     if (!isHidden) {
@@ -26,7 +45,10 @@ export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
   return (
     <>
       <div className={backdropClass} onClick={closeSidebar} aria-hidden="true" />
-      <aside className={sidebarClass}>
+      <aside
+        className={sidebarClass}
+        style={!isMobile && !isHidden ? { width: size } : undefined}
+      >
         <div className={styles.sidebar__content}>
           <VirtualChapterList />
           {canUndoReorder && (
@@ -59,6 +81,12 @@ export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
             Import Backup
           </Button>
         </div>
+        {!isMobile && !isHidden && (
+          <div
+            className={`${styles.resizeHandle} ${isResizing ? styles['resizeHandle--active'] : ''}`}
+            {...handleProps}
+          />
+        )}
       </aside>
     </>
   );
