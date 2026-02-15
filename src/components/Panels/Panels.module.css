@@ -49,6 +49,17 @@
   color: var(--text);
 }
 
+.aiPanel__providerBadge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.25rem;
+  opacity: 0.6;
+}
+
+.aiPanel__providerBadge .material-symbols-rounded {
+  font-size: 0.875rem;
+}
+
 .aiPanel__notice {
   display: flex;
   align-items: flex-start;

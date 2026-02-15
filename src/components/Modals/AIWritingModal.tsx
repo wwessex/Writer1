@@ -3,6 +3,14 @@ import { Dialog, Button, Input, Textarea } from '@/components/UI';
 import { useToast } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
 import { editorToPlainText } from '@/lib/utils';
+import {
+  loadAIConfig,
+  saveAIConfig,
+  createProvider,
+  isChromeAIAvailable,
+  checkChromeAIAvailability,
+} from '@/lib/ai';
+import type { AIProviderConfig, AvailabilityStatus } from '@/lib/ai';
 import type { ProjectType } from '@/types';
 import styles from './Modals.module.css';
 
@@ -15,11 +23,6 @@ interface AIWritingModalProps {
   onClose: () => void;
 }
 
-interface AIConfig {
-  endpoint: string;
-  apiKey: string;
-}
-
 interface PresetPrompt {
   id: string;
   label: string;
@@ -30,8 +33,6 @@ interface PresetPrompt {
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
-
-const STORAGE_KEY = 'draftharbour_ai_config';
 
 const BOOK_PRESET_PROMPTS: PresetPrompt[] = [
   {
@@ -140,66 +141,6 @@ function getPresetPrompts(projectType: ProjectType): PresetPrompt[] {
   return projectType === 'screenplay' ? SCREENPLAY_PRESET_PROMPTS : BOOK_PRESET_PROMPTS;
 }
 
-function extractScreenplayContext(chapterText: string): {
-  sceneHeading: string;
-  characters: string[];
-  previousDialogueTurn: string;
-} {
-  const lines = chapterText
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean);
-
-  const sceneHeading = lines.find(line => /^(INT\.?|EXT\.?|INT\/EXT\.?)/i.test(line)) || '';
-  const characterSet = new Set<string>();
-
-  for (const line of lines) {
-    if (/^[A-Z0-9\s()'.-]{2,}$/.test(line) && !/^(INT|EXT|INT\/EXT)\b/.test(line)) {
-      characterSet.add(line.replace(/\s+/g, ' ').trim());
-    }
-  }
-
-  let previousDialogueTurn = '';
-  for (let i = lines.length - 1; i >= 1; i -= 1) {
-    const speaker = lines[i - 1];
-    const dialogue = lines[i];
-    if (/^[A-Z0-9\s()'.-]{2,}$/.test(speaker) && !/^(INT|EXT|INT\/EXT)\b/.test(speaker)) {
-      previousDialogueTurn = `${speaker}: ${dialogue}`;
-      break;
-    }
-  }
-
-  return {
-    sceneHeading,
-    characters: Array.from(characterSet),
-    previousDialogueTurn
-  };
-}
-
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
-/* ------------------------------------------------------------------ */
-
-function loadConfig(): AIConfig {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<AIConfig>;
-      return {
-        endpoint: parsed.endpoint || '',
-        apiKey: parsed.apiKey || ''
-      };
-    }
-  } catch {
-    // Ignore corrupt data
-  }
-  return { endpoint: '', apiKey: '' };
-}
-
-function saveConfig(config: AIConfig): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-}
-
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
@@ -210,10 +151,14 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   const isScreenplay = state.projectType === 'screenplay';
   const presetPrompts = useMemo(() => getPresetPrompts(state.projectType), [state.projectType]);
 
-  // AI configuration
-  const [config, setConfig] = useState<AIConfig>(loadConfig);
+  // AI configuration (provider-aware)
+  const [config, setConfig] = useState<AIProviderConfig>(loadAIConfig);
   const [showSettings, setShowSettings] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
+
+  // Chrome AI availability
+  const [chromeAIAvailable, setChromeAIAvailable] = useState(false);
+  const [chromeAIStatus, setChromeAIStatus] = useState<AvailabilityStatus>('unknown');
 
   // Prompt / response state
   const [prompt, setPrompt] = useState('');
@@ -226,17 +171,40 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   const responseRef = useRef<HTMLDivElement>(null);
 
   // Persist config changes
-  const updateConfig = useCallback((updates: Partial<AIConfig>) => {
+  const updateConfig = useCallback((updates: Partial<AIProviderConfig>) => {
     setConfig(prev => {
       const next = { ...prev, ...updates };
-      saveConfig(next);
+      saveAIConfig(next);
       return next;
     });
   }, []);
 
-  // Reset transient state when the modal opens/closes. We intentionally
-  // read config inside but only trigger on `open` changes — we don't want
-  // config edits to reset the prompt/response while the modal is visible.
+  // Detect Chrome AI availability on mount
+  useEffect(() => {
+    isChromeAIAvailable().then(available => {
+      setChromeAIAvailable(available);
+      if (available) {
+        checkChromeAIAvailability().then(result => {
+          // Use the best status across all APIs
+          const statuses = Object.values(result);
+          if (statuses.includes('readily')) setChromeAIStatus('readily');
+          else if (statuses.includes('after-download')) setChromeAIStatus('after-download');
+          else setChromeAIStatus('no');
+        });
+      } else {
+        setChromeAIStatus('no');
+      }
+    });
+  }, []);
+
+  /* ----- Provider logic --------------------------------------------- */
+
+  const isConfigured =
+    config.provider === 'chrome-ai'
+      ? chromeAIAvailable
+      : !!(config.endpoint?.trim() && config.apiKey?.trim());
+
+  // Reset transient state when the modal opens/closes
   useEffect(() => {
     if (open) {
       setResponse('');
@@ -244,11 +212,10 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       setPrompt('');
       setLoading(false);
       // Auto-open settings panel when AI is not configured
-      if (!config.endpoint.trim() || !config.apiKey.trim()) {
+      if (!isConfigured) {
         setShowSettings(true);
       }
     } else {
-      // Cancel any in-flight request when modal closes
       abortRef.current?.abort();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -261,33 +228,22 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
     }
   }, [response]);
 
-  /* ----- API call ------------------------------------------------- */
-
-  const isConfigured = config.endpoint.trim() !== '' && config.apiKey.trim() !== '';
-
   const sendPrompt = useCallback(
-    async (promptText: string) => {
+    async (promptText: string, presetId?: string) => {
       if (!promptText.trim()) return;
 
       if (!isConfigured) {
         setError(
-          'AI is not configured yet. Open Settings in this modal to set your API endpoint and API key.'
+          config.provider === 'chrome-ai'
+            ? 'Chrome AI is not available in this browser. Switch to OpenAI-Compatible API in Settings, or use Chrome 137+ on a supported platform.'
+            : 'AI is not configured yet. Open Settings to set your API endpoint and API key.'
         );
         return;
       }
 
-      // Build context from the active chapter
       const chapterText = activeChapter
         ? editorToPlainText(activeChapter.content)
         : '';
-
-      const structuralContext = isScreenplay
-        ? extractScreenplayContext(chapterText)
-        : undefined;
-
-      const fullPrompt = chapterText
-        ? `Here is the current ${isScreenplay ? 'scene' : 'chapter'} text for context:\n\n---\n${chapterText}\n---\n\n${promptText}`
-        : promptText;
 
       // Abort any previous request
       abortRef.current?.abort();
@@ -298,53 +254,21 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       setError(null);
       setResponse('');
 
+      const provider = createProvider(config);
+
       try {
-        const res = await fetch(config.endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${config.apiKey}`
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o',
-            context: {
-              projectType: state.projectType,
-              sectionTitle: activeChapter?.title || '',
-              ...(structuralContext ? { screenplayStructure: structuralContext } : {})
-            },
-            messages: [
-              {
-                role: 'system',
-                content:
-                  `You are a helpful creative writing assistant for ${isScreenplay ? 'screenplays' : 'books'}. Respond in plain text with clear formatting.`
-              },
-              { role: 'user', content: fullPrompt }
-            ],
-            max_tokens: 2048
-          }),
-          signal: controller.signal
+        const result = await provider.execute({
+          action: presetId || 'custom',
+          prompt: promptText,
+          context: chapterText,
+          projectType: state.projectType,
+          sectionTitle: activeChapter?.title,
+          signal: controller.signal,
         });
 
-        if (!res.ok) {
-          const body = await res.text().catch(() => '');
-          throw new Error(
-            `API request failed (${res.status}): ${body || res.statusText}`
-          );
-        }
-
-        const data = await res.json();
-
-        // Handle OpenAI-compatible response shape
-        const text =
-          data?.choices?.[0]?.message?.content ??
-          data?.content?.[0]?.text ??
-          data?.response ??
-          JSON.stringify(data, null, 2);
-
-        setResponse(text);
+        setResponse(result.text);
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === 'AbortError') {
-          // User cancelled; nothing to show
           return;
         }
         const message =
@@ -352,9 +276,10 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         setError(message);
       } finally {
         setLoading(false);
+        provider.destroy();
       }
     },
-    [activeChapter, config, isConfigured, isScreenplay, state.projectType]
+    [activeChapter, config, isConfigured, state.projectType]
   );
 
   const handleSubmit = () => {
@@ -363,7 +288,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
 
   const handlePreset = (preset: PresetPrompt) => {
     setPrompt(preset.prompt);
-    sendPrompt(preset.prompt);
+    sendPrompt(preset.prompt, preset.id);
   };
 
   const handleCopyResponse = () => {
@@ -377,20 +302,20 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   };
 
   const handleTestConnection = async () => {
-    if (!config.endpoint.trim() || !config.apiKey.trim()) {
+    if (!config.endpoint?.trim() || !config.apiKey?.trim()) {
       showToast('Enter both an API endpoint and API key first', 'warning');
       return;
     }
     setTestingConnection(true);
     try {
-      const res = await fetch(config.endpoint, {
+      const res = await fetch(config.endpoint!, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${config.apiKey}`
         },
         body: JSON.stringify({
-          model: 'gpt-4o',
+          model: config.model || 'gpt-4o',
           messages: [
             { role: 'user', content: 'Say "Connection successful" in exactly two words.' }
           ],
@@ -413,7 +338,12 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
     }
   };
 
-  /* ----- Render --------------------------------------------------- */
+  /* ----- Helpers ---------------------------------------------------- */
+
+  const providerLabel = config.provider === 'chrome-ai' ? 'Chrome AI' : 'API';
+  const providerIcon = config.provider === 'chrome-ai' ? 'memory' : 'cloud';
+
+  /* ----- Render ----------------------------------------------------- */
 
   return (
     <Dialog
@@ -423,13 +353,19 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       size="large"
       footer={
         <div className={styles.aiFooter}>
-          <Button
-            variant="ghost"
-            onClick={() => setShowSettings(s => !s)}
-          >
-            <span className="material-symbols-rounded">settings</span>
-            {showSettings ? 'Hide Settings' : 'Settings'}
-          </Button>
+          <div className={styles.aiFooterLeft}>
+            <Button
+              variant="ghost"
+              onClick={() => setShowSettings(s => !s)}
+            >
+              <span className="material-symbols-rounded">settings</span>
+              {showSettings ? 'Hide Settings' : 'Settings'}
+            </Button>
+            <span className={styles.aiProviderIndicator}>
+              <span className="material-symbols-rounded">{providerIcon}</span>
+              {providerLabel}
+            </span>
+          </div>
           <div className={styles.aiFooterRight}>
             {response && (
               <Button variant="ghost" onClick={handleCopyResponse}>
@@ -454,46 +390,101 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         <div className={styles.aiSettings}>
           <h4>
             <span className="material-symbols-rounded">tune</span>
-            API Configuration
+            AI Configuration
           </h4>
-          <div className={styles.aiSettingsFields}>
-            <label className={styles.aiLabel}>
-              API Endpoint
-              <Input
-                placeholder="https://api.openai.com/v1/chat/completions"
-                value={config.endpoint}
-                onChange={e => updateConfig({ endpoint: e.target.value })}
-              />
-            </label>
-            <label className={styles.aiLabel}>
-              API Key
-              <Input
-                type="password"
-                placeholder="sk-..."
-                value={config.apiKey}
-                onChange={e => updateConfig({ apiKey: e.target.value })}
-              />
-            </label>
+
+          {/* Provider selector */}
+          <div className={styles.aiProviderSelector}>
+            <label className={styles.aiLabel}>AI Provider</label>
+            <div className={styles.aiProviderOptions}>
+              <button
+                className={`${styles.aiProviderOption} ${
+                  config.provider === 'chrome-ai' ? styles['aiProviderOption--active'] : ''
+                }`}
+                onClick={() => updateConfig({ provider: 'chrome-ai' })}
+                disabled={!chromeAIAvailable}
+              >
+                <span className="material-symbols-rounded">memory</span>
+                <span className={styles.aiProviderOptionText}>
+                  <strong>Chrome Built-in AI</strong>
+                  <small>Free, on-device, no API key needed</small>
+                </span>
+                {chromeAIStatus === 'readily' && (
+                  <span className={styles.aiBadge} data-status="ready">Ready</span>
+                )}
+                {chromeAIStatus === 'after-download' && (
+                  <span className={styles.aiBadge} data-status="download">Download needed</span>
+                )}
+                {chromeAIStatus === 'no' && (
+                  <span className={styles.aiBadge} data-status="unavailable">Not available</span>
+                )}
+              </button>
+              <button
+                className={`${styles.aiProviderOption} ${
+                  config.provider === 'openai-compatible' ? styles['aiProviderOption--active'] : ''
+                }`}
+                onClick={() => updateConfig({ provider: 'openai-compatible' })}
+              >
+                <span className="material-symbols-rounded">cloud</span>
+                <span className={styles.aiProviderOptionText}>
+                  <strong>OpenAI-Compatible API</strong>
+                  <small>OpenAI, Anthropic, Ollama, LM Studio</small>
+                </span>
+              </button>
+            </div>
           </div>
-          <div className={styles.aiSettingsActions}>
-            <Button
-              variant="default"
-              size="small"
-              onClick={handleTestConnection}
-              disabled={testingConnection || !config.endpoint.trim() || !config.apiKey.trim()}
-            >
-              <span className="material-symbols-rounded">wifi_tethering</span>
-              {testingConnection ? 'Testing...' : 'Test Connection'}
-            </Button>
-          </div>
+
+          {/* OpenAI-compatible settings (only shown when that provider is selected) */}
+          {config.provider === 'openai-compatible' && (
+            <>
+              <div className={styles.aiSettingsFields}>
+                <label className={styles.aiLabel}>
+                  API Endpoint
+                  <Input
+                    placeholder="https://api.openai.com/v1/chat/completions"
+                    value={config.endpoint || ''}
+                    onChange={e => updateConfig({ endpoint: e.target.value })}
+                  />
+                </label>
+                <label className={styles.aiLabel}>
+                  API Key
+                  <Input
+                    type="password"
+                    placeholder="sk-..."
+                    value={config.apiKey || ''}
+                    onChange={e => updateConfig({ apiKey: e.target.value })}
+                  />
+                </label>
+              </div>
+              <div className={styles.aiSettingsActions}>
+                <Button
+                  variant="default"
+                  size="small"
+                  onClick={handleTestConnection}
+                  disabled={testingConnection || !config.endpoint?.trim() || !config.apiKey?.trim()}
+                >
+                  <span className="material-symbols-rounded">wifi_tethering</span>
+                  {testingConnection ? 'Testing...' : 'Test Connection'}
+                </Button>
+              </div>
+              <div className={styles.aiPrivacyNote}>
+                <span className="material-symbols-rounded">shield</span>
+                <span>Your API key is stored only in your browser&apos;s localStorage and is sent only to the endpoint you configure. No data is shared with DraftHarbour Studio servers.</span>
+              </div>
+            </>
+          )}
+
+          {/* Chrome AI info */}
+          {config.provider === 'chrome-ai' && chromeAIAvailable && (
+            <div className={styles.aiPrivacyNote}>
+              <span className="material-symbols-rounded">shield</span>
+              <span>Chrome AI runs entirely on your device. Your writing never leaves your computer.</span>
+            </div>
+          )}
+
           <p className={styles.aiSettingsHint}>
-            Settings are stored locally in your browser. The endpoint should
-            accept OpenAI-compatible chat completion requests.
+            Settings are stored locally in your browser.
           </p>
-          <div className={styles.aiPrivacyNote}>
-            <span className="material-symbols-rounded">shield</span>
-            <span>Your API key is stored only in your browser&apos;s localStorage and is sent only to the endpoint you configure. No data is shared with DraftHarbour Studio servers.</span>
-          </div>
         </div>
       )}
 
@@ -502,16 +493,29 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         <div className={styles.aiNotice}>
           <span className="material-symbols-rounded">info</span>
           <div>
-            <strong>AI is not configured yet.</strong> Open{' '}
-            <button className={styles.aiNoticeLink} onClick={() => setShowSettings(true)}>
-              Settings
-            </button>{' '}
-            to enter your API endpoint and API key.
-            <br /><br />
-            <strong>Compatible services:</strong> OpenAI, Anthropic (via proxy), Ollama, LM Studio, or any OpenAI-compatible API.
-            <br />
-            <strong>Example endpoint:</strong>{' '}
-            <code className={styles.aiCode}>https://api.openai.com/v1/chat/completions</code>
+            {config.provider === 'chrome-ai' ? (
+              <>
+                <strong>Chrome AI is not available in this browser.</strong>{' '}
+                Use Chrome 137+ on a supported platform for free on-device AI, or open{' '}
+                <button className={styles.aiNoticeLink} onClick={() => setShowSettings(true)}>
+                  Settings
+                </button>{' '}
+                to configure an OpenAI-compatible API instead.
+              </>
+            ) : (
+              <>
+                <strong>AI is not configured yet.</strong> Open{' '}
+                <button className={styles.aiNoticeLink} onClick={() => setShowSettings(true)}>
+                  Settings
+                </button>{' '}
+                to enter your API endpoint and API key.
+                <br /><br />
+                <strong>Compatible services:</strong> OpenAI, Anthropic (via proxy), Ollama, LM Studio, or any OpenAI-compatible API.
+                <br />
+                <strong>Example endpoint:</strong>{' '}
+                <code className={styles.aiCode}>https://api.openai.com/v1/chat/completions</code>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -583,7 +587,11 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
             Response
           </h4>
           {loading && (
-            <p className={styles.loadingText}>Generating response...</p>
+            <p className={styles.loadingText}>
+              {config.provider === 'chrome-ai' && chromeAIStatus === 'after-download'
+                ? 'Downloading AI model...'
+                : 'Generating response...'}
+            </p>
           )}
           {error && <p className={styles.aiError}>{error}</p>}
           {response && (

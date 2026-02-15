@@ -1550,10 +1550,121 @@
   width: 100%;
 }
 
+.aiFooterLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .aiFooterRight {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+/* Provider selector */
+.aiProviderSelector {
+  margin-bottom: 0.75rem;
+}
+
+.aiProviderOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.375rem;
+}
+
+.aiProviderOption {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: var(--panel);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.aiProviderOption:hover:not(:disabled) {
+  background: var(--btn-bg);
+}
+
+.aiProviderOption:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.aiProviderOption--active {
+  border-color: var(--accent);
+  background: var(--accent-alpha);
+}
+
+.aiProviderOption > .material-symbols-rounded {
+  font-size: 1.25rem;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.aiProviderOptionText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.aiProviderOptionText strong {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.aiProviderOptionText small {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.aiBadge {
+  flex-shrink: 0;
+  padding: 0.1875rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.aiBadge[data-status="ready"] {
+  background: #22c55e22;
+  color: #22c55e;
+}
+
+.aiBadge[data-status="download"] {
+  background: #f59e0b22;
+  color: #f59e0b;
+}
+
+.aiBadge[data-status="unavailable"] {
+  background: #ef444422;
+  color: #ef4444;
+}
+
+.aiProviderIndicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  padding: 0.25rem 0.5rem;
+  background: var(--btn-bg);
+  border-radius: 999px;
+}
+
+.aiProviderIndicator .material-symbols-rounded {
+  font-size: 0.875rem;
 }
 
 /* ===== Advanced Analytics Modal ===== */
