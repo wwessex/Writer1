@@ -11,8 +11,9 @@ import { Editor } from '@/components/Editor';
 import {
   ExportModal, SnapshotModal, AnalysisModal, WordCountModal, DashboardModal, OnboardingModal,
   AIWritingModal, CharacterBibleModal, CommentModal, AdvancedAnalyticsModal, IntegrationsModal,
-  ProjectsModal
+  ProjectsModal, SceneTemplatesModal, ExportHistoryModal
 } from '@/components/Modals';
+import { AISuggestionsPanel } from '@/components/Panels';
 import { SettingsWindow, AboutWindow } from '@/components/Windows';
 import { ToastProvider, useToast } from '@/components/UI';
 import { exportBackup, importBackup, createChapter, addChapter } from '@/lib/storage';
@@ -116,6 +117,9 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
   const [advancedAnalyticsOpen, setAdvancedAnalyticsOpen] = useState(false);
   const [integrationsOpen, setIntegrationsOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
+  const [sceneTemplatesOpen, setSceneTemplatesOpen] = useState(false);
+  const [exportHistoryOpen, setExportHistoryOpen] = useState(false);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -283,6 +287,15 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
       case 'projects':
         setProjectsOpen(true);
         break;
+      case 'sceneTemplates':
+        setSceneTemplatesOpen(true);
+        break;
+      case 'exportHistory':
+        setExportHistoryOpen(true);
+        break;
+      case 'aiPanel':
+        setAiPanelOpen(prev => !prev);
+        break;
       case 'undo':
         editor?.chain().focus().undo().run();
         break;
@@ -398,6 +411,7 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
           onImportBackup={() => fileInputRef.current?.click()}
         />
         <Editor screenplayMode={screenplayMode} onToggleScreenplayMode={onToggleScreenplayMode} />
+        <AISuggestionsPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} />
       </main>
 
       {/* Modals */}
@@ -413,6 +427,8 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
       <AdvancedAnalyticsModal open={advancedAnalyticsOpen} onClose={() => setAdvancedAnalyticsOpen(false)} />
       <IntegrationsModal open={integrationsOpen} onClose={() => setIntegrationsOpen(false)} />
       <ProjectsModal open={projectsOpen} onClose={() => setProjectsOpen(false)} />
+      <SceneTemplatesModal open={sceneTemplatesOpen} onClose={() => setSceneTemplatesOpen(false)} />
+      <ExportHistoryModal open={exportHistoryOpen} onClose={() => setExportHistoryOpen(false)} />
 
       {/* Windows */}
       <SettingsWindow open={settingsOpen} onClose={() => setSettingsOpen(false)} />

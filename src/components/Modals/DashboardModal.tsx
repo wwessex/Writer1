@@ -1,7 +1,15 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { Dialog } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
 import { countWords, editorToPlainText } from '@/lib/utils';
+import {
+  getProgressData,
+  recordDailyWords,
+  getWeeklyHistory,
+  getMonthlyHistory,
+  type DailyProgress,
+  type ProgressData,
+} from '@/lib/progressTracker';
 import styles from './Modals.module.css';
 
 interface DashboardModalProps {
@@ -11,6 +19,9 @@ interface DashboardModalProps {
 
 export function DashboardModal({ open, onClose }: DashboardModalProps) {
   const { state } = useApp();
+  const [progress, setProgress] = useState<ProgressData | null>(null);
+  const [weeklyHistory, setWeeklyHistory] = useState<DailyProgress[]>([]);
+  const [monthlyHistory, setMonthlyHistory] = useState<DailyProgress[]>([]);
 
   const stats = useMemo(() => {
     const chapterStats = state.chapters.map(ch => {
@@ -47,8 +58,24 @@ export function DashboardModal({ open, onClose }: DashboardModalProps) {
     };
   }, [state.chapters]);
 
+  // Record progress and load history when modal opens
+  useEffect(() => {
+    if (open) {
+      const data = recordDailyWords(stats.totalWords, state.settings.dailyWordGoal);
+      setProgress(data);
+      setWeeklyHistory(getWeeklyHistory());
+      setMonthlyHistory(getMonthlyHistory());
+    }
+  }, [open, stats.totalWords, state.settings.dailyWordGoal]);
+
   const novelGoalPercent = state.settings.novelWordGoal > 0
     ? Math.min(100, Math.round((stats.totalWords / state.settings.novelWordGoal) * 100))
+    : 0;
+
+  const todayEntry = monthlyHistory.find(d => d.date === new Date().toISOString().slice(0, 10));
+  const todayWords = todayEntry?.wordsWritten ?? 0;
+  const dailyGoalPercent = state.settings.dailyWordGoal > 0
+    ? Math.min(100, Math.round((todayWords / state.settings.dailyWordGoal) * 100))
     : 0;
 
   return (
@@ -73,6 +100,114 @@ export function DashboardModal({ open, onClose }: DashboardModalProps) {
             <span className={styles.dashboardStat__label}>Completed</span>
           </div>
         </div>
+
+        {/* Writing Streak and Daily Progress */}
+        {progress && (
+          <div className={styles.dashboardStreakRow}>
+            <div className={styles.dashboardStreakCard}>
+              <div className={styles.dashboardStreakCard__icon}>
+                <span className="material-symbols-rounded">local_fire_department</span>
+              </div>
+              <div className={styles.dashboardStreakCard__info}>
+                <span className={styles.dashboardStreakCard__value}>{progress.streak.current}</span>
+                <span className={styles.dashboardStreakCard__label}>Day Streak</span>
+              </div>
+              <div className={styles.dashboardStreakCard__best}>
+                Best: {progress.streak.longest}
+              </div>
+            </div>
+
+            <div className={styles.dashboardStreakCard}>
+              <div className={styles.dashboardStreakCard__icon}>
+                <span className="material-symbols-rounded">edit_note</span>
+              </div>
+              <div className={styles.dashboardStreakCard__info}>
+                <span className={styles.dashboardStreakCard__value}>{todayWords.toLocaleString()}</span>
+                <span className={styles.dashboardStreakCard__label}>Words Today</span>
+              </div>
+              {state.settings.dailyWordGoal > 0 && (
+                <div className={styles.dashboardStreakCard__best}>
+                  Goal: {state.settings.dailyWordGoal.toLocaleString()}
+                </div>
+              )}
+            </div>
+
+            <div className={styles.dashboardStreakCard}>
+              <div className={styles.dashboardStreakCard__icon}>
+                <span className="material-symbols-rounded">calendar_month</span>
+              </div>
+              <div className={styles.dashboardStreakCard__info}>
+                <span className={styles.dashboardStreakCard__value}>{progress.totalSessions}</span>
+                <span className={styles.dashboardStreakCard__label}>Total Sessions</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Daily Goal Progress */}
+        {state.settings.dailyWordGoal > 0 && (
+          <div className={styles.dashboardGoal}>
+            <h4>
+              <span className="material-symbols-rounded">track_changes</span>
+              Daily Target
+            </h4>
+            <div className={styles.progressBar}>
+              <div
+                className={styles.progressBar__fill}
+                style={{
+                  width: `${dailyGoalPercent}%`,
+                  background: dailyGoalPercent >= 100 ? 'var(--success, #22c55e)' : 'var(--accent)',
+                }}
+              />
+            </div>
+            <span className={styles.progressBar__label}>
+              {todayWords.toLocaleString()} / {state.settings.dailyWordGoal.toLocaleString()} words ({dailyGoalPercent}%)
+              {dailyGoalPercent >= 100 && ' -- Goal met!'}
+            </span>
+          </div>
+        )}
+
+        {/* Weekly Writing Activity */}
+        {weeklyHistory.length > 0 && (
+          <div className={styles.dashboardGoal}>
+            <h4>
+              <span className="material-symbols-rounded">bar_chart</span>
+              Last 7 Days
+            </h4>
+            <div className={styles.weeklyChart}>
+              {(() => {
+                // Build a full 7-day array
+                const days: { date: string; label: string; words: number; goalMet: boolean }[] = [];
+                for (let i = 6; i >= 0; i--) {
+                  const d = new Date();
+                  d.setDate(d.getDate() - i);
+                  const dateStr = d.toISOString().slice(0, 10);
+                  const entry = weeklyHistory.find(h => h.date === dateStr);
+                  days.push({
+                    date: dateStr,
+                    label: d.toLocaleDateString(undefined, { weekday: 'short' }),
+                    words: entry?.wordsWritten ?? 0,
+                    goalMet: entry?.goalMet ?? false,
+                  });
+                }
+                const maxWords = Math.max(...days.map(d => d.words), 1);
+                return days.map(day => (
+                  <div key={day.date} className={styles.weeklyChart__day}>
+                    <div className={styles.weeklyChart__barWrap}>
+                      <div
+                        className={`${styles.weeklyChart__bar} ${day.goalMet ? styles['weeklyChart__bar--goalMet'] : ''}`}
+                        style={{ height: `${Math.max(2, (day.words / maxWords) * 100)}%` }}
+                        title={`${day.words.toLocaleString()} words`}
+                      />
+                    </div>
+                    <span className={styles.weeklyChart__label}>{day.label}</span>
+                    <span className={styles.weeklyChart__value}>{day.words > 0 ? day.words.toLocaleString() : '--'}</span>
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+        )}
 
         {/* Novel goal progress */}
         {state.settings.novelWordGoal > 0 && (

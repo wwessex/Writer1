@@ -11,3 +11,5 @@ export { AdvancedAnalyticsModal } from './AdvancedAnalyticsModal';
 export { IntegrationsModal } from './IntegrationsModal';
 export { ConflictResolutionModal } from './ConflictResolutionModal';
 export { ProjectsModal } from './ProjectsModal';
+export { SceneTemplatesModal } from './SceneTemplatesModal';
+export { ExportHistoryModal } from './ExportHistoryModal';
