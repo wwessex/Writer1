@@ -32,15 +32,9 @@ export function Editor({ screenplayMode, onToggleScreenplayMode }: EditorProps) 
   const { editor } = useCurrentEditor();
 
   useEffect(() => {
-    if (editor && activeChapter) {
-      const currentContent = JSON.stringify(editor.getJSON());
-      const newContent = JSON.stringify(activeChapter.content || { type: 'doc', content: [] });
-
-      if (currentContent !== newContent) {
-        editor.commands.setContent(activeChapter.content || '');
-      }
-    }
-  }, [editor, activeChapter]);
+    if (!editor || !activeChapter) return;
+    editor.commands.setContent(activeChapter.content || '');
+  }, [editor, activeChapter?.id]);
 
   const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (activeChapter) {
