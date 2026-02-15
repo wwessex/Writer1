@@ -551,6 +551,7 @@ function analyzeText(text) {
 }
 
 function getActiveChapterText() {
+  flushEditorContent();
   const chapter = state.chapters.find(c => c.id === state.activeChapterId);
   if (!chapter?.content) return "";
   return editorToPlainText(chapter.content);
@@ -654,11 +655,25 @@ function countWordsFromJson(node) {
   for (const child of c) sum += countWordsFromJson(child);
   return sum;
 }
+const _chapterWordCache = new Map();
 const updateCountsDebounced = debounce(() => {
   try {
     const active = state.chapters.find(c => c.id === state.activeChapterId);
     const chapterWords = active?.content ? countWordsFromJson(active.content) : 0;
-    const totalWords = state.chapters.reduce((acc, c) => acc + (c.content ? countWordsFromJson(c.content) : 0), 0);
+    if (state.activeChapterId) _chapterWordCache.set(state.activeChapterId, chapterWords);
+    let totalWords = 0;
+    for (const c of state.chapters) {
+      if (c.id === state.activeChapterId) {
+        totalWords += chapterWords;
+      } else {
+        let cached = _chapterWordCache.get(c.id);
+        if (cached === undefined) {
+          cached = c.content ? countWordsFromJson(c.content) : 0;
+          _chapterWordCache.set(c.id, cached);
+        }
+        totalWords += cached;
+      }
+    }
     $("#chapterWords") && ($("#chapterWords").textContent = chapterWords.toLocaleString());
     $("#totalWords") && ($("#totalWords").textContent = totalWords.toLocaleString());
     updateGoalProgress(totalWords);
@@ -896,16 +911,38 @@ function configureAutosave() {
   }, state.autosaveMs);
 }
 
-function onEditorUpdate(jsonDoc) {
+let _contentFlushRAF = null;
+
+function flushEditorContent() {
+  if (_contentFlushRAF === null) return;
+  cancelAnimationFrame(_contentFlushRAF);
+  _contentFlushRAF = null;
   const id = state.activeChapterId;
-  if (!id) return;
+  if (!id || !editor) return;
   const ch = state.chapters.find(c => c.id === id);
   if (!ch) return;
+  const jsonDoc = editor.getJSON();
   ch.content = jsonDoc;
   ch.updatedAt = Date.now();
-  // async write to IndexedDB (debounced)
   writeChapterDebounced(id, { content: jsonDoc });
   updateCountsDebounced();
+}
+
+function onEditorUpdate() {
+  const id = state.activeChapterId;
+  if (!id) return;
+  if (_contentFlushRAF !== null) cancelAnimationFrame(_contentFlushRAF);
+  _contentFlushRAF = requestAnimationFrame(() => {
+    _contentFlushRAF = null;
+    if (!editor || state.activeChapterId !== id) return;
+    const ch = state.chapters.find(c => c.id === id);
+    if (!ch) return;
+    const jsonDoc = editor.getJSON();
+    ch.content = jsonDoc;
+    ch.updatedAt = Date.now();
+    writeChapterDebounced(id, { content: jsonDoc });
+    updateCountsDebounced();
+  });
 }
 
 const writeChapterDebounced = debounce(async (id, patch) => {
@@ -1009,6 +1046,8 @@ function bindDragHandlers(li) {
 async function openChapter(id) {
   if (id === state.activeChapterId) return;
 
+  // Flush pending editor content before switching chapters
+  flushEditorContent();
   // Save title of current chapter before switching
   await flushChapterTitle();
 
@@ -1091,6 +1130,7 @@ async function syncNow({ direction = "push" } = {}) {
   Boot
 --------------------------- */
 async function loadFromDB() {
+  _chapterWordCache.clear();
   const { novel, chapters } = await getNovel(state.novelId);
   state.novelTitle = novel?.title || "Untitled Novel";
   state.chapters = chapters || [];
@@ -1768,6 +1808,7 @@ function renderSceneList(chapter) {
 
 async function saveSnapshotForChapter(chapterId) {
   if (!chapterId) return;
+  if (chapterId === state.activeChapterId) flushEditorContent();
   const chapter = state.chapters.find(c => c.id === chapterId);
   if (!chapter?.content) return;
   const docCopy = JSON.parse(JSON.stringify(chapter.content));
