@@ -80,7 +80,7 @@ export function Header({ onAction, onToggleInspector, inspectorOpen }: HeaderPro
             onClick={toggleSidebar}
             className={styles.menuBtn}
           />
-          <img src="/assets/icon.svg" alt="DraftHarbour" className={styles.logo} />
+          <img src={`${import.meta.env.BASE_URL}assets/icon.svg`} alt="DraftHarbour" className={styles.logo} />
           <Input
             variant="title"
             value={state.novelTitle}
