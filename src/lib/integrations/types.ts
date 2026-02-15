@@ -1,4 +1,4 @@
-import type { AppState, Chapter, IntegrationConfig, IntegrationType, ProjectType } from '@/types';
+import type { AppState, Chapter, ConflictInfo, IntegrationConfig, IntegrationType, ProjectType } from '@/types';
 
 export interface ProviderDocument {
   id: string;
@@ -17,6 +17,7 @@ export interface ProviderPayload {
 export interface NormalizedPullResult {
   chapterUpdates: Chapter[];
   remoteRevision: string;
+  conflicts: ConflictInfo[];
 }
 
 export interface RemoteRevision {
@@ -34,7 +35,7 @@ export interface IntegrationAdapter {
   readonly type: IntegrationType;
   connect(config: IntegrationConfig): Promise<IntegrationOperationResult>;
   testConnection(config: IntegrationConfig): Promise<IntegrationOperationResult>;
-  pull(config: IntegrationConfig, payload: ProviderPayload): Promise<NormalizedPullResult>;
+  pull(config: IntegrationConfig, payload: ProviderPayload, localChapters: Chapter[]): Promise<NormalizedPullResult>;
   push(config: IntegrationConfig, payload: ProviderPayload): Promise<IntegrationOperationResult>;
   listRemoteRevisions(config: IntegrationConfig): Promise<RemoteRevision[]>;
 }

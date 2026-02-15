@@ -1,4 +1,4 @@
-import type { IntegrationConfig } from '@/types';
+import type { Chapter, IntegrationConfig } from '@/types';
 import { normalizeProviderPullResponse } from './orchestration';
 import type { IntegrationAdapter, ProviderPayload, RemoteRevision } from './types';
 import { createRemoteRevisionLabel, simulateLatency } from './helpers';
@@ -30,7 +30,7 @@ export const googleDriveAdapter: IntegrationAdapter = {
     };
   },
 
-  async pull(_config: IntegrationConfig, payload: ProviderPayload) {
+  async pull(_config: IntegrationConfig, payload: ProviderPayload, localChapters: Chapter[]) {
     await simulateLatency();
     const remoteDocs = payload.chapters.map((chapter) => ({
       ...chapter,
@@ -38,7 +38,7 @@ export const googleDriveAdapter: IntegrationAdapter = {
       title: `${chapter.title} (Drive)`
     }));
 
-    return normalizeProviderPullResponse([], remoteDocs, createRemoteRevisionLabel('gdrive-revision'));
+    return normalizeProviderPullResponse(localChapters, remoteDocs, createRemoteRevisionLabel('gdrive-revision'), 'google-drive');
   },
 
   async push(config: IntegrationConfig, payload: ProviderPayload) {

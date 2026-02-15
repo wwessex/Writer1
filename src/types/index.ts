@@ -62,6 +62,14 @@ export interface Chapter {
   scenes: Scene[];
   act?: number;
   sequence?: number;
+  sync?: ChapterSyncMetadata;
+}
+
+export interface ChapterSyncMetadata {
+  providerRevisionIds: Partial<Record<IntegrationType, string>>;
+  lastPushedHash?: string;
+  lastPulledAt?: number;
+  lastSyncedContent?: JSONContent | null;
 }
 
 export interface Novel {
@@ -277,9 +285,14 @@ export interface ConflictInfo {
   remoteVersion: number;
   localContent: JSONContent | null;
   remoteContent: JSONContent | null;
+  baseContent?: JSONContent | null;
+  mergedContent?: JSONContent | null;
   localUpdatedAt: number;
   remoteUpdatedAt: number;
+  resolutionOptions: ConflictResolutionOption[];
 }
+
+export type ConflictResolutionOption = 'local' | 'remote' | 'merge';
 
 // Integration types
 export type IntegrationType = 'dropbox' | 'google-drive' | 'scrivener';

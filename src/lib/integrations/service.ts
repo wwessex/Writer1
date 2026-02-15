@@ -1,4 +1,6 @@
+import { pluginManager } from '@/lib/plugins';
 import type { AppState, IntegrationConfig, IntegrationType } from '@/types';
+import { buildPushSyncMetadata } from './sync';
 import { dropboxAdapter } from './dropbox';
 import { googleDriveAdapter } from './googleDrive';
 import { mapAppStateToProviderPayload } from './orchestration';
@@ -35,7 +37,27 @@ export async function pushIntegrationData(
   appState: Pick<AppState, 'novelId' | 'projectType' | 'chapters'>
 ): Promise<IntegrationOperationResult> {
   const payload = mapAppStateToProviderPayload(appState);
-  return getIntegrationAdapter(type).push(config, payload);
+
+  pluginManager.emit('export:before', { provider: type, chapterCount: payload.chapters.length, source: 'sync' });
+  pluginManager.emit('sync:export:before', { provider: type, payload });
+
+  const result = await getIntegrationAdapter(type).push(config, payload);
+
+  const remoteRevision = `push-${type}-${result.syncedAt}`;
+  const syncedChapters = appState.chapters.map((chapter) => ({
+    ...chapter,
+    sync: buildPushSyncMetadata(chapter, type, remoteRevision),
+  }));
+
+  pluginManager.emit('sync:export:after', {
+    provider: type,
+    result,
+    chapters: syncedChapters,
+    remoteRevision,
+  });
+  pluginManager.emit('export:after', { provider: type, result, source: 'sync' });
+
+  return result;
 }
 
 export async function pullIntegrationData(
@@ -44,7 +66,21 @@ export async function pullIntegrationData(
   appState: Pick<AppState, 'novelId' | 'projectType' | 'chapters'>
 ): Promise<NormalizedPullResult> {
   const payload = mapAppStateToProviderPayload(appState);
-  return getIntegrationAdapter(type).pull(config, payload);
+
+  pluginManager.emit('import:before', { provider: type, chapterCount: payload.chapters.length, source: 'sync' });
+  pluginManager.emit('sync:import:before', { provider: type, payload });
+
+  const result = await getIntegrationAdapter(type).pull(config, payload, appState.chapters);
+
+  pluginManager.emit('sync:import:after', {
+    provider: type,
+    remoteRevision: result.remoteRevision,
+    chapterCount: result.chapterUpdates.length,
+    conflictCount: result.conflicts.length,
+  });
+  pluginManager.emit('import:after', { provider: type, result, source: 'sync' });
+
+  return result;
 }
 
 export async function listIntegrationRevisions(
