@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useApp } from '@/context/AppContext';
 import { useWindowResize } from '@/hooks/useResizable';
 import styles from './Windows.module.css';
 
@@ -9,7 +8,6 @@ interface AboutWindowProps {
 }
 
 export function AboutWindow({ open, onClose }: AboutWindowProps) {
-  const { state } = useApp();
   const windowRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -111,11 +109,8 @@ export function AboutWindow({ open, onClose }: AboutWindowProps) {
 
         <div className={styles.window__body}>
           <div className={styles.aboutLogo}>
-            <img
-              src={`${import.meta.env.BASE_URL}brand/${state.settings.theme === 'light' ? 'logo-light' : 'logo'}.svg`}
-              alt="DraftHarbour Studio"
-              className={styles.brandLogo}
-            />
+            <img src={`${import.meta.env.BASE_URL}assets/icon.svg`} alt="DraftHarbour" className={styles.logoIcon} />
+            <h2>DraftHarbour Studio</h2>
             <p className={styles.version}>Version 2.0.0</p>
           </div>
 
