@@ -138,7 +138,7 @@ export function AboutWindow({ open, onClose }: AboutWindowProps) {
             </li>
             <li>
               <span className="material-symbols-rounded">dark_mode</span>
-              Dark and light themes
+              Warm light, true dark, and high-contrast themes
             </li>
           </ul>
 
