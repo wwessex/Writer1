@@ -80,7 +80,7 @@ export function isEncryptionSupported(): boolean {
 
 // ---- Encrypted Sync Helpers ----
 
-const SYNC_ENCRYPTION_KEY = 'novelwriter_sync_encryption';
+const SYNC_ENCRYPTION_KEY = 'draftharbour_sync_encryption';
 
 export interface SyncEncryptionConfig {
   enabled: boolean;
@@ -131,7 +131,7 @@ export async function decryptSyncPayload(base64Data: string, passphrase: string)
  * Initialize sync encryption: sets up a passphrase check value.
  */
 export async function initSyncEncryption(passphrase: string): Promise<void> {
-  const checkValue = await encryptSyncPayload('novelwriter-encryption-check', passphrase);
+  const checkValue = await encryptSyncPayload('draftharbour-encryption-check', passphrase);
   setSyncEncryptionConfig({ enabled: true, passphraseCheck: checkValue });
 }
 
@@ -143,7 +143,7 @@ export async function verifySyncPassphrase(passphrase: string): Promise<boolean>
   if (!config.passphraseCheck) return false;
   try {
     const decrypted = await decryptSyncPayload(config.passphraseCheck, passphrase);
-    return decrypted === 'novelwriter-encryption-check';
+    return decrypted === 'draftharbour-encryption-check';
   } catch {
     return false;
   }

@@ -31,7 +31,7 @@ interface PresetPrompt {
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-const STORAGE_KEY = 'novelwriter_ai_config';
+const STORAGE_KEY = 'draftharbour_ai_config';
 
 const BOOK_PRESET_PROMPTS: PresetPrompt[] = [
   {
@@ -492,7 +492,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
           </p>
           <div className={styles.aiPrivacyNote}>
             <span className="material-symbols-rounded">shield</span>
-            <span>Your API key is stored only in your browser&apos;s localStorage and is sent only to the endpoint you configure. No data is shared with NovelWriter servers.</span>
+            <span>Your API key is stored only in your browser&apos;s localStorage and is sent only to the endpoint you configure. No data is shared with DraftHarbour Studio servers.</span>
           </div>
         </div>
       )}

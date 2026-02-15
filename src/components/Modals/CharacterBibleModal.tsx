@@ -28,8 +28,8 @@ const WORLD_CATEGORY_OPTIONS = [
   { value: 'other', label: 'Other' }
 ];
 
-const STORAGE_KEY_CHARS = 'novelwriter_characters';
-const STORAGE_KEY_WORLD = 'novelwriter_world';
+const STORAGE_KEY_CHARS = 'draftharbour_characters';
+const STORAGE_KEY_WORLD = 'draftharbour_world';
 
 function loadEntities<T>(key: string): T[] {
   try {

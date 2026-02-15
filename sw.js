@@ -1,5 +1,5 @@
-/* NovelWriter Service Worker — offline cache */
-const CACHE_NAME = "novelwriter-v20";
+/* DraftHarbour Studio Service Worker — offline cache */
+const CACHE_NAME = "draftharbour-v20";
 const CORE_ASSETS = [
   "./",
   "./index.html",

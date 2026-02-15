@@ -1,4 +1,4 @@
-# NovelWriter (PWA) — Offline/Online Novel Word Processor
+# DraftHarbour Studio (PWA) — Offline/Online Novel Word Processor
 
 A lightweight, installable web app for writing novels:
 - Rich text editor (Tiptap/ProseMirror)

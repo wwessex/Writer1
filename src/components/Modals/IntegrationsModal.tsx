@@ -24,7 +24,7 @@ interface IntegrationsModalProps {
   onClose: () => void;
 }
 
-const STORAGE_KEY = 'novelwriter_integrations';
+const STORAGE_KEY = 'draftharbour_integrations';
 
 type PersistedIntegrationConfig = Pick<
   IntegrationConfig,
@@ -405,7 +405,7 @@ function ScrivenerCard({ config, appState, onToggle, onUpdate, onApplyPull }: In
     >
       <div className={styles.integrationCard__section}>
         <p className={styles.integrationCard__hint}>
-          Transfer your work between NovelWriter and Scrivener with adapter-backed pull/push operations.
+          Transfer your work between DraftHarbour Studio and Scrivener with adapter-backed pull/push operations.
         </p>
         <div className={styles.integrationCard__actions}>
           <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async () => {
@@ -533,7 +533,7 @@ function GoogleDriveCard({ config, appState, onToggle, onUpdate, onApplyPull }: 
 
 function DropboxCard({ config, appState, onToggle, onUpdate, onApplyPull }: IntegrationCardBaseProps) {
   const status = getConnectionStatus(config);
-  const [folder, setFolder] = useState(config.folderId || '/NovelWriter');
+  const [folder, setFolder] = useState(config.folderId || '/DraftHarbour');
   const [operationState, setOperationState] = useState<OperationState>('idle');
   const [operationMessage, setOperationMessage] = useState('Use secure OAuth to connect your Dropbox account.');
 
@@ -571,7 +571,7 @@ function DropboxCard({ config, appState, onToggle, onUpdate, onApplyPull }: Inte
           <Input
             value={folder}
             onChange={(e) => setFolder(e.target.value)}
-            placeholder="/NovelWriter"
+            placeholder="/DraftHarbour"
           />
           <p className={styles.integrationCard__fieldHint}>
             Choose the Dropbox folder where novel backups will be stored. OAuth tokens stay in the broker backend.
@@ -595,7 +595,7 @@ function DropboxCard({ config, appState, onToggle, onUpdate, onApplyPull }: Inte
           <Button variant="default" disabled={operationState === 'loading' || !config.connectionId} onClick={() => run(async (cardConfig) => {
             const result = await refreshProviderConnection('dropbox', config.connectionId!);
             onUpdate(mapMetadataToConfig(result.connection));
-            return `Dropbox connection refreshed for ${cardConfig.folderId || '/NovelWriter'}.`;
+            return `Dropbox connection refreshed for ${cardConfig.folderId || '/DraftHarbour'}.`;
           })}>
             <span className="material-symbols-rounded">autorenew</span>
             Refresh Auth

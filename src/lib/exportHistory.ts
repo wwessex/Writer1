@@ -3,7 +3,7 @@
  * Records each export with format, timestamp, and file metadata.
  */
 
-const STORAGE_KEY = 'novelwriter_export_history_v1';
+const STORAGE_KEY = 'draftharbour_export_history_v1';
 const MAX_HISTORY = 50;
 
 export interface ExportRecord {
@@ -62,7 +62,7 @@ export function downloadExportHistoryAsJson(): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'novelwriter-export-history.json';
+  a.download = 'draftharbour-export-history.json';
   a.click();
   URL.revokeObjectURL(url);
 }

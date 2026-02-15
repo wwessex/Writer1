@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'assets/*.png'],
       manifest: {
-        name: 'NovelWriter',
-        short_name: 'NovelWriter',
+        name: 'DraftHarbour Studio',
+        short_name: 'DraftHarbour',
         description: 'Offline-first Progressive Web Application for writing novels',
         theme_color: '#0b1020',
         background_color: '#0b1020',

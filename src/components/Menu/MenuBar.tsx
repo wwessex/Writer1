@@ -97,7 +97,7 @@ const MENUS: MenuConfig[] = [
     label: 'Help',
     items: [
       { label: 'Getting Started', action: 'onboarding' },
-      { label: 'About NovelWriter', action: 'about' }
+      { label: 'About DraftHarbour Studio', action: 'about' }
     ]
   }
 ];

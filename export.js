@@ -87,7 +87,7 @@ export async function exportDOCX({ novelTitle, chapters, includeHeadings }) {
   }
 
   const doc = new Document({
-    creator: "NovelWriter",
+    creator: "DraftHarbour Studio",
     title: novelTitle || "Untitled Novel",
     sections: [{ properties: {}, children: docChildren }]
   });

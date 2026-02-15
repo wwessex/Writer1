@@ -19,7 +19,7 @@ interface OnboardingStep {
 const BASE_STEPS: OnboardingStep[] = [
   {
     icon: 'edit_note',
-    title: 'Welcome to NovelWriter',
+    title: 'Welcome to DraftHarbour Studio',
     description: 'A distraction-free writing environment for long-form projects. Everything is saved locally in your browser -- no account needed, fully offline-capable.',
     tips: [
       'Your data never leaves your device unless you configure cloud sync',

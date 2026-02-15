@@ -88,7 +88,7 @@ export function AboutWindow({ open, onClose }: AboutWindowProps) {
         onMouseDown={handleMouseDown}
       >
         <div className={styles.window__header}>
-          <h3>About NovelWriter</h3>
+          <h3>About DraftHarbour Studio</h3>
           <button className={styles.closeBtn} onClick={onClose} aria-label="Close">
             <span className="material-symbols-rounded">close</span>
           </button>
@@ -96,8 +96,8 @@ export function AboutWindow({ open, onClose }: AboutWindowProps) {
 
         <div className={styles.window__body}>
           <div className={styles.aboutLogo}>
-            <span className={styles.logoIcon}>NW</span>
-            <h2>NovelWriter</h2>
+            <span className={styles.logoIcon}>DH</span>
+            <h2>DraftHarbour Studio</h2>
             <p className={styles.version}>Version 2.0.0</p>
           </div>
 

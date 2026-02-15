@@ -2,7 +2,7 @@
 
 import Dexie from "https://esm.sh/dexie@4.0.8";
 
-export const db = new Dexie("NovelWriterDB");
+export const db = new Dexie("DraftHarbourDB");
 db.version(1).stores({
   // single novel (for now)
   novels: "id, title, updatedAt",
@@ -228,7 +228,7 @@ export async function getSnapshot(snapshotId) {
   return db.snapshots.get(snapshotId);
 }
 
-const WINDOW_STATE_KEY = "novelwriter_window_state_v1";
+const WINDOW_STATE_KEY = "draftharbour_window_state_v1";
 
 export function loadWindowState(windowId) {
   if (!windowId) return null;

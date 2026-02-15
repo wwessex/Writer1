@@ -222,7 +222,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | null>(null);
 
 // Settings storage key
-const SETTINGS_KEY = 'novelwriter_settings_v1';
+const SETTINGS_KEY = 'draftharbour_settings_v1';
 
 // Provider component
 export function AppProvider({ children }: { children: ReactNode }) {

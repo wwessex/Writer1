@@ -13,7 +13,7 @@ export const dropboxAdapter: IntegrationAdapter = {
     }
 
     return {
-      message: `Connected to Dropbox folder ${config.folderId || '/NovelWriter'}.`,
+      message: `Connected to Dropbox folder ${config.folderId || '/DraftHarbour'}.`,
       syncedAt: Date.now(),
     };
   },
@@ -48,7 +48,7 @@ export const dropboxAdapter: IntegrationAdapter = {
     }
 
     return {
-      message: `Uploaded ${payload.chapters.length} chapter(s) to ${config.folderId || '/NovelWriter'}.`,
+      message: `Uploaded ${payload.chapters.length} chapter(s) to ${config.folderId || '/DraftHarbour'}.`,
       syncedAt: Date.now(),
     };
   },

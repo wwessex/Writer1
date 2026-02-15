@@ -181,7 +181,7 @@ class PluginManager {
 
   /** Create a sandboxed storage for a plugin */
   createStorage(pluginId: string): PluginStorage {
-    const prefix = `novelwriter_plugin_${pluginId}_`;
+    const prefix = `draftharbour_plugin_${pluginId}_`;
     return {
       get(key: string): unknown {
         try {
@@ -291,20 +291,20 @@ export const pluginManager = new PluginManager();
 // Expose to window for third-party plugins
 if (typeof window !== 'undefined') {
   (window as unknown as {
-    NovelWriterPlugins: PluginManager;
-    NovelWriterPluginAPI: {
+    DraftHarbourPlugins: PluginManager;
+    DraftHarbourPluginAPI: {
       register: (manifest: PluginManifest, activate: (ctx: PluginContext) => (() => void) | void) => void;
       unregister: (id: string) => void;
     };
-  }).NovelWriterPlugins = pluginManager;
+  }).DraftHarbourPlugins = pluginManager;
 
   // Convenience API for community plugins
   (window as unknown as {
-    NovelWriterPluginAPI: {
+    DraftHarbourPluginAPI: {
       register: (manifest: PluginManifest, activate: (ctx: PluginContext) => (() => void) | void) => void;
       unregister: (id: string) => void;
     };
-  }).NovelWriterPluginAPI = {
+  }).DraftHarbourPluginAPI = {
     register(manifest: PluginManifest, activate: (ctx: PluginContext) => (() => void) | void) {
       pluginManager.register(manifest);
       const ctx = pluginManager.createContext(manifest.id);
