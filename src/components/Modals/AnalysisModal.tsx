@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Dialog, Button } from '@/components/UI';
+import { useToast } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
 import { analyzeText, editorToPlainText } from '@/lib/utils';
 import type { TextAnalysis, LanguageToolMatch } from '@/types';
@@ -12,6 +13,7 @@ interface AnalysisModalProps {
 
 export function AnalysisModal({ open, onClose }: AnalysisModalProps) {
   const { activeChapter, state } = useApp();
+  const { showToast } = useToast();
   const sectionLabel = state.projectType === 'screenplay' ? 'scene' : 'chapter';
   const [analysis, setAnalysis] = useState<TextAnalysis | null>(null);
   const [grammarResults, setGrammarResults] = useState<LanguageToolMatch[]>([]);
@@ -55,7 +57,7 @@ export function AnalysisModal({ open, onClose }: AnalysisModalProps) {
       setGrammarResults(data.matches?.slice(0, 30) || []);
     } catch (error) {
       console.error('Grammar check error:', error);
-      alert('Grammar check failed. Please check your settings.');
+      showToast('Grammar check failed. Check your LanguageTool settings.', 'error', 'spellcheck');
     } finally {
       setLoading(false);
     }
@@ -74,7 +76,13 @@ export function AnalysisModal({ open, onClose }: AnalysisModalProps) {
   if (!activeChapter) {
     return (
       <Dialog open={open} onClose={onClose} title="Writing Analysis" size="large">
-        <p className={styles.emptyMessage}>Select a {sectionLabel} to analyze</p>
+        <div className={styles.analysisEmptyState}>
+          <span className={`material-symbols-rounded ${styles.analysisEmptyState__icon}`}>analytics</span>
+          <p className={styles.emptyMessage}>Select a {sectionLabel} to analyze</p>
+          <p className={styles.analysisEmptyState__hint}>
+            Choose a {sectionLabel} from the sidebar first. Analysis includes readability scores, repeated word detection, pacing checks, and optional grammar checking.
+          </p>
+        </div>
       </Dialog>
     );
   }
@@ -174,7 +182,17 @@ export function AnalysisModal({ open, onClose }: AnalysisModalProps) {
             Grammar & Style
           </h4>
           {!state.settings.assist.languageToolEnabled ? (
-            <p className={styles.emptyMessage}>Enable LanguageTool in Settings to check grammar</p>
+            <div className={styles.analysisGrammarSetup}>
+              <span className="material-symbols-rounded">info</span>
+              <div>
+                <p className={styles.analysisGrammarSetup__text}>
+                  Grammar checking requires LanguageTool. Enable it in <strong>Settings &gt; Writing Assistance</strong> to check for grammar, style, and spelling issues.
+                </p>
+                <p className={styles.analysisGrammarSetup__note}>
+                  The free public API works out of the box -- no account required.
+                </p>
+              </div>
+            </div>
           ) : grammarResults.length > 0 ? (
             <div className={styles.grammarList}>
               {grammarResults.map((match, idx) => (

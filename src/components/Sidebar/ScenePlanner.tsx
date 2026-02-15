@@ -281,9 +281,21 @@ export function ScenePlanner() {
         })}
       </div>
 
-      {filteredScenes.length === 0 && (
+      {filteredScenes.length === 0 && scenes.length === 0 && (
+        <div className={styles.scenePlanner__emptyState}>
+          <span className={`material-symbols-rounded ${styles.scenePlanner__emptyIcon}`}>movie_filter</span>
+          <p className={styles.scenePlanner__empty}>
+            No scenes yet. Break your {isScreenplay ? 'sequence' : 'chapter'} into scenes to plan structure, track POV, and set goals.
+          </p>
+          <button className={styles.scenePlanner__ctaBtn} onClick={handleAddScene}>
+            <span className="material-symbols-rounded">add</span>
+            Create First Scene
+          </button>
+        </div>
+      )}
+      {filteredScenes.length === 0 && scenes.length > 0 && (
         <p className={styles.scenePlanner__empty}>
-          No matching scenes. Adjust filters or add scenes.
+          No scenes match current filters. Adjust the status or tag filter above.
         </p>
       )}
     </section>

@@ -31,7 +31,15 @@ export function OutlinePanel() {
   if (!activeChapter) {
     return (
       <section className={styles.outline}>
-        <p className={styles.outline__empty}>Select a {isScreenplay ? 'scene group' : 'chapter'} to view outline</p>
+        <div className={styles.outline__emptyState}>
+          <span className={`material-symbols-rounded ${styles.outline__emptyIcon}`}>description</span>
+          <p className={styles.outline__empty}>Select a {isScreenplay ? 'scene group' : 'chapter'} to view its outline</p>
+          <p className={styles.outline__emptyHint}>
+            {isScreenplay
+              ? 'Choose a scene group from the sidebar to add act/sequence details, summaries, and scene breakdowns.'
+              : 'Choose a chapter from the sidebar to add summaries, POV, status, tags, and word goals.'}
+          </p>
+        </div>
       </section>
     );
   }

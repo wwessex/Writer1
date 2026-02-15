@@ -248,7 +248,10 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                   />
                 </div>
                 <div className={styles.field}>
-                  <label>Authorization Header</label>
+                  <label>
+                    Authorization Header
+                    <HelpTooltip text="The full Authorization header value sent with sync requests, e.g. 'Bearer your-token-here'" />
+                  </label>
                   <Input
                     type="password"
                     value={state.settings.sync.auth}
@@ -285,6 +288,7 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                       })}
                     />
                     <span>Enable LanguageTool</span>
+                    <HelpTooltip text="LanguageTool checks grammar, spelling, and style. The free public API works without an account." position="right" />
                   </label>
                 </div>
                 <div className={styles.field}>
@@ -342,7 +346,10 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                     />
                   </div>
                   <div className={styles.field}>
-                    <label>Daily Word Goal</label>
+                    <label>
+                      Daily Word Goal
+                      <HelpTooltip text="Set a daily writing target. Progress is tracked in the Dashboard and status bar." />
+                    </label>
                     <Input
                       type="number"
                       value={state.settings.dailyWordGoal || ''}
@@ -352,7 +359,10 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                   </div>
                 </div>
                 <div className={styles.field}>
-                  <label>Novel Word Goal</label>
+                  <label>
+                    Novel Word Goal
+                    <HelpTooltip text="Set an overall word goal for your project. A progress bar appears in the status bar." />
+                  </label>
                   <Input
                     type="number"
                     value={state.settings.novelWordGoal || ''}

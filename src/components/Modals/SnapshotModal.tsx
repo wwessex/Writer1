@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Dialog, Button, IconButton } from '@/components/UI';
+import { useToast } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
 import { getSnapshots, createSnapshot, deleteSnapshot } from '@/lib/storage';
 import { editorToPlainText, formatDateTime } from '@/lib/utils';
@@ -13,6 +14,7 @@ interface SnapshotModalProps {
 
 export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
   const { activeChapter, updateChapter, state } = useApp();
+  const { showToast } = useToast();
   const sectionLabel = state.projectType === 'screenplay' ? 'scene' : 'chapter';
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [selectedSnapshot, setSelectedSnapshot] = useState<Snapshot | null>(null);
@@ -46,6 +48,10 @@ export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
     try {
       await createSnapshot(activeChapter.id, activeChapter.content);
       await loadSnapshots();
+      showToast('Snapshot saved', 'success', 'photo_camera');
+    } catch (err) {
+      console.error('Failed to save snapshot:', err);
+      showToast('Failed to save snapshot', 'error');
     } finally {
       setLoading(false);
     }
@@ -111,7 +117,17 @@ export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
           {loading && <p className={styles.loadingText}>Loading...</p>}
 
           {!loading && snapshots.length === 0 && (
-            <p className={styles.emptyMessage}>No snapshots yet. Save a snapshot to preserve your current {sectionLabel} draft.</p>
+            <div className={styles.snapshotEmptyState}>
+              <span className={`material-symbols-rounded ${styles.snapshotEmptyState__icon}`}>photo_camera</span>
+              <p className={styles.emptyMessage}>No snapshots yet</p>
+              <p className={styles.snapshotEmptyState__hint}>
+                Save a snapshot to preserve your current {sectionLabel} draft. You can compare versions side-by-side and restore any snapshot later.
+              </p>
+              <Button variant="primary" size="small" onClick={handleSaveSnapshot} disabled={loading || !activeChapter?.content}>
+                <span className="material-symbols-rounded">save</span>
+                Save First Snapshot
+              </Button>
+            </div>
           )}
 
           <div className={styles.snapshotItems}>

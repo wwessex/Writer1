@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Dialog, Button, Input, Textarea } from '@/components/UI';
+import { useToast } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
 import { editorToPlainText } from '@/lib/utils';
 import type { ProjectType } from '@/types';
@@ -205,12 +206,14 @@ function saveConfig(config: AIConfig): void {
 
 export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   const { activeChapter, state } = useApp();
+  const { showToast } = useToast();
   const isScreenplay = state.projectType === 'screenplay';
   const presetPrompts = useMemo(() => getPresetPrompts(state.projectType), [state.projectType]);
 
   // AI configuration
   const [config, setConfig] = useState<AIConfig>(loadConfig);
   const [showSettings, setShowSettings] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
 
   // Prompt / response state
   const [prompt, setPrompt] = useState('');
@@ -238,6 +241,10 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       setError(null);
       setPrompt('');
       setLoading(false);
+      // Auto-open settings panel when AI is not configured
+      if (!config.endpoint.trim() || !config.apiKey.trim()) {
+        setShowSettings(true);
+      }
     } else {
       // Cancel any in-flight request when modal closes
       abortRef.current?.abort();
@@ -358,9 +365,48 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
 
   const handleCopyResponse = () => {
     if (response) {
-      navigator.clipboard.writeText(response).catch(() => {
-        // Clipboard API may not be available
+      navigator.clipboard.writeText(response).then(() => {
+        showToast('Response copied to clipboard', 'success', 'content_copy');
+      }).catch(() => {
+        showToast('Failed to copy to clipboard', 'error');
       });
+    }
+  };
+
+  const handleTestConnection = async () => {
+    if (!config.endpoint.trim() || !config.apiKey.trim()) {
+      showToast('Enter both an API endpoint and API key first', 'warning');
+      return;
+    }
+    setTestingConnection(true);
+    try {
+      const res = await fetch(config.endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            { role: 'user', content: 'Say "Connection successful" in exactly two words.' }
+          ],
+          max_tokens: 10
+        }),
+        signal: AbortSignal.timeout(10000)
+      });
+
+      if (res.ok) {
+        showToast('Connection successful', 'success', 'check_circle');
+      } else {
+        const body = await res.text().catch(() => '');
+        showToast(`Connection failed (${res.status}): ${body.slice(0, 100) || res.statusText}`, 'error');
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      showToast(`Connection failed: ${message}`, 'error');
+    } finally {
+      setTestingConnection(false);
     }
   };
 
@@ -426,10 +472,25 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
               />
             </label>
           </div>
+          <div className={styles.aiSettingsActions}>
+            <Button
+              variant="default"
+              size="small"
+              onClick={handleTestConnection}
+              disabled={testingConnection || !config.endpoint.trim() || !config.apiKey.trim()}
+            >
+              <span className="material-symbols-rounded">wifi_tethering</span>
+              {testingConnection ? 'Testing...' : 'Test Connection'}
+            </Button>
+          </div>
           <p className={styles.aiSettingsHint}>
             Settings are stored locally in your browser. The endpoint should
             accept OpenAI-compatible chat completion requests.
           </p>
+          <div className={styles.aiPrivacyNote}>
+            <span className="material-symbols-rounded">shield</span>
+            <span>Your API key is stored only in your browser&apos;s localStorage and is sent only to the endpoint you configure. No data is shared with NovelWriter servers.</span>
+          </div>
         </div>
       )}
 
@@ -438,11 +499,16 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         <div className={styles.aiNotice}>
           <span className="material-symbols-rounded">info</span>
           <div>
-            <strong>AI is not configured.</strong> Click{' '}
-            <em>Settings</em> below to enter your API endpoint and API key.
-            This feature works with any OpenAI-compatible API (OpenAI, Ollama,
-            LM Studio, etc.). Your credentials are stored only in your
-            browser&apos;s localStorage.
+            <strong>AI is not configured yet.</strong> Open{' '}
+            <button className={styles.aiNoticeLink} onClick={() => setShowSettings(true)}>
+              Settings
+            </button>{' '}
+            to enter your API endpoint and API key.
+            <br /><br />
+            <strong>Compatible services:</strong> OpenAI, Anthropic (via proxy), Ollama, LM Studio, or any OpenAI-compatible API.
+            <br />
+            <strong>Example endpoint:</strong>{' '}
+            <code className={styles.aiCode}>https://api.openai.com/v1/chat/completions</code>
           </div>
         </div>
       )}
