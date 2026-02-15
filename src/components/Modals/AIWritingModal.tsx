@@ -234,7 +234,9 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
     });
   }, []);
 
-  // Reset transient state when the modal opens
+  // Reset transient state when the modal opens/closes. We intentionally
+  // read config inside but only trigger on `open` changes — we don't want
+  // config edits to reset the prompt/response while the modal is visible.
   useEffect(() => {
     if (open) {
       setResponse('');
@@ -249,6 +251,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       // Cancel any in-flight request when modal closes
       abortRef.current?.abort();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // Scroll response area when new content arrives

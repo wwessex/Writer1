@@ -2,6 +2,8 @@ import type { JSONContent } from '@tiptap/core';
 
 export type ProjectType = 'book' | 'screenplay';
 
+export type ScreenplayBlockType = 'scene-heading' | 'action' | 'character' | 'parenthetical' | 'dialogue' | 'transition';
+
 export type ChapterStatus = 'planned' | 'draft' | 'revised' | 'final';
 
 export interface Scene {

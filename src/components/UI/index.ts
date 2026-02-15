@@ -3,5 +3,6 @@ export { Input, Textarea } from './Input';
 export { Select } from './Select';
 export { Dialog } from './Dialog';
 export { Pill, StatusDot } from './Pill';
-export { ToastProvider, useToast } from './Toast';
+export { ToastProvider } from './Toast';
+export { useToast } from './useToast';
 export { Tooltip, HelpTooltip } from './Tooltip';

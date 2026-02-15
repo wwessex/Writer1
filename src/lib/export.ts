@@ -1,8 +1,6 @@
 import type { JSONContent } from '@tiptap/core';
-import type { Chapter } from '@/types';
-import { editorToPlainText, downloadFile } from './utils';
-
-type ScreenplayBlockType = 'scene-heading' | 'action' | 'character' | 'parenthetical' | 'dialogue' | 'transition';
+import type { Chapter, ScreenplayBlockType } from '@/types';
+import { editorToPlainText, downloadFile, escapeHtml } from './utils';
 
 export interface ScreenplayBlock {
   type: ScreenplayBlockType;
@@ -448,11 +446,3 @@ export async function exportToRtf(
   downloadFile(rtf, `${title}.rtf`, 'application/rtf');
 }
 
-/**
- * Escape HTML special characters
- */
-function escapeHtml(text: string): string {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}

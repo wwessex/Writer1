@@ -24,7 +24,7 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
 }
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ variant = 'default', className, ...props }, ref) => {
+  ({ variant: _variant = 'default', className, ...props }, ref) => {
     const classes = [
       styles.input,
       styles['input--area'],
