@@ -354,11 +354,31 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
     <div className={styles.app} role="application" aria-label={appLabel}>
       <Header onAction={handleMenuAction} onToggleInspector={() => setInspectorOpen(prev => !prev)} inspectorOpen={inspectorOpen} />
       <main className={layoutClass} role="main">
+        {state.settings.sidebarHidden && (
+          <button
+            className={styles.expandTab}
+            onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
+            aria-label="Expand sidebar (Ctrl+Shift+B)"
+            title="Expand sidebar"
+          >
+            <span className="material-symbols-rounded">chevron_right</span>
+          </button>
+        )}
         <Sidebar
           onExportBackup={handleExportBackup}
           onImportBackup={() => fileInputRef.current?.click()}
         />
         <Editor screenplayMode={screenplayMode} onToggleScreenplayMode={onToggleScreenplayMode} />
+        {!inspectorOpen && (
+          <button
+            className={`${styles.expandTab} ${styles['expandTab--right']}`}
+            onClick={() => setInspectorOpen(true)}
+            aria-label="Expand inspector (Ctrl+Shift+I)"
+            title="Expand inspector"
+          >
+            <span className="material-symbols-rounded">chevron_left</span>
+          </button>
+        )}
         <Inspector open={inspectorOpen} onClose={() => setInspectorOpen(false)} />
         <AISuggestionsPanel open={modals.aiPanel} onClose={() => closeModal('aiPanel')} />
       </main>
