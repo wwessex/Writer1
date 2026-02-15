@@ -8,6 +8,8 @@ import { useApp, AppProvider } from '@/context/AppContext';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
 import { Editor } from '@/components/Editor';
+import { Inspector } from '@/components/Inspector';
+import { QuickSwitcher } from '@/components/QuickSwitcher';
 import {
   ExportModal, SnapshotModal, AnalysisModal, WordCountModal, DashboardModal, OnboardingModal,
   AIWritingModal, CharacterBibleModal, CommentModal, AdvancedAnalyticsModal, IntegrationsModal,
@@ -43,6 +45,8 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
   const { modals, openModal, closeModal, toggleModal } = useModalState();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -219,6 +223,12 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
       case 'aiPanel':
         toggleModal('aiPanel');
         break;
+      case 'inspector':
+        setInspectorOpen(prev => !prev);
+        break;
+      case 'quickSwitcher':
+        setQuickSwitcherOpen(true);
+        break;
       case 'undo':
         editor?.chain().focus().undo().run();
         break;
@@ -258,6 +268,13 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Quick Switcher: Ctrl/Cmd+K
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && !e.shiftKey) {
+        e.preventDefault();
+        setQuickSwitcherOpen(prev => !prev);
+        return;
+      }
+
       if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
         switch (e.key.toLowerCase()) {
           case 'n':
@@ -275,6 +292,10 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
           case 'f':
             e.preventDefault();
             dispatch({ type: 'TOGGLE_FOCUS_MODE' });
+            break;
+          case 'i':
+            e.preventDefault();
+            setInspectorOpen(prev => !prev);
             break;
         }
       }
@@ -321,21 +342,33 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
     );
   }
 
-  const layoutClass = `${styles.layout} ${state.settings.sidebarHidden ? styles['layout--sidebarHidden'] : ''}`;
+  const layoutClass = [
+    styles.layout,
+    state.settings.sidebarHidden ? styles['layout--sidebarHidden'] : '',
+    inspectorOpen ? styles['layout--inspectorOpen'] : '',
+  ].filter(Boolean).join(' ');
 
   const appLabel = `DraftHarbour Studio ${state.projectType === 'screenplay' ? 'Screenplay Project Workspace' : 'Book Project Workspace'}`;
 
   return (
     <div className={styles.app} role="application" aria-label={appLabel}>
-      <Header onAction={handleMenuAction} />
+      <Header onAction={handleMenuAction} onToggleInspector={() => setInspectorOpen(prev => !prev)} inspectorOpen={inspectorOpen} />
       <main className={layoutClass} role="main">
         <Sidebar
           onExportBackup={handleExportBackup}
           onImportBackup={() => fileInputRef.current?.click()}
         />
         <Editor screenplayMode={screenplayMode} onToggleScreenplayMode={onToggleScreenplayMode} />
+        <Inspector open={inspectorOpen} onClose={() => setInspectorOpen(false)} />
         <AISuggestionsPanel open={modals.aiPanel} onClose={() => closeModal('aiPanel')} />
       </main>
+
+      {/* Quick Switcher */}
+      <QuickSwitcher
+        open={quickSwitcherOpen}
+        onClose={() => setQuickSwitcherOpen(false)}
+        onAction={handleMenuAction}
+      />
 
       {/* Modals */}
       <ExportModal open={modals.export} onClose={() => closeModal('export')} />

@@ -46,8 +46,11 @@ const MENUS: MenuConfig[] = [
     label: 'View',
     items: [
       { label: 'Toggle Sidebar', action: 'toggleSidebar', shortcut: 'Ctrl+Shift+B' },
+      { label: 'Toggle Inspector', action: 'inspector', shortcut: 'Ctrl+Shift+I' },
       { label: 'Toggle Page View', action: 'togglePageView' },
       { label: 'Focus Mode', action: 'toggleFocusMode', shortcut: 'Ctrl+Shift+F' },
+      { divider: true },
+      { label: 'Quick Switcher', action: 'quickSwitcher', shortcut: 'Ctrl+K' },
       { divider: true },
       { label: 'Dark Theme', action: 'themeDark' },
       { label: 'Light Theme', action: 'themeLight' },
