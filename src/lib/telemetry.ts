@@ -16,6 +16,7 @@ export interface TelemetryEvent {
   promptLengthChars: number;
   responseLengthChars: number;
   model?: string;
+  provider?: string;
   latencyMs?: number;
   success: boolean;
   errorType?: string;

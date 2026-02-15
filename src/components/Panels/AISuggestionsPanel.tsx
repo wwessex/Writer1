@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { editorToPlainText } from '@/lib/utils';
+import { loadAIConfig, createProvider } from '@/lib/ai';
+import type { AIProviderConfig } from '@/lib/ai';
 import { recordTelemetryEvent, isTelemetryOptedIn } from '@/lib/telemetry';
 import styles from './Panels.module.css';
 
@@ -16,21 +18,11 @@ interface Suggestion {
   loading: boolean;
 }
 
-const AI_CONFIG_KEY = 'draftharbour_ai_config';
-
-function getAIConfig(): { endpoint: string; apiKey: string } {
-  try {
-    const raw = localStorage.getItem(AI_CONFIG_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
-  return { endpoint: '', apiKey: '' };
-}
-
 const QUICK_ACTIONS = [
-  { id: 'continue', label: 'Continue', icon: 'edit_note', prompt: 'Continue writing the next 2-3 sentences, matching the tone and style.' },
-  { id: 'rephrase', label: 'Rephrase', icon: 'swap_horiz', prompt: 'Suggest 2 alternative ways to write the last paragraph.' },
-  { id: 'strengthen', label: 'Strengthen', icon: 'bolt', prompt: 'Make the last paragraph more vivid with stronger verbs and sensory details.' },
-  { id: 'shorten', label: 'Shorten', icon: 'compress', prompt: 'Tighten the last paragraph to half its length without losing meaning.' },
+  { id: 'continue', label: 'Continue', icon: 'edit_note', type: 'continuation' as const, prompt: 'Continue writing the next 2-3 sentences, matching the tone and style.' },
+  { id: 'rephrase', label: 'Rephrase', icon: 'swap_horiz', type: 'alternative' as const, prompt: 'Suggest 2 alternative ways to write the last paragraph.' },
+  { id: 'strengthen', label: 'Strengthen', icon: 'bolt', type: 'style' as const, prompt: 'Make the last paragraph more vivid with stronger verbs and sensory details.' },
+  { id: 'shorten', label: 'Shorten', icon: 'compress', type: 'style' as const, prompt: 'Tighten the last paragraph to half its length without losing meaning.' },
 ];
 
 export function AISuggestionsPanel({ open, onClose }: AISuggestionsPanelProps) {
@@ -41,8 +33,9 @@ export function AISuggestionsPanel({ open, onClose }: AISuggestionsPanelProps) {
   const abortRef = useRef<AbortController | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const config = getAIConfig();
-  const isConfigured = config.endpoint.trim() !== '' && config.apiKey.trim() !== '';
+  const config: AIProviderConfig = loadAIConfig();
+  const provider = createProvider(config);
+  const isConfigured = provider.isAvailable();
 
   useEffect(() => {
     if (!open) {
@@ -51,7 +44,7 @@ export function AISuggestionsPanel({ open, onClose }: AISuggestionsPanelProps) {
     }
   }, [open]);
 
-  const fetchSuggestion = useCallback(async (prompt: string, type: Suggestion['type']) => {
+  const fetchSuggestion = useCallback(async (prompt: string, type: Suggestion['type'], actionId?: string) => {
     if (!isConfigured || !activeChapter) return;
 
     const chapterText = editorToPlainText(activeChapter.content);
@@ -66,47 +59,30 @@ export function AISuggestionsPanel({ open, onClose }: AISuggestionsPanelProps) {
     setLoading(true);
 
     const startTime = Date.now();
+    const aiProvider = createProvider(config);
 
     try {
-      const res = await fetch(config.endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${config.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [
-            {
-              role: 'system',
-              content: `You are a concise creative writing assistant. Provide suggestions directly without preamble. Project type: ${state.projectType}.`,
-            },
-            {
-              role: 'user',
-              content: `Context (last part of the ${state.projectType === 'screenplay' ? 'scene' : 'chapter'}):\n\n${contextSnippet}\n\n---\n\n${prompt}`,
-            },
-          ],
-          max_tokens: 512,
-        }),
+      const result = await aiProvider.execute({
+        action: actionId || type,
+        prompt,
+        context: contextSnippet,
+        projectType: state.projectType,
+        sectionTitle: activeChapter.title,
         signal: controller.signal,
       });
 
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
-
-      const data = await res.json();
-      const text = data?.choices?.[0]?.message?.content ?? data?.response ?? '';
-
       setSuggestions(prev =>
-        prev.map(s => s.id === suggestionId ? { ...s, text, loading: false } : s)
+        prev.map(s => s.id === suggestionId ? { ...s, text: result.text, loading: false } : s)
       );
 
       if (isTelemetryOptedIn()) {
         recordTelemetryEvent({
           action: `inline_${type}`,
+          provider: result.provider,
           contextLengthChars: contextSnippet.length,
           promptLengthChars: prompt.length,
-          responseLengthChars: text.length,
-          latencyMs: Date.now() - startTime,
+          responseLengthChars: result.text.length,
+          latencyMs: result.latencyMs,
           success: true,
         });
       }
@@ -123,6 +99,7 @@ export function AISuggestionsPanel({ open, onClose }: AISuggestionsPanelProps) {
       if (isTelemetryOptedIn()) {
         recordTelemetryEvent({
           action: `inline_${type}`,
+          provider: config.provider,
           contextLengthChars: 0,
           promptLengthChars: prompt.length,
           responseLengthChars: 0,
@@ -133,6 +110,7 @@ export function AISuggestionsPanel({ open, onClose }: AISuggestionsPanelProps) {
       }
     } finally {
       setLoading(false);
+      aiProvider.destroy();
     }
   }, [isConfigured, activeChapter, config, state.projectType]);
 
@@ -159,6 +137,13 @@ export function AISuggestionsPanel({ open, onClose }: AISuggestionsPanelProps) {
         <h4>
           <span className="material-symbols-rounded">auto_awesome</span>
           AI Suggestions
+          {isConfigured && (
+            <span className={styles.aiPanel__providerBadge}>
+              <span className="material-symbols-rounded">
+                {config.provider === 'chrome-ai' ? 'memory' : 'cloud'}
+              </span>
+            </span>
+          )}
         </h4>
         <button className={styles.aiPanel__close} onClick={onClose} aria-label="Close panel">
           <span className="material-symbols-rounded">close</span>
@@ -168,7 +153,12 @@ export function AISuggestionsPanel({ open, onClose }: AISuggestionsPanelProps) {
       {!isConfigured ? (
         <div className={styles.aiPanel__notice}>
           <span className="material-symbols-rounded">info</span>
-          <p>Configure your AI endpoint in <strong>AI Writing Tools</strong> to enable inline suggestions.</p>
+          <p>
+            {config.provider === 'chrome-ai'
+              ? 'Chrome AI is not available in this browser. Use Chrome 137+ on a supported platform, or configure an OpenAI-compatible API in AI Writing Tools.'
+              : 'Configure your AI endpoint in AI Writing Tools to enable inline suggestions.'
+            }
+          </p>
         </div>
       ) : (
         <>
@@ -178,7 +168,7 @@ export function AISuggestionsPanel({ open, onClose }: AISuggestionsPanelProps) {
               <button
                 key={action.id}
                 className={styles.aiPanel__actionBtn}
-                onClick={() => fetchSuggestion(action.prompt, action.id === 'continue' ? 'continuation' : action.id === 'rephrase' ? 'alternative' : 'style')}
+                onClick={() => fetchSuggestion(action.prompt, action.type, action.id)}
                 disabled={loading || !activeChapter}
               >
                 <span className="material-symbols-rounded">{action.icon}</span>
