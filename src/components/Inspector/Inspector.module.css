@@ -5,6 +5,8 @@
   width: 300px;
   min-width: 220px;
   max-width: 520px;
+  height: 100%;
+  min-height: 0;
   flex-shrink: 0;
   background: var(--panel);
   border-left: 1px solid var(--border-subtle, var(--border));
