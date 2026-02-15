@@ -2175,3 +2175,53 @@
     min-width: 4rem;
   }
 }
+
+.integrationCard__feedback {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.integrationCard__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.75rem;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.integrationCard__badge--idle {
+  color: var(--text-muted);
+  background: var(--btn-bg);
+}
+
+.integrationCard__badge--loading {
+  color: #0369a1;
+  background: #e0f2fe;
+}
+
+.integrationCard__badge--success {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.integrationCard__badge--error {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.integrationCard__feedbackText {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}

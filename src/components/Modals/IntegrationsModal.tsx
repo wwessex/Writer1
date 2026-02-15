@@ -1,6 +1,14 @@
 import { useState, useCallback } from 'react';
 import { Dialog, Button, Input } from '@/components/UI';
-import type { IntegrationConfig, IntegrationType } from '@/types';
+import { useApp } from '@/context/AppContext';
+import {
+  connectIntegration,
+  listIntegrationRevisions,
+  pullIntegrationData,
+  pushIntegrationData,
+  testIntegrationConnection,
+} from '@/lib/integrations';
+import type { AppState, Chapter, IntegrationConfig, IntegrationType } from '@/types';
 import styles from './Modals.module.css';
 
 interface IntegrationsModalProps {
@@ -15,6 +23,8 @@ interface IntegrationConfigs {
   'google-drive': IntegrationConfig;
   dropbox: IntegrationConfig;
 }
+
+type OperationState = 'idle' | 'loading' | 'success' | 'error';
 
 function loadConfigs(): IntegrationConfigs {
   try {
@@ -57,7 +67,7 @@ function formatSyncTime(timestamp?: number): string {
   });
 }
 
-type ConnectionStatus = 'disconnected' | 'configured' | 'coming-soon';
+type ConnectionStatus = 'disconnected' | 'configured';
 
 function getConnectionStatus(
   type: IntegrationType,
@@ -65,38 +75,34 @@ function getConnectionStatus(
 ): ConnectionStatus {
   if (!config.enabled) return 'disconnected';
 
-  if (type === 'dropbox' && config.accessToken) return 'configured';
-  if (type === 'google-drive') return 'coming-soon';
-  if (type === 'scrivener') return 'configured';
-
-  return 'coming-soon';
+  if (type === 'dropbox' && !config.accessToken) return 'disconnected';
+  return 'configured';
 }
 
 function statusLabel(status: ConnectionStatus): string {
-  switch (status) {
-    case 'configured':
-      return 'Configured';
-    case 'coming-soon':
-      return 'Coming Soon';
-    case 'disconnected':
-    default:
-      return 'Disconnected';
-  }
+  return status === 'configured' ? 'Configured' : 'Disconnected';
 }
 
 function statusColor(status: ConnectionStatus): string {
+  return status === 'configured' ? 'var(--accent)' : 'var(--text-muted)';
+}
+
+function statusBadgeLabel(status: OperationState): string {
   switch (status) {
-    case 'configured':
-      return 'var(--accent)';
-    case 'coming-soon':
-      return '#eab308';
-    case 'disconnected':
+    case 'loading':
+      return 'Running';
+    case 'success':
+      return 'Success';
+    case 'error':
+      return 'Failed';
+    case 'idle':
     default:
-      return 'var(--text-muted)';
+      return 'Idle';
   }
 }
 
 export function IntegrationsModal({ open, onClose }: IntegrationsModalProps) {
+  const { state, dispatch } = useApp();
   const [configs, setConfigs] = useState<IntegrationConfigs>(loadConfigs);
 
   const updateConfig = useCallback(
@@ -130,34 +136,39 @@ export function IntegrationsModal({ open, onClose }: IntegrationsModalProps) {
       size="large"
     >
       <div className={styles.integrationsGrid}>
-        {/* Scrivener Card */}
         <ScrivenerCard
           config={configs.scrivener}
+          appState={state}
           onToggle={() => toggleEnabled('scrivener')}
           onUpdate={(updates) => updateConfig('scrivener', updates)}
+          onApplyPull={(chapterUpdates) => {
+            dispatch({ type: 'SET_CHAPTERS', payload: chapterUpdates });
+          }}
         />
 
-        {/* Google Docs Card */}
         <GoogleDriveCard
           config={configs['google-drive']}
+          appState={state}
           onToggle={() => toggleEnabled('google-drive')}
           onUpdate={(updates) => updateConfig('google-drive', updates)}
+          onApplyPull={(chapterUpdates) => {
+            dispatch({ type: 'SET_CHAPTERS', payload: chapterUpdates });
+          }}
         />
 
-        {/* Dropbox Card */}
         <DropboxCard
           config={configs.dropbox}
+          appState={state}
           onToggle={() => toggleEnabled('dropbox')}
           onUpdate={(updates) => updateConfig('dropbox', updates)}
+          onApplyPull={(chapterUpdates) => {
+            dispatch({ type: 'SET_CHAPTERS', payload: chapterUpdates });
+          }}
         />
       </div>
     </Dialog>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/*  Integration Card Shell                                             */
-/* ------------------------------------------------------------------ */
 
 interface CardShellProps {
   icon: string;
@@ -200,7 +211,6 @@ function CardShell({
         </label>
       </div>
 
-      {/* Status Row */}
       <div className={styles.integrationCard__statusRow}>
         <span
           className={styles.integrationCard__dot}
@@ -214,7 +224,6 @@ function CardShell({
         </span>
       </div>
 
-      {/* Config Body - only visible when enabled */}
       {enabled && (
         <div className={styles.integrationCard__body}>{children}</div>
       )}
@@ -222,36 +231,49 @@ function CardShell({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Scrivener Integration                                              */
-/* ------------------------------------------------------------------ */
-
-interface ScrivenerCardProps {
-  config: IntegrationConfig;
-  onToggle: () => void;
-  onUpdate: (updates: Partial<IntegrationConfig>) => void;
+function OperationFeedback({
+  state,
+  message,
+}: {
+  state: OperationState;
+  message: string;
+}) {
+  return (
+    <div className={styles.integrationCard__feedback}>
+      <span className={`${styles.integrationCard__badge} ${styles[`integrationCard__badge--${state}`]}`}>
+        {statusBadgeLabel(state)}
+      </span>
+      <p className={styles.integrationCard__feedbackText}>{message}</p>
+    </div>
+  );
 }
 
-function ScrivenerCard({ config, onToggle, onUpdate }: ScrivenerCardProps) {
+interface IntegrationCardBaseProps {
+  config: IntegrationConfig;
+  appState: Pick<AppState, 'novelId' | 'projectType' | 'chapters'>;
+  onToggle: () => void;
+  onUpdate: (updates: Partial<IntegrationConfig>) => void;
+  onApplyPull: (chapters: Chapter[]) => void;
+}
+
+function ScrivenerCard({ config, appState, onToggle, onUpdate, onApplyPull }: IntegrationCardBaseProps) {
   const status = getConnectionStatus('scrivener', config);
+  const [operationState, setOperationState] = useState<OperationState>('idle');
+  const [operationMessage, setOperationMessage] = useState('No operations run yet.');
 
-  const handleImport = () => {
-    // Placeholder: in a full implementation, this would open a file picker
-    // for .scriv bundles and parse the internal XML structure.
-    alert(
-      'Scrivener import is not yet available. This feature will allow you to import .scriv project files in a future update.'
-    );
-    onUpdate({ lastSyncAt: Date.now() });
-  };
-
-  const handleExport = () => {
-    // Placeholder: in a full implementation, this would generate a .scriv
-    // bundle from the current novel data.
-    alert(
-      'Scrivener export is not yet available. This feature will allow you to export your novel as a .scriv project in a future update.'
-    );
-    onUpdate({ lastSyncAt: Date.now() });
-  };
+  const run = useCallback(async (task: () => Promise<string>) => {
+    setOperationState('loading');
+    try {
+      const message = await task();
+      const syncedAt = Date.now();
+      onUpdate({ lastSyncAt: syncedAt });
+      setOperationState('success');
+      setOperationMessage(message);
+    } catch (error) {
+      setOperationState('error');
+      setOperationMessage(error instanceof Error ? error.message : 'Unexpected integration error.');
+    }
+  }, [onUpdate]);
 
   return (
     <CardShell
@@ -265,40 +287,49 @@ function ScrivenerCard({ config, onToggle, onUpdate }: ScrivenerCardProps) {
     >
       <div className={styles.integrationCard__section}>
         <p className={styles.integrationCard__hint}>
-          Transfer your work between NovelWriter and Scrivener. Import brings in
-          your binder structure as chapters; export produces a compatible .scriv
-          bundle.
+          Transfer your work between NovelWriter and Scrivener with adapter-backed pull/push operations.
         </p>
         <div className={styles.integrationCard__actions}>
-          <Button variant="default" onClick={handleImport}>
+          <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async () => {
+            const pullResult = await pullIntegrationData('scrivener', config, appState);
+            onApplyPull(pullResult.chapterUpdates);
+            return `Pulled ${pullResult.chapterUpdates.length} chapter(s) from Scrivener.`;
+          })}>
             <span className="material-symbols-rounded">upload_file</span>
             Import .scriv
           </Button>
-          <Button variant="default" onClick={handleExport}>
+          <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async () => {
+            const pushResult = await pushIntegrationData('scrivener', config, appState);
+            return pushResult.message;
+          })}>
             <span className="material-symbols-rounded">download</span>
             Export .scriv
           </Button>
         </div>
+        <OperationFeedback state={operationState} message={operationMessage} />
       </div>
     </CardShell>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Google Docs Integration                                            */
-/* ------------------------------------------------------------------ */
-
-interface GoogleDriveCardProps {
-  config: IntegrationConfig;
-  onToggle: () => void;
-  onUpdate: (updates: Partial<IntegrationConfig>) => void;
-}
-
-function GoogleDriveCard({
-  config,
-  onToggle,
-}: GoogleDriveCardProps) {
+function GoogleDriveCard({ config, appState, onToggle, onUpdate, onApplyPull }: IntegrationCardBaseProps) {
   const status = getConnectionStatus('google-drive', config);
+  const [operationState, setOperationState] = useState<OperationState>('idle');
+  const [operationMessage, setOperationMessage] = useState('Google Drive adapter ready.');
+
+  const run = useCallback(async (task: () => Promise<string>) => {
+    setOperationState('loading');
+    try {
+      const message = await task();
+      const syncedAt = Date.now();
+      onUpdate({ lastSyncAt: syncedAt });
+      setOperationState('success');
+      setOperationMessage(message);
+    } catch (error) {
+      setOperationState('error');
+      setOperationMessage(error instanceof Error ? error.message : 'Unexpected integration error.');
+    }
+  }, [onUpdate]);
 
   return (
     <CardShell
@@ -311,73 +342,80 @@ function GoogleDriveCard({
       onToggle={onToggle}
     >
       <div className={styles.integrationCard__section}>
-        <div className={styles.integrationCard__comingSoon}>
-          <span className="material-symbols-rounded">lock</span>
-          <div>
-            <h5 className={styles.integrationCard__comingSoonTitle}>
-              OAuth Required
-            </h5>
-            <p className={styles.integrationCard__hint}>
-              Google Docs integration requires OAuth 2.0 authentication with a
-              backend server to securely manage tokens. This feature is planned
-              for a future release when server-side infrastructure is available.
-            </p>
-          </div>
+        <p className={styles.integrationCard__hint}>
+          Adapter workflow supports OAuth bootstrapping, connectivity checks, push/pull and revision listing.
+        </p>
+
+        <div className={styles.integrationCard__actions}>
+          <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async () => {
+            const result = await connectIntegration('google-drive', config);
+            return result.message;
+          })}>
+            <span className="material-symbols-rounded">link</span>
+            Connect
+          </Button>
+          <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async () => {
+            const result = await testIntegrationConnection('google-drive', config);
+            return result.message;
+          })}>
+            <span className="material-symbols-rounded">wifi_tethering</span>
+            Test
+          </Button>
+          <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async () => {
+            const result = await pushIntegrationData('google-drive', config, appState);
+            return result.message;
+          })}>
+            <span className="material-symbols-rounded">cloud_upload</span>
+            Push
+          </Button>
+          <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async () => {
+            const result = await pullIntegrationData('google-drive', config, appState);
+            onApplyPull(result.chapterUpdates);
+            return `Pulled ${result.chapterUpdates.length} chapter(s) from Google Drive.`;
+          })}>
+            <span className="material-symbols-rounded">cloud_download</span>
+            Pull
+          </Button>
+          <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async () => {
+            const revisions = await listIntegrationRevisions('google-drive', config);
+            return `Found ${revisions.length} remote revision(s).`;
+          })}>
+            <span className="material-symbols-rounded">history</span>
+            Revisions
+          </Button>
         </div>
 
-        <div className={styles.integrationCard__instructions}>
-          <h5>Setup Instructions (Future)</h5>
-          <ol>
-            <li>A Google Cloud project with the Docs API enabled will be required.</li>
-            <li>The application will redirect you to Google for authorization.</li>
-            <li>Once authorized, chapters can be pushed to and pulled from Google Docs.</li>
-            <li>Collaborative edits made in Google Docs will sync back on demand.</li>
-          </ol>
-        </div>
+        <OperationFeedback state={operationState} message={operationMessage} />
       </div>
     </CardShell>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Dropbox Integration                                                */
-/* ------------------------------------------------------------------ */
-
-interface DropboxCardProps {
-  config: IntegrationConfig;
-  onToggle: () => void;
-  onUpdate: (updates: Partial<IntegrationConfig>) => void;
-}
-
-function DropboxCard({ config, onToggle, onUpdate }: DropboxCardProps) {
+function DropboxCard({ config, appState, onToggle, onUpdate, onApplyPull }: IntegrationCardBaseProps) {
   const status = getConnectionStatus('dropbox', config);
   const [apiKey, setApiKey] = useState(config.accessToken || '');
   const [folder, setFolder] = useState(config.folderId || '/NovelWriter');
+  const [operationState, setOperationState] = useState<OperationState>('idle');
+  const [operationMessage, setOperationMessage] = useState('Configure Dropbox access and run an operation.');
 
-  const handleSaveConfig = () => {
-    onUpdate({
-      accessToken: apiKey,
-      folderId: folder,
-      lastSyncAt: Date.now(),
-    });
-  };
-
-  const handleTestConnection = () => {
-    // Placeholder: in a full implementation this would call the Dropbox API
-    // to verify the access token and list files in the folder.
-    if (!apiKey.trim()) {
-      alert('Please enter your Dropbox API key first.');
-      return;
+  const run = useCallback(async (task: (cardConfig: IntegrationConfig) => Promise<string>) => {
+    setOperationState('loading');
+    try {
+      const cardConfig: IntegrationConfig = {
+        ...config,
+        accessToken: apiKey,
+        folderId: folder,
+      };
+      const message = await task(cardConfig);
+      const syncedAt = Date.now();
+      onUpdate({ accessToken: apiKey, folderId: folder, lastSyncAt: syncedAt });
+      setOperationState('success');
+      setOperationMessage(message);
+    } catch (error) {
+      setOperationState('error');
+      setOperationMessage(error instanceof Error ? error.message : 'Unexpected integration error.');
     }
-    alert(
-      'Dropbox connection test is not yet implemented. The API key has been saved locally and will be used when Dropbox sync is available.'
-    );
-    onUpdate({
-      accessToken: apiKey,
-      folderId: folder,
-      lastSyncAt: Date.now(),
-    });
-  };
+  }, [apiKey, config, folder, onUpdate]);
 
   return (
     <CardShell
@@ -391,9 +429,7 @@ function DropboxCard({ config, onToggle, onUpdate }: DropboxCardProps) {
     >
       <div className={styles.integrationCard__section}>
         <div className={styles.integrationCard__field}>
-          <label className={styles.integrationCard__label}>
-            API Access Token
-          </label>
+          <label className={styles.integrationCard__label}>API Access Token</label>
           <Input
             type="password"
             value={apiKey}
@@ -415,9 +451,7 @@ function DropboxCard({ config, onToggle, onUpdate }: DropboxCardProps) {
         </div>
 
         <div className={styles.integrationCard__field}>
-          <label className={styles.integrationCard__label}>
-            Sync Folder Path
-          </label>
+          <label className={styles.integrationCard__label}>Sync Folder Path</label>
           <Input
             value={folder}
             onChange={(e) => setFolder(e.target.value)}
@@ -430,15 +464,45 @@ function DropboxCard({ config, onToggle, onUpdate }: DropboxCardProps) {
         </div>
 
         <div className={styles.integrationCard__actions}>
-          <Button variant="primary" onClick={handleSaveConfig}>
-            <span className="material-symbols-rounded">save</span>
-            Save Configuration
+          <Button variant="primary" disabled={operationState === 'loading'} onClick={() => run(async (cardConfig) => {
+            const result = await connectIntegration('dropbox', cardConfig);
+            return result.message;
+          })}>
+            <span className="material-symbols-rounded">link</span>
+            Connect
           </Button>
-          <Button variant="default" onClick={handleTestConnection}>
+          <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async (cardConfig) => {
+            const result = await testIntegrationConnection('dropbox', cardConfig);
+            return result.message;
+          })}>
             <span className="material-symbols-rounded">wifi_tethering</span>
             Test Connection
           </Button>
+          <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async (cardConfig) => {
+            const result = await pushIntegrationData('dropbox', cardConfig, appState);
+            return result.message;
+          })}>
+            <span className="material-symbols-rounded">cloud_upload</span>
+            Push
+          </Button>
+          <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async (cardConfig) => {
+            const result = await pullIntegrationData('dropbox', cardConfig, appState);
+            onApplyPull(result.chapterUpdates);
+            return `Pulled ${result.chapterUpdates.length} chapter(s) from Dropbox.`;
+          })}>
+            <span className="material-symbols-rounded">cloud_download</span>
+            Pull
+          </Button>
+          <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async (cardConfig) => {
+            const revisions = await listIntegrationRevisions('dropbox', cardConfig);
+            return `Found ${revisions.length} remote revision(s).`;
+          })}>
+            <span className="material-symbols-rounded">history</span>
+            Revisions
+          </Button>
         </div>
+
+        <OperationFeedback state={operationState} message={operationMessage} />
       </div>
     </CardShell>
   );
