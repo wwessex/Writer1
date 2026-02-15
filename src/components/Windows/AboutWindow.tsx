@@ -112,7 +112,7 @@ export function AboutWindow({ open, onClose }: AboutWindowProps) {
         <div className={styles.window__body}>
           <div className={styles.aboutLogo}>
             <img
-              src={`${import.meta.env.BASE_URL}assets/${state.settings.theme === 'light' ? 'logo-black' : 'logo-blue'}.png`}
+              src={`${import.meta.env.BASE_URL}brand/${state.settings.theme === 'light' ? 'logo.svg' : 'logo-light.svg'}`}
               alt="DraftHarbour Studio"
               className={styles.brandLogo}
             />
