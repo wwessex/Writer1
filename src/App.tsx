@@ -459,6 +459,12 @@ function AppShell() {
   const { activeChapter, updateChapter, state } = useApp();
   const [screenplayMode, setScreenplayMode] = useState(state.projectType === 'screenplay');
 
+  // Use refs to avoid stale closures in editor onUpdate callback
+  const activeChapterRef = useRef(activeChapter);
+  activeChapterRef.current = activeChapter;
+  const updateChapterRef = useRef(updateChapter);
+  updateChapterRef.current = updateChapter;
+
   useEffect(() => {
     setScreenplayMode(state.projectType === 'screenplay');
   }, [state.projectType]);
@@ -469,8 +475,9 @@ function AppShell() {
     extensions,
     content: activeChapter?.content || { type: 'doc', content: [{ type: 'paragraph' }] },
     onUpdate: ({ editor: ed }) => {
-      if (activeChapter) {
-        updateChapter(activeChapter.id, { content: ed.getJSON() });
+      const chapter = activeChapterRef.current;
+      if (chapter) {
+        updateChapterRef.current(chapter.id, { content: ed.getJSON() });
       }
     },
   });
