@@ -5,6 +5,7 @@ import { HelpTooltip } from '@/components/UI/Tooltip';
 import { Select } from '@/components/UI/Select';
 import { clearAllData } from '@/lib/storage';
 import { isTelemetryOptedIn, setTelemetryOptIn, clearTelemetryData } from '@/lib/telemetry';
+import { useWindowResize } from '@/hooks/useResizable';
 import styles from './Windows.module.css';
 
 interface SettingsWindowProps {
@@ -57,6 +58,15 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isMobile, setIsMobile] = useState(false);
+  const { width, height, startResize, reset: resetSize } = useWindowResize({
+    initialWidth: 400,
+    initialHeight: 520,
+    minWidth: 320,
+    maxWidth: 700,
+    minHeight: 300,
+    maxHeight: 800,
+    disabled: isMobile,
+  });
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     typography: false,
     sync: true,
@@ -88,11 +98,13 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
       windowRef.current.style.left = '';
       windowRef.current.style.top = '';
       windowRef.current.style.transform = '';
+      resetSize();
     }
-  }, [open]);
+  }, [open, resetSize]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (isMobile) return;
+    if ((e.target as HTMLElement).closest(`.${styles.resizeHandle}`) || (e.target as HTMLElement).closest(`.${styles.resizeCorner}`)) return;
     if ((e.target as HTMLElement).closest(`.${styles.window__header}`)) {
       setIsDragging(true);
       const rect = windowRef.current?.getBoundingClientRect();
@@ -150,6 +162,7 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
         onMouseDown={handleMouseDown}
         role="dialog"
         aria-label="Settings"
+        style={!isMobile ? { width, height } : undefined}
       >
         <div className={styles.window__header}>
           <h3>Settings</h3>
@@ -489,6 +502,13 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
             )}
           </section>
         </div>
+        {!isMobile && (
+          <>
+            <div className={`${styles.resizeHandle} ${styles['resizeHandle--right']}`} onMouseDown={startResize('right')} />
+            <div className={`${styles.resizeHandle} ${styles['resizeHandle--bottom']}`} onMouseDown={startResize('bottom')} />
+            <div className={styles.resizeCorner} onMouseDown={startResize('bottom-right')} />
+          </>
+        )}
       </div>
     </>
   );

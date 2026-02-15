@@ -1,8 +1,9 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Input, Textarea, Button, IconButton } from '@/components/UI';
 import { Select } from '@/components/UI/Select';
 import { countWords, editorToPlainText } from '@/lib/utils';
+import { useResizable } from '@/hooks/useResizable';
 import type { ChapterStatus, Scene } from '@/types';
 import styles from './Inspector.module.css';
 
@@ -21,6 +22,23 @@ interface InspectorProps {
 export function Inspector({ open, onClose }: InspectorProps) {
   const { state, activeChapter, updateChapterImmediate, addScene, updateScene, deleteScene } = useApp();
   const [activeTab, setActiveTab] = useState<'details' | 'scenes' | 'notes'>('details');
+
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 820);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  const { size, isResizing, handleProps } = useResizable({
+    initialSize: 300,
+    minSize: 220,
+    maxSize: 520,
+    direction: 'left',
+    persistKey: 'dh-inspector-width',
+    disabled: isMobile,
+  });
 
   const isScreenplay = state.projectType === 'screenplay';
 
@@ -61,7 +79,18 @@ export function Inspector({ open, onClose }: InspectorProps) {
   return (
     <>
       <div className={styles.backdrop} onClick={onClose} aria-hidden="true" />
-      <aside className={styles.inspector} role="complementary" aria-label="Inspector">
+      <aside
+        className={styles.inspector}
+        role="complementary"
+        aria-label="Inspector"
+        style={!isMobile ? { width: size } : undefined}
+      >
+        {!isMobile && (
+          <div
+            className={`${styles.resizeHandle} ${isResizing ? styles['resizeHandle--active'] : ''}`}
+            {...handleProps}
+          />
+        )}
         <div className={styles.header}>
           <div className={styles.tabs}>
             {tabs.map(tab => (
