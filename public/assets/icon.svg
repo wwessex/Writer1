@@ -31,8 +31,8 @@
     </filter>
   </defs>
 
-  <!-- Rounded square background -->
-  <rect x="40" y="40" width="432" height="432" rx="96" fill="url(#bg)"/>
+  <!-- Rounded square background (softer corners) -->
+  <rect x="40" y="40" width="432" height="432" rx="112" fill="url(#bg)"/>
 
   <!-- Emblem with outer glow -->
   <g filter="url(#outerGlow)">
@@ -40,19 +40,18 @@
       <!-- Arc / harbour horizon -->
       <path d="M155 235c30-75 90-118 148-118s118 43 148 118" opacity="0.7"/>
 
-      <!-- Pen-nib lighthouse body -->
+      <!-- Pen-nib lighthouse body (rounded nib tip) -->
       <path d="M256 160
                c32 0 58 26 58 58
                v112
                c0 16-7 28-18 39
-               l-40 44
-               l-40-44
+               l-28 31 q-12 13-24 0 l-28-31
                c-11-11-18-23-18-39
                V218
                c0-32 26-58 58-58z"/>
 
       <!-- Nib slit -->
-      <path d="M256 214v88" opacity="0.8"/>
+      <path d="M256 214v80" opacity="0.8"/>
 
       <!-- Lighthouse cap -->
       <path d="M234 134h44l-9 24h-26l-9-24z"/>

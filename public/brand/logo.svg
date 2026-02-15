@@ -26,16 +26,16 @@
     </filter>
   </defs>
 
-  <!-- Icon -->
+  <!-- Icon (softer corners) -->
   <g transform="translate(20,20)">
-    <rect x="0" y="0" width="280" height="280" rx="64" fill="url(#bg)"/>
+    <rect x="0" y="0" width="280" height="280" rx="72" fill="url(#bg)"/>
     <g filter="url(#iconGlow)">
       <g stroke="url(#fg)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" fill="none">
         <path d="M70 135c20-55 65-86 110-86s90 31 110 86" opacity="0.7"/>
         <path d="M140 88h40l-8 20h-24l-8-20z"/>
         <path d="M110 118h100" opacity="0.75"/>
-        <path d="M140 120c24 0 44 20 44 44v82c0 12-5 20-14 29l-30 32-30-32c-9-9-14-17-14-29v-82c0-24 20-44 44-44z"/>
-        <path d="M140 160v70" opacity="0.8"/>
+        <path d="M140 120c24 0 44 20 44 44v82c0 12-5 20-14 29l-20 22 q-10 10-20 0 l-20-22c-9-9-14-17-14-29v-82c0-24 20-44 44-44z"/>
+        <path d="M140 160v64" opacity="0.8"/>
         <path d="M113 152l-18-7" opacity="0.6"/>
         <path d="M167 152l18-7" opacity="0.6"/>
         <path d="M70 210c20 12 40 12 60 0s40-12 60 0 40 12 60 0 40-12 60 0" opacity="0.9"/>
@@ -46,15 +46,15 @@
   </g>
 
   <!-- Wordmark (light text for dark backgrounds) -->
-  <g transform="translate(340,88)">
-    <text x="0" y="86"
+  <g transform="translate(340,80)">
+    <text x="0" y="90"
       font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial"
-      font-size="86" font-weight="700" fill="#EAF6FF" letter-spacing="0.2">
+      font-size="92" font-weight="800" fill="#F0F8FF" letter-spacing="-0.5">
       DraftHarbour
     </text>
-    <text x="2" y="156"
+    <text x="3" y="158"
       font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial"
-      font-size="56" font-weight="500" fill="#B7D7E6" letter-spacing="0.6">
+      font-size="60" font-weight="600" fill="#D0E8F4" letter-spacing="1.5">
       Studio
     </text>
   </g>
