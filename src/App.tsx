@@ -351,18 +351,21 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
 
   // Show loading state
   if (isLoading) {
+    const loadingProjectLabel = state.projectType === 'screenplay' ? 'screenplay project' : 'book project';
     return (
       <div className={styles.loading}>
         <div className={styles.loadingSpinner} />
-        <p>Loading NovelWriter...</p>
+        <p>Loading NovelWriter {loadingProjectLabel}...</p>
       </div>
     );
   }
 
   const layoutClass = `${styles.layout} ${state.settings.sidebarHidden ? styles['layout--sidebarHidden'] : ''}`;
 
+  const appLabel = `NovelWriter ${state.projectType === 'screenplay' ? 'Screenplay Project Workspace' : 'Book Project Workspace'}`;
+
   return (
-    <div className={styles.app} role="application" aria-label="NovelWriter">
+    <div className={styles.app} role="application" aria-label={appLabel}>
       <Header onAction={handleMenuAction} />
       <main className={layoutClass} role="main">
         <Sidebar
