@@ -3,6 +3,7 @@ import { Dialog, Button } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
 import type { ExportFormat } from '@/types';
 import { exportToDocx, exportToPdf, exportToRtf, exportToFountain, exportToScreenplayPdf } from '@/lib/export';
+import type { FountainExportOptions } from '@/lib/export';
 import styles from './Modals.module.css';
 
 interface ExportModalProps {
@@ -14,6 +15,9 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
   const { state } = useApp();
   const [includeHeadings, setIncludeHeadings] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [includeSectionTitles, setIncludeSectionTitles] = useState(true);
+  const [includeMetadataBlock, setIncludeMetadataBlock] = useState(true);
+  const [filenameConvention, setFilenameConvention] = useState<FountainExportOptions['filenameConvention']>('title');
 
   const isScreenplay = state.projectType === 'screenplay';
 
@@ -31,7 +35,11 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
           await exportToScreenplayPdf(state.chapters, state.novelTitle);
           break;
         case 'fountain':
-          await exportToFountain(state.chapters, state.novelTitle);
+          await exportToFountain(state.chapters, state.novelTitle, {
+            includeSectionTitles,
+            includeMetadataBlock,
+            filenameConvention,
+          });
           break;
         case 'rtf':
           await exportToRtf(state.chapters, state.novelTitle, includeHeadings);
@@ -57,6 +65,39 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
               onChange={e => setIncludeHeadings(e.target.checked)}
             />
             <span>Include chapter headings</span>
+          </label>
+        </div>
+      )}
+
+      {isScreenplay && (
+        <div className={styles.exportOptions}>
+          <p className={styles.exportOptionHeading}>Fountain options</p>
+          <label className={styles.checkbox}>
+            <input
+              type="checkbox"
+              checked={includeSectionTitles}
+              onChange={e => setIncludeSectionTitles(e.target.checked)}
+            />
+            <span>Include section titles as Fountain sections</span>
+          </label>
+          <label className={styles.checkbox}>
+            <input
+              type="checkbox"
+              checked={includeMetadataBlock}
+              onChange={e => setIncludeMetadataBlock(e.target.checked)}
+            />
+            <span>Include Fountain metadata block</span>
+          </label>
+          <label className={styles.exportField}>
+            <span>Filename convention</span>
+            <select
+              value={filenameConvention}
+              onChange={e => setFilenameConvention(e.target.value as FountainExportOptions['filenameConvention'])}
+            >
+              <option value="title">{`{title}.fountain`}</option>
+              <option value="title-screenplay">{`{title}.screenplay.fountain`}</option>
+              <option value="title-fountain">{`{title}.fountain-export.fountain`}</option>
+            </select>
           </label>
         </div>
       )}

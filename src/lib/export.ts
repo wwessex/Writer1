@@ -9,6 +9,26 @@ export interface ScreenplayBlock {
   text: string;
 }
 
+export interface FountainMetadata {
+  credit?: string;
+  author?: string;
+  draftDate?: string;
+  source?: string;
+}
+
+export interface ScreenplayFountainOptions {
+  sceneSeparator?: string;
+}
+
+export interface FountainExportOptions {
+  includeSectionTitles?: boolean;
+  includeMetadataBlock?: boolean;
+  metadata?: FountainMetadata;
+  sceneSeparator?: string;
+  sectionSeparator?: string;
+  filenameConvention?: 'title' | 'title-screenplay' | 'title-fountain';
+}
+
 const SCREENPLAY_PDF_FONTS = {
   Helvetica: {
     normal: 'Helvetica',
@@ -89,30 +109,59 @@ function normalizeScreenplayText(block: ScreenplayBlock): string {
   return block.text;
 }
 
+function formatSceneHeadingForFountain(text: string): string {
+  const normalized = text.toUpperCase();
+  const isStandardSceneHeading = /^(INT|EXT|EST|INT\/EXT|I\/E)\.?\s/.test(normalized);
+  return isStandardSceneHeading ? normalized : `.${normalized}`;
+}
+
 /**
  * Convert screenplay chapter JSON into Fountain text.
  */
-export function screenplayChapterToFountain(chapter: Chapter): string {
-  const lines = screenplayJsonToBlocks(chapter.content).flatMap(block => {
+export function screenplayChapterToFountain(chapter: Chapter, options: ScreenplayFountainOptions = {}): string {
+  const sceneSeparator = options.sceneSeparator ?? '\n\n';
+  const chunks: string[] = [];
+  let hasScene = false;
+
+  const pushBlock = (text: string, withLeadingSpacer = false) => {
+    if (!text) {
+      return;
+    }
+    if (withLeadingSpacer && chunks.length > 0 && chunks[chunks.length - 1] !== '') {
+      chunks.push('');
+    }
+    chunks.push(text);
+  };
+
+  for (const block of screenplayJsonToBlocks(chapter.content)) {
     const normalized = normalizeScreenplayText(block);
 
     switch (block.type) {
-      case 'scene-heading':
-        return ['', normalized];
-      case 'transition':
-        return [normalized];
+      case 'scene-heading': {
+        if (hasScene && sceneSeparator) {
+          const separatorLines = sceneSeparator.split('\n');
+          chunks.push(...separatorLines);
+        }
+        pushBlock(formatSceneHeadingForFountain(normalized), !hasScene);
+        hasScene = true;
+        break;
+      }
       case 'action':
-        return ['', normalized, ''];
+        pushBlock(normalized, true);
+        break;
+      case 'transition':
+        pushBlock(normalized, true);
+        break;
       case 'character':
       case 'dialogue':
       case 'parenthetical':
       default:
-        return [normalized];
+        pushBlock(normalized, false);
+        break;
     }
-  });
+  }
 
-  const rendered = lines.join('\n').replace(/^\n+/, '').replace(/\n{3,}/g, '\n\n');
-  return rendered.trim();
+  return chunks.join('\n').replace(/^\n+/, '').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 /**
@@ -317,14 +366,55 @@ export async function exportToScreenplayPdf(
 /**
  * Export chapters to Fountain format.
  */
-export async function exportToFountain(chapters: Chapter[], title: string): Promise<void> {
-  const body = chapters
-    .map(chapter => screenplayChapterToFountain(chapter))
-    .filter(Boolean)
-    .join('\n\n');
+export async function exportToFountain(
+  chapters: Chapter[],
+  title: string,
+  options: FountainExportOptions = {}
+): Promise<void> {
+  const {
+    includeSectionTitles = false,
+    includeMetadataBlock = true,
+    metadata,
+    sceneSeparator,
+    sectionSeparator = '\n\n',
+    filenameConvention = 'title',
+  } = options;
 
-  const output = `Title: ${title}\n\n${body}`;
-  downloadFile(output, `${title}.fountain`, 'text/plain;charset=utf-8');
+  const headerLines = [
+    `Title: ${title}`,
+    metadata?.credit ? `Credit: ${metadata.credit}` : null,
+    metadata?.author ? `Author: ${metadata.author}` : null,
+    metadata?.draftDate ? `Draft date: ${metadata.draftDate}` : null,
+    metadata?.source ? `Source: ${metadata.source}` : null,
+  ].filter((line): line is string => Boolean(line));
+
+  const header = includeMetadataBlock ? `${headerLines.join('\n')}\n\n` : '';
+
+  const body = chapters
+    .map(chapter => {
+      const chapterBody = screenplayChapterToFountain(chapter, { sceneSeparator });
+      if (!chapterBody) {
+        return includeSectionTitles && chapter.title ? `# ${chapter.title}` : '';
+      }
+
+      if (!includeSectionTitles || !chapter.title) {
+        return chapterBody;
+      }
+
+      return `# ${chapter.title}\n\n${chapterBody}`;
+    })
+    .filter(Boolean)
+    .join(sectionSeparator);
+
+  const output = `${header}${body}`.trim();
+
+  const filename = filenameConvention === 'title-screenplay'
+    ? `${title}.screenplay.fountain`
+    : filenameConvention === 'title-fountain'
+      ? `${title}.fountain-export.fountain`
+      : `${title}.fountain`;
+
+  downloadFile(output, filename, 'text/plain;charset=utf-8');
 }
 
 /**

@@ -1,6 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Chapter } from '@/types';
-import { screenplayJsonToBlocks, screenplayChapterToFountain, screenplayChapterToPdfContent } from './export';
+import { screenplayJsonToBlocks, screenplayChapterToFountain, screenplayChapterToPdfContent, exportToFountain } from './export';
+
+const { downloadFileMock } = vi.hoisted(() => ({
+  downloadFileMock: vi.fn(),
+}));
+
+vi.mock('./utils', async () => {
+  const actual = await vi.importActual<typeof import('./utils')>('./utils');
+  return {
+    ...actual,
+    downloadFile: downloadFileMock,
+  };
+});
 
 const screenplayFixture: Chapter = {
   id: 'chapter-1',
@@ -27,7 +39,27 @@ const screenplayFixture: Chapter = {
   },
 };
 
+function createChapter(id: string, title: string, paragraphs: Array<{ screenplayType?: string; text: string }>): Chapter {
+  return {
+    ...screenplayFixture,
+    id,
+    title,
+    content: {
+      type: 'doc',
+      content: paragraphs.map(paragraph => ({
+        type: 'paragraph',
+        attrs: paragraph.screenplayType ? { screenplayType: paragraph.screenplayType } : {},
+        content: [{ type: 'text', text: paragraph.text }],
+      })),
+    },
+  };
+}
+
 describe('screenplay export helpers', () => {
+  beforeEach(() => {
+    downloadFileMock.mockReset();
+  });
+
   it('maps screenplay JSON into typed blocks', () => {
     expect(screenplayJsonToBlocks(screenplayFixture.content)).toEqual([
       { type: 'scene-heading', text: 'Int. House - Night' },
@@ -44,11 +76,39 @@ describe('screenplay export helpers', () => {
 `INT. HOUSE - NIGHT
 
 Rain pounds the windows.
-
 SAM
 (whispering)
 We need to leave. Now.
+
 CUT TO:`
+    );
+  });
+
+  it('keeps character and dialogue grouped, spaces transitions, and marks non-standard scene headings', () => {
+    const chapter = createChapter('chapter-2', 'Alt', [
+      { screenplayType: 'scene-heading', text: 'Flashback - Beach' },
+      { screenplayType: 'action', text: 'Waves crash hard.' },
+      { screenplayType: 'character', text: 'Jules' },
+      { screenplayType: 'dialogue', text: 'I remember this place.' },
+      { screenplayType: 'transition', text: 'smash cut to:' },
+      { screenplayType: 'scene-heading', text: 'Ext. Road - Dawn' },
+      { screenplayType: 'action', text: 'A bus rounds the corner.' },
+    ]);
+
+    expect(screenplayChapterToFountain(chapter, { sceneSeparator: '\n\n***\n\n' })).toBe(
+`.FLASHBACK - BEACH
+
+Waves crash hard.
+JULES
+I remember this place.
+
+SMASH CUT TO:
+
+***
+
+EXT. ROAD - DAWN
+
+A bus rounds the corner.`
     );
   });
 
@@ -61,5 +121,54 @@ CUT TO:`
       { text: 'We need to leave. Now.', style: 'dialogue', margin: [110, 0, 110, 4] },
       { text: 'CUT TO:', style: 'transition', margin: [0, 10, 0, 6], alignment: 'right' },
     ]);
+  });
+
+  it('exports multi-chapter Fountain output with metadata and section titles', async () => {
+    const secondChapter = createChapter('chapter-3', 'Second Movement', [
+      { screenplayType: 'scene-heading', text: 'Ext. Alley - Night' },
+      { screenplayType: 'action', text: 'A cat darts between cans.' },
+    ]);
+
+    await exportToFountain([screenplayFixture, secondChapter], 'Project Echo', {
+      includeSectionTitles: true,
+      includeMetadataBlock: true,
+      metadata: {
+        credit: 'Written for the screen by',
+        author: 'Dev Writer',
+        draftDate: '2026-02-14',
+        source: 'Story outline v2',
+      },
+      sectionSeparator: '\n\n===\n\n',
+      filenameConvention: 'title-screenplay',
+    });
+
+    expect(downloadFileMock).toHaveBeenCalledWith(
+      `Title: Project Echo\nCredit: Written for the screen by\nAuthor: Dev Writer\nDraft date: 2026-02-14\nSource: Story outline v2\n\n# Opening\n\nINT. HOUSE - NIGHT\n\nRain pounds the windows.\nSAM\n(whispering)\nWe need to leave. Now.\n\nCUT TO:\n\n===\n\n# Second Movement\n\nEXT. ALLEY - NIGHT\n\nA cat darts between cans.`,
+      'Project Echo.screenplay.fountain',
+      'text/plain;charset=utf-8'
+    );
+  });
+
+  it('handles empty chapters and ignores mixed non-screenplay paragraphs', async () => {
+    const mixedChapter = createChapter('chapter-4', 'Mixed', [
+      { text: 'This should be ignored' },
+      { screenplayType: 'action', text: 'Only this action exports.' },
+      { text: 'This line is also ignored' },
+    ]);
+
+    const emptyChapter = createChapter('chapter-5', 'Empty Chapter', []);
+
+    await exportToFountain([mixedChapter, emptyChapter], 'Noir', {
+      includeSectionTitles: true,
+      includeMetadataBlock: false,
+      sectionSeparator: '\n\n--\n\n',
+      filenameConvention: 'title-fountain',
+    });
+
+    expect(downloadFileMock).toHaveBeenCalledWith(
+      '# Mixed\n\nOnly this action exports.\n\n--\n\n# Empty Chapter',
+      'Noir.fountain-export.fountain',
+      'text/plain;charset=utf-8'
+    );
   });
 });
