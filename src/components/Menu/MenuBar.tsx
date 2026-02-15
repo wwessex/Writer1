@@ -28,6 +28,7 @@ const MENUS: MenuConfig[] = [
       { divider: true },
       { label: 'Export Backup', action: 'exportBackup' },
       { label: 'Import Backup', action: 'importBackup' },
+      { label: 'Export History...', action: 'exportHistory' },
       { divider: true },
       { label: 'Settings', action: 'settings' }
     ]
@@ -83,7 +84,10 @@ const MENUS: MenuConfig[] = [
       { label: 'Word Count...', action: 'wordCount' },
       { divider: true },
       { label: 'Character & World Bible...', action: 'characterBible' },
+      { label: 'Scene Templates...', action: 'sceneTemplates' },
+      { divider: true },
       { label: 'AI Writing Tools...', action: 'aiWriting' },
+      { label: 'AI Suggestions Panel', action: 'aiPanel' },
       { label: 'Comments...', action: 'comments' },
       { divider: true },
       { label: 'Integrations...', action: 'integrations' }

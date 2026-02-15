@@ -3,9 +3,62 @@ import { Dialog, Button, IconButton } from '@/components/UI';
 import { useToast } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
 import { getSnapshots, createSnapshot, deleteSnapshot } from '@/lib/storage';
-import { editorToPlainText, formatDateTime } from '@/lib/utils';
+import { editorToPlainText, formatDateTime, countWords } from '@/lib/utils';
 import type { Snapshot } from '@/types';
 import styles from './Modals.module.css';
+
+// -- Visual Timeline Component --
+function SnapshotTimeline({
+  snapshots,
+  selectedId,
+  onSelect,
+}: {
+  snapshots: Snapshot[];
+  selectedId: string | null;
+  onSelect: (s: Snapshot) => void;
+}) {
+  if (snapshots.length === 0) return null;
+
+  const wordCounts = snapshots.map(s => countWords(editorToPlainText(s.doc)));
+  const maxWords = Math.max(...wordCounts, 1);
+
+  // Group by date
+  const groups = new Map<string, { snapshot: Snapshot; words: number }[]>();
+  snapshots.forEach((s, i) => {
+    const dateKey = new Date(s.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    if (!groups.has(dateKey)) groups.set(dateKey, []);
+    groups.get(dateKey)!.push({ snapshot: s, words: wordCounts[i] });
+  });
+
+  return (
+    <div className={styles.timeline}>
+      <div className={styles.timeline__line} />
+      {[...groups.entries()].map(([dateLabel, items]) => (
+        <div key={dateLabel} className={styles.timeline__group}>
+          <div className={styles.timeline__dateLabel}>{dateLabel}</div>
+          {items.map(({ snapshot, words }) => {
+            const isSelected = selectedId === snapshot.id;
+            const heightPercent = Math.max(8, (words / maxWords) * 100);
+            const time = new Date(snapshot.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+            return (
+              <button
+                key={snapshot.id}
+                className={`${styles.timeline__node} ${isSelected ? styles['timeline__node--selected'] : ''}`}
+                onClick={() => onSelect(snapshot)}
+                title={`${time} - ${words.toLocaleString()} words`}
+              >
+                <div className={styles.timeline__dot} />
+                <div className={styles.timeline__bar} style={{ height: `${heightPercent}%` }} />
+                <span className={styles.timeline__time}>{time}</span>
+                <span className={styles.timeline__words}>{words.toLocaleString()}w</span>
+              </button>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 interface SnapshotModalProps {
   open: boolean;
@@ -104,6 +157,21 @@ export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
 
   return (
     <Dialog open={open} onClose={onClose} title={`Snapshots - ${activeChapter.title}`} size="large">
+      {/* Visual Timeline */}
+      {snapshots.length > 1 && (
+        <div className={styles.snapshotTimelineWrap}>
+          <h4 className={styles.snapshotTimelineWrap__title}>
+            <span className="material-symbols-rounded">timeline</span>
+            Version Timeline
+          </h4>
+          <SnapshotTimeline
+            snapshots={snapshots}
+            selectedId={selectedSnapshot?.id ?? null}
+            onSelect={(s) => { setSelectedSnapshot(s); setShowDiff(false); }}
+          />
+        </div>
+      )}
+
       <div className={styles.snapshotLayout}>
         <div className={styles.snapshotList}>
           <div className={styles.snapshotList__header}>

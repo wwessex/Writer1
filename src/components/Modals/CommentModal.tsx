@@ -10,6 +10,55 @@ interface CommentModalProps {
   onClose: () => void;
 }
 
+// ---- Collaboration Roles ----
+
+type CollabRole = 'author' | 'editor' | 'reviewer' | 'viewer';
+
+interface Collaborator {
+  id: string;
+  name: string;
+  role: CollabRole;
+  color: string;
+}
+
+const ROLE_PERMISSIONS: Record<CollabRole, { canComment: boolean; canResolve: boolean; canDelete: boolean; canEdit: boolean }> = {
+  author: { canComment: true, canResolve: true, canDelete: true, canEdit: true },
+  editor: { canComment: true, canResolve: true, canDelete: false, canEdit: true },
+  reviewer: { canComment: true, canResolve: false, canDelete: false, canEdit: false },
+  viewer: { canComment: false, canResolve: false, canDelete: false, canEdit: false },
+};
+
+const ROLE_LABELS: Record<CollabRole, string> = {
+  author: 'Author',
+  editor: 'Editor',
+  reviewer: 'Reviewer',
+  viewer: 'Viewer',
+};
+
+const COLLAB_STORAGE_KEY = 'novelwriter_collaborators';
+const ACTIVE_USER_KEY = 'novelwriter_active_user';
+
+function loadCollaborators(): Collaborator[] {
+  try {
+    const data = localStorage.getItem(COLLAB_STORAGE_KEY);
+    if (data) return JSON.parse(data);
+  } catch { /* ignore */ }
+  return [{ id: 'default', name: 'Author', role: 'author', color: '#60a5fa' }];
+}
+
+function saveCollaborators(collabs: Collaborator[]) {
+  localStorage.setItem(COLLAB_STORAGE_KEY, JSON.stringify(collabs));
+}
+
+function getActiveUser(): Collaborator {
+  try {
+    const data = localStorage.getItem(ACTIVE_USER_KEY);
+    if (data) return JSON.parse(data);
+  } catch { /* ignore */ }
+  const collabs = loadCollaborators();
+  return collabs[0];
+}
+
 const STORAGE_PREFIX = 'novelwriter_comments_';
 
 function loadComments(chapterId: string): Comment[] {
@@ -36,6 +85,35 @@ export function CommentModal({ open, onClose }: CommentModalProps) {
   const [replyTargetId, setReplyTargetId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
+  const [showCollabPanel, setShowCollabPanel] = useState(false);
+  const [collaborators, setCollaborators] = useState<Collaborator[]>(loadCollaborators);
+  const [activeUser] = useState<Collaborator>(getActiveUser);
+  const [newCollabName, setNewCollabName] = useState('');
+  const [newCollabRole, setNewCollabRole] = useState<CollabRole>('reviewer');
+
+  const permissions = ROLE_PERMISSIONS[activeUser.role];
+
+  const handleAddCollaborator = useCallback(() => {
+    if (!newCollabName.trim()) return;
+    const colors = ['#f87171', '#34d399', '#fbbf24', '#a78bfa', '#fb923c', '#38bdf8'];
+    const collab: Collaborator = {
+      id: crypto.randomUUID(),
+      name: newCollabName.trim(),
+      role: newCollabRole,
+      color: colors[collaborators.length % colors.length],
+    };
+    const updated = [...collaborators, collab];
+    setCollaborators(updated);
+    saveCollaborators(updated);
+    setNewCollabName('');
+  }, [newCollabName, newCollabRole, collaborators]);
+
+  const handleRemoveCollaborator = useCallback((id: string) => {
+    if (id === 'default') return; // Can't remove the author
+    const updated = collaborators.filter(c => c.id !== id);
+    setCollaborators(updated);
+    saveCollaborators(updated);
+  }, [collaborators]);
 
   // Load comments when modal opens or active chapter changes
   useEffect(() => {
@@ -156,6 +234,68 @@ export function CommentModal({ open, onClose }: CommentModalProps) {
       size="medium"
     >
       <div className={styles.commentLayout}>
+        {/* Collaboration panel toggle */}
+        <div className={styles.collabToggleBar}>
+          <button
+            className={`${styles.collabToggleBtn} ${showCollabPanel ? styles['collabToggleBtn--active'] : ''}`}
+            onClick={() => setShowCollabPanel(!showCollabPanel)}
+          >
+            <span className="material-symbols-rounded">group</span>
+            Collaborators ({collaborators.length})
+          </button>
+          <span className={styles.collabActiveUser}>
+            <span className={styles.collabDot} style={{ background: activeUser.color }} />
+            {activeUser.name} ({ROLE_LABELS[activeUser.role]})
+          </span>
+        </div>
+
+        {showCollabPanel && (
+          <div className={styles.collabPanel}>
+            <div className={styles.collabPanel__list}>
+              {collaborators.map(collab => (
+                <div key={collab.id} className={styles.collabPanel__item}>
+                  <span className={styles.collabDot} style={{ background: collab.color }} />
+                  <span className={styles.collabPanel__name}>{collab.name}</span>
+                  <span className={styles.collabPanel__role}>{ROLE_LABELS[collab.role]}</span>
+                  <span className={styles.collabPanel__perms}>
+                    {ROLE_PERMISSIONS[collab.role].canComment ? 'Comment' : ''}
+                    {ROLE_PERMISSIONS[collab.role].canResolve ? ', Resolve' : ''}
+                    {ROLE_PERMISSIONS[collab.role].canEdit ? ', Edit' : ''}
+                  </span>
+                  {collab.id !== 'default' && (
+                    <button
+                      className={styles.collabPanel__remove}
+                      onClick={() => handleRemoveCollaborator(collab.id)}
+                    >
+                      <span className="material-symbols-rounded">close</span>
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className={styles.collabPanel__addForm}>
+              <input
+                className={styles.collabPanel__input}
+                value={newCollabName}
+                onChange={e => setNewCollabName(e.target.value)}
+                placeholder="Name"
+              />
+              <select
+                className={styles.collabPanel__select}
+                value={newCollabRole}
+                onChange={e => setNewCollabRole(e.target.value as CollabRole)}
+              >
+                <option value="editor">Editor</option>
+                <option value="reviewer">Reviewer</option>
+                <option value="viewer">Viewer</option>
+              </select>
+              <Button variant="ghost" size="small" onClick={handleAddCollaborator} disabled={!newCollabName.trim()}>
+                Add
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* New comment form */}
         <div className={styles.commentForm}>
           <Textarea

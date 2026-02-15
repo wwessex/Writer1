@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Dialog, Button } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
-import { editorToPlainText, countWords } from '@/lib/utils';
+import { editorToPlainText, countWords, findRepetitions } from '@/lib/utils';
 import type { AdvancedAnalytics, SentenceDistribution, SentimentResult } from '@/types';
 import styles from './Modals.module.css';
 
@@ -312,9 +312,9 @@ interface AdvancedAnalyticsModalProps {
 }
 
 export function AdvancedAnalyticsModal({ open, onClose }: AdvancedAnalyticsModalProps) {
-  const { activeChapter } = useApp();
+  const { activeChapter, state } = useApp();
   const [activeTab, setActiveTab] = useState<
-    'distribution' | 'vocabulary' | 'sentiment' | 'frequency'
+    'distribution' | 'vocabulary' | 'sentiment' | 'frequency' | 'pacing' | 'repetition'
   >('distribution');
 
   const text = useMemo(() => {
@@ -335,6 +335,41 @@ export function AdvancedAnalyticsModal({ open, onClose }: AdvancedAnalyticsModal
   const wordFrequency = useMemo(() => {
     if (!text.trim()) return new Map<string, number>();
     return getWordFrequency(text);
+  }, [text]);
+
+  // Pacing analysis across all chapters
+  const pacingData = useMemo(() => {
+    return state.chapters.map(ch => {
+      const chText = editorToPlainText(ch.content);
+      const words = countWords(chText);
+      const sentences = chText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+      const avgSentenceLen = sentences.length > 0
+        ? Math.round(sentences.reduce((sum, s) => sum + s.trim().split(/\s+/).length, 0) / sentences.length)
+        : 0;
+
+      // Dialogue ratio
+      const dialogueMatches = chText.match(/[""\u201C\u201D][^""\u201C\u201D]+[""\u201C\u201D]/g) || [];
+      const dialogueWords = dialogueMatches.join(' ').split(/\s+/).length;
+      const dialogueRatio = words > 0 ? Math.round((dialogueWords / words) * 100) : 0;
+
+      // Sentiment
+      const sentiment = chText.trim() ? analyzeSentiment(chText) : { label: 'neutral' as const, score: 0 };
+
+      return {
+        id: ch.id,
+        title: ch.title,
+        words,
+        avgSentenceLen,
+        dialogueRatio,
+        sentiment,
+      };
+    });
+  }, [state.chapters]);
+
+  // Word repetition detection
+  const repetitions = useMemo(() => {
+    if (!text.trim()) return [];
+    return findRepetitions(text, 3);
   }, [text]);
 
   const totalWords = useMemo(() => countWords(text), [text]);
@@ -462,6 +497,20 @@ export function AdvancedAnalyticsModal({ open, onClose }: AdvancedAnalyticsModal
         >
           <span className="material-symbols-rounded">format_list_numbered</span>
           Word Frequency
+        </button>
+        <button
+          className={`${styles.advancedAnalytics__tab} ${activeTab === 'pacing' ? styles['advancedAnalytics__tab--active'] : ''}`}
+          onClick={() => setActiveTab('pacing')}
+        >
+          <span className="material-symbols-rounded">speed</span>
+          Pacing
+        </button>
+        <button
+          className={`${styles.advancedAnalytics__tab} ${activeTab === 'repetition' ? styles['advancedAnalytics__tab--active'] : ''}`}
+          onClick={() => setActiveTab('repetition')}
+        >
+          <span className="material-symbols-rounded">repeat</span>
+          Repetition
         </button>
       </div>
 
@@ -666,6 +715,103 @@ export function AdvancedAnalyticsModal({ open, onClose }: AdvancedAnalyticsModal
                 />
               ) : (
                 <p className={styles.emptyMessage}>Not enough text for word frequency analysis</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Pacing Heatmap Tab */}
+        {activeTab === 'pacing' && (
+          <div className={styles.advancedAnalytics__section}>
+            <div className={styles.analysisCard}>
+              <h4>
+                <span className="material-symbols-rounded">speed</span>
+                Pacing Heatmap
+              </h4>
+              <p className={styles.advancedAnalytics__hint}>
+                Visualizes pacing across all chapters. Short sentences and high dialogue create faster pacing.
+                Long sentences and low dialogue create slower, more contemplative sections.
+              </p>
+              {pacingData.length > 0 ? (
+                <div className={styles.pacingHeatmap}>
+                  <div className={styles.pacingHeatmap__header}>
+                    <span>Chapter</span>
+                    <span>Words</span>
+                    <span>Avg Sentence</span>
+                    <span>Dialogue %</span>
+                    <span>Tone</span>
+                    <span>Pace</span>
+                  </div>
+                  {pacingData.map((ch, idx) => {
+                    // Pace score: shorter sentences + more dialogue = faster
+                    const paceScore = Math.min(100, Math.max(0,
+                      (ch.dialogueRatio * 0.5) + Math.max(0, (25 - ch.avgSentenceLen)) * 3
+                    ));
+                    const paceLabel = paceScore > 60 ? 'Fast' : paceScore > 35 ? 'Medium' : 'Slow';
+                    const paceColor = paceScore > 60 ? 'var(--danger, #ef4444)' : paceScore > 35 ? 'var(--warning, #f59e0b)' : 'var(--accent)';
+                    return (
+                      <div key={ch.id} className={styles.pacingHeatmap__row}>
+                        <span className={styles.pacingHeatmap__title} title={ch.title}>
+                          {idx + 1}. {ch.title.length > 20 ? ch.title.slice(0, 20) + '...' : ch.title}
+                        </span>
+                        <span>{ch.words.toLocaleString()}</span>
+                        <span>{ch.avgSentenceLen}w</span>
+                        <span>{ch.dialogueRatio}%</span>
+                        <span className={styles.pacingHeatmap__sentiment}>
+                          {ch.sentiment.label === 'positive' ? '+' : ch.sentiment.label === 'negative' ? '-' : '~'}
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                          <div className={styles.pacingHeatmap__bar}>
+                            <div
+                              className={styles.pacingHeatmap__barFill}
+                              style={{ width: `${paceScore}%`, background: paceColor }}
+                            />
+                          </div>
+                          <span style={{ fontSize: '0.6875rem', color: paceColor }}>{paceLabel}</span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className={styles.emptyMessage}>Add chapters to see pacing analysis</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Repetition Detection Tab */}
+        {activeTab === 'repetition' && (
+          <div className={styles.advancedAnalytics__section}>
+            <div className={styles.analysisCard}>
+              <h4>
+                <span className="material-symbols-rounded">repeat</span>
+                Word Repetition Detection
+              </h4>
+              <p className={styles.advancedAnalytics__hint}>
+                Words used 3+ times in the current chapter. Frequent repetition may indicate
+                areas where synonyms or restructuring would improve prose quality.
+              </p>
+              {repetitions.length > 0 ? (
+                <div className={styles.repetitionList}>
+                  {repetitions.slice(0, 30).map(({ word, count }) => (
+                    <div key={word} className={styles.repetitionItem}>
+                      <span className={styles.repetitionItem__word}>{word}</span>
+                      <div className={styles.repetitionItem__bar}>
+                        <div
+                          className={styles.repetitionItem__barFill}
+                          style={{
+                            width: `${Math.min(100, (count / Math.max(...repetitions.map(r => r.count))) * 100)}%`,
+                            background: count > 10 ? 'var(--danger, #ef4444)' : count > 5 ? 'var(--warning, #f59e0b)' : 'var(--accent)',
+                          }}
+                        />
+                      </div>
+                      <span className={styles.repetitionItem__count}>{count}x</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className={styles.emptyMessage}>No significant word repetitions detected</p>
               )}
             </div>
           </div>

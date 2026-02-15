@@ -4,6 +4,7 @@ import { Input, Button } from '@/components/UI';
 import { HelpTooltip } from '@/components/UI/Tooltip';
 import { Select } from '@/components/UI/Select';
 import { clearAllData } from '@/lib/storage';
+import { isTelemetryOptedIn, setTelemetryOptIn, clearTelemetryData } from '@/lib/telemetry';
 import styles from './Windows.module.css';
 
 interface SettingsWindowProps {
@@ -60,9 +61,11 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
     typography: false,
     sync: true,
     assist: true,
+    privacy: true,
     app: false,
     data: true
   });
+  const [telemetryEnabled, setTelemetryEnabled] = useState(isTelemetryOptedIn());
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 820);
@@ -369,6 +372,97 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                     onChange={e => updateSettings({ novelWordGoal: parseInt(e.target.value) || 0 })}
                     placeholder="0"
                   />
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* Privacy & Sync Section */}
+          <section className={styles.section}>
+            <button className={styles.sectionToggle} onClick={() => toggleSection('privacy')}>
+              <h4>
+                <span className="material-symbols-rounded">shield</span>
+                Privacy & Data Sync
+              </h4>
+              <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
+                {collapsedSections.privacy ? 'expand_more' : 'expand_less'}
+              </span>
+            </button>
+            {!collapsedSections.privacy && (
+              <div className={styles.sectionContent}>
+                <div className={styles.privacyNotice}>
+                  <span className="material-symbols-rounded">info</span>
+                  <div>
+                    <p className={styles.privacyNotice__text}>
+                      <strong>Your writing stays private by default.</strong> NovelWriter stores everything in
+                      your browser's local storage (IndexedDB). No data leaves your device unless you
+                      explicitly enable cloud sync below.
+                    </p>
+                  </div>
+                </div>
+
+                <div className={styles.privacyToggle}>
+                  <div className={styles.privacyToggle__info}>
+                    <span className={styles.privacyToggle__label}>Cloud Sync</span>
+                    <span className={styles.privacyToggle__desc}>
+                      When enabled, chapter content is sent to your configured sync server.
+                      Data is transmitted over HTTPS. Enable encrypted sync in Integrations for end-to-end encryption.
+                    </span>
+                  </div>
+                  <label className={styles.toggleSwitch}>
+                    <input
+                      type="checkbox"
+                      checked={state.settings.sync.url.trim() !== ''}
+                      onChange={e => {
+                        if (!e.target.checked) {
+                          updateSettings({ sync: { ...state.settings.sync, url: '', auth: '' } });
+                        }
+                      }}
+                    />
+                    <span className={styles.toggleSwitch__slider} />
+                  </label>
+                </div>
+
+                <div className={styles.privacyToggle}>
+                  <div className={styles.privacyToggle__info}>
+                    <span className={styles.privacyToggle__label}>AI Usage Telemetry</span>
+                    <span className={styles.privacyToggle__desc}>
+                      Opt in to track your AI usage locally (character counts, latency, action types).
+                      No content or text is ever recorded -- only metadata. Data stays on your device.
+                    </span>
+                  </div>
+                  <label className={styles.toggleSwitch}>
+                    <input
+                      type="checkbox"
+                      checked={telemetryEnabled}
+                      onChange={e => {
+                        setTelemetryEnabled(e.target.checked);
+                        setTelemetryOptIn(e.target.checked);
+                      }}
+                    />
+                    <span className={styles.toggleSwitch__slider} />
+                  </label>
+                </div>
+
+                {telemetryEnabled && (
+                  <Button variant="ghost" onClick={() => { clearTelemetryData(); }}>
+                    <span className="material-symbols-rounded">delete_sweep</span>
+                    Clear Telemetry Data
+                  </Button>
+                )}
+
+                <div className={styles.privacyToggle}>
+                  <div className={styles.privacyToggle__info}>
+                    <span className={styles.privacyToggle__label}>Local Storage Only</span>
+                    <span className={styles.privacyToggle__desc}>
+                      Grammar checking via LanguageTool sends text to the configured API endpoint.
+                      AI Writing Tools sends chapter context to your configured AI endpoint.
+                      Both are opt-in and disabled by default.
+                    </span>
+                  </div>
+                  <span className="material-symbols-rounded" style={{ color: 'var(--success, #22c55e)', fontSize: '1.5rem' }}>
+                    verified_user
+                  </span>
                 </div>
               </div>
             )}

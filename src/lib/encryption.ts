@@ -77,3 +77,81 @@ export async function decryptData(buffer: ArrayBuffer, password: string): Promis
 export function isEncryptionSupported(): boolean {
   return typeof crypto !== 'undefined' && typeof crypto.subtle !== 'undefined';
 }
+
+// ---- Encrypted Sync Helpers ----
+
+const SYNC_ENCRYPTION_KEY = 'novelwriter_sync_encryption';
+
+export interface SyncEncryptionConfig {
+  enabled: boolean;
+  /** Encrypted passphrase check - used to verify the correct password on unlock */
+  passphraseCheck?: string;
+}
+
+export function getSyncEncryptionConfig(): SyncEncryptionConfig {
+  try {
+    const data = localStorage.getItem(SYNC_ENCRYPTION_KEY);
+    if (data) return JSON.parse(data);
+  } catch { /* ignore */ }
+  return { enabled: false };
+}
+
+export function setSyncEncryptionConfig(config: SyncEncryptionConfig): void {
+  localStorage.setItem(SYNC_ENCRYPTION_KEY, JSON.stringify(config));
+}
+
+/**
+ * Encrypt a sync payload (JSON string) with the user's passphrase.
+ * Returns a base64-encoded string suitable for transmission.
+ */
+export async function encryptSyncPayload(jsonData: string, passphrase: string): Promise<string> {
+  const buffer = await encryptData(jsonData, passphrase);
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+/**
+ * Decrypt a base64-encoded encrypted sync payload.
+ * Returns the original JSON string.
+ */
+export async function decryptSyncPayload(base64Data: string, passphrase: string): Promise<string> {
+  const binary = atob(base64Data);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return decryptData(bytes.buffer, passphrase);
+}
+
+/**
+ * Initialize sync encryption: sets up a passphrase check value.
+ */
+export async function initSyncEncryption(passphrase: string): Promise<void> {
+  const checkValue = await encryptSyncPayload('novelwriter-encryption-check', passphrase);
+  setSyncEncryptionConfig({ enabled: true, passphraseCheck: checkValue });
+}
+
+/**
+ * Verify a passphrase against the stored check.
+ */
+export async function verifySyncPassphrase(passphrase: string): Promise<boolean> {
+  const config = getSyncEncryptionConfig();
+  if (!config.passphraseCheck) return false;
+  try {
+    const decrypted = await decryptSyncPayload(config.passphraseCheck, passphrase);
+    return decrypted === 'novelwriter-encryption-check';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Disable sync encryption and clear config.
+ */
+export function disableSyncEncryption(): void {
+  setSyncEncryptionConfig({ enabled: false });
+}
