@@ -31,9 +31,13 @@ export function Editor({ screenplayMode, onToggleScreenplayMode }: EditorProps) 
   const { state, activeChapter, updateChapterImmediate, deleteChapter, dispatch } = useApp();
   const { editor } = useCurrentEditor();
 
+  // Sync editor content when switching chapters. We intentionally depend on
+  // activeChapter.id rather than the full object to avoid re-setting content
+  // on every keystroke (which would create an update loop).
   useEffect(() => {
     if (!editor || !activeChapter) return;
     editor.commands.setContent(activeChapter.content || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, activeChapter?.id]);
 
   const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
