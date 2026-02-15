@@ -20,9 +20,9 @@ export default defineConfig({
         start_url: '/Writer1/',
         icons: [
           {
-            src: 'assets/icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml'
+            src: 'assets/icon-blue-32.png',
+            sizes: '32x32',
+            type: 'image/png'
           },
           {
             src: 'assets/icon-blue-48.png',
