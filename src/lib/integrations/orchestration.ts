@@ -1,3 +1,4 @@
+import type { JSONContent } from '@tiptap/core';
 import type { AppState, Chapter } from '@/types';
 import type { NormalizedPullResult, ProviderDocument, ProviderPayload } from './types';
 
@@ -18,6 +19,22 @@ function chapterContentToText(chapter: Chapter): string {
     })
     .join('\n')
     .trim();
+}
+
+function documentBodyToContent(body: string): JSONContent {
+  const paragraphs = body
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => ({
+      type: 'paragraph',
+      content: [{ type: 'text', text: line }],
+    }));
+
+  return {
+    type: 'doc',
+    content: paragraphs.length > 0 ? paragraphs : [{ type: 'paragraph' }],
+  };
 }
 
 export function mapAppStateToProviderPayload(
@@ -57,7 +74,7 @@ export function normalizeProviderPullResponse(
         order: document.order,
         title: document.title,
         updatedAt: document.updatedAt,
-        content: null,
+        content: documentBodyToContent(document.body),
         summary: document.body.slice(0, 200),
         pov: '',
         status: 'draft' as const,
@@ -73,6 +90,7 @@ export function normalizeProviderPullResponse(
       title: document.title,
       order: document.order,
       updatedAt: document.updatedAt,
+      content: documentBodyToContent(document.body),
       summary: document.body.slice(0, 200),
     } as Chapter;
   });

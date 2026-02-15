@@ -44,7 +44,7 @@ export async function pullIntegrationData(
   appState: Pick<AppState, 'novelId' | 'projectType' | 'chapters'>
 ): Promise<NormalizedPullResult> {
   const payload = mapAppStateToProviderPayload(appState);
-  return getIntegrationAdapter(type).pull(config, payload);
+  return getIntegrationAdapter(type).pull(config, payload, appState.chapters);
 }
 
 export async function listIntegrationRevisions(

@@ -1,4 +1,4 @@
-import type { IntegrationConfig } from '@/types';
+import type { Chapter, IntegrationConfig } from '@/types';
 import { normalizeProviderPullResponse } from './orchestration';
 import type { IntegrationAdapter, ProviderPayload, RemoteRevision } from './types';
 import { createRemoteRevisionLabel, simulateLatency } from './helpers';
@@ -22,7 +22,7 @@ export const scrivenerAdapter: IntegrationAdapter = {
     };
   },
 
-  async pull(_config: IntegrationConfig, payload: ProviderPayload) {
+  async pull(_config: IntegrationConfig, payload: ProviderPayload, localChapters: Chapter[]) {
     await simulateLatency();
     const remoteRevision = createRemoteRevisionLabel('scrivener-revision');
     const remoteDocs = payload.chapters.map((chapter) => ({
@@ -32,7 +32,7 @@ export const scrivenerAdapter: IntegrationAdapter = {
       body: `${chapter.body}\n\nImported from Scrivener sync draft.`,
     }));
 
-    return normalizeProviderPullResponse([], remoteDocs, remoteRevision);
+    return normalizeProviderPullResponse(localChapters, remoteDocs, remoteRevision);
   },
 
   async push(_config: IntegrationConfig, payload: ProviderPayload) {
