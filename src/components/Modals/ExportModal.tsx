@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Dialog, Button } from '@/components/UI';
+import { useToast } from '@/components/UI';
+import { HelpTooltip } from '@/components/UI/Tooltip';
 import { useApp } from '@/context/AppContext';
 import type { ExportFormat } from '@/types';
 import { exportToDocx, exportToPdf, exportToRtf, exportToFountain, exportToScreenplayPdf } from '@/lib/export';
@@ -13,6 +15,7 @@ interface ExportModalProps {
 
 export function ExportModal({ open, onClose }: ExportModalProps) {
   const { state } = useApp();
+  const { showToast } = useToast();
   const [includeHeadings, setIncludeHeadings] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [includeSectionTitles, setIncludeSectionTitles] = useState(true);
@@ -20,6 +23,14 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
   const [filenameConvention, setFilenameConvention] = useState<FountainExportOptions['filenameConvention']>('title');
 
   const isScreenplay = state.projectType === 'screenplay';
+
+  const FORMAT_LABELS: Record<ExportFormat, string> = {
+    docx: 'DOCX',
+    pdf: 'PDF',
+    screenplayPdf: 'Screenplay PDF',
+    rtf: 'RTF',
+    fountain: 'Fountain'
+  };
 
   const handleExport = async (format: ExportFormat) => {
     setExporting(true);
@@ -45,10 +56,11 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
           await exportToRtf(state.chapters, state.novelTitle, includeHeadings);
           break;
       }
+      showToast(`Exported ${FORMAT_LABELS[format]} successfully`, 'success', 'download_done');
       onClose();
     } catch (error) {
       console.error('Export failed:', error);
-      alert('Export failed. Please try again.');
+      showToast(`${FORMAT_LABELS[format]} export failed. Please try again.`, 'error', 'error');
     } finally {
       setExporting(false);
     }
@@ -65,6 +77,7 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
               onChange={e => setIncludeHeadings(e.target.checked)}
             />
             <span>Include chapter headings</span>
+            <HelpTooltip text="When enabled, each chapter title appears as a heading in the exported document" position="right" />
           </label>
         </div>
       )}
