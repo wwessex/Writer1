@@ -6,16 +6,24 @@ import { createRemoteRevisionLabel, simulateLatency } from './helpers';
 export const googleDriveAdapter: IntegrationAdapter = {
   type: 'google-drive',
 
-  async connect(_config: IntegrationConfig) {
+  async connect(config: IntegrationConfig) {
     await simulateLatency();
+    if (!config.connectionId) {
+      throw new Error('Google Drive connection is required before syncing.');
+    }
+
     return {
-      message: 'Google Drive OAuth handshake simulated in local mode.',
+      message: 'Google Drive broker handshake simulated in local mode.',
       syncedAt: Date.now(),
     };
   },
 
-  async testConnection(_config: IntegrationConfig) {
+  async testConnection(config: IntegrationConfig) {
     await simulateLatency();
+    if (!config.connectionId) {
+      throw new Error('Missing Google broker connection. Connect your account first.');
+    }
+
     return {
       message: 'Google Drive API bridge is reachable (mock provider).',
       syncedAt: Date.now(),
@@ -33,8 +41,12 @@ export const googleDriveAdapter: IntegrationAdapter = {
     return normalizeProviderPullResponse([], remoteDocs, createRemoteRevisionLabel('gdrive-revision'));
   },
 
-  async push(_config: IntegrationConfig, payload: ProviderPayload) {
+  async push(config: IntegrationConfig, payload: ProviderPayload) {
     await simulateLatency();
+    if (!config.connectionId) {
+      throw new Error('Cannot push to Google Drive without an active broker connection.');
+    }
+
     return {
       message: `Pushed ${payload.chapters.length} chapter(s) to Google Drive docs.`,
       syncedAt: Date.now(),
