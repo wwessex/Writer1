@@ -29,8 +29,8 @@ export function createNovelEditor({ element, onUpdate }) {
     editorProps: {
       attributes: { class: "ProseMirror" }
     },
-    onUpdate: ({ editor }) => {
-      onUpdate?.(editor.getJSON());
+    onUpdate: () => {
+      onUpdate?.();
     }
   });
 
@@ -56,8 +56,15 @@ export function bindToolbar(editor, toolbarEl) {
     q("quote")?.classList.toggle("is-active", editor.isActive("blockquote"));
   };
 
-  editor.on("selectionUpdate", updateActive);
-  editor.on("transaction", updateActive);
+  let rafId = null;
+  const scheduleActive = () => {
+    if (rafId !== null) return;
+    rafId = requestAnimationFrame(() => {
+      rafId = null;
+      updateActive();
+    });
+  };
+  editor.on("transaction", scheduleActive);
   updateActive();
 
   toolbarEl.addEventListener("click", (e) => {
