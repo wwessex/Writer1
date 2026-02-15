@@ -15,7 +15,7 @@ import {
 import { SettingsWindow, AboutWindow } from '@/components/Windows';
 import { ToastProvider, useToast } from '@/components/UI';
 import { exportBackup, importBackup, createChapter, addChapter } from '@/lib/storage';
-import { importFile } from '@/lib/import';
+import { importFile, mapImportedContentToProjectType } from '@/lib/import';
 import { downloadFile } from '@/lib/utils';
 import './styles/index.css';
 import styles from './App.module.css';
@@ -180,16 +180,36 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
     if (!file) return;
 
     try {
-      const chapters = await importFile(file);
+      const result = await importFile(file);
 
-      for (let i = 0; i < chapters.length; i++) {
-        const chapter = createChapter(state.novelId, state.chapters.length + i, chapters[i].title);
-        chapter.content = chapters[i].content;
+      for (let i = 0; i < result.sections.length; i++) {
+        const importedSection = result.sections[i];
+        const chapter = createChapter(
+          state.novelId,
+          state.chapters.length + i,
+          importedSection.title,
+          state.projectType
+        );
+        chapter.content = mapImportedContentToProjectType(importedSection.content, state.projectType);
         await addChapter(chapter);
       }
 
-      showToast(`Imported ${chapters.length} chapter${chapters.length > 1 ? 's' : ''}`, 'success', 'upload_file');
-      loadNovel();
+      const sectionLabel = state.projectType === 'screenplay' ? 'scene' : 'chapter';
+      showToast(
+        `Imported ${result.sections.length} ${sectionLabel}${result.sections.length !== 1 ? 's' : ''}`,
+        'success',
+        'upload_file'
+      );
+
+      if (result.notices.length > 0) {
+        const firstNotice = result.notices[0];
+        showToast(
+          `Imported with ${result.notices.length} note${result.notices.length !== 1 ? 's' : ''}: ${firstNotice.message}`,
+          'info'
+        );
+      }
+
+      await loadNovel();
     } catch (err) {
       console.error('Document import failed:', err);
       showToast('Failed to import document. Check the file format.', 'error');
@@ -404,7 +424,7 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
       <input
         ref={importInputRef}
         type="file"
-        accept=".docx,.rtf,.txt"
+        accept=".docx,.rtf,.txt,.fountain,.spmd"
         onChange={handleImportDocument}
         style={{ display: 'none' }}
         aria-hidden="true"

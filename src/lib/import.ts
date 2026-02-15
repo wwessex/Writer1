@@ -1,14 +1,31 @@
 import type { JSONContent } from '@tiptap/core';
+import type { ProjectType } from '@/types';
 
 interface ParsedChapter {
   title: string;
   content: JSONContent;
+  metadata?: {
+    sourceFormat: 'docx' | 'rtf' | 'txt' | 'fountain';
+    originalTitle?: string;
+    sourceLineStart?: number;
+    sourceLineEnd?: number;
+  };
+}
+
+export interface ImportNotice {
+  message: string;
+  line?: number;
+}
+
+export interface ImportResult {
+  sections: ParsedChapter[];
+  notices: ImportNotice[];
 }
 
 // Regex patterns for chapter detection
-const CHAPTER_RE = /^(?:chapter|chap\.?)\s*(\d+|[ivxlcdm]+)[\s:.\-]*/i;
-const PART_RE = /^(?:part)\s*(\d+|[ivxlcdm]+)[\s:.\-]*/i;
-const FRONT_RE = /^(?:prologue|epilogue|introduction|preface|foreword|afterword)[\s:.\-]*/i;
+const CHAPTER_RE = /^(?:chapter|chap\.?)\s*(\d+|[ivxlcdm]+)[\s:.-]*/i;
+const PART_RE = /^(?:part)\s*(\d+|[ivxlcdm]+)[\s:.-]*/i;
+const FRONT_RE = /^(?:prologue|epilogue|introduction|preface|foreword|afterword)[\s:.-]*/i;
 const ALL_CAPS_RE = /^[A-Z\s\d]+$/;
 
 /**
@@ -88,6 +105,158 @@ function splitIntoChapters(lines: string[]): ParsedChapter[] {
   return chapters;
 }
 
+type ScreenplayBlockType = 'scene-heading' | 'action' | 'character' | 'parenthetical' | 'dialogue' | 'transition';
+
+function screenplayBlocksToDoc(blocks: Array<{ type: ScreenplayBlockType; text: string }>): JSONContent {
+  return {
+    type: 'doc',
+    content: blocks.map(block => ({
+      type: 'paragraph',
+      attrs: {
+        screenplayType: block.type
+      },
+      content: block.text.trim() ? [{ type: 'text', text: block.text.trim() }] : []
+    }))
+  };
+}
+
+function isSceneHeading(line: string): boolean {
+  const normalized = line.trim().toUpperCase();
+  return /^\.?\s*(INT\.|EXT\.|EST\.|INT\/EXT\.|I\/E\.)/.test(normalized);
+}
+
+function isTransition(line: string): boolean {
+  const normalized = line.trim().toUpperCase();
+  return normalized.endsWith(' TO:') || normalized.endsWith('TO:') || normalized.startsWith('>');
+}
+
+function isCharacterCue(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.length > 40) return false;
+  if (isSceneHeading(trimmed) || isTransition(trimmed)) return false;
+  return /^[A-Z0-9 '.\-()]+$/.test(trimmed) && /[A-Z]/.test(trimmed);
+}
+
+function normalizeFountainCue(line: string): string {
+  return line.trim().replace(/^@/, '');
+}
+
+function parseFountain(text: string): ImportResult {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  const sections: ParsedChapter[] = [];
+  const notices: ImportNotice[] = [];
+
+  let currentTitle = 'Scene 1';
+  let currentBlocks: Array<{ type: ScreenplayBlockType; text: string }> = [];
+  let sceneStartLine = 1;
+  let sceneCounter = 1;
+  let pendingDialogue = false;
+
+  const flushSection = (endLine: number) => {
+    if (currentBlocks.length === 0) return;
+    sections.push({
+      title: currentTitle,
+      content: screenplayBlocksToDoc(currentBlocks),
+      metadata: {
+        sourceFormat: 'fountain',
+        originalTitle: currentTitle,
+        sourceLineStart: sceneStartLine,
+        sourceLineEnd: endLine
+      }
+    });
+  };
+
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    const trimmed = line.trim();
+    const lineNumber = index + 1;
+
+    if (!trimmed) {
+      pendingDialogue = false;
+      continue;
+    }
+
+    if (trimmed.startsWith('/*') || trimmed.startsWith('*/')) {
+      notices.push({ message: 'Boneyard comments are imported as action text.', line: lineNumber });
+      currentBlocks.push({ type: 'action', text: trimmed.replace(/\/\*|\*\//g, '').trim() });
+      continue;
+    }
+
+    if (trimmed.startsWith('#')) {
+      notices.push({ message: 'Section headings are not fully supported and were imported as action text.', line: lineNumber });
+      currentBlocks.push({ type: 'action', text: trimmed.replace(/^#+\s*/, '') });
+      continue;
+    }
+
+    if (trimmed.startsWith('=')) {
+      notices.push({ message: 'Synopses are imported as action text.', line: lineNumber });
+      currentBlocks.push({ type: 'action', text: trimmed.replace(/^=\s*/, '') });
+      continue;
+    }
+
+    if (trimmed.startsWith('[[') && trimmed.endsWith(']]')) {
+      notices.push({ message: 'Inline notes are imported as action text.', line: lineNumber });
+      currentBlocks.push({ type: 'action', text: `NOTE: ${trimmed.slice(2, -2).trim()}` });
+      continue;
+    }
+
+    if (isSceneHeading(trimmed)) {
+      flushSection(lineNumber - 1);
+      currentTitle = trimmed.startsWith('.') ? trimmed.slice(1).trim() : trimmed;
+      currentBlocks = [{ type: 'scene-heading', text: currentTitle }];
+      sceneStartLine = lineNumber;
+      sceneCounter += 1;
+      pendingDialogue = false;
+      continue;
+    }
+
+    if (isTransition(trimmed)) {
+      currentBlocks.push({ type: 'transition', text: trimmed.replace(/^>\s*/, '') });
+      pendingDialogue = false;
+      continue;
+    }
+
+    if (isCharacterCue(trimmed) || trimmed.startsWith('@')) {
+      currentBlocks.push({ type: 'character', text: normalizeFountainCue(trimmed) });
+      pendingDialogue = true;
+      continue;
+    }
+
+    if (trimmed.startsWith('(') && trimmed.endsWith(')')) {
+      currentBlocks.push({ type: pendingDialogue ? 'parenthetical' : 'action', text: trimmed });
+      continue;
+    }
+
+    if (pendingDialogue) {
+      currentBlocks.push({ type: 'dialogue', text: trimmed });
+    } else {
+      currentBlocks.push({ type: 'action', text: trimmed });
+    }
+  }
+
+  flushSection(lines.length);
+
+  if (sections.length === 0 && currentBlocks.length === 0 && lines.some(line => line.trim())) {
+    sections.push({
+      title: `Scene ${sceneCounter}`,
+      content: screenplayBlocksToDoc([{ type: 'action', text: text.trim() }]),
+      metadata: { sourceFormat: 'fountain', sourceLineStart: 1, sourceLineEnd: lines.length }
+    });
+  }
+
+  if (sections.length === 0 && lines.every(line => !line.trim())) {
+    return { sections: [], notices };
+  }
+
+  return {
+    sections: sections.map((section, index) => ({
+      ...section,
+      title: section.title || `Scene ${index + 1}`
+    })),
+    notices
+  };
+}
+
 /**
  * Import DOCX file
  */
@@ -120,7 +289,10 @@ export async function importDocx(file: File): Promise<ParsedChapter[]> {
     paragraphs.push(texts.join(''));
   }
 
-  return splitIntoChapters(paragraphs);
+  return splitIntoChapters(paragraphs).map(section => ({
+    ...section,
+    metadata: { sourceFormat: 'docx', originalTitle: section.title }
+  }));
 }
 
 /**
@@ -161,7 +333,10 @@ function parseRtf(rtf: string): string[] {
 export async function importRtf(file: File): Promise<ParsedChapter[]> {
   const text = await file.text();
   const lines = parseRtf(text);
-  return splitIntoChapters(lines);
+  return splitIntoChapters(lines).map(section => ({
+    ...section,
+    metadata: { sourceFormat: 'rtf', originalTitle: section.title }
+  }));
 }
 
 /**
@@ -170,22 +345,68 @@ export async function importRtf(file: File): Promise<ParsedChapter[]> {
 export async function importText(file: File): Promise<ParsedChapter[]> {
   const text = await file.text();
   const lines = text.split('\n');
-  return splitIntoChapters(lines);
+  return splitIntoChapters(lines).map(section => ({
+    ...section,
+    metadata: { sourceFormat: 'txt', originalTitle: section.title }
+  }));
+}
+
+export async function importFountain(file: File): Promise<ImportResult> {
+  const text = await file.text();
+  return parseFountain(text);
+}
+
+export function mapImportedContentToProjectType(content: JSONContent, projectType: ProjectType): JSONContent {
+  const originalNodes = content.content || [];
+
+  if (projectType === 'screenplay') {
+    return {
+      ...content,
+      content: originalNodes.map(node => {
+        if (node.type !== 'paragraph') return node;
+        const screenplayType = typeof node.attrs?.screenplayType === 'string' ? node.attrs.screenplayType : 'action';
+        return {
+          ...node,
+          attrs: {
+            ...node.attrs,
+            screenplayType
+          }
+        };
+      })
+    };
+  }
+
+  return {
+    ...content,
+    content: originalNodes.map(node => {
+      if (node.type !== 'paragraph') return node;
+      if (!node.attrs || !('screenplayType' in node.attrs)) return node;
+      const attrs = { ...node.attrs };
+      delete attrs.screenplayType;
+      return {
+        ...node,
+        attrs: Object.keys(attrs).length > 0 ? attrs : undefined
+      };
+    })
+  };
 }
 
 /**
  * Import file based on extension
  */
-export async function importFile(file: File): Promise<ParsedChapter[]> {
+export async function importFile(file: File): Promise<ImportResult> {
   const ext = file.name.split('.').pop()?.toLowerCase();
 
   switch (ext) {
     case 'docx':
-      return importDocx(file);
+      return { sections: await importDocx(file), notices: [] };
     case 'rtf':
-      return importRtf(file);
+      return { sections: await importRtf(file), notices: [] };
     case 'txt':
-      return importText(file);
+      return { sections: await importText(file), notices: [] };
+    case 'fountain':
+    case 'spmd':
+      return importFountain(file);
     default:
       throw new Error(`Unsupported file type: ${ext}`);
   }
