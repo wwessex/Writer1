@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" fill="none">
+  <defs>
+    <linearGradient id="fg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#8FE9FF"/>
+      <stop offset="1" stop-color="#2EC6FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Icon (reuse simplified version) -->
+  <g transform="translate(20,20)">
+    <rect x="0" y="0" width="280" height="280" rx="64" fill="#07121F"/>
+    <g stroke="url(#fg)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M70 135c20-55 65-86 110-86s90 31 110 86" opacity="0.75"/>
+      <path d="M140 88h40l-8 20h-24l-8-20z"/>
+      <path d="M110 118h100" opacity="0.8"/>
+      <path d="M140 120c24 0 44 20 44 44v82c0 12-5 20-14 29l-30 32-30-32c-9-9-14-17-14-29v-82c0-24 20-44 44-44z"/>
+      <path d="M140 160v70" opacity="0.85"/>
+      <circle cx="140" cy="190" r="7" fill="url(#fg)" stroke="none"/>
+      <path d="M70 210c20 12 40 12 60 0s40-12 60 0 40 12 60 0 40-12 60 0"/>
+      <path d="M70 242c20 12 40 12 60 0s40-12 60 0 40 12 60 0 40-12 60 0" opacity="0.85"/>
+    </g>
+  </g>
+
+  <!-- Wordmark -->
+  <g transform="translate(340,88)">
+    <text x="0" y="86"
+      font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial"
+      font-size="86" font-weight="700" fill="#EAF6FF" letter-spacing="0.2">
+      DraftHarbour
+    </text>
+    <text x="2" y="156"
+      font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial"
+      font-size="56" font-weight="500" fill="#B7D7E6" letter-spacing="0.6">
+      Studio
+    </text>
+  </g>
+</svg>
