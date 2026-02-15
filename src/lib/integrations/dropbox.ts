@@ -8,8 +8,8 @@ export const dropboxAdapter: IntegrationAdapter = {
 
   async connect(config: IntegrationConfig) {
     await simulateLatency();
-    if (!config.accessToken) {
-      throw new Error('Dropbox access token is required to connect.');
+    if (!config.connectionId) {
+      throw new Error('Dropbox connection is required before syncing.');
     }
 
     return {
@@ -20,12 +20,12 @@ export const dropboxAdapter: IntegrationAdapter = {
 
   async testConnection(config: IntegrationConfig) {
     await simulateLatency();
-    if (!config.accessToken) {
-      throw new Error('Missing Dropbox token. Save your token before testing connection.');
+    if (!config.connectionId) {
+      throw new Error('Missing Dropbox broker connection. Connect your account first.');
     }
 
     return {
-      message: 'Dropbox token verified and folder is reachable.',
+      message: 'Dropbox broker connection verified and folder is reachable.',
       syncedAt: Date.now(),
     };
   },
@@ -43,8 +43,8 @@ export const dropboxAdapter: IntegrationAdapter = {
 
   async push(config: IntegrationConfig, payload: ProviderPayload) {
     await simulateLatency();
-    if (!config.accessToken) {
-      throw new Error('Cannot push to Dropbox without an access token.');
+    if (!config.connectionId) {
+      throw new Error('Cannot push to Dropbox without an active broker connection.');
     }
 
     return {

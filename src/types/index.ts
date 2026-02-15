@@ -287,7 +287,11 @@ export type IntegrationType = 'dropbox' | 'google-drive' | 'scrivener';
 export interface IntegrationConfig {
   type: IntegrationType;
   enabled: boolean;
-  accessToken?: string;
+  connectionId?: string;
+  providerUserId?: string;
+  scopes?: string[];
+  expiresAt?: number;
+  status?: 'disconnected' | 'pending' | 'connected' | 'error';
   folderId?: string;
   lastSyncAt?: number;
 }
