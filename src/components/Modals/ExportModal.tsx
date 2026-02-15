@@ -22,6 +22,11 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
   const isScreenplay = state.projectType === 'screenplay';
 
   const handleExport = async (format: ExportFormat) => {
+    if (!isScreenplay && (format === 'screenplayPdf' || format === 'fountain')) {
+      alert('Screenplay PDF and Fountain export are only available for screenplay projects.');
+      return;
+    }
+
     setExporting(true);
     try {
       switch (format) {
@@ -147,22 +152,6 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
             >
               <span className="material-symbols-rounded">article</span>
               Export RTF
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => handleExport('screenplayPdf')}
-              disabled={exporting}
-            >
-              <span className="material-symbols-rounded">picture_as_pdf</span>
-              Export Screenplay PDF
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => handleExport('fountain')}
-              disabled={exporting}
-            >
-              <span className="material-symbols-rounded">article</span>
-              Export Fountain
             </Button>
           </>
         )}
