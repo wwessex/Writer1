@@ -57,8 +57,8 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
       { id: 'act-analysis', type: 'action', title: 'Writing Analysis', icon: 'analytics', action: () => { onAction?.('analysis'); onClose(); } },
       { id: 'act-snapshots', type: 'action', title: 'Snapshots', icon: 'history', action: () => { onAction?.('snapshots'); onClose(); } },
       { id: 'act-characters', type: 'action', title: 'Character & World Bible', icon: 'person', action: () => { onAction?.('characterBible'); onClose(); } },
-      { id: 'act-dark', type: 'action', title: 'Dark Theme', icon: 'dark_mode', action: () => { dispatch({ type: 'SET_THEME', payload: 'dark' }); onClose(); } },
-      { id: 'act-light', type: 'action', title: 'Light Theme', icon: 'light_mode', action: () => { dispatch({ type: 'SET_THEME', payload: 'light' }); onClose(); } },
+      { id: 'act-dark', type: 'action', title: 'True Dark', icon: 'dark_mode', action: () => { dispatch({ type: 'SET_THEME', payload: 'dark' }); onClose(); } },
+      { id: 'act-light', type: 'action', title: 'Warm Light', icon: 'light_mode', action: () => { dispatch({ type: 'SET_THEME', payload: 'light' }); onClose(); } },
     ];
 
     return [...chapterItems, ...actionItems];

@@ -52,9 +52,9 @@ const MENUS: MenuConfig[] = [
       { divider: true },
       { label: 'Quick Switcher', action: 'quickSwitcher', shortcut: 'Ctrl+K' },
       { divider: true },
-      { label: 'Dark Theme', action: 'themeDark' },
-      { label: 'Light Theme', action: 'themeLight' },
-      { label: 'High Contrast', action: 'themeHighContrast' },
+      { label: 'True Dark', action: 'themeDark' },
+      { label: 'Warm Light (Default)', action: 'themeLight' },
+      { label: 'High Contrast (Optional)', action: 'themeHighContrast' },
       { divider: true },
       { label: 'Project Dashboard', action: 'dashboard' }
     ]

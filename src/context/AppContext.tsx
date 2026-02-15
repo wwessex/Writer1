@@ -30,7 +30,7 @@ const defaultSettings: AppSettings = {
     languageToolUrl: 'https://api.languagetool.org/v2/check',
     languageToolLanguage: 'en-US'
   },
-  theme: 'dark',
+  theme: 'light',
   sidebarHidden: isMobile, // Hidden by default on mobile
   pageView: true,
   focusMode: false,
