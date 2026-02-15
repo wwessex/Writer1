@@ -8,6 +8,7 @@ import {
   pushIntegrationData,
   testIntegrationConnection,
 } from '@/lib/integrations';
+import * as storage from '@/lib/storage';
 import type { AppState, Chapter, IntegrationConfig, IntegrationType } from '@/types';
 import styles from './Modals.module.css';
 
@@ -87,6 +88,29 @@ function statusColor(status: ConnectionStatus): string {
   return status === 'configured' ? 'var(--accent)' : 'var(--text-muted)';
 }
 
+async function persistPulledChapters(
+  novelId: string,
+  previousChapters: Chapter[],
+  pulledChapters: Chapter[]
+) {
+  const previousById = new Map(previousChapters.map((chapter) => [chapter.id, chapter]));
+  const pulledIds = new Set(pulledChapters.map((chapter) => chapter.id));
+
+  const deletes = previousChapters
+    .filter((chapter) => chapter.novelId === novelId && !pulledIds.has(chapter.id))
+    .map((chapter) => storage.deleteChapter(chapter.id));
+
+  const writes = pulledChapters.map((chapter) => {
+    const chapterForNovel = { ...chapter, novelId };
+    if (previousById.has(chapter.id)) {
+      return storage.updateChapter(chapter.id, chapterForNovel);
+    }
+    return storage.addChapter(chapterForNovel);
+  });
+
+  await Promise.all([...deletes, ...writes]);
+}
+
 function statusBadgeLabel(status: OperationState): string {
   switch (status) {
     case 'loading':
@@ -141,7 +165,8 @@ export function IntegrationsModal({ open, onClose }: IntegrationsModalProps) {
           appState={state}
           onToggle={() => toggleEnabled('scrivener')}
           onUpdate={(updates) => updateConfig('scrivener', updates)}
-          onApplyPull={(chapterUpdates) => {
+          onApplyPull={async (chapterUpdates) => {
+            await persistPulledChapters(state.novelId, state.chapters, chapterUpdates);
             dispatch({ type: 'SET_CHAPTERS', payload: chapterUpdates });
           }}
         />
@@ -151,7 +176,8 @@ export function IntegrationsModal({ open, onClose }: IntegrationsModalProps) {
           appState={state}
           onToggle={() => toggleEnabled('google-drive')}
           onUpdate={(updates) => updateConfig('google-drive', updates)}
-          onApplyPull={(chapterUpdates) => {
+          onApplyPull={async (chapterUpdates) => {
+            await persistPulledChapters(state.novelId, state.chapters, chapterUpdates);
             dispatch({ type: 'SET_CHAPTERS', payload: chapterUpdates });
           }}
         />
@@ -161,7 +187,8 @@ export function IntegrationsModal({ open, onClose }: IntegrationsModalProps) {
           appState={state}
           onToggle={() => toggleEnabled('dropbox')}
           onUpdate={(updates) => updateConfig('dropbox', updates)}
-          onApplyPull={(chapterUpdates) => {
+          onApplyPull={async (chapterUpdates) => {
+            await persistPulledChapters(state.novelId, state.chapters, chapterUpdates);
             dispatch({ type: 'SET_CHAPTERS', payload: chapterUpdates });
           }}
         />
@@ -253,7 +280,7 @@ interface IntegrationCardBaseProps {
   appState: Pick<AppState, 'novelId' | 'projectType' | 'chapters'>;
   onToggle: () => void;
   onUpdate: (updates: Partial<IntegrationConfig>) => void;
-  onApplyPull: (chapters: Chapter[]) => void;
+  onApplyPull: (chapters: Chapter[]) => Promise<void>;
 }
 
 function ScrivenerCard({ config, appState, onToggle, onUpdate, onApplyPull }: IntegrationCardBaseProps) {
@@ -292,7 +319,7 @@ function ScrivenerCard({ config, appState, onToggle, onUpdate, onApplyPull }: In
         <div className={styles.integrationCard__actions}>
           <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async () => {
             const pullResult = await pullIntegrationData('scrivener', config, appState);
-            onApplyPull(pullResult.chapterUpdates);
+            await onApplyPull(pullResult.chapterUpdates);
             return `Pulled ${pullResult.chapterUpdates.length} chapter(s) from Scrivener.`;
           })}>
             <span className="material-symbols-rounded">upload_file</span>
@@ -370,7 +397,7 @@ function GoogleDriveCard({ config, appState, onToggle, onUpdate, onApplyPull }: 
           </Button>
           <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async () => {
             const result = await pullIntegrationData('google-drive', config, appState);
-            onApplyPull(result.chapterUpdates);
+            await onApplyPull(result.chapterUpdates);
             return `Pulled ${result.chapterUpdates.length} chapter(s) from Google Drive.`;
           })}>
             <span className="material-symbols-rounded">cloud_download</span>
@@ -487,7 +514,7 @@ function DropboxCard({ config, appState, onToggle, onUpdate, onApplyPull }: Inte
           </Button>
           <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async (cardConfig) => {
             const result = await pullIntegrationData('dropbox', cardConfig, appState);
-            onApplyPull(result.chapterUpdates);
+            await onApplyPull(result.chapterUpdates);
             return `Pulled ${result.chapterUpdates.length} chapter(s) from Dropbox.`;
           })}>
             <span className="material-symbols-rounded">cloud_download</span>

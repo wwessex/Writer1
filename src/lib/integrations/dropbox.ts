@@ -1,4 +1,4 @@
-import type { IntegrationConfig } from '@/types';
+import type { Chapter, IntegrationConfig } from '@/types';
 import { normalizeProviderPullResponse } from './orchestration';
 import type { IntegrationAdapter, ProviderPayload, RemoteRevision } from './types';
 import { createRemoteRevisionLabel, simulateLatency } from './helpers';
@@ -30,7 +30,7 @@ export const dropboxAdapter: IntegrationAdapter = {
     };
   },
 
-  async pull(_config: IntegrationConfig, payload: ProviderPayload) {
+  async pull(_config: IntegrationConfig, payload: ProviderPayload, localChapters: Chapter[]) {
     await simulateLatency();
     const remoteDocs = payload.chapters.map((chapter) => ({
       ...chapter,
@@ -38,7 +38,11 @@ export const dropboxAdapter: IntegrationAdapter = {
       body: `${chapter.body}\n\nSynced from Dropbox backup.`,
     }));
 
-    return normalizeProviderPullResponse([], remoteDocs, createRemoteRevisionLabel('dropbox-revision'));
+    return normalizeProviderPullResponse(
+      localChapters,
+      remoteDocs,
+      createRemoteRevisionLabel('dropbox-revision')
+    );
   },
 
   async push(config: IntegrationConfig, payload: ProviderPayload) {
