@@ -428,7 +428,7 @@ function AppShell() {
         updateChapter(activeChapter.id, { content: ed.getJSON() });
       }
     },
-  });
+  }, [screenplayMode]);
 
   return (
     <EditorContext.Provider value={{ editor }}>
