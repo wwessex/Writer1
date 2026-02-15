@@ -170,7 +170,7 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
   const filteredPresets = EXPORT_PRESETS.filter(p => p.projectTypes.includes(state.projectType));
 
   return (
-    <Dialog open={open} onClose={onClose} title={isScreenplay ? 'Export Screenplay' : 'Export Novel'} size="medium">
+    <Dialog open={open} onClose={onClose} title="Export" size="medium">
       {/* Presets Section */}
       <div className={styles.exportPresetsSection}>
         <button
