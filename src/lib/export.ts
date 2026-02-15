@@ -1,6 +1,6 @@
 import type { JSONContent } from '@tiptap/core';
 import type { Chapter, ScreenplayBlockType } from '@/types';
-import { editorToPlainText, downloadFile, escapeHtml } from './utils';
+import { editorToPlainText, downloadFile } from './utils';
 
 export interface ScreenplayBlock {
   type: ScreenplayBlockType;
@@ -416,6 +416,37 @@ export async function exportToFountain(
 }
 
 /**
+ * Build a simple RTF document from plain text without external dependencies.
+ * html-to-rtf requires Node.js `fs` module which is unavailable in browsers.
+ */
+function buildRtf(title: string, chapters: Chapter[], includeHeadings: boolean): string {
+  const escape = (s: string) => s.replace(/\\/g, '\\\\').replace(/\{/g, '\\{').replace(/\}/g, '\\}');
+
+  const parts: string[] = [
+    '{\\rtf1\\ansi\\deff0',
+    '{\\fonttbl{\\f0 Times New Roman;}}',
+    '\\f0\\fs24',
+    `\\pard\\qc\\b\\fs36 ${escape(title)}\\b0\\fs24\\par\\par`,
+  ];
+
+  for (const chapter of chapters) {
+    if (includeHeadings) {
+      parts.push(`\\pard\\b\\fs28 ${escape(chapter.title)}\\b0\\fs24\\par\\par`);
+    }
+
+    const text = editorToPlainText(chapter.content);
+    const paragraphs = text.split('\n').filter(p => p.trim());
+
+    for (const para of paragraphs) {
+      parts.push(`\\pard ${escape(para)}\\par\\par`);
+    }
+  }
+
+  parts.push('}');
+  return parts.join('\n');
+}
+
+/**
  * Export chapters to RTF format
  */
 export async function exportToRtf(
@@ -423,26 +454,7 @@ export async function exportToRtf(
   title: string,
   includeHeadings: boolean = true
 ): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const htmlToRtf = (await import('html-to-rtf')) as any;
-
-  let html = `<h1>${escapeHtml(title)}</h1>`;
-
-  for (const chapter of chapters) {
-    if (includeHeadings) {
-      html += `<h2>${escapeHtml(chapter.title)}</h2>`;
-    }
-
-    const text = editorToPlainText(chapter.content);
-    const paragraphs = text.split('\n').filter(p => p.trim());
-
-    for (const para of paragraphs) {
-      html += `<p>${escapeHtml(para)}</p>`;
-    }
-  }
-
-  const converter = htmlToRtf.default || htmlToRtf;
-  const rtf = converter.convertHtmlToRtf(html);
+  const rtf = buildRtf(title, chapters, includeHeadings);
   downloadFile(rtf, `${title}.rtf`, 'application/rtf');
 }
 

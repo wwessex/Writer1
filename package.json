@@ -21,7 +21,6 @@
     "dexie": "^4.0.8",
     "dexie-react-hooks": "^1.1.7",
     "docx": "^9.5.0",
-    "html-to-rtf": "^2.1.0",
     "jszip": "^3.10.1",
     "pdfmake": "^0.2.10",
     "react": "^19.0.0",
