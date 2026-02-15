@@ -17,6 +17,7 @@ import { AISuggestionsPanel } from '@/components/Panels';
 import { SettingsWindow, AboutWindow } from '@/components/Windows';
 import { ToastProvider, useToast } from '@/components/UI';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { useModalState } from '@/hooks/useModalState';
 import { exportBackup, importBackup, createChapter, addChapter } from '@/lib/storage';
 import { importFile, mapImportedContentToProjectType } from '@/lib/import';
 import { downloadFile } from '@/lib/utils';
@@ -39,27 +40,9 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
   const { state, loadNovel, createChapter: createNewChapter, dispatch, updateSettings } = useApp();
   const { editor } = useCurrentEditor();
   const { showToast } = useToast();
+  const { modals, openModal, closeModal, toggleModal } = useModalState();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Modal states
-  const [exportOpen, setExportOpen] = useState(false);
-  const [snapshotOpen, setSnapshotOpen] = useState(false);
-  const [analysisOpen, setAnalysisOpen] = useState(false);
-  const [wordCountOpen, setWordCountOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [aboutOpen, setAboutOpen] = useState(false);
-  const [dashboardOpen, setDashboardOpen] = useState(false);
-  const [onboardingOpen, setOnboardingOpen] = useState(false);
-  const [characterBibleOpen, setCharacterBibleOpen] = useState(false);
-  const [aiWritingOpen, setAiWritingOpen] = useState(false);
-  const [commentsOpen, setCommentsOpen] = useState(false);
-  const [advancedAnalyticsOpen, setAdvancedAnalyticsOpen] = useState(false);
-  const [integrationsOpen, setIntegrationsOpen] = useState(false);
-  const [projectsOpen, setProjectsOpen] = useState(false);
-  const [sceneTemplatesOpen, setSceneTemplatesOpen] = useState(false);
-  const [exportHistoryOpen, setExportHistoryOpen] = useState(false);
-  const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -78,9 +61,9 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
   // Show onboarding on first visit
   useEffect(() => {
     if (!isLoading && !state.settings.onboardingComplete) {
-      setOnboardingOpen(true);
+      openModal('onboarding');
     }
-  }, [isLoading, state.settings.onboardingComplete]);
+  }, [isLoading, state.settings.onboardingComplete, openModal]);
 
   // Apply focus mode body class
   useEffect(() => {
@@ -165,9 +148,9 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
   };
 
   const handleOnboardingClose = useCallback(() => {
-    setOnboardingOpen(false);
+    closeModal('onboarding');
     updateSettings({ onboardingComplete: true });
-  }, [updateSettings]);
+  }, [closeModal, updateSettings]);
 
   // Handle menu actions
   const handleMenuAction = useCallback((action: string) => {
@@ -177,7 +160,7 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
         showToast('New chapter created', 'success', 'add');
         break;
       case 'export':
-        setExportOpen(true);
+        openModal('export');
         break;
       case 'importDocument':
         importInputRef.current?.click();
@@ -189,52 +172,52 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
         fileInputRef.current?.click();
         break;
       case 'settings':
-        setSettingsOpen(true);
+        openModal('settings');
         break;
       case 'snapshots':
-        setSnapshotOpen(true);
+        openModal('snapshot');
         break;
       case 'analysis':
-        setAnalysisOpen(true);
+        openModal('analysis');
         break;
       case 'wordCount':
-        setWordCountOpen(true);
+        openModal('wordCount');
         break;
       case 'dashboard':
-        setDashboardOpen(true);
+        openModal('dashboard');
         break;
       case 'onboarding':
-        setOnboardingOpen(true);
+        openModal('onboarding');
         break;
       case 'about':
-        setAboutOpen(true);
+        openModal('about');
         break;
       case 'characterBible':
-        setCharacterBibleOpen(true);
+        openModal('characterBible');
         break;
       case 'aiWriting':
-        setAiWritingOpen(true);
+        openModal('aiWriting');
         break;
       case 'comments':
-        setCommentsOpen(true);
+        openModal('comments');
         break;
       case 'advancedAnalytics':
-        setAdvancedAnalyticsOpen(true);
+        openModal('advancedAnalytics');
         break;
       case 'integrations':
-        setIntegrationsOpen(true);
+        openModal('integrations');
         break;
       case 'projects':
-        setProjectsOpen(true);
+        openModal('projects');
         break;
       case 'sceneTemplates':
-        setSceneTemplatesOpen(true);
+        openModal('sceneTemplates');
         break;
       case 'exportHistory':
-        setExportHistoryOpen(true);
+        openModal('exportHistory');
         break;
       case 'aiPanel':
-        setAiPanelOpen(prev => !prev);
+        toggleModal('aiPanel');
         break;
       case 'undo':
         editor?.chain().focus().undo().run();
@@ -270,7 +253,7 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
         editor?.chain().focus().setParagraph().run();
         break;
     }
-  }, [createNewChapter, editor, handleExportBackup, showToast]);
+  }, [createNewChapter, editor, handleExportBackup, openModal, toggleModal, showToast]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -283,7 +266,7 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
             break;
           case 'e':
             e.preventDefault();
-            setExportOpen(true);
+            openModal('export');
             break;
           case 'b':
             e.preventDefault();
@@ -303,7 +286,7 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [createNewChapter, dispatch, state.settings.focusMode]);
+  }, [createNewChapter, dispatch, openModal, state.settings.focusMode]);
 
   // Show error state
   if (error) {
@@ -351,28 +334,28 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
           onImportBackup={() => fileInputRef.current?.click()}
         />
         <Editor screenplayMode={screenplayMode} onToggleScreenplayMode={onToggleScreenplayMode} />
-        <AISuggestionsPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} />
+        <AISuggestionsPanel open={modals.aiPanel} onClose={() => closeModal('aiPanel')} />
       </main>
 
       {/* Modals */}
-      <ExportModal open={exportOpen} onClose={() => setExportOpen(false)} />
-      <SnapshotModal open={snapshotOpen} onClose={() => setSnapshotOpen(false)} />
-      <AnalysisModal open={analysisOpen} onClose={() => setAnalysisOpen(false)} />
-      <WordCountModal open={wordCountOpen} onClose={() => setWordCountOpen(false)} />
-      <DashboardModal open={dashboardOpen} onClose={() => setDashboardOpen(false)} />
-      <OnboardingModal open={onboardingOpen} onClose={handleOnboardingClose} />
-      <CharacterBibleModal open={characterBibleOpen} onClose={() => setCharacterBibleOpen(false)} />
-      <AIWritingModal open={aiWritingOpen} onClose={() => setAiWritingOpen(false)} />
-      <CommentModal open={commentsOpen} onClose={() => setCommentsOpen(false)} />
-      <AdvancedAnalyticsModal open={advancedAnalyticsOpen} onClose={() => setAdvancedAnalyticsOpen(false)} />
-      <IntegrationsModal open={integrationsOpen} onClose={() => setIntegrationsOpen(false)} />
-      <ProjectsModal open={projectsOpen} onClose={() => setProjectsOpen(false)} />
-      <SceneTemplatesModal open={sceneTemplatesOpen} onClose={() => setSceneTemplatesOpen(false)} />
-      <ExportHistoryModal open={exportHistoryOpen} onClose={() => setExportHistoryOpen(false)} />
+      <ExportModal open={modals.export} onClose={() => closeModal('export')} />
+      <SnapshotModal open={modals.snapshot} onClose={() => closeModal('snapshot')} />
+      <AnalysisModal open={modals.analysis} onClose={() => closeModal('analysis')} />
+      <WordCountModal open={modals.wordCount} onClose={() => closeModal('wordCount')} />
+      <DashboardModal open={modals.dashboard} onClose={() => closeModal('dashboard')} />
+      <OnboardingModal open={modals.onboarding} onClose={handleOnboardingClose} />
+      <CharacterBibleModal open={modals.characterBible} onClose={() => closeModal('characterBible')} />
+      <AIWritingModal open={modals.aiWriting} onClose={() => closeModal('aiWriting')} />
+      <CommentModal open={modals.comments} onClose={() => closeModal('comments')} />
+      <AdvancedAnalyticsModal open={modals.advancedAnalytics} onClose={() => closeModal('advancedAnalytics')} />
+      <IntegrationsModal open={modals.integrations} onClose={() => closeModal('integrations')} />
+      <ProjectsModal open={modals.projects} onClose={() => closeModal('projects')} />
+      <SceneTemplatesModal open={modals.sceneTemplates} onClose={() => closeModal('sceneTemplates')} />
+      <ExportHistoryModal open={modals.exportHistory} onClose={() => closeModal('exportHistory')} />
 
       {/* Windows */}
-      <SettingsWindow open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <AboutWindow open={aboutOpen} onClose={() => setAboutOpen(false)} />
+      <SettingsWindow open={modals.settings} onClose={() => closeModal('settings')} />
+      <AboutWindow open={modals.about} onClose={() => closeModal('about')} />
 
       {/* Hidden file inputs */}
       <input
