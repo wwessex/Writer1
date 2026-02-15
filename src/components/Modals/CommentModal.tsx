@@ -28,7 +28,8 @@ function saveComments(chapterId: string, comments: Comment[]) {
 type FilterMode = 'all' | 'open' | 'resolved';
 
 export function CommentModal({ open, onClose }: CommentModalProps) {
-  const { activeChapter } = useApp();
+  const { activeChapter, state } = useApp();
+  const sectionLabel = state.projectType === 'screenplay' ? 'scene' : 'chapter';
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [newCommentText, setNewCommentText] = useState('');
@@ -142,7 +143,7 @@ export function CommentModal({ open, onClose }: CommentModalProps) {
   if (!activeChapter) {
     return (
       <Dialog open={open} onClose={onClose} title="Comments" size="medium">
-        <p className={styles.emptyMessage}>Select a chapter to view comments</p>
+        <p className={styles.emptyMessage}>Select a {sectionLabel} to view comments</p>
       </Dialog>
     );
   }
@@ -210,7 +211,7 @@ export function CommentModal({ open, onClose }: CommentModalProps) {
           {filteredComments.length === 0 && (
             <p className={styles.emptyMessage}>
               {comments.length === 0
-                ? 'No comments yet. Add one above to start annotating this chapter.'
+                ? `No comments yet. Add one above to start annotating this ${sectionLabel}.`
                 : 'No comments match the current filter.'}
             </p>
           )}

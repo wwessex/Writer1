@@ -10,6 +10,8 @@ interface WordCountModalProps {
 
 export function WordCountModal({ open, onClose }: WordCountModalProps) {
   const { state, activeChapter } = useApp();
+  const sectionLabel = state.projectType === 'screenplay' ? 'Scene' : 'Chapter';
+  const totalLabel = state.projectType === 'screenplay' ? 'Total Project (Scenes)' : 'Total Project';
 
   const chapterWords = activeChapter
     ? countWords(editorToPlainText(activeChapter.content))
@@ -33,7 +35,7 @@ export function WordCountModal({ open, onClose }: WordCountModalProps) {
         <div className={styles.wordCountCard}>
           <h4>
             <span className="material-symbols-rounded">article</span>
-            Current Chapter
+            Current {sectionLabel}
           </h4>
           <div className={styles.wordCountValue}>{chapterWords.toLocaleString()}</div>
           {activeChapter && (
@@ -55,11 +57,11 @@ export function WordCountModal({ open, onClose }: WordCountModalProps) {
         <div className={styles.wordCountCard}>
           <h4>
             <span className="material-symbols-rounded">menu_book</span>
-            Total Novel
+            {totalLabel}
           </h4>
           <div className={styles.wordCountValue}>{totalWords.toLocaleString()}</div>
           <div className={styles.wordCountLabel}>
-            {state.chapters.length} chapter{state.chapters.length !== 1 ? 's' : ''}
+            {state.chapters.length} {state.projectType === 'screenplay' ? 'scene' : 'chapter'}{state.chapters.length !== 1 ? 's' : ''}
           </div>
           {novelGoalProgress !== null && (
             <div className={styles.progressBar}>

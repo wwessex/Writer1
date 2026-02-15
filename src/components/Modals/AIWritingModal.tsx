@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Dialog, Button, Input, Textarea } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
 import { editorToPlainText } from '@/lib/utils';
+import type { ProjectType } from '@/types';
 import styles from './Modals.module.css';
 
 /* ------------------------------------------------------------------ */
@@ -31,7 +32,7 @@ interface PresetPrompt {
 
 const STORAGE_KEY = 'novelwriter_ai_config';
 
-const PRESET_PROMPTS: PresetPrompt[] = [
+const BOOK_PRESET_PROMPTS: PresetPrompt[] = [
   {
     id: 'continue',
     label: 'Continue Writing',
@@ -69,6 +70,111 @@ const PRESET_PROMPTS: PresetPrompt[] = [
   }
 ];
 
+const SCREENPLAY_PRESET_PROMPTS: PresetPrompt[] = [
+  {
+    id: 'dialogueAlternatives',
+    label: 'Generate Dialogue Alternatives',
+    icon: 'record_voice_over',
+    prompt:
+      'Generate scene dialogue alternatives for the latest dialogue exchange. Keep each option true to the character voices and scene tension.'
+  },
+  {
+    id: 'tightenAction',
+    label: 'Tighten Action Lines',
+    icon: 'compress',
+    prompt:
+      'Tighten action lines in this scene for pace and clarity. Keep visual language concise, cinematic, and production-ready.'
+  },
+  {
+    id: 'beatToDraft',
+    label: 'Beat Outline to Scene Draft',
+    icon: 'movie',
+    prompt:
+      'Turn this beat outline into a screenplay scene draft. Preserve the scene objective, escalate conflict, and include action + dialogue blocks.'
+  },
+  {
+    id: 'continuityPass',
+    label: 'Continuity Check',
+    icon: 'rule',
+    prompt:
+      'Review this scene for screenplay continuity issues (character intent, props, entrances/exits, timing). List issues and propose fixes.'
+  },
+  {
+    id: 'punchUp',
+    label: 'Punch Up Scene',
+    icon: 'bolt',
+    prompt:
+      'Punch up this scene with stronger subtext and sharper turns while preserving story intent and character objectives.'
+  }
+];
+
+const BOOK_CHAPTER_TEMPLATE = `# Chapter Title
+
+## Scene Goal
+- What changes by the end of this chapter?
+
+## Opening Beat
+Set the location, mood, and immediate conflict.
+
+## Complication
+Escalate pressure with a choice, reveal, or obstacle.
+
+## Turning Point
+Land the emotional or plot shift that propels the next section.`;
+
+const SCREENPLAY_SCENE_TEMPLATE = `INT./EXT. LOCATION - DAY/NIGHT
+
+Action: Describe only what is visible and audible on screen.
+
+CHARACTER NAME
+Dialogue line.
+
+CHARACTER NAME
+(optional parenthetical)
+Response line.
+
+Action: End on a visual turn, reveal, or decision.`;
+
+function getPresetPrompts(projectType: ProjectType): PresetPrompt[] {
+  return projectType === 'screenplay' ? SCREENPLAY_PRESET_PROMPTS : BOOK_PRESET_PROMPTS;
+}
+
+function extractScreenplayContext(chapterText: string): {
+  sceneHeading: string;
+  characters: string[];
+  previousDialogueTurn: string;
+} {
+  const lines = chapterText
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  const sceneHeading = lines.find(line => /^(INT\.?|EXT\.?|INT\/EXT\.?)/i.test(line)) || '';
+  const characterSet = new Set<string>();
+
+  for (const line of lines) {
+    if (/^[A-Z0-9\s()'.-]{2,}$/.test(line) && !/^(INT|EXT|INT\/EXT)\b/.test(line)) {
+      characterSet.add(line.replace(/\s+/g, ' ').trim());
+    }
+  }
+
+  let previousDialogueTurn = '';
+  for (let i = lines.length - 1; i >= 1; i -= 1) {
+    const speaker = lines[i - 1];
+    const dialogue = lines[i];
+    if (/^[A-Z0-9\s()'.-]{2,}$/.test(speaker) && !/^(INT|EXT|INT\/EXT)\b/.test(speaker)) {
+      previousDialogueTurn = `${speaker}: ${dialogue}`;
+      break;
+    }
+  }
+
+  return {
+    sceneHeading,
+    characters: Array.from(characterSet),
+    previousDialogueTurn
+  };
+}
+
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
@@ -98,7 +204,9 @@ function saveConfig(config: AIConfig): void {
 /* ------------------------------------------------------------------ */
 
 export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
-  const { activeChapter } = useApp();
+  const { activeChapter, state } = useApp();
+  const isScreenplay = state.projectType === 'screenplay';
+  const presetPrompts = useMemo(() => getPresetPrompts(state.projectType), [state.projectType]);
 
   // AI configuration
   const [config, setConfig] = useState<AIConfig>(loadConfig);
@@ -163,8 +271,12 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         ? editorToPlainText(activeChapter.content)
         : '';
 
+      const structuralContext = isScreenplay
+        ? extractScreenplayContext(chapterText)
+        : undefined;
+
       const fullPrompt = chapterText
-        ? `Here is the current chapter text for context:\n\n---\n${chapterText}\n---\n\n${promptText}`
+        ? `Here is the current ${isScreenplay ? 'scene' : 'chapter'} text for context:\n\n---\n${chapterText}\n---\n\n${promptText}`
         : promptText;
 
       // Abort any previous request
@@ -185,11 +297,16 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
           },
           body: JSON.stringify({
             model: 'gpt-4o',
+            context: {
+              projectType: state.projectType,
+              sectionTitle: activeChapter?.title || '',
+              ...(structuralContext ? { screenplayStructure: structuralContext } : {})
+            },
             messages: [
               {
                 role: 'system',
                 content:
-                  'You are a helpful creative writing assistant. Respond in plain text with clear formatting.'
+                  `You are a helpful creative writing assistant for ${isScreenplay ? 'screenplays' : 'books'}. Respond in plain text with clear formatting.`
               },
               { role: 'user', content: fullPrompt }
             ],
@@ -227,7 +344,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         setLoading(false);
       }
     },
-    [activeChapter, config, isConfigured]
+    [activeChapter, config, isConfigured, isScreenplay, state.projectType]
   );
 
   const handleSubmit = () => {
@@ -332,7 +449,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
 
       {/* Preset prompts */}
       <div className={styles.aiPresets}>
-        {PRESET_PROMPTS.map(preset => (
+        {presetPrompts.map(preset => (
           <button
             key={preset.id}
             className={styles.aiPresetBtn}
@@ -348,7 +465,11 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       {/* Custom prompt input */}
       <div className={styles.aiPromptArea}>
         <Textarea
-          placeholder="Enter a custom prompt... (e.g. 'Rewrite this scene from a different POV')"
+          placeholder={
+            isScreenplay
+              ? "Enter a custom prompt... (e.g. 'Punch up the subtext in this exchange')"
+              : "Enter a custom prompt... (e.g. 'Rewrite this scene from a different POV')"
+          }
           value={prompt}
           onChange={e => setPrompt(e.target.value)}
           rows={3}
@@ -362,9 +483,27 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         {activeChapter && (
           <p className={styles.aiContextHint}>
             <span className="material-symbols-rounded">auto_awesome</span>
-            Context: {activeChapter.title} will be sent along with your prompt.
+            Context: {activeChapter.title} and relevant {isScreenplay ? 'scene structure' : 'chapter details'} will be sent with your prompt.
           </p>
         )}
+        <div className={styles.aiPresets}>
+          <button
+            className={styles.aiPresetBtn}
+            onClick={() => setPrompt(BOOK_CHAPTER_TEMPLATE)}
+            disabled={loading}
+          >
+            <span className="material-symbols-rounded">auto_stories</span>
+            Insert Book Chapter Template
+          </button>
+          <button
+            className={styles.aiPresetBtn}
+            onClick={() => setPrompt(SCREENPLAY_SCENE_TEMPLATE)}
+            disabled={loading}
+          >
+            <span className="material-symbols-rounded">theaters</span>
+            Insert Screenplay Scene Template
+          </button>
+        </div>
       </div>
 
       {/* Response area */}

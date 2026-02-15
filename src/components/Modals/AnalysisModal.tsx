@@ -12,6 +12,7 @@ interface AnalysisModalProps {
 
 export function AnalysisModal({ open, onClose }: AnalysisModalProps) {
   const { activeChapter, state } = useApp();
+  const sectionLabel = state.projectType === 'screenplay' ? 'scene' : 'chapter';
   const [analysis, setAnalysis] = useState<TextAnalysis | null>(null);
   const [grammarResults, setGrammarResults] = useState<LanguageToolMatch[]>([]);
   const [loading, setLoading] = useState(false);
@@ -73,7 +74,7 @@ export function AnalysisModal({ open, onClose }: AnalysisModalProps) {
   if (!activeChapter) {
     return (
       <Dialog open={open} onClose={onClose} title="Writing Analysis" size="large">
-        <p className={styles.emptyMessage}>Select a chapter to analyze</p>
+        <p className={styles.emptyMessage}>Select a {sectionLabel} to analyze</p>
       </Dialog>
     );
   }

@@ -12,7 +12,8 @@ interface SnapshotModalProps {
 }
 
 export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
-  const { activeChapter, updateChapter } = useApp();
+  const { activeChapter, updateChapter, state } = useApp();
+  const sectionLabel = state.projectType === 'screenplay' ? 'scene' : 'chapter';
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [selectedSnapshot, setSelectedSnapshot] = useState<Snapshot | null>(null);
   const [compareSnapshot, setCompareSnapshot] = useState<Snapshot | null>(null);
@@ -52,7 +53,7 @@ export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
 
   const handleRestoreSnapshot = async () => {
     if (!selectedSnapshot || !activeChapter) return;
-    if (!confirm('Restore this snapshot? Current content will be replaced.')) return;
+    if (!confirm(`Restore this snapshot? Current ${sectionLabel} content will be replaced.`)) return;
 
     updateChapter(activeChapter.id, { content: selectedSnapshot.doc });
     onClose();
@@ -90,7 +91,7 @@ export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
   if (!activeChapter) {
     return (
       <Dialog open={open} onClose={onClose} title="Snapshots" size="medium">
-        <p className={styles.emptyMessage}>Select a chapter to view snapshots</p>
+        <p className={styles.emptyMessage}>Select a {sectionLabel} to view snapshots</p>
       </Dialog>
     );
   }
@@ -110,7 +111,7 @@ export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
           {loading && <p className={styles.loadingText}>Loading...</p>}
 
           {!loading && snapshots.length === 0 && (
-            <p className={styles.emptyMessage}>No snapshots yet. Save a snapshot to preserve your current work.</p>
+            <p className={styles.emptyMessage}>No snapshots yet. Save a snapshot to preserve your current {sectionLabel} draft.</p>
           )}
 
           <div className={styles.snapshotItems}>
@@ -183,7 +184,7 @@ export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
                   <div className={styles.diffView}>
                     <div className={styles.diffPane}>
                       <div className={styles.diffPane__header}>
-                        {compareSnapshot ? `Older (${formatDateTime(compareSnapshot.createdAt)})` : 'Current Content'}
+                        {compareSnapshot ? `Older (${formatDateTime(compareSnapshot.createdAt)})` : `Current ${sectionLabel} Content`}
                       </div>
                       <div className={styles.diffPane__content}>
                         {diffLines?.oldLines.map((line, i) => (
