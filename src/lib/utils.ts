@@ -246,3 +246,12 @@ export function downloadFile(data: string | Blob, filename: string, type?: strin
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Escape HTML special characters to prevent XSS in generated markup
+ */
+export function escapeHtml(text: string): string {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
