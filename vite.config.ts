@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 
 export default defineConfig({
-  base: '/Writer1/',
+  base: './',
   plugins: [
     react(),
     VitePWA({
@@ -17,7 +17,7 @@ export default defineConfig({
         theme_color: '#0b1020',
         background_color: '#0b1020',
         display: 'standalone',
-        start_url: '/Writer1/',
+        start_url: './',
         icons: [
           {
             src: 'assets/icon-blue-32.png',
