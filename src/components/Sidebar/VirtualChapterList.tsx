@@ -24,10 +24,13 @@ export function VirtualChapterList() {
   const animRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [statusFilter, setStatusFilter] = useState<'all' | 'planned' | 'draft' | 'revised' | 'final'>('all');
   const [productionTagFilter, setProductionTagFilter] = useState('all');
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   const isScreenplay = state.projectType === 'screenplay';
   const sectionLabel = isScreenplay ? 'Scenes' : 'Chapters';
   const singularLabel = isScreenplay ? 'Scene' : 'Chapter';
+
+  const hasActiveFilters = statusFilter !== 'all' || productionTagFilter !== 'all';
 
   const [dragState, setDragState] = useState<DragState>({
     dragging: false,
@@ -218,16 +221,27 @@ export function VirtualChapterList() {
           {sectionLabel}
           {filteredChapters.length > 0 && ` (${filteredChapters.length})`}
         </h3>
-        <IconButton
-          icon="add"
-          label={`New ${singularLabel}`}
-          variant="ghost"
-          onClick={createChapter}
-        />
+        <div className={styles.chapterList__actions}>
+          {isScreenplay && (
+            <IconButton
+              icon="filter_list"
+              label="Toggle filters"
+              variant="ghost"
+              active={filtersExpanded || hasActiveFilters}
+              onClick={() => setFiltersExpanded(prev => !prev)}
+            />
+          )}
+          <IconButton
+            icon="add"
+            label={`New ${singularLabel}`}
+            variant="ghost"
+            onClick={createChapter}
+          />
+        </div>
       </div>
 
-      {isScreenplay && (
-        <div className={styles.chapterList__items} style={{ maxHeight: 'unset', overflow: 'visible', marginBottom: '0.5rem' }}>
+      {isScreenplay && filtersExpanded && (
+        <div className={styles.chapterList__filters}>
           <Select
             options={[
               { value: 'all', label: 'All statuses' },
@@ -247,6 +261,14 @@ export function VirtualChapterList() {
             value={productionTagFilter}
             onChange={e => setProductionTagFilter(e.target.value)}
           />
+          {hasActiveFilters && (
+            <button
+              className={styles.chapterList__clearFilters}
+              onClick={() => { setStatusFilter('all'); setProductionTagFilter('all'); }}
+            >
+              Clear filters
+            </button>
+          )}
         </div>
       )}
 

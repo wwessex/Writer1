@@ -86,6 +86,7 @@ export function Inspector({ open, onClose }: InspectorProps) {
             </div>
           ) : (
             <>
+              {/* CHAPTER / SCENE METADATA TAB */}
               {activeTab === 'details' && (
                 <div className={styles.section}>
                   {/* Word count card */}
@@ -111,6 +112,17 @@ export function Inspector({ open, onClose }: InspectorProps) {
                       <div className={styles.progressFill} style={{ width: `${wordGoalProgress}%` }} />
                     </div>
                   )}
+
+                  {/* Synopsis — prominent at the top */}
+                  <div className={styles.field}>
+                    <label className={styles.fieldLabel}>Synopsis</label>
+                    <Textarea
+                      value={activeChapter.summary}
+                      onChange={e => handleFieldChange('summary', e.target.value)}
+                      placeholder={`Brief ${isScreenplay ? 'sequence' : 'chapter'} synopsis...`}
+                      rows={3}
+                    />
+                  </div>
 
                   {/* Status */}
                   <div className={styles.field}>
@@ -177,6 +189,7 @@ export function Inspector({ open, onClose }: InspectorProps) {
                 </div>
               )}
 
+              {/* SCENES TAB — context-sensitive scene fields */}
               {activeTab === 'scenes' && (
                 <div className={styles.section}>
                   {(activeChapter.scenes || []).map(scene => (
@@ -197,44 +210,65 @@ export function Inspector({ open, onClose }: InspectorProps) {
                       <Textarea
                         value={scene.summary}
                         onChange={e => handleSceneChange(scene.id, { summary: e.target.value })}
-                        placeholder="Scene summary..."
+                        placeholder="What happens in this scene..."
                         rows={2}
                       />
                       <div className={styles.fieldRow}>
-                        <Select
-                          options={STATUS_OPTIONS}
-                          value={scene.status}
-                          onChange={e => handleSceneChange(scene.id, { status: e.target.value as ChapterStatus })}
+                        <div className={styles.field}>
+                          <label className={styles.fieldLabel}>Status</label>
+                          <Select
+                            options={STATUS_OPTIONS}
+                            value={scene.status}
+                            onChange={e => handleSceneChange(scene.id, { status: e.target.value as ChapterStatus })}
+                          />
+                        </div>
+                      </div>
+                      {/* Scene-specific context fields */}
+                      <div className={styles.field}>
+                        <label className={styles.fieldLabel}>Location</label>
+                        <Input
+                          value={scene.location || ''}
+                          onChange={e => handleSceneChange(scene.id, { location: e.target.value })}
+                          placeholder="Where does this scene take place?"
+                        />
+                      </div>
+                      <div className={styles.field}>
+                        <label className={styles.fieldLabel}>Characters</label>
+                        <Input
+                          value={scene.pov || ''}
+                          onChange={e => handleSceneChange(scene.id, { pov: e.target.value })}
+                          placeholder="Characters in this scene"
                         />
                       </div>
                       {isScreenplay && (
                         <>
                           <div className={styles.fieldRow}>
-                            <Select
-                              options={[
-                                { value: 'INT', label: 'INT' },
-                                { value: 'EXT', label: 'EXT' },
-                                { value: 'INT/EXT', label: 'INT/EXT' }
-                              ]}
-                              value={scene.interiorExterior || 'INT'}
-                              onChange={e => handleSceneChange(scene.id, { interiorExterior: e.target.value as Scene['interiorExterior'] })}
-                            />
-                            <Select
-                              options={[
-                                { value: 'DAY', label: 'DAY' },
-                                { value: 'NIGHT', label: 'NIGHT' },
-                                { value: 'DAWN', label: 'DAWN' },
-                                { value: 'DUSK', label: 'DUSK' }
-                              ]}
-                              value={scene.timeOfDay || 'DAY'}
-                              onChange={e => handleSceneChange(scene.id, { timeOfDay: e.target.value as Scene['timeOfDay'] })}
-                            />
+                            <div className={styles.field}>
+                              <label className={styles.fieldLabel}>INT/EXT</label>
+                              <Select
+                                options={[
+                                  { value: 'INT', label: 'INT' },
+                                  { value: 'EXT', label: 'EXT' },
+                                  { value: 'INT/EXT', label: 'INT/EXT' }
+                                ]}
+                                value={scene.interiorExterior || 'INT'}
+                                onChange={e => handleSceneChange(scene.id, { interiorExterior: e.target.value as Scene['interiorExterior'] })}
+                              />
+                            </div>
+                            <div className={styles.field}>
+                              <label className={styles.fieldLabel}>Time</label>
+                              <Select
+                                options={[
+                                  { value: 'DAY', label: 'DAY' },
+                                  { value: 'NIGHT', label: 'NIGHT' },
+                                  { value: 'DAWN', label: 'DAWN' },
+                                  { value: 'DUSK', label: 'DUSK' }
+                                ]}
+                                value={scene.timeOfDay || 'DAY'}
+                                onChange={e => handleSceneChange(scene.id, { timeOfDay: e.target.value as Scene['timeOfDay'] })}
+                              />
+                            </div>
                           </div>
-                          <Input
-                            value={scene.location || ''}
-                            onChange={e => handleSceneChange(scene.id, { location: e.target.value })}
-                            placeholder="Location"
-                          />
                         </>
                       )}
                     </div>
@@ -246,6 +280,7 @@ export function Inspector({ open, onClose }: InspectorProps) {
                 </div>
               )}
 
+              {/* NOTES TAB — rich notes + synopsis */}
               {activeTab === 'notes' && (
                 <div className={styles.section}>
                   <div className={styles.field}>
@@ -254,8 +289,12 @@ export function Inspector({ open, onClose }: InspectorProps) {
                       value={activeChapter.summary}
                       onChange={e => handleFieldChange('summary', e.target.value)}
                       placeholder={`Brief ${isScreenplay ? 'sequence' : 'chapter'} synopsis...`}
-                      rows={5}
+                      rows={4}
                     />
+                  </div>
+                  <div className={styles.notesHint}>
+                    <span className="material-symbols-rounded">lightbulb</span>
+                    <span>Use the synopsis to capture the essence of this {isScreenplay ? 'scene group' : 'chapter'}. What is the core conflict? What changes by the end?</span>
                   </div>
                 </div>
               )}
