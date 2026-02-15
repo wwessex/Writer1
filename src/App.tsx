@@ -492,6 +492,17 @@ function AppShell() {
     },
   });
 
+  // Keep the ScreenplayParagraph extension's screenplayMode option in sync
+  // with the React state. useEditor does not recreate the editor when the
+  // extensions array reference changes, so we patch the live option directly.
+  useEffect(() => {
+    if (!editor) return;
+    const ext = editor.extensionManager.extensions.find(e => e.name === 'paragraph');
+    if (ext) {
+      ext.options.screenplayMode = screenplayMode;
+    }
+  }, [editor, screenplayMode]);
+
   return (
     <EditorContext.Provider value={{ editor }}>
       <AppContent
