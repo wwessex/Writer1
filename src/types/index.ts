@@ -109,6 +109,14 @@ export interface TypographySettings {
   lineHeight: number;
 }
 
+export type SidebarPanelId = 'chapters' | 'scenePlanner' | 'outline';
+
+export interface SidebarPanelsSettings {
+  order?: SidebarPanelId[];
+  collapsed?: Partial<Record<SidebarPanelId, boolean>>;
+  visible?: Partial<Record<SidebarPanelId, boolean>>;
+}
+
 export interface AppSettings {
   autosaveMs: number;
   dailyWordGoal: number;
@@ -122,6 +130,7 @@ export interface AppSettings {
   quickSwitcherMode: 'chapter' | 'action' | 'search-result';
   typography: TypographySettings;
   onboardingComplete: boolean;
+  sidebarPanels: SidebarPanelsSettings;
 }
 
 export interface AppState {

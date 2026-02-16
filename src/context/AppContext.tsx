@@ -8,12 +8,55 @@ import {
   useRef,
   type ReactNode
 } from 'react';
-import type { Chapter, Novel, AppSettings, AppState, Scene, ProjectType } from '@/types';
+import type { Chapter, Novel, AppSettings, AppState, Scene, ProjectType, SidebarPanelId, SidebarPanelsSettings } from '@/types';
 import * as storage from '@/lib/storage';
 import { debounce, generateId } from '@/lib/utils';
 
 // Check if mobile viewport (matches the CSS breakpoint)
 const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches;
+
+
+const BASE_SIDEBAR_PANEL_ORDER: SidebarPanelId[] = ['chapters', 'scenePlanner', 'outline'];
+
+const sidebarPanelsForProjectType = (projectType: ProjectType): SidebarPanelsSettings => ({
+  order: projectType === 'screenplay'
+    ? ['chapters', 'outline', 'scenePlanner']
+    : [...BASE_SIDEBAR_PANEL_ORDER],
+  collapsed: {
+    chapters: false,
+    scenePlanner: false,
+    outline: false
+  },
+  visible: {
+    chapters: true,
+    scenePlanner: true,
+    outline: true
+  }
+});
+
+const normalizeSidebarPanels = (
+  rawPanels: SidebarPanelsSettings | undefined,
+  projectType: ProjectType
+): SidebarPanelsSettings => {
+  const defaults = sidebarPanelsForProjectType(projectType);
+  const rawOrder = rawPanels?.order || [];
+  const dedupedKnown = rawOrder.filter((id, index): id is SidebarPanelId =>
+    BASE_SIDEBAR_PANEL_ORDER.includes(id) && rawOrder.indexOf(id) === index
+  );
+  const missing = BASE_SIDEBAR_PANEL_ORDER.filter(id => !dedupedKnown.includes(id));
+
+  return {
+    order: [...dedupedKnown, ...missing],
+    collapsed: {
+      ...defaults.collapsed,
+      ...rawPanels?.collapsed
+    },
+    visible: {
+      ...defaults.visible,
+      ...rawPanels?.visible
+    }
+  };
+};
 
 // Default settings
 const defaultSettings: AppSettings = {
@@ -40,7 +83,8 @@ const defaultSettings: AppSettings = {
     fontSize: 16,
     lineHeight: 1.75
   },
-  onboardingComplete: false
+  onboardingComplete: false,
+  sidebarPanels: {}
 };
 
 // Initial state
@@ -252,12 +296,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (saved) {
       try {
         const settings = JSON.parse(saved);
-        dispatch({ type: 'SET_SETTINGS', payload: { ...defaultSettings, ...settings } });
+        const mergedSettings = { ...defaultSettings, ...settings };
+        dispatch({
+          type: 'SET_SETTINGS',
+          payload: {
+            ...mergedSettings,
+            sidebarPanels: settings?.sidebarPanels || {}
+          }
+        });
       } catch (e) {
         console.error('Failed to load settings:', e);
       }
     }
   }, []);
+
+
+  useEffect(() => {
+    const normalizedPanels = normalizeSidebarPanels(state.settings.sidebarPanels, state.projectType);
+    const hasDifference =
+      JSON.stringify(normalizedPanels.order) !== JSON.stringify(state.settings.sidebarPanels.order) ||
+      JSON.stringify(normalizedPanels.collapsed) !== JSON.stringify(state.settings.sidebarPanels.collapsed) ||
+      JSON.stringify(normalizedPanels.visible) !== JSON.stringify(state.settings.sidebarPanels.visible);
+
+    if (hasDifference) {
+      dispatch({ type: 'SET_SETTINGS', payload: { sidebarPanels: normalizedPanels } });
+    }
+  }, [state.projectType, state.settings.sidebarPanels]);
 
   // Save settings to localStorage
   useEffect(() => {
