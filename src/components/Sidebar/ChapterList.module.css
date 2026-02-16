@@ -175,6 +175,16 @@
   opacity: 1;
 }
 
+@media (pointer: coarse) {
+  .chapterItem__drag {
+    opacity: 0.5;
+  }
+
+  .chapterItem__drag:active {
+    opacity: 1;
+  }
+}
+
 .chapterItem__drag .material-symbols-rounded {
   font-size: 1.125rem;
 }

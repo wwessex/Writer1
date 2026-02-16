@@ -258,6 +258,11 @@
     pointer-events: auto;
   }
 
+  .tab {
+    min-height: 44px;
+    padding: 8px 12px;
+  }
+
   .inspector {
     position: fixed;
     bottom: 0;

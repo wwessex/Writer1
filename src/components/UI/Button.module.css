@@ -87,6 +87,13 @@
   transition: all var(--transition-fast, 120ms ease);
 }
 
+@media (pointer: coarse) {
+  .iconBtn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 .iconBtn:hover {
   background: var(--btn-bg);
   color: var(--text);
