@@ -2,295 +2,359 @@
 
 ## Project Overview
 
-DraftHarbour Studio is an **offline-first Progressive Web Application (PWA)** for writing novels. It's a lightweight, browser-based word processor with rich text editing, chapter management, and optional cloud sync.
+DraftHarbour Studio is an **offline-first Progressive Web Application (PWA)** for writing novels and screenplays. It is a React + TypeScript application built with Vite, featuring rich text editing via Tiptap, chapter/scene management, multi-format export, AI writing assistance, and optional cloud sync integrations.
 
 **Key characteristics:**
-- Static site (no backend required for core functionality)
-- Vanilla JavaScript with ES modules
-- All external dependencies loaded from CDN (esm.sh)
-- Service Worker for offline-first PWA experience
-- IndexedDB for local data persistence
-- ~4,200 lines of focused, readable code
+- React 19 + TypeScript with Vite build tooling
+- Tiptap 2 (ProseMirror) rich text editor via `@tiptap/react`
+- IndexedDB for local data persistence (Dexie ORM)
+- Dual project types: **Book** and **Screenplay**
+- CSS Modules for component-scoped styling
+- PWA via `vite-plugin-pwa` + Workbox
+- ~24,100 lines of source code across ~95 TypeScript/TSX and ~23 CSS files
 
 ## Architecture
 
 ```
-DraftHarbourStudio/
-├── index.html          # Main HTML structure, modals, UI scaffold
-├── app.js              # Core application logic, UI state management (~1,740 lines)
-├── editor.js           # Tiptap/ProseMirror editor wrapper (~109 lines)
-├── storage.js          # IndexedDB operations via Dexie (~229 lines)
-├── export.js           # DOCX/PDF/RTF export functionality (~143 lines)
-├── importer.js         # DOCX/RTF import with chapter detection (~238 lines)
-├── sw.js               # Service Worker for offline caching (~70 lines)
-├── styles.css          # Modern UI with dark/light themes (~1,127 lines)
-├── manifest.webmanifest # PWA manifest configuration
-├── README.md           # User-facing documentation
-└── assets/             # PWA icons (192px, 512px)
+Writer1/
+├── index.html                  # Vite entry HTML (mounts #root)
+├── vite.config.ts              # Vite + React + PWA plugin config
+├── tsconfig.json               # TypeScript config (strict, ES2022, @/* alias)
+├── eslint.config.js            # ESLint flat config (typescript-eslint + react-hooks)
+├── package.json                # npm deps, scripts
+├── public/                     # Static assets served as-is
+│   ├── assets/                 # PWA icons, branding images
+│   ├── brand/                  # Logo SVGs
+│   └── CNAME                   # GitHub Pages custom domain
+├── src/
+│   ├── main.tsx                # React entry point, StrictMode mount
+│   ├── App.tsx                 # Root component: editor setup, keyboard shortcuts, layout
+│   ├── App.module.css          # Root layout styles
+│   ├── styles/index.css        # Global CSS: reset, design tokens, themes
+│   ├── types/index.ts          # All TypeScript interfaces and type aliases
+│   ├── context/AppContext.tsx   # React Context + useReducer state management
+│   ├── declarations.d.ts       # CSS module type declarations
+│   ├── vite-env.d.ts           # Vite client types
+│   ├── hooks/
+│   │   ├── useModalState.ts    # Modal open/close/toggle reducer
+│   │   └── useResizable.ts     # Draggable panel resize hook
+│   ├── components/
+│   │   ├── Editor/             # Tiptap editor wrapper, screenplay extension
+│   │   ├── FindReplace/        # In-editor find & replace (Ctrl+F/H)
+│   │   ├── Header/             # Top header bar + formatting toolbar
+│   │   ├── Inspector/          # Right panel: chapter metadata, stats
+│   │   ├── Menu/               # Application menu bar
+│   │   ├── Modals/             # 14 modal dialogs (export, settings, AI, etc.)
+│   │   ├── Panels/             # AI suggestions sliding panel
+│   │   ├── QuickSwitcher/      # Ctrl+K quick chapter/action/search switcher
+│   │   ├── Sidebar/            # Left panel: chapter list, outline, scene planner
+│   │   ├── UI/                 # Shared primitives: Button, Dialog, Input, Pill, Toast, Tooltip
+│   │   ├── Windows/            # Settings and About floating windows
+│   │   └── ErrorBoundary.tsx   # Top-level React error boundary
+│   ├── lib/
+│   │   ├── storage.ts          # Dexie DB schema, CRUD for novels/chapters/snapshots
+│   │   ├── commands.ts         # Typed command registry (COMMAND_IDS + handlers)
+│   │   ├── export.ts           # DOCX, PDF, screenplay PDF, RTF, Fountain export
+│   │   ├── import.ts           # DOCX, RTF, TXT, Fountain import with chapter detection
+│   │   ├── utils.ts            # Text analysis, word count, Flesch score, debounce, IDs
+│   │   ├── search.ts           # Content search for quick switcher
+│   │   ├── adapters.ts         # Data shape adapters between formats
+│   │   ├── encryption.ts       # AES-GCM encryption helpers for sync
+│   │   ├── exportHistory.ts    # Export history tracking
+│   │   ├── findReplaceExtension.ts  # Tiptap ProseMirror find/replace plugin
+│   │   ├── plugins.ts          # Plugin system manifest + hooks
+│   │   ├── progressTracker.ts  # Daily word goal and progress tracking
+│   │   ├── projectMetrics.ts   # Novel/project-level metrics computation
+│   │   ├── telemetry.ts        # Privacy-respecting usage telemetry
+│   │   ├── ai/                 # AI provider abstraction (Chrome AI, OpenAI)
+│   │   └── integrations/       # Cloud sync: Dropbox, Google Drive, Scrivener
+│   └── assets/                 # Imported assets (icons, images)
+└── .github/workflows/
+    ├── deploy.yml              # Deploy to GitHub Pages (npm ci → build → deploy)
+    └── build-static-zip.yml    # Build dist/ and upload ZIP artifact
 ```
 
 ## Technology Stack
 
-| Category | Technology |
-|----------|------------|
-| Core | Vanilla JavaScript (ES2024+), ES Modules |
-| Editor | Tiptap 2.11.5 with ProseMirror |
-| Database | Dexie 4.0.8 (IndexedDB wrapper) |
-| Export | docx@9.5.0, pdfmake@0.2.10, html-to-rtf@2.2.0 |
-| Import | jszip@3.10.1 (DOCX parsing) |
-| Writing Analysis | LanguageTool API (optional) |
-| Icons | Material Symbols Rounded (Google Fonts) |
-| PWA | Service Worker with cache-first strategy |
-
-**All dependencies are loaded from CDN** - no npm/yarn, no build step.
-
-## Key Files and Their Responsibilities
-
-### `app.js` - Main Application
-- State management (single `state` object)
-- UI event handling and DOM manipulation
-- Text analysis (Flesch-Kincaid readability, word counts)
-- LanguageTool integration
-- Keyboard shortcuts
-- Autosave with debouncing
-- Online sync functionality
-
-### `editor.js` - Rich Text Editor
-- Tiptap/ProseMirror initialization
-- Custom keyboard shortcuts extension
-- Toolbar binding and active state updates
-- JSON-to-plain-text conversion
-
-### `storage.js` - Data Persistence
-- Dexie database schema (novels, chapters, snapshots)
-- CRUD operations for novels and chapters
-- Chapter reordering
-- Snapshot (version history) management
-- Backup export/import
-
-### `export.js` - Document Export
-- DOCX generation with proper structure
-- PDF generation with fonts and styling
-- RTF conversion via HTML intermediary
-- Lazy-loaded dependencies
-
-### `importer.js` - Document Import
-- DOCX XML parsing
-- RTF parsing with custom lightweight parser
-- Smart chapter detection (regex patterns for "Chapter X", "Part X", etc.)
-- Automatic chapter splitting
-
-## Data Schema (IndexedDB)
-
-```javascript
-// Database: DraftHarbourDB
-db.version(2).stores({
-  novels: "id, title, updatedAt",
-  chapters: "id, novelId, order, title, updatedAt",
-  snapshots: "id, chapterId, createdAt"
-});
-
-// Chapter object structure:
-{
-  id: string,           // crypto.randomUUID()
-  novelId: string,      // Foreign key to novel
-  order: number,        // Display order
-  title: string,
-  updatedAt: number,    // Timestamp
-  content: object,      // Tiptap JSON document
-  summary: string,
-  pov: string,          // Point-of-view character
-  status: string,       // "planned" | "draft" | "revised" | "final"
-  tags: string[],
-  wordGoal: number,
-  scenes: string[]
-}
-```
+| Category | Technology | Version |
+|----------|------------|---------|
+| UI Framework | React | 19.x |
+| Language | TypeScript | ~5.6 |
+| Build Tool | Vite | 6.x |
+| Editor | Tiptap (ProseMirror) via `@tiptap/react` | 2.11.5 |
+| Database | Dexie (IndexedDB) | 4.0.8 |
+| Export | docx, pdfmake, built-in RTF/Fountain | 9.5.0 / 0.2.10 |
+| Import | jszip (DOCX), custom RTF/TXT/Fountain parsers | 3.10.1 |
+| Testing | Vitest | 4.x |
+| Linting | ESLint (flat config) + typescript-eslint | 9.x |
+| PWA | vite-plugin-pwa + Workbox | 0.21.x |
+| Icons | Material Symbols Rounded (Google Fonts CDN) | — |
 
 ## Development Workflow
 
-### Running Locally
+### Setup
 ```bash
-# Option A: Python
-python3 -m http.server 8080
-
-# Option B: Any static server
-npx serve .
-```
-Open: http://localhost:8080
-
-### Service Worker Bypass
-If caching causes issues during development:
-```
-http://localhost:8080?nosw=1
-```
-This unregisters the Service Worker and reloads.
-
-### No Build Step
-Files are served as-is. Just edit and refresh.
-
-## Code Conventions
-
-### Module Pattern
-- ES modules with named exports
-- CDN imports from `https://esm.sh/`
-```javascript
-import Dexie from "https://esm.sh/dexie@4.0.8";
-import { Editor } from "https://esm.sh/@tiptap/core@2.11.5";
+npm install
 ```
 
-### DOM Utilities
-```javascript
-const $ = (sel) => document.querySelector(sel);
+### Scripts
+```bash
+npm run dev          # Vite dev server with HMR
+npm run build        # TypeScript check + Vite production build → dist/
+npm run preview      # Preview production build locally
+npm run lint         # ESLint across all .ts/.tsx files
+npm run typecheck    # TypeScript --noEmit type checking only
+npm run test         # Vitest test runner (single run)
 ```
 
-### State Management
-Single state object in `app.js`:
-```javascript
-const state = {
-  novelId,
-  pageView,           // "chapters" | "outline"
-  sidebarHidden,
-  theme,              // "dark" | "light"
-  novelTitle,
-  chapters: [],
-  activeChapterId,
-  autosaveMs,
-  dailyWordGoal,
-  novelWordGoal,
-  sync: { novelId, url, auth },
-  assist: { languageToolEnabled, url, language }
-};
+### Path Aliases
+TypeScript and Vite are configured with `@/*` → `src/*`:
+```typescript
+import { useApp } from '@/context/AppContext';
+import type { Chapter } from '@/types';
 ```
 
-### Debouncing
-Used for autosave and word count updates:
-```javascript
-function debounce(fn, ms) {
-  let t;
-  return (...args) => {
-    clearTimeout(t);
-    t = setTimeout(() => fn(...args), ms);
-  };
+### PWA During Development
+The PWA service worker is auto-registered by `vite-plugin-pwa`. During development, Workbox manages caching. If stale caches cause issues, clear Application → Cache Storage in DevTools.
+
+## State Management
+
+### AppContext (React Context + useReducer)
+All application state lives in `src/context/AppContext.tsx`:
+
+```typescript
+interface AppState {
+  projectType: 'book' | 'screenplay';
+  novelId: string;
+  novelTitle: string;
+  chapters: Chapter[];
+  activeChapterId: string | null;
+  isOnline: boolean;
+  isSaving: boolean;
+  settings: AppSettings;
 }
 ```
 
-### Event Delegation
-Menu actions use `data-action` attributes:
-```html
-<button data-action="newChapter">New Chapter</button>
+The `AppProvider` component exposes:
+- `state` and `dispatch` for the reducer
+- Action methods: `loadNovel`, `createChapter`, `deleteChapter`, `updateChapter`, `reorderChapters`, `setActiveChapter`, etc.
+- Scene CRUD: `addScene`, `updateScene`, `deleteScene`, `reorderScenes`
+- `updateSettings` for persisting settings to localStorage
+
+Access via the `useApp()` hook:
+```typescript
+const { state, activeChapter, createChapter, dispatch } = useApp();
 ```
-```javascript
-element.addEventListener("click", (e) => {
-  const btn = e.target.closest("[data-action]");
-  if (!btn) return;
-  const action = btn.dataset.action;
-  // Handle action...
+
+### Settings Persistence
+- **localStorage** (`draftharbour_settings_v1`): App settings, theme, typography prefs, goal trends, comment threads
+- **IndexedDB** (`DraftHarbourDB`): Novels, chapters (with content), snapshots
+
+### Command System
+All UI actions go through a typed command registry in `src/lib/commands.ts`:
+```typescript
+import { COMMAND_IDS, runCommand } from '@/lib/commands';
+runCommand(COMMAND_IDS.NEW_CHAPTER, context);
+```
+
+## Data Schema (IndexedDB via Dexie)
+
+```typescript
+// Database: DraftHarbourDB — version 3
+db.version(3).stores({
+  novels: 'id, title, projectType, updatedAt',
+  chapters: 'id, novelId, order, title, updatedAt',
+  snapshots: 'id, chapterId, createdAt'
 });
 ```
 
-### Defensive Null Checks
-Always check elements exist before accessing:
-```javascript
-const el = document.querySelector(selector);
-if (el) {
-  el.textContent = value;
+### Chapter structure:
+```typescript
+interface Chapter {
+  id: string;              // crypto.randomUUID()
+  novelId: string;         // FK to novel
+  order: number;           // Display order
+  title: string;
+  updatedAt: number;       // Timestamp
+  content: JSONContent | null;  // Tiptap JSON document
+  summary: string;
+  pov: string;             // Point-of-view character
+  status: 'planned' | 'draft' | 'revised' | 'final';
+  tags: string[];
+  wordGoal: number;
+  scenes: Scene[];         // Sub-scenes within chapter
+  act?: number;            // Screenplay act number
+  sequence?: number;       // Screenplay sequence
+  sync?: ChapterSyncMetadata;
 }
 ```
 
-### Modals
-Use native `<dialog>` elements:
-```javascript
-document.getElementById("settingsDialog").showModal();
-document.getElementById("settingsDialog").close();
+### Comment threads:
+Stored in localStorage (keyed by chapter ID), not IndexedDB. Each thread anchors to a text range in the editor content.
+
+## Key Patterns
+
+### Component Structure
+Each component directory follows the pattern:
 ```
+ComponentName/
+├── ComponentName.tsx          # React component
+├── ComponentName.module.css   # Scoped CSS Module
+└── index.ts                   # Re-export barrel
+```
+
+### CSS Modules
+All component styles use CSS Modules (`.module.css`) imported as `styles`:
+```typescript
+import styles from './Editor.module.css';
+<div className={styles.editor}>
+```
+
+Global styles and design tokens live in `src/styles/index.css`.
+
+### Theming
+Three themes controlled via `data-theme` attribute on `<html>`:
+- `light` (warm editorial paper — default)
+- `dark`
+- `high-contrast`
+
+Design tokens use CSS custom properties (`--bg`, `--text`, `--accent`, etc.) defined per theme in `src/styles/index.css`.
+
+### Modal Management
+Modals use `useModalState` hook (reducer-based):
+```typescript
+const { modals, openModal, closeModal, toggleModal } = useModalState();
+```
+
+Adding a new modal:
+1. Add key to `ModalKey` in `src/hooks/useModalState.ts`
+2. Add initial state entry
+3. Create modal component in `src/components/Modals/`
+4. Wire up in `App.tsx`
+
+### Editor Extensions
+The Tiptap editor is configured in `App.tsx` with:
+- `StarterKit` (headings H1/H2, lists, blockquote, etc.)
+- `ScreenplayParagraph` — custom paragraph node with `screenplayType` attribute for screenplay mode
+- `Underline`, `HorizontalRule`
+- `CommentAnchorMark` — inline mark for comment thread anchors
+- `FindReplaceExtension` — ProseMirror plugin for in-editor search
+
+### Keyboard Shortcuts
+Global shortcuts in `App.tsx`:
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl/Cmd+F` | Find |
+| `Ctrl/Cmd+H` | Find & Replace |
+| `Ctrl/Cmd+K` | Quick Switcher |
+| `Ctrl/Cmd+Shift+N` | New Chapter |
+| `Ctrl/Cmd+Shift+E` | Export |
+| `Ctrl/Cmd+Shift+B` | Toggle Sidebar |
+| `Ctrl/Cmd+Shift+F` | Toggle Focus Mode |
+| `Ctrl/Cmd+Shift+I` | Toggle Inspector |
+| `Ctrl/Cmd+Shift+M` | Add Comment |
+| `Escape` | Exit Focus Mode |
+
+### Lazy Loading
+Export libraries are imported on-demand inside export functions:
+```typescript
+const docx = await import('docx');
+const pdfMake = await import('pdfmake/build/pdfmake.min.js');
+```
+
+### Autosave
+Chapter content changes are debounced (default 800ms) before writing to IndexedDB. The debounce interval is configurable via settings.
+
+## Testing
+
+### Framework: Vitest
+```bash
+npm run test         # Run all tests once
+```
+
+### Test Files
+Test files are co-located with source using `.test.ts` suffix:
+- `src/lib/utils.test.ts` — utility function tests
+- `src/lib/export.screenplay.test.ts` — screenplay export tests
+- `src/lib/import.screenplay.test.ts` — screenplay import tests
+- `src/lib/integrations/sync.test.ts` — sync integration tests
+
+### Manual Testing
+For UI features without automated tests, test in browser:
+- **Application tab**: Inspect IndexedDB, Service Worker, localStorage
+- **Console**: Check for runtime errors
+- **Network tab**: Verify asset loading
 
 ## Common Tasks
 
 ### Adding a New Feature
-1. Identify which file(s) need modification
-2. Add UI elements in `index.html` if needed
-3. Add styles in `styles.css`
-4. Implement logic in `app.js` (or appropriate module)
-5. If persisted, update `storage.js` schema/operations
+1. Identify which files need modification
+2. Add TypeScript types in `src/types/index.ts` if needed
+3. Add UI component in `src/components/` with CSS Module
+4. Add business logic in `src/lib/`
+5. Wire into `App.tsx` or relevant parent component
+6. If persisted, update `src/lib/storage.ts` schema/operations
+7. Run `npm run lint && npm run typecheck` to verify
+
+### Adding a New Modal
+1. Add key to `ModalKey` in `src/hooks/useModalState.ts`
+2. Add `false` default in `initialState` record
+3. Create `src/components/Modals/MyModal.tsx`
+4. Export from `src/components/Modals/index.ts`
+5. Add command ID in `src/lib/commands.ts` if menu-accessible
+6. Render in `App.tsx`
+
+### Adding a New Command
+1. Add constant to `COMMAND_IDS` in `src/lib/commands.ts`
+2. Add handler to `COMMAND_HANDLERS` record
+3. Wire into `CommandContext` interface if it needs new dependencies
 
 ### Adding Storage Fields
-1. Update the chapter/novel creation in `storage.js`
-2. Add the field to relevant forms in `index.html`
-3. Handle persistence in `app.js`
+1. Add field to type in `src/types/index.ts`
+2. Update `createChapter()` or `createNovel()` in `src/lib/storage.ts`
+3. Handle in relevant components
 
 ### Adding Export Formats
-1. Add lazy-load import in `export.js`
-2. Implement conversion function
-3. Add UI option in export modal (`index.html`)
-4. Wire up in `app.js`
+1. Add format to `ExportFormat` type in `src/types/index.ts`
+2. Implement export function in `src/lib/export.ts` (lazy-load heavy deps)
+3. Add option in `src/components/Modals/ExportModal.tsx`
 
-### Keyboard Shortcuts
-Global shortcuts in `app.js`:
-```javascript
-document.addEventListener("keydown", (e) => {
-  if (e.ctrlKey || e.metaKey) {
-    if (e.shiftKey && e.key === "B") {
-      // Toggle sidebar
-    }
-  }
-});
-```
+### Adding Import Formats
+1. Add parser function in `src/lib/import.ts`
+2. Update accepted file extensions in `App.tsx` file input
 
-Editor shortcuts in `editor.js` via Tiptap extension:
-```javascript
-const ShortcutKeymap = Extension.create({
-  addKeyboardShortcuts() {
-    return {
-      "Mod-b": () => this.editor.commands.toggleBold(),
-      // ...
-    };
-  }
-});
-```
+## AI Integration
 
-## Testing and Debugging
+Two provider types in `src/lib/ai/`:
+- **Chrome AI** (`chromeAI.ts`): Uses the browser-native `window.ai` API (Chrome Canary/Dev)
+- **OpenAI** (`openaiProvider.ts`): Uses OpenAI-compatible API endpoints
 
-### No Automated Tests
-This project has no test framework. Test manually in browser.
+Provider management via `providerManager.ts`: auto-detects best available provider, persists config to localStorage.
 
-### Browser DevTools
-- **Application tab**: Inspect IndexedDB data, Service Worker status
-- **Console**: Check for errors
-- **Network tab**: Verify CDN requests
+## Cloud Integrations
 
-### Clearing Data
-- Settings > "Reset All Data" (in app)
-- Or clear IndexedDB via DevTools > Application > IndexedDB > Delete database
+Located in `src/lib/integrations/`:
+- **Dropbox** (`dropbox.ts`): OAuth2 file sync
+- **Google Drive** (`googleDrive.ts`): OAuth2 file sync
+- **Scrivener** (`scrivener.ts`): Project file import/export
+- **Sync engine** (`sync.ts`): Bidirectional sync with conflict detection
+- **Orchestration** (`orchestration.ts`): Coordinates multi-provider sync
 
-### Service Worker Issues
-1. DevTools > Application > Service Workers > Unregister
-2. Or visit with `?nosw=1` query parameter
+## Project Types
 
-## Important Patterns
+The app supports two project modes:
+- **Book**: Chapters with prose content, traditional export formats
+- **Screenplay**: Scenes with screenplay-typed paragraphs (scene-heading, action, character, dialogue, parenthetical, transition), Fountain format support, screenplay PDF export
 
-### Lazy Loading
-Export libraries are loaded on-demand:
-```javascript
-const { Document, Packer, Paragraph } = await import("https://esm.sh/docx@9.5.0");
-```
+The `projectType` field is stored on the novel and affects chapter creation, editor behavior, export options, and UI labels.
 
-### Graceful Degradation
-Features work offline; optional features (LanguageTool, sync) fail gracefully.
+## CI/CD
 
-### LocalStorage vs IndexedDB
-- **LocalStorage**: Settings, preferences, theme
-- **IndexedDB**: Novel content, chapters, snapshots
+### GitHub Actions
+- **deploy.yml**: On push to `main` → `npm ci` → `npm run build` → deploy `dist/` to GitHub Pages
+- **build-static-zip.yml**: On push to `main` → build → create ZIP artifact for cPanel deployment
 
-### Error Handling
-```javascript
-try {
-  // operation
-} catch (err) {
-  console.error("Context:", err);
-  // Show user-friendly message
-}
-```
+Both use Node.js 20.
 
 ## Git Conventions
 
@@ -299,53 +363,36 @@ try {
 - Always create from main branch
 
 ### Commit Messages
-- Short, descriptive summary
-- Present tense ("Add feature" not "Added feature")
+- Short, descriptive summary in present tense ("Add feature" not "Added feature")
 - Reference issue numbers if applicable
-
-### Pull Requests
-- Include summary of changes
-- Test manually before merging
-
-## External Dependencies (CDN URLs)
-
-```javascript
-// Core editor
-"https://esm.sh/@tiptap/core@2.11.5"
-"https://esm.sh/@tiptap/starter-kit@2.11.5"
-"https://esm.sh/@tiptap/extension-underline@2.11.5"
-"https://esm.sh/@tiptap/extension-horizontal-rule@2.11.5"
-
-// Database
-"https://esm.sh/dexie@4.0.8"
-
-// Export (lazy-loaded)
-"https://esm.sh/docx@9.5.0"
-"https://esm.sh/pdfmake@0.2.10/build/pdfmake.min.js"
-"https://esm.sh/html-to-rtf@2.2.0"
-
-// Import
-"https://esm.sh/jszip@3.10.1"
-```
 
 ## Security Considerations
 
-- All data stored locally by default
-- No tracking or analytics
-- Optional cloud sync requires user configuration
-- Bearer token auth for sync API (if implemented)
-- Be cautious with user-provided content in exports
+- All data stored locally by default (IndexedDB + localStorage)
+- No tracking or analytics beyond optional privacy-respecting telemetry
+- AES-GCM encryption available for sync data (`src/lib/encryption.ts`)
+- Optional cloud sync requires explicit user configuration
+- User-provided content in exports is escaped to prevent injection
+- HTML escaping utility in `src/lib/utils.ts` (`escapeHtml`)
 
 ## Quick Reference
 
 | Task | Location |
 |------|----------|
-| Add UI element | `index.html` |
-| Style changes | `styles.css` |
-| Editor behavior | `editor.js` |
-| Data persistence | `storage.js` |
-| Export formats | `export.js` |
-| Import formats | `importer.js` |
-| Business logic | `app.js` |
-| Caching | `sw.js` |
-| PWA config | `manifest.webmanifest` |
+| Add/modify types | `src/types/index.ts` |
+| App state management | `src/context/AppContext.tsx` |
+| Data persistence | `src/lib/storage.ts` |
+| Command registry | `src/lib/commands.ts` |
+| Editor config | `src/App.tsx` (extensions), `src/components/Editor/` |
+| Export formats | `src/lib/export.ts` |
+| Import formats | `src/lib/import.ts` |
+| UI components | `src/components/` (each in own directory) |
+| Shared UI primitives | `src/components/UI/` |
+| Global styles & tokens | `src/styles/index.css` |
+| AI providers | `src/lib/ai/` |
+| Cloud integrations | `src/lib/integrations/` |
+| Tests | Co-located `*.test.ts` files, run with `npm run test` |
+| Build config | `vite.config.ts` |
+| TypeScript config | `tsconfig.json` |
+| Linting | `eslint.config.js` |
+| CI/CD | `.github/workflows/` |
