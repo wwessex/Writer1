@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Dialog, Button, Input, Textarea, IconButton } from '@/components/UI';
 import { Select } from '@/components/UI/Select';
+import { generateId } from '@/lib/utils';
 import type { CharacterEntity, WorldEntry } from '@/types';
 import styles from './Modals.module.css';
 
@@ -64,7 +65,7 @@ export function CharacterBibleModal({ open, onClose }: CharacterBibleModalProps)
 
   const addCharacter = () => {
     const newChar: CharacterEntity = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       novelId: '',
       name: 'New Character',
       aliases: [],
@@ -82,7 +83,7 @@ export function CharacterBibleModal({ open, onClose }: CharacterBibleModalProps)
 
   const addWorldEntry = () => {
     const newEntry: WorldEntry = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       novelId: '',
       category: 'location',
       name: 'New Entry',

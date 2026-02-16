@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { Novel, Chapter, Snapshot, BackupData, BackupDataV3, LegacyBackupData, ProjectType } from '@/types';
+import { generateId } from '@/lib/utils';
 
 const CURRENT_BACKUP_VERSION = 3;
 
@@ -80,7 +81,7 @@ export async function getNovel(id: string): Promise<Novel | undefined> {
 
 export async function createNovel(title: string = 'Untitled Novel', projectType: ProjectType = 'book'): Promise<Novel> {
   const novel: Novel = {
-    id: crypto.randomUUID(),
+    id: generateId(),
     title,
     projectType,
     updatedAt: Date.now()
@@ -140,7 +141,7 @@ export function createChapter(
   projectType: ProjectType = 'book'
 ): Chapter {
   return {
-    id: crypto.randomUUID(),
+    id: generateId(),
     novelId,
     order,
     title: title || (projectType === 'screenplay' ? `Scene ${order + 1}` : `Chapter ${order + 1}`),
@@ -196,7 +197,7 @@ export async function getSnapshots(chapterId: string): Promise<Snapshot[]> {
 
 export async function createSnapshot(chapterId: string, doc: Snapshot['doc']): Promise<Snapshot> {
   const snapshot: Snapshot = {
-    id: crypto.randomUUID(),
+    id: generateId(),
     chapterId,
     createdAt: Date.now(),
     doc
@@ -236,7 +237,7 @@ export async function exportBackup(novelId: string, includeSnapshots: boolean = 
 
 export async function importBackup(backup: BackupData): Promise<Novel> {
   const normalizedBackup = upgradeBackup(backup);
-  const newNovelId = crypto.randomUUID();
+  const newNovelId = generateId();
   const idMap = new Map<string, string>();
   idMap.set(normalizedBackup.project.id, newNovelId);
 
@@ -248,7 +249,7 @@ export async function importBackup(backup: BackupData): Promise<Novel> {
   };
 
   const chapters: Chapter[] = normalizedBackup.sections.map(chapter => {
-    const newId = crypto.randomUUID();
+    const newId = generateId();
     idMap.set(chapter.id, newId);
     return {
       ...chapter,
@@ -260,7 +261,7 @@ export async function importBackup(backup: BackupData): Promise<Novel> {
 
   const snapshots: Snapshot[] = (normalizedBackup.snapshots || []).map(snapshot => ({
     ...snapshot,
-    id: crypto.randomUUID(),
+    id: generateId(),
     chapterId: idMap.get(snapshot.chapterId) || snapshot.chapterId
   }));
 
@@ -287,7 +288,7 @@ export async function replaceNovelData(novelId: string, chapters: Chapter[]): Pr
     // Add new chapters
     const newChapters = chapters.map((chapter, index) => ({
       ...chapter,
-      id: crypto.randomUUID(),
+      id: generateId(),
       novelId,
       order: index,
       updatedAt: Date.now()

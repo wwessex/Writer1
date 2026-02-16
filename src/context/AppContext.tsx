@@ -10,7 +10,7 @@ import {
 } from 'react';
 import type { Chapter, Novel, AppSettings, AppState, Scene, ProjectType } from '@/types';
 import * as storage from '@/lib/storage';
-import { debounce } from '@/lib/utils';
+import { debounce, generateId } from '@/lib/utils';
 
 // Check if mobile viewport (matches the CSS breakpoint)
 const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches;
@@ -437,7 +437,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const existingScenes = chapter.scenes || [];
     const newScene: Scene = state.projectType === 'screenplay'
       ? {
-        id: crypto.randomUUID(),
+        id: generateId(),
         title: `Scene ${existingScenes.length + 1}`,
         summary: '',
         pov: '',
@@ -452,7 +452,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         productionTags: []
       }
       : {
-        id: crypto.randomUUID(),
+        id: generateId(),
         title: `Scene ${existingScenes.length + 1}`,
         summary: '',
         pov: '',

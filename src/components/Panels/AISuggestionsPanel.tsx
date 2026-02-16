@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
-import { editorToPlainText } from '@/lib/utils';
+import { editorToPlainText, generateId } from '@/lib/utils';
 import { loadAIConfig, createProvider } from '@/lib/ai';
 import type { AIProviderConfig } from '@/lib/ai';
 import { recordTelemetryEvent, isTelemetryOptedIn } from '@/lib/telemetry';
@@ -54,7 +54,7 @@ export function AISuggestionsPanel({ open, onClose }: AISuggestionsPanelProps) {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    const suggestionId = crypto.randomUUID();
+    const suggestionId = generateId();
     setSuggestions(prev => [...prev, { id: suggestionId, type, text: '', loading: true }]);
     setLoading(true);
 
@@ -115,7 +115,9 @@ export function AISuggestionsPanel({ open, onClose }: AISuggestionsPanelProps) {
   }, [isConfigured, activeChapter, config, state.projectType]);
 
   const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(text).catch(() => {
+      // Fallback for Safari insecure contexts
+    });
   };
 
   const handleDismiss = (id: string) => {

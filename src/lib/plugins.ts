@@ -5,6 +5,7 @@
  */
 
 import type { PluginManifest } from '@/types';
+import { generateId } from '@/lib/utils';
 
 type EventHandler = (...args: unknown[]) => void;
 type FilterHandler = (value: unknown) => unknown;
@@ -162,7 +163,7 @@ class PluginManager {
 
   /** Register a UI slot */
   registerUISlot(pluginId: string, slot: Omit<PluginUISlot, 'id' | 'pluginId'>): string {
-    const id = `${pluginId}__${slot.slot}__${crypto.randomUUID().slice(0, 8)}`;
+    const id = `${pluginId}__${slot.slot}__${generateId().slice(0, 8)}`;
     this.uiSlots.set(id, { ...slot, id, pluginId });
     return id;
   }
