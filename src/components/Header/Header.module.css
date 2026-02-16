@@ -13,8 +13,8 @@
   align-items: center;
   justify-content: space-between;
   min-height: 44px;
-  padding: 8px var(--space-2, 16px);
-  gap: var(--space-2, 16px);
+  padding: 8px clamp(8px, 2vw, 16px);
+  gap: clamp(8px, 2vw, 16px);
 }
 
 .topbar__brand {
@@ -60,6 +60,10 @@
 @keyframes pulse {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }
+}
+
+.desktopOnlyStats {
+  display: contents;
 }
 
 .mobileQuickActions {
@@ -159,8 +163,6 @@
   .mobileQuickActions { display: flex; }
   .topbar {
     flex-wrap: nowrap;
-    padding: 8px var(--space-1, 8px);
-    gap: var(--space-1, 8px);
   }
   .topbar__status { flex-wrap: nowrap; flex-shrink: 0; gap: 4px; }
   .novelTitle {
@@ -173,9 +175,9 @@
   .logo { display: none; }
   .savingStatus { display: none; }
   .inspectorBtn { display: none !important; }
+  .desktopOnlyStats { display: none; }
 }
 
 @media (max-width: 480px) {
-  .topbar { padding: 6px var(--space-1, 8px); gap: 6px; }
   .novelTitle { max-width: 120px; font-size: 0.8125rem; }
 }

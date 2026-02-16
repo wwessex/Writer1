@@ -4,12 +4,14 @@ import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import HorizontalRule from '@tiptap/extension-horizontal-rule';
 import { ScreenplayParagraph, CommentAnchorMark } from '@/components/Editor/screenplayExtension';
+import { FindReplaceExtension } from '@/lib/findReplaceExtension';
 import { useApp, AppProvider } from '@/context/AppContext';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
 import { Editor } from '@/components/Editor';
 import { Inspector } from '@/components/Inspector';
 import { QuickSwitcher } from '@/components/QuickSwitcher';
+import { FindReplace, useFindReplace } from '@/components/FindReplace';
 import {
   ExportModal, SnapshotModal, AnalysisModal, WordCountModal, DashboardModal, OnboardingModal,
   AIWritingModal, CharacterBibleModal, CommentModal, AdvancedAnalyticsModal, IntegrationsModal,
@@ -38,7 +40,8 @@ const createExtensions = (screenplayMode: boolean) => [
   ScreenplayParagraph.configure({ screenplayMode }),
   Underline,
   HorizontalRule,
-  CommentAnchorMark
+  CommentAnchorMark,
+  FindReplaceExtension,
 ];
 
 function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode: boolean; onToggleScreenplayMode: () => void }) {
@@ -50,6 +53,7 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
   const [error, setError] = useState<string | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
+  const findReplace = useFindReplace(editor);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -235,6 +239,20 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Find: Ctrl/Cmd+F (no shift)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f' && !e.shiftKey) {
+        e.preventDefault();
+        findReplace.open(false);
+        return;
+      }
+
+      // Find & Replace: Ctrl/Cmd+H
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'h' && !e.shiftKey) {
+        e.preventDefault();
+        findReplace.open(true);
+        return;
+      }
+
       // Quick Switcher: Ctrl/Cmd+K
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && !e.shiftKey) {
         e.preventDefault();
@@ -278,7 +296,7 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleMenuAction, state.settings.focusMode]);
+  }, [handleMenuAction, state.settings.focusMode, findReplace]);
 
   useEffect(() => {
     const handleAddComment = () => handleMenuAction(COMMAND_IDS.ADD_COMMENT);
@@ -330,6 +348,7 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
   return (
     <div className={styles.app} role="application" aria-label={appLabel}>
       <Header onAction={handleMenuAction} onToggleInspector={() => setInspectorOpen(prev => !prev)} inspectorOpen={inspectorOpen} />
+      <FindReplace controls={findReplace} />
       <main className={layoutClass} role="main">
         {state.settings.sidebarHidden && (
           <button

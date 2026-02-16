@@ -113,6 +113,11 @@ export function Header({ onAction, onToggleInspector, inspectorOpen }: HeaderPro
           <StatusDot online={state.isOnline} />
           <Pill label="Ch" value={chapterWords.toLocaleString()} />
           <Pill label="Total" value={totalWords.toLocaleString()} />
+          <span className={styles.desktopOnlyStats}>
+            <Pill label="Para" value={(activeChapter?.paragraphs ?? 0).toLocaleString()} />
+            <Pill label="Sent" value={(activeChapter?.sentences ?? 0).toLocaleString()} />
+            <Pill label="Char" value={(activeChapter?.characters ?? 0).toLocaleString()} />
+          </span>
           {state.settings.dailyWordGoal > 0 && (
             <Pill
               label="Goal"

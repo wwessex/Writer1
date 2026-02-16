@@ -61,6 +61,21 @@ export function countSentences(text: string): number {
 }
 
 /**
+ * Count paragraphs in text
+ */
+export function countParagraphs(text: string): number {
+  if (!text.trim()) return 0;
+  return text.split(/\n+/).filter(p => p.trim().length > 0).length;
+}
+
+/**
+ * Count characters excluding whitespace
+ */
+export function countCharacters(text: string): number {
+  return text.replace(/\s/g, '').length;
+}
+
+/**
  * Calculate Flesch Reading Ease score
  * Higher scores = easier to read (60-70 is standard)
  */

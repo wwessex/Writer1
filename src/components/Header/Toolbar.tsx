@@ -38,6 +38,8 @@ export function Toolbar() {
   const [isMobile, setIsMobile] = useState(false);
   const [moreFormattingOpen, setMoreFormattingOpen] = useState(false);
   const moreFormattingRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const [scrollHint, setScrollHint] = useState<'none' | 'right' | 'left' | 'both'>('none');
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 820);
@@ -50,6 +52,34 @@ export function Toolbar() {
     if (!isMobile) {
       setMoreFormattingOpen(false);
     }
+  }, [isMobile]);
+
+  useEffect(() => {
+    const el = toolbarRef.current;
+    if (!el || !isMobile) {
+      setScrollHint('none');
+      return;
+    }
+
+    const updateHint = () => {
+      const { scrollLeft, scrollWidth, clientWidth } = el;
+      const atStart = scrollLeft <= 2;
+      const atEnd = scrollLeft + clientWidth >= scrollWidth - 2;
+
+      if (scrollWidth <= clientWidth) setScrollHint('none');
+      else if (atStart && atEnd) setScrollHint('none');
+      else if (atStart) setScrollHint('right');
+      else if (atEnd) setScrollHint('left');
+      else setScrollHint('both');
+    };
+
+    updateHint();
+    el.addEventListener('scroll', updateHint, { passive: true });
+    window.addEventListener('resize', updateHint);
+    return () => {
+      el.removeEventListener('scroll', updateHint);
+      window.removeEventListener('resize', updateHint);
+    };
   }, [isMobile]);
 
   useEffect(() => {
@@ -134,103 +164,111 @@ export function Toolbar() {
   };
 
   if (isMobile) {
+    const scrollClasses = [
+      styles.toolbarScroll,
+      (scrollHint === 'right' || scrollHint === 'both') && styles['toolbarScroll--overflowRight'],
+      (scrollHint === 'left' || scrollHint === 'both') && styles['toolbarScroll--overflowLeft'],
+    ].filter(Boolean).join(' ');
+
     return (
-      <div className={styles.toolbar}>
-        <div className={styles.toolbar__group}>
-          <Select
-            options={STYLE_OPTIONS}
-            value={getCurrentStyle()}
-            onChange={e => handleStyleChange(e.target.value)}
-            className={styles.styleSelect}
-          />
-        </div>
-
-        <div className={styles.toolbar__divider} />
-
-        <div className={styles.toolbar__group}>
-          {MOBILE_PRIMARY_COMMANDS.map(({ icon, cmd, label }) => (
-            <IconButton
-              key={cmd}
-              icon={icon}
-              label={label}
-              variant="ghost"
-              active={isActive(cmd)}
-              onClick={() => handleFormatClick(cmd)}
-              className={styles.toolbarActionBtn}
+      <div className={scrollClasses}>
+        <div className={styles.toolbar} ref={toolbarRef}>
+          <div className={styles.toolbar__group}>
+            <Select
+              options={STYLE_OPTIONS}
+              value={getCurrentStyle()}
+              onChange={e => handleStyleChange(e.target.value)}
+              className={styles.styleSelect}
             />
-          ))}
-
-          <div className={styles.moreFormatting} ref={moreFormattingRef}>
-            <IconButton
-              icon="more_horiz"
-              label="More formatting"
-              variant="ghost"
-              active={moreFormattingOpen}
-              onClick={() => setMoreFormattingOpen(prev => !prev)}
-              className={styles.toolbarActionBtn}
-            />
-            {moreFormattingOpen && (
-              <div className={styles.moreFormattingMenu}>
-                {MOBILE_MORE_FORMATTING_COMMANDS.map(({ icon, cmd, label }) => (
-                  <button
-                    key={cmd}
-                    className={styles.moreFormattingItem}
-                    onClick={() => {
-                      handleFormatClick(cmd);
-                      setMoreFormattingOpen(false);
-                    }}
-                  >
-                    <span className="material-symbols-rounded">{icon}</span>
-                    <span>{label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
-        </div>
 
-        <div className={styles.toolbar__divider} />
+          <div className={styles.toolbar__divider} />
 
-        <div className={styles.toolbar__group}>
-          <Tooltip content="Add Comment (Ctrl+Shift+M)" position="bottom">
+          <div className={styles.toolbar__group}>
+            {MOBILE_PRIMARY_COMMANDS.map(({ icon, cmd, label }) => (
+              <IconButton
+                key={cmd}
+                icon={icon}
+                label={label}
+                variant="ghost"
+                active={isActive(cmd)}
+                onClick={() => handleFormatClick(cmd)}
+                className={styles.toolbarActionBtn}
+              />
+            ))}
+
+            <div className={styles.moreFormatting} ref={moreFormattingRef}>
+              <IconButton
+                icon="more_horiz"
+                label="More formatting"
+                variant="ghost"
+                active={moreFormattingOpen}
+                onClick={() => setMoreFormattingOpen(prev => !prev)}
+                className={styles.toolbarActionBtn}
+              />
+              {moreFormattingOpen && (
+                <div className={styles.moreFormattingMenu}>
+                  {MOBILE_MORE_FORMATTING_COMMANDS.map(({ icon, cmd, label }) => (
+                    <button
+                      key={cmd}
+                      className={styles.moreFormattingItem}
+                      onClick={() => {
+                        handleFormatClick(cmd);
+                        setMoreFormattingOpen(false);
+                      }}
+                    >
+                      <span className="material-symbols-rounded">{icon}</span>
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className={styles.toolbar__divider} />
+
+          <div className={styles.toolbar__group}>
+            <Tooltip content="Add Comment (Ctrl+Shift+M)" position="bottom">
+              <IconButton
+                icon="add_comment"
+                label="Add Comment (Ctrl+Shift+M)"
+                variant="ghost"
+                onClick={triggerAddComment}
+                className={styles.toolbarActionBtn}
+              />
+            </Tooltip>
+            <Tooltip content={state.projectType === 'screenplay' ? 'New Scene' : 'New Chapter'} position="bottom">
+              <IconButton
+                icon="note_add"
+                label={state.projectType === 'screenplay' ? 'New Scene' : 'New Chapter'}
+                variant="ghost"
+                onClick={createChapter}
+                className={styles.toolbarActionBtn}
+              />
+            </Tooltip>
+          </div>
+
+          <div className={styles.toolbar__spacer} />
+
+          <div className={styles.toolbar__group}>
             <IconButton
-              icon="add_comment"
-              label="Add Comment (Ctrl+Shift+M)"
+              icon="undo"
+              label="Undo"
               variant="ghost"
-              onClick={triggerAddComment}
+              onClick={() => handleFormatClick('undo')}
+              disabled={!editor?.can().undo()}
               className={styles.toolbarActionBtn}
             />
-          </Tooltip>
-          <Tooltip content={state.projectType === 'screenplay' ? 'New Scene' : 'New Chapter'} position="bottom">
             <IconButton
-              icon="note_add"
-              label={state.projectType === 'screenplay' ? 'New Scene' : 'New Chapter'}
+              icon="redo"
+              label="Redo"
               variant="ghost"
-              onClick={createChapter}
+              onClick={() => handleFormatClick('redo')}
+              disabled={!editor?.can().redo()}
               className={styles.toolbarActionBtn}
             />
-          </Tooltip>
-        </div>
-
-        <div className={styles.toolbar__spacer} />
-
-        <div className={styles.toolbar__group}>
-          <IconButton
-            icon="undo"
-            label="Undo"
-            variant="ghost"
-            onClick={() => handleFormatClick('undo')}
-            disabled={!editor?.can().undo()}
-            className={styles.toolbarActionBtn}
-          />
-          <IconButton
-            icon="redo"
-            label="Redo"
-            variant="ghost"
-            onClick={() => handleFormatClick('redo')}
-            disabled={!editor?.can().redo()}
-            className={styles.toolbarActionBtn}
-          />
+          </div>
         </div>
       </div>
     );

@@ -1,11 +1,14 @@
 import type { Chapter, ChapterStatus } from '@/types';
-import { countWords, editorToPlainText } from '@/lib/utils';
+import { countWords, countSentences, countParagraphs, countCharacters, editorToPlainText } from '@/lib/utils';
 
 export interface ChapterMetric {
   id: string;
   order: number;
   title: string;
   words: number;
+  sentences: number;
+  paragraphs: number;
+  characters: number;
   status: ChapterStatus;
   wordGoal: number;
   updatedAt: number;
@@ -14,25 +17,37 @@ export interface ChapterMetric {
 export interface ProjectMetrics {
   chapters: ChapterMetric[];
   totalWords: number;
+  totalSentences: number;
+  totalParagraphs: number;
+  totalCharacters: number;
   totalChapters: number;
   avgWordsPerChapter: number;
   statusCounts: Record<ChapterStatus, number>;
 }
 
 export function buildChapterMetrics(chapters: Chapter[]): ChapterMetric[] {
-  return chapters.map(chapter => ({
-    id: chapter.id,
-    order: chapter.order,
-    title: chapter.title,
-    words: countWords(editorToPlainText(chapter.content)),
-    status: chapter.status,
-    wordGoal: chapter.wordGoal,
-    updatedAt: chapter.updatedAt,
-  }));
+  return chapters.map(chapter => {
+    const text = editorToPlainText(chapter.content);
+    return {
+      id: chapter.id,
+      order: chapter.order,
+      title: chapter.title,
+      words: countWords(text),
+      sentences: countSentences(text),
+      paragraphs: countParagraphs(text),
+      characters: countCharacters(text),
+      status: chapter.status,
+      wordGoal: chapter.wordGoal,
+      updatedAt: chapter.updatedAt,
+    };
+  });
 }
 
 export function summarizeProjectMetrics(chapterMetrics: ChapterMetric[]): ProjectMetrics {
   const totalWords = chapterMetrics.reduce((sum, chapter) => sum + chapter.words, 0);
+  const totalSentences = chapterMetrics.reduce((sum, chapter) => sum + chapter.sentences, 0);
+  const totalParagraphs = chapterMetrics.reduce((sum, chapter) => sum + chapter.paragraphs, 0);
+  const totalCharacters = chapterMetrics.reduce((sum, chapter) => sum + chapter.characters, 0);
   const totalChapters = chapterMetrics.length;
 
   const statusCounts: Record<ChapterStatus, number> = {
@@ -49,6 +64,9 @@ export function summarizeProjectMetrics(chapterMetrics: ChapterMetric[]): Projec
   return {
     chapters: chapterMetrics,
     totalWords,
+    totalSentences,
+    totalParagraphs,
+    totalCharacters,
     totalChapters,
     avgWordsPerChapter: totalChapters > 0 ? Math.round(totalWords / totalChapters) : 0,
     statusCounts,

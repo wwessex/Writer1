@@ -1,0 +1,129 @@
+.findBar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px var(--space-2, 16px);
+  background: var(--panel);
+  border-bottom: 1px solid var(--border-subtle, var(--border));
+  flex-shrink: 0;
+  animation: slideDown 0.12s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.findRow,
+.replaceRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--transition-fast, 120ms ease);
+}
+
+.searchInput:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-alpha, rgba(79, 124, 255, 0.15));
+}
+
+.matchCount {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  min-width: 72px;
+  text-align: center;
+}
+
+.toggleBtn {
+  flex-shrink: 0;
+}
+
+.textToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 8px);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--transition-fast, 120ms ease);
+  flex-shrink: 0;
+}
+
+.textToggle:hover {
+  background: var(--btn-bg);
+  color: var(--text);
+}
+
+.textToggle--active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.textToggle--active:hover {
+  background: var(--accent-hover, var(--accent));
+}
+
+.navBtn {
+  flex-shrink: 0;
+}
+
+.replaceAllBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border: none;
+  border-radius: var(--radius-sm, 8px);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--transition-fast, 120ms ease);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.replaceAllBtn:hover:not(:disabled) {
+  background: var(--btn-bg);
+  color: var(--text);
+}
+
+.replaceAllBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 820px) {
+  .findBar {
+    padding: 6px var(--space-1, 8px);
+  }
+
+  .matchCount {
+    min-width: auto;
+    font-size: 0.6875rem;
+  }
+}

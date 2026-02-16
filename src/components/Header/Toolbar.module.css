@@ -96,3 +96,33 @@
   .toolbar__divider { margin: 0 2px; }
   .styleSelect { width: 94px; font-size: 0.6875rem; min-height: 34px; padding: 4px 6px; }
 }
+
+/* Scroll hint wrapper — gradient overlays for overflow indication */
+.toolbarScroll {
+  position: relative;
+  overflow: hidden;
+}
+
+.toolbarScroll--overflowRight::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 32px;
+  height: 100%;
+  background: linear-gradient(to right, transparent, var(--panel));
+  pointer-events: none;
+  z-index: 1;
+}
+
+.toolbarScroll--overflowLeft::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 32px;
+  height: 100%;
+  background: linear-gradient(to left, transparent, var(--panel));
+  pointer-events: none;
+  z-index: 1;
+}
