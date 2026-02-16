@@ -192,6 +192,7 @@ export interface BackupDataV3 {
   project: Project;
   sections: Section[];
   snapshots?: Snapshot[];
+  commentThreads?: CommentThread[];
   exportedAt: number;
 }
 
@@ -226,17 +227,18 @@ export interface WorldEntry {
 }
 
 // Comment types
+export interface CommentAnchorRange {
+  from: number;
+  to: number;
+  length: number;
+  selectedText?: string;
+}
+
 export interface Comment {
   id: string;
-  chapterId: string;
-  anchorOffset: number;
-  anchorLength: number;
   text: string;
   author: string;
-  resolved: boolean;
   createdAt: number;
-  updatedAt: number;
-  replies: CommentReply[];
 }
 
 export interface CommentReply {
@@ -244,6 +246,16 @@ export interface CommentReply {
   text: string;
   author: string;
   createdAt: number;
+}
+
+export interface CommentThread {
+  id: string;
+  chapterId: string;
+  anchor: CommentAnchorRange;
+  resolved: boolean;
+  createdAt: number;
+  updatedAt: number;
+  comments: Comment[];
 }
 
 // Advanced analytics types

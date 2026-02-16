@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Novel, Chapter, Snapshot, BackupData, BackupDataV3, LegacyBackupData, ProjectType } from '@/types';
+import type { Novel, Chapter, Snapshot, BackupData, BackupDataV3, LegacyBackupData, ProjectType, CommentThread } from '@/types';
 import { generateId } from '@/lib/utils';
 
 const CURRENT_BACKUP_VERSION = 3;
@@ -12,6 +12,8 @@ export interface GoalTrendSnapshot {
   dailyGoal: number;
   goalMet: boolean;
 }
+
+const COMMENT_THREADS_STORAGE_PREFIX = 'draftharbour_comment_threads_';
 
 class DraftHarbourDB extends Dexie {
   novels!: EntityTable<Novel, 'id'>;
@@ -184,6 +186,7 @@ export async function deleteChapter(id: string): Promise<void> {
     await db.snapshots.where('chapterId').equals(id).delete();
     await db.chapters.delete(id);
   });
+  localStorage.removeItem(`${COMMENT_THREADS_STORAGE_PREFIX}${id}`);
 }
 
 export async function reorderChapters(_novelId: string, chapterIds: string[]): Promise<void> {
@@ -227,6 +230,7 @@ export async function exportBackup(novelId: string, includeSnapshots: boolean = 
   }
 
   const chapters = await getChapters(novelId);
+  const commentThreads = getCommentThreadsForChapters(chapters.map(chapter => chapter.id));
   let snapshots: Snapshot[] = [];
 
   if (includeSnapshots) {
@@ -240,6 +244,7 @@ export async function exportBackup(novelId: string, includeSnapshots: boolean = 
     project: novel,
     sections: chapters,
     snapshots: includeSnapshots ? snapshots : undefined,
+    commentThreads,
     exportedAt: Date.now()
   };
 }
@@ -274,6 +279,11 @@ export async function importBackup(backup: BackupData): Promise<Novel> {
     chapterId: idMap.get(snapshot.chapterId) || snapshot.chapterId
   }));
 
+  const commentThreads = (normalizedBackup.commentThreads || []).map(thread => ({
+    ...thread,
+    chapterId: idMap.get(thread.chapterId) || thread.chapterId,
+  }));
+
   await db.transaction('rw', [db.novels, db.chapters, db.snapshots], async () => {
     await db.novels.add(novel);
     await db.chapters.bulkAdd(chapters);
@@ -282,7 +292,50 @@ export async function importBackup(backup: BackupData): Promise<Novel> {
     }
   });
 
+  commentThreads.forEach(thread => {
+    upsertCommentThread(thread);
+  });
+
   return novel;
+}
+
+export function getCommentThreads(chapterId: string): CommentThread[] {
+  try {
+    const raw = localStorage.getItem(`${COMMENT_THREADS_STORAGE_PREFIX}${chapterId}`);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCommentThreads(chapterId: string, threads: CommentThread[]): void {
+  localStorage.setItem(`${COMMENT_THREADS_STORAGE_PREFIX}${chapterId}`, JSON.stringify(threads));
+}
+
+function getCommentThreadsForChapters(chapterIds: string[]): CommentThread[] {
+  return chapterIds.flatMap(chapterId => getCommentThreads(chapterId));
+}
+
+export function upsertCommentThread(thread: CommentThread): void {
+  const threads = getCommentThreads(thread.chapterId);
+  const index = threads.findIndex(item => item.id === thread.id);
+  if (index >= 0) {
+    threads[index] = thread;
+  } else {
+    threads.unshift(thread);
+  }
+  saveCommentThreads(thread.chapterId, threads);
+}
+
+export function saveAllCommentThreads(chapterId: string, threads: CommentThread[]): void {
+  saveCommentThreads(chapterId, threads);
+}
+
+export function deleteCommentThread(chapterId: string, threadId: string): void {
+  const threads = getCommentThreads(chapterId).filter(thread => thread.id !== threadId);
+  saveCommentThreads(chapterId, threads);
 }
 
 // Replace entire novel data (for sync)
@@ -355,4 +408,8 @@ export async function clearAllData(): Promise<void> {
     await db.chapters.clear();
     await db.novels.clear();
   });
+
+  Object.keys(localStorage)
+    .filter(key => key.startsWith(COMMENT_THREADS_STORAGE_PREFIX))
+    .forEach(key => localStorage.removeItem(key));
 }
