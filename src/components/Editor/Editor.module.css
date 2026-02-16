@@ -348,3 +348,15 @@
   background: rgba(74, 222, 128, 0.16);
   box-shadow: inset 0 -2px 0 rgba(22, 163, 74, 0.55);
 }
+
+/* Find & Replace match highlights */
+.editorWrapper :global(.find-replace-match) {
+  background: rgba(250, 204, 21, 0.3);
+  border-radius: 2px;
+}
+
+.editorWrapper :global(.find-replace-current) {
+  background: rgba(79, 124, 255, 0.35);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--accent);
+}
