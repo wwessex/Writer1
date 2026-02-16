@@ -6,82 +6,143 @@ import { MenuBar } from '@/components/Menu/MenuBar';
 import { Toolbar } from './Toolbar';
 import { getProjectMetrics } from '@/lib/projectMetrics';
 import { getMonthlyHistory } from '@/lib/progressTracker';
-import { COMMAND_IDS, type CommandId } from '@/lib/commands';
+import { createProvider, loadAIConfig } from '@/lib/ai';
+import { COMMAND_IDS, COMMAND_METADATA, type CommandId } from '@/lib/commands';
 import styles from './Header.module.css';
 
 interface HeaderProps {
   onAction?: (action: CommandId) => void;
   onToggleInspector?: () => void;
   inspectorOpen?: boolean;
-}
-
-interface MobileMenuItem {
-  label: string;
-  action: CommandId;
-  icon: string;
+  hasTextSelection?: boolean;
 }
 
 interface MobileMenuSection {
   section: 'Write' | 'Navigate' | 'Tools' | 'Project';
-  items: MobileMenuItem[];
+  items: CommandId[];
 }
 
 const MOBILE_MENU_SECTIONS: MobileMenuSection[] = [
   {
     section: 'Write',
     items: [
-      { label: 'New Chapter', action: COMMAND_IDS.NEW_CHAPTER, icon: 'note_add' },
-      { label: 'Quick Switcher', action: COMMAND_IDS.QUICK_SWITCHER, icon: 'search' },
+      COMMAND_IDS.NEW_CHAPTER,
+      COMMAND_IDS.QUICK_SWITCHER,
+      COMMAND_IDS.ADD_COMMENT,
+      COMMAND_IDS.FORMAT_BOLD,
+      COMMAND_IDS.FORMAT_ITALIC,
     ]
   },
   {
     section: 'Navigate',
     items: [
-      { label: 'Focus Mode', action: COMMAND_IDS.TOGGLE_FOCUS_MODE, icon: 'fullscreen' },
-      { label: 'Toggle Page View', action: COMMAND_IDS.TOGGLE_PAGE_VIEW, icon: 'article' },
+      COMMAND_IDS.TOGGLE_FOCUS_MODE,
+      COMMAND_IDS.TOGGLE_PAGE_VIEW,
+      COMMAND_IDS.UNDO,
+      COMMAND_IDS.REDO,
     ]
   },
   {
     section: 'Tools',
     items: [
-      { label: 'Snapshots...', action: COMMAND_IDS.SNAPSHOTS, icon: 'history' },
-      { label: 'Writing Analysis...', action: COMMAND_IDS.ANALYSIS, icon: 'analytics' },
-      { label: 'Settings', action: COMMAND_IDS.SETTINGS, icon: 'settings' },
+      COMMAND_IDS.AI_PANEL,
+      COMMAND_IDS.SNAPSHOTS,
+      COMMAND_IDS.ANALYSIS,
+      COMMAND_IDS.SETTINGS,
     ]
   },
   {
     section: 'Project',
     items: [
-      { label: 'Projects...', action: COMMAND_IDS.PROJECTS, icon: 'folder_open' },
-      { label: 'Export...', action: COMMAND_IDS.EXPORT, icon: 'download' },
-      { label: 'Import Document...', action: COMMAND_IDS.IMPORT_DOCUMENT, icon: 'upload' },
+      COMMAND_IDS.PROJECTS,
+      COMMAND_IDS.EXPORT,
+      COMMAND_IDS.IMPORT_DOCUMENT,
     ]
   },
 ];
 
-export function Header({ onAction, onToggleInspector, inspectorOpen }: HeaderProps) {
+export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSelection = false }: HeaderProps) {
   const { state, dispatch, updateNovelTitle } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   const projectMetrics = useMemo(() => getProjectMetrics(state.chapters), [state.chapters]);
   const totalWords = projectMetrics.totalWords;
-  const todayWords = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const todayEntry = getMonthlyHistory().find(d => d.date === today);
-    return todayEntry?.wordsWritten ?? 0;
-  }, [totalWords]);
+  const today = new Date().toISOString().slice(0, 10);
+  const todayWords = getMonthlyHistory().find(d => d.date === today)?.wordsWritten ?? 0;
 
   const activeChapter = projectMetrics.chapters.find(ch => ch.id === state.activeChapterId);
   const chapterWords = activeChapter?.words ?? 0;
 
   const toggleSidebar = () => dispatch({ type: 'TOGGLE_SIDEBAR' });
-  const newDraftLabel = state.projectType === 'screenplay' ? 'New Scene' : 'New Chapter';
+  const hasNoChapterContent = totalWords === 0;
+  const aiConfigured = useMemo(() => {
+    const provider = createProvider(loadAIConfig());
+    try {
+      return provider.isAvailable();
+    } finally {
+      provider.destroy();
+    }
+  }, []);
 
-  const handleMobileMenuAction = (action: CommandId) => {
+  const getCommandPresentation = useCallback((commandId: CommandId) => {
+    const metadata = COMMAND_METADATA[commandId];
+    if (commandId !== COMMAND_IDS.NEW_CHAPTER) {
+      return metadata;
+    }
+
+    if (state.projectType === 'screenplay') {
+      return {
+        ...metadata,
+        label: 'New Scene',
+        icon: 'movie_edit',
+      };
+    }
+
+    return {
+      ...metadata,
+      label: 'New Chapter',
+      icon: 'note_add',
+    };
+  }, [state.projectType]);
+
+  const dispatchCommand = useCallback((action: CommandId) => {
     setMobileMenuOpen(false);
     onAction?.(action);
-  };
+  }, [onAction]);
+
+  const quickActionCommands = useMemo(() => {
+    const selected: CommandId[] = [];
+    const addUnique = (command: CommandId) => {
+      if (!selected.includes(command)) {
+        selected.push(command);
+      }
+    };
+
+    if (hasTextSelection) {
+      [COMMAND_IDS.ADD_COMMENT, COMMAND_IDS.AI_PANEL, COMMAND_IDS.FORMAT_BOLD, COMMAND_IDS.FORMAT_ITALIC].forEach(addUnique);
+    }
+
+    if (hasNoChapterContent) {
+      [COMMAND_IDS.NEW_CHAPTER, COMMAND_IDS.IMPORT_DOCUMENT].forEach(addUnique);
+    }
+
+    if (aiConfigured) {
+      selected.unshift(COMMAND_IDS.AI_PANEL);
+    }
+
+    const defaults: CommandId[] = [
+      COMMAND_IDS.NEW_CHAPTER,
+      COMMAND_IDS.QUICK_SWITCHER,
+      COMMAND_IDS.EXPORT,
+      COMMAND_IDS.UNDO,
+      COMMAND_IDS.REDO,
+    ];
+
+    defaults.forEach(addUnique);
+
+    return selected.slice(0, 5);
+  }, [aiConfigured, hasNoChapterContent, hasTextSelection]);
 
   const handleClickOutside = useCallback((e: MouseEvent) => {
     if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
@@ -144,41 +205,19 @@ export function Header({ onAction, onToggleInspector, inspectorOpen }: HeaderPro
           />
 
           <div className={styles.mobileQuickActions}>
-            <IconButton
-              icon="note_add"
-              label={newDraftLabel}
-              variant="ghost"
-              onClick={() => onAction?.(COMMAND_IDS.NEW_CHAPTER)}
-              className={styles.mobileQuickActionBtn}
-            />
-            <IconButton
-              icon="search"
-              label="Quick Switcher"
-              variant="ghost"
-              onClick={() => onAction?.(COMMAND_IDS.QUICK_SWITCHER)}
-              className={styles.mobileQuickActionBtn}
-            />
-            <IconButton
-              icon="download"
-              label="Export..."
-              variant="ghost"
-              onClick={() => onAction?.(COMMAND_IDS.EXPORT)}
-              className={styles.mobileQuickActionBtn}
-            />
-            <IconButton
-              icon="undo"
-              label="Undo"
-              variant="ghost"
-              onClick={() => onAction?.(COMMAND_IDS.UNDO)}
-              className={styles.mobileQuickActionBtn}
-            />
-            <IconButton
-              icon="redo"
-              label="Redo"
-              variant="ghost"
-              onClick={() => onAction?.(COMMAND_IDS.REDO)}
-              className={styles.mobileQuickActionBtn}
-            />
+            {quickActionCommands.map(commandId => {
+              const command = getCommandPresentation(commandId);
+              return (
+                <IconButton
+                  key={commandId}
+                  icon={command.icon}
+                  label={command.label}
+                  variant="ghost"
+                  onClick={() => dispatchCommand(commandId)}
+                  className={styles.mobileQuickActionBtn}
+                />
+              );
+            })}
           </div>
 
           {/* Mobile overflow menu */}
@@ -195,16 +234,20 @@ export function Header({ onAction, onToggleInspector, inspectorOpen }: HeaderPro
                 {MOBILE_MENU_SECTIONS.map(({ section, items }) => (
                   <div key={section} className={styles.mobileMenuSection}>
                     <div className={styles.mobileMenuSectionTitle}>{section}</div>
-                    {items.map(item => (
-                      <button
-                        key={item.action}
-                        className={styles.mobileMenuItem}
-                        onClick={() => handleMobileMenuAction(item.action)}
-                      >
-                        <span className="material-symbols-rounded">{item.icon}</span>
-                        <span>{item.action === COMMAND_IDS.NEW_CHAPTER ? newDraftLabel : item.label}</span>
-                      </button>
-                    ))}
+                    {items.map(commandId => {
+                      const command = getCommandPresentation(commandId);
+
+                      return (
+                        <button
+                          key={commandId}
+                          className={styles.mobileMenuItem}
+                          onClick={() => dispatchCommand(commandId)}
+                        >
+                          <span className="material-symbols-rounded">{command.icon}</span>
+                          <span>{command.label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 ))}
               </div>
