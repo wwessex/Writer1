@@ -122,3 +122,28 @@
   .backdrop--visible { display: block; opacity: 1; pointer-events: auto; }
   .backdrop--hidden { display: none; opacity: 0; pointer-events: none; }
 }
+
+.panelSection {
+  border-top: 1px solid var(--border-subtle, var(--border));
+}
+
+.panelSection__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px var(--space-2, 16px);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle, var(--border));
+  color: var(--text-secondary, var(--text));
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.panelSection__header:hover {
+  background: var(--panel-subtle, rgba(127, 127, 127, 0.08));
+}

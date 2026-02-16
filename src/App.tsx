@@ -53,6 +53,7 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
   const [error, setError] = useState<string | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
+  const [hasTextSelection, setHasTextSelection] = useState(false);
   const findReplace = useFindReplace(editor);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -81,6 +82,28 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
     document.body.classList.toggle('focus-mode', state.settings.focusMode);
     return () => document.body.classList.remove('focus-mode');
   }, [state.settings.focusMode]);
+
+  // Track whether the editor has a non-empty selection for contextual mobile actions
+  useEffect(() => {
+    if (!editor) {
+      setHasTextSelection(false);
+      return;
+    }
+
+    const updateSelectionState = () => {
+      setHasTextSelection(!editor.state.selection.empty);
+    };
+    const handleEditorBlur = () => setHasTextSelection(false);
+
+    updateSelectionState();
+    editor.on('selectionUpdate', updateSelectionState);
+    editor.on('blur', handleEditorBlur);
+
+    return () => {
+      editor.off('selectionUpdate', updateSelectionState);
+      editor.off('blur', handleEditorBlur);
+    };
+  }, [editor]);
 
   // Export backup
   const handleExportBackup = useCallback(async () => {
@@ -352,7 +375,12 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
 
   return (
     <div className={styles.app} role="application" aria-label={appLabel}>
-      <Header onAction={handleMenuAction} onToggleInspector={() => setInspectorOpen(prev => !prev)} inspectorOpen={inspectorOpen} />
+      <Header
+        onAction={handleMenuAction}
+        onToggleInspector={() => setInspectorOpen(prev => !prev)}
+        inspectorOpen={inspectorOpen}
+        hasTextSelection={hasTextSelection}
+      />
       <FindReplace controls={findReplace} />
       <main className={layoutClass} role="main">
         {state.settings.sidebarHidden && (

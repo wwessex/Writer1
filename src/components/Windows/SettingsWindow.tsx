@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Input, Button } from '@/components/UI';
 import { HelpTooltip } from '@/components/UI/Tooltip';
@@ -52,6 +52,68 @@ const LINE_HEIGHT_OPTIONS = [
   { value: '2.25', label: 'Wide (2.25)' }
 ];
 
+const SETTINGS_SECTIONS = [
+  {
+    id: 'typography',
+    title: 'Typography',
+    keywords: ['font', 'text', 'line height', 'readability'],
+    fields: [
+      { id: 'fontFamily', label: 'Font Family', keywords: ['typeface'] },
+      { id: 'fontSize', label: 'Font Size', keywords: ['size', 'text scale'] },
+      { id: 'lineHeight', label: 'Line Height', keywords: ['spacing', 'leading'] }
+    ]
+  },
+  {
+    id: 'sync',
+    title: 'Online Sync',
+    keywords: ['cloud', 'backup', 'server'],
+    fields: [
+      { id: 'novelId', label: 'Novel ID', keywords: ['identifier', 'sync key'] },
+      { id: 'syncUrl', label: 'Sync Server URL', keywords: ['endpoint', 'server url'] },
+      { id: 'authHeader', label: 'Authorization Header', keywords: ['token', 'bearer', 'credentials'] }
+    ]
+  },
+  {
+    id: 'assist',
+    title: 'Writing Assistance',
+    keywords: ['grammar', 'spelling', 'language tool'],
+    fields: [
+      { id: 'languageToolEnabled', label: 'Enable LanguageTool', keywords: ['toggle', 'grammar check'] },
+      { id: 'languageToolUrl', label: 'LanguageTool URL', keywords: ['api', 'endpoint'] },
+      { id: 'languageToolLanguage', label: 'Language', keywords: ['locale', 'dictionary'] }
+    ]
+  },
+  {
+    id: 'app',
+    title: 'Application',
+    keywords: ['app', 'behavior', 'productivity'],
+    fields: [
+      { id: 'autosaveMs', label: 'Autosave (ms)', keywords: ['autosave', 'save delay'] },
+      { id: 'dailyWordGoal', label: 'Daily Word Goal', keywords: ['target', 'daily'] },
+      { id: 'novelWordGoal', label: 'Novel Word Goal', keywords: ['target', 'project goal'] },
+      { id: 'typewriterMode', label: 'Typewriter Mode', keywords: ['scroll', 'cursor', 'center'] }
+    ]
+  },
+  {
+    id: 'privacy',
+    title: 'Privacy & Data Sync',
+    keywords: ['privacy', 'telemetry', 'security', 'local storage'],
+    fields: [
+      { id: 'cloudSync', label: 'Cloud Sync', keywords: ['sync', 'remote'] },
+      { id: 'aiUsageTelemetry', label: 'AI Usage Telemetry', keywords: ['metrics', 'tracking'] },
+      { id: 'localStorageOnly', label: 'Local Storage Only', keywords: ['offline', 'device'] }
+    ]
+  },
+  {
+    id: 'data',
+    title: 'Data Management',
+    keywords: ['reset', 'delete', 'storage'],
+    fields: [
+      { id: 'resetAllData', label: 'Reset All Data', keywords: ['clear', 'remove'] }
+    ]
+  }
+] as const;
+
 export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   const { state, updateSettings } = useApp();
   const windowRef = useRef<HTMLDivElement>(null);
@@ -76,6 +138,74 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
     data: true
   });
   const [telemetryEnabled, setTelemetryEnabled] = useState(isTelemetryOptedIn());
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const hasSearchQuery = normalizedSearchQuery.length > 0;
+
+  const searchState = useMemo(() => {
+    const stateBySection: Record<string, { matchedSection: boolean; matchedFields: Set<string>; hasMatches: boolean }> = {};
+
+    SETTINGS_SECTIONS.forEach(section => {
+      if (!hasSearchQuery) {
+        stateBySection[section.id] = {
+          matchedSection: false,
+          matchedFields: new Set(section.fields.map(field => field.id)),
+          hasMatches: true,
+        };
+        return;
+      }
+
+      const sectionQuery = `${section.title} ${section.keywords.join(' ')}`.toLowerCase();
+      const matchedSection = sectionQuery.includes(normalizedSearchQuery);
+      const matchedFields = new Set(
+        section.fields
+          .filter(field => `${field.label} ${field.keywords.join(' ')}`.toLowerCase().includes(normalizedSearchQuery))
+          .map(field => field.id)
+      );
+
+      stateBySection[section.id] = {
+        matchedSection,
+        matchedFields,
+        hasMatches: matchedSection || matchedFields.size > 0,
+      };
+    });
+
+    return stateBySection;
+  }, [hasSearchQuery, normalizedSearchQuery]);
+
+  const isFieldVisible = useCallback((sectionId: string, fieldId: string) => {
+    if (!hasSearchQuery) return true;
+    const sectionState = searchState[sectionId];
+    if (!sectionState) return true;
+    return sectionState.matchedSection || sectionState.matchedFields.has(fieldId);
+  }, [hasSearchQuery, searchState]);
+
+  const isSectionVisible = useCallback((sectionId: string) => {
+    if (!hasSearchQuery) return true;
+    return searchState[sectionId]?.hasMatches ?? true;
+  }, [hasSearchQuery, searchState]);
+
+  const highlightMatch = useCallback((text: string) => {
+    if (!hasSearchQuery) return text;
+    const index = text.toLowerCase().indexOf(normalizedSearchQuery);
+    if (index === -1) return text;
+
+    const before = text.slice(0, index);
+    const match = text.slice(index, index + normalizedSearchQuery.length);
+    const after = text.slice(index + normalizedSearchQuery.length);
+
+    return (
+      <>
+        {before}
+        <mark className={styles.searchHighlight}>{match}</mark>
+        {after}
+      </>
+    );
+  }, [hasSearchQuery, normalizedSearchQuery]);
+
+  const visibleSections = SETTINGS_SECTIONS.filter(section => isSectionVisible(section.id));
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 820);
@@ -88,6 +218,21 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return;
+      }
+
+      if (e.key === '/') {
+        const target = e.target as HTMLElement | null;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+          return;
+        }
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
@@ -148,6 +293,15 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
     setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const isSectionCollapsed = useCallback((sectionId: string) => {
+    if (hasSearchQuery) return false;
+    return collapsedSections[sectionId];
+  }, [collapsedSections, hasSearchQuery]);
+
+  const jumpToSection = (sectionId: string) => {
+    sectionRefs.current[sectionId]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   if (!open) return null;
 
   return (
@@ -172,22 +326,43 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
         </div>
 
         <div className={styles.window__body}>
+          <div className={styles.settingsSearchWrap}>
+            <Input
+              ref={searchInputRef}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search settings…"
+              aria-label="Search settings"
+            />
+          </div>
+
+          {!isMobile && visibleSections.length > 0 && (
+            <nav className={styles.settingsToc} aria-label="Settings sections">
+              {visibleSections.map(section => (
+                <button key={section.id} type="button" className={styles.settingsTocLink} onClick={() => jumpToSection(section.id)}>
+                  {highlightMatch(section.title)}
+                </button>
+              ))}
+            </nav>
+          )}
+
           {/* Typography Section */}
-          <section className={styles.section}>
+          {isSectionVisible('typography') && (
+          <section className={styles.section} ref={el => { sectionRefs.current.typography = el; }}>
             <button className={styles.sectionToggle} onClick={() => toggleSection('typography')}>
               <h4>
                 <span className="material-symbols-rounded">text_format</span>
-                Typography
+                {highlightMatch('Typography')}
               </h4>
               <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
-                {collapsedSections.typography ? 'expand_more' : 'expand_less'}
+                {isSectionCollapsed('typography') ? 'expand_more' : 'expand_less'}
               </span>
             </button>
-            {!collapsedSections.typography && (
+            {!isSectionCollapsed('typography') && (
               <div className={styles.sectionContent}>
-                <div className={styles.field}>
+                {isFieldVisible('typography', 'fontFamily') && <div className={styles.field}>
                   <label>
-                    Font Family
+                    {highlightMatch('Font Family')}
                     <HelpTooltip text="Choose the typeface for your writing area" />
                   </label>
                   <Select
@@ -197,10 +372,10 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                       typography: { ...state.settings.typography, fontFamily: e.target.value }
                     })}
                   />
-                </div>
-                <div className={styles.fieldRow}>
-                  <div className={styles.field}>
-                    <label>Font Size</label>
+                </div>}
+                {(isFieldVisible('typography', 'fontSize') || isFieldVisible('typography', 'lineHeight')) && <div className={styles.fieldRow}>
+                  {isFieldVisible('typography', 'fontSize') && <div className={styles.field}>
+                    <label>{highlightMatch('Font Size')}</label>
                     <Select
                       options={FONT_SIZE_OPTIONS}
                       value={String(state.settings.typography.fontSize)}
@@ -208,9 +383,9 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                         typography: { ...state.settings.typography, fontSize: parseInt(e.target.value) }
                       })}
                     />
-                  </div>
-                  <div className={styles.field}>
-                    <label>Line Height</label>
+                  </div>}
+                  {isFieldVisible('typography', 'lineHeight') && <div className={styles.field}>
+                    <label>{highlightMatch('Line Height')}</label>
                     <Select
                       options={LINE_HEIGHT_OPTIONS}
                       value={String(state.settings.typography.lineHeight)}
@@ -218,28 +393,30 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                         typography: { ...state.settings.typography, lineHeight: parseFloat(e.target.value) }
                       })}
                     />
-                  </div>
-                </div>
+                  </div>}
+                </div>}
               </div>
             )}
           </section>
+          )}
 
           {/* Online Sync Section */}
-          <section className={styles.section}>
+          {isSectionVisible('sync') && (
+          <section className={styles.section} ref={el => { sectionRefs.current.sync = el; }}>
             <button className={styles.sectionToggle} onClick={() => toggleSection('sync')}>
               <h4>
                 <span className="material-symbols-rounded">cloud_sync</span>
-                Online Sync
+                {highlightMatch('Online Sync')}
               </h4>
               <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
-                {collapsedSections.sync ? 'expand_more' : 'expand_less'}
+                {isSectionCollapsed('sync') ? 'expand_more' : 'expand_less'}
               </span>
             </button>
-            {!collapsedSections.sync && (
+            {!isSectionCollapsed('sync') && (
               <div className={styles.sectionContent}>
-                <div className={styles.field}>
+                {isFieldVisible('sync', 'novelId') && <div className={styles.field}>
                   <label>
-                    Novel ID
+                    {highlightMatch('Novel ID')}
                     <HelpTooltip text="A unique identifier for syncing this novel across devices" />
                   </label>
                   <Input
@@ -249,10 +426,10 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                     })}
                     placeholder="unique-novel-id"
                   />
-                </div>
-                <div className={styles.field}>
+                </div>}
+                {isFieldVisible('sync', 'syncUrl') && <div className={styles.field}>
                   <label>
-                    Sync Server URL
+                    {highlightMatch('Sync Server URL')}
                     <HelpTooltip text="The endpoint of your sync server for cloud backup" />
                   </label>
                   <Input
@@ -262,10 +439,10 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                     })}
                     placeholder="https://your-server.com/sync"
                   />
-                </div>
-                <div className={styles.field}>
+                </div>}
+                {isFieldVisible('sync', 'authHeader') && <div className={styles.field}>
                   <label>
-                    Authorization Header
+                    {highlightMatch('Authorization Header')}
                     <HelpTooltip text="The full Authorization header value sent with sync requests, e.g. 'Bearer your-token-here'" />
                   </label>
                   <Input
@@ -276,25 +453,27 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                     })}
                     placeholder="Bearer your-token"
                   />
-                </div>
+                </div>}
               </div>
             )}
           </section>
+          )}
 
           {/* Writing Assistance Section */}
-          <section className={styles.section}>
+          {isSectionVisible('assist') && (
+          <section className={styles.section} ref={el => { sectionRefs.current.assist = el; }}>
             <button className={styles.sectionToggle} onClick={() => toggleSection('assist')}>
               <h4>
                 <span className="material-symbols-rounded">spellcheck</span>
-                Writing Assistance
+                {highlightMatch('Writing Assistance')}
               </h4>
               <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
-                {collapsedSections.assist ? 'expand_more' : 'expand_less'}
+                {isSectionCollapsed('assist') ? 'expand_more' : 'expand_less'}
               </span>
             </button>
-            {!collapsedSections.assist && (
+            {!isSectionCollapsed('assist') && (
               <div className={styles.sectionContent}>
-                <div className={styles.fieldRow}>
+                {isFieldVisible('assist', 'languageToolEnabled') && <div className={styles.fieldRow}>
                   <label className={styles.checkbox}>
                     <input
                       type="checkbox"
@@ -303,13 +482,13 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                         assist: { ...state.settings.assist, languageToolEnabled: e.target.checked }
                       })}
                     />
-                    <span>Enable LanguageTool</span>
+                    <span>{highlightMatch('Enable LanguageTool')}</span>
                     <HelpTooltip text="LanguageTool checks grammar, spelling, and style. The free public API works without an account." position="right" />
                   </label>
-                </div>
-                <div className={styles.field}>
+                </div>}
+                {isFieldVisible('assist', 'languageToolUrl') && <div className={styles.field}>
                   <label>
-                    LanguageTool URL
+                    {highlightMatch('LanguageTool URL')}
                     <HelpTooltip text="API endpoint for grammar checking. Use the public server or your own instance." />
                   </label>
                   <Input
@@ -319,9 +498,9 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                     })}
                     placeholder="https://api.languagetool.org/v2/check"
                   />
-                </div>
-                <div className={styles.field}>
-                  <label>Language</label>
+                </div>}
+                {isFieldVisible('assist', 'languageToolLanguage') && <div className={styles.field}>
+                  <label>{highlightMatch('Language')}</label>
                   <Select
                     options={LANGUAGE_OPTIONS}
                     value={state.settings.assist.languageToolLanguage}
@@ -329,28 +508,30 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                       assist: { ...state.settings.assist, languageToolLanguage: e.target.value }
                     })}
                   />
-                </div>
+                </div>}
               </div>
             )}
           </section>
+          )}
 
           {/* App Settings Section */}
-          <section className={styles.section}>
+          {isSectionVisible('app') && (
+          <section className={styles.section} ref={el => { sectionRefs.current.app = el; }}>
             <button className={styles.sectionToggle} onClick={() => toggleSection('app')}>
               <h4>
                 <span className="material-symbols-rounded">settings</span>
-                Application
+                {highlightMatch('Application')}
               </h4>
               <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
-                {collapsedSections.app ? 'expand_more' : 'expand_less'}
+                {isSectionCollapsed('app') ? 'expand_more' : 'expand_less'}
               </span>
             </button>
-            {!collapsedSections.app && (
+            {!isSectionCollapsed('app') && (
               <div className={styles.sectionContent}>
-                <div className={styles.fieldRow}>
-                  <div className={styles.field}>
+                {(isFieldVisible('app', 'autosaveMs') || isFieldVisible('app', 'dailyWordGoal')) && <div className={styles.fieldRow}>
+                  {isFieldVisible('app', 'autosaveMs') && <div className={styles.field}>
                     <label>
-                      Autosave (ms)
+                      {highlightMatch('Autosave (ms)')}
                       <HelpTooltip text="How long to wait after you stop typing before auto-saving" />
                     </label>
                     <Input
@@ -360,10 +541,10 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                       min={100}
                       max={5000}
                     />
-                  </div>
-                  <div className={styles.field}>
+                  </div>}
+                  {isFieldVisible('app', 'dailyWordGoal') && <div className={styles.field}>
                     <label>
-                      Daily Word Goal
+                      {highlightMatch('Daily Word Goal')}
                       <HelpTooltip text="Set a daily writing target. Progress is tracked in the Dashboard and status bar." />
                     </label>
                     <Input
@@ -372,11 +553,11 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                       onChange={e => updateSettings({ dailyWordGoal: parseInt(e.target.value) || 0 })}
                       placeholder="0"
                     />
-                  </div>
-                </div>
-                <div className={styles.field}>
+                  </div>}
+                </div>}
+                {isFieldVisible('app', 'novelWordGoal') && <div className={styles.field}>
                   <label>
-                    Novel Word Goal
+                    {highlightMatch('Novel Word Goal')}
                     <HelpTooltip text="Set an overall word goal for your project. A progress bar appears in the status bar." />
                   </label>
                   <Input
@@ -385,7 +566,7 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                     onChange={e => updateSettings({ novelWordGoal: parseInt(e.target.value) || 0 })}
                     placeholder="0"
                   />
-                </div>
+                </div>}
                 <div className={styles.fieldRow}>
                   <label className={styles.checkbox}>
                     <input
@@ -400,19 +581,21 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
               </div>
             )}
           </section>
+          )}
 
           {/* Privacy & Sync Section */}
-          <section className={styles.section}>
+          {isSectionVisible('privacy') && (
+          <section className={styles.section} ref={el => { sectionRefs.current.privacy = el; }}>
             <button className={styles.sectionToggle} onClick={() => toggleSection('privacy')}>
               <h4>
                 <span className="material-symbols-rounded">shield</span>
-                Privacy & Data Sync
+                {highlightMatch('Privacy & Data Sync')}
               </h4>
               <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
-                {collapsedSections.privacy ? 'expand_more' : 'expand_less'}
+                {isSectionCollapsed('privacy') ? 'expand_more' : 'expand_less'}
               </span>
             </button>
-            {!collapsedSections.privacy && (
+            {!isSectionCollapsed('privacy') && (
               <div className={styles.sectionContent}>
                 <div className={styles.privacyNotice}>
                   <span className="material-symbols-rounded">info</span>
@@ -425,9 +608,9 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                   </div>
                 </div>
 
-                <div className={styles.privacyToggle}>
+                {isFieldVisible('privacy', 'cloudSync') && <div className={styles.privacyToggle}>
                   <div className={styles.privacyToggle__info}>
-                    <span className={styles.privacyToggle__label}>Cloud Sync</span>
+                    <span className={styles.privacyToggle__label}>{highlightMatch('Cloud Sync')}</span>
                     <span className={styles.privacyToggle__desc}>
                       When enabled, chapter content is sent to your configured sync server.
                       Data is transmitted over HTTPS. Enable encrypted sync in Integrations for end-to-end encryption.
@@ -445,11 +628,11 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                     />
                     <span className={styles.toggleSwitch__slider} />
                   </label>
-                </div>
+                </div>}
 
-                <div className={styles.privacyToggle}>
+                {isFieldVisible('privacy', 'aiUsageTelemetry') && <div className={styles.privacyToggle}>
                   <div className={styles.privacyToggle__info}>
-                    <span className={styles.privacyToggle__label}>AI Usage Telemetry</span>
+                    <span className={styles.privacyToggle__label}>{highlightMatch('AI Usage Telemetry')}</span>
                     <span className={styles.privacyToggle__desc}>
                       Opt in to track your AI usage locally (character counts, latency, action types).
                       No content or text is ever recorded -- only metadata. Data stays on your device.
@@ -466,7 +649,7 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                     />
                     <span className={styles.toggleSwitch__slider} />
                   </label>
-                </div>
+                </div>}
 
                 {telemetryEnabled && (
                   <Button variant="ghost" onClick={() => { clearTelemetryData(); }}>
@@ -475,9 +658,9 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                   </Button>
                 )}
 
-                <div className={styles.privacyToggle}>
+                {isFieldVisible('privacy', 'localStorageOnly') && <div className={styles.privacyToggle}>
                   <div className={styles.privacyToggle__info}>
-                    <span className={styles.privacyToggle__label}>Local Storage Only</span>
+                    <span className={styles.privacyToggle__label}>{highlightMatch('Local Storage Only')}</span>
                     <span className={styles.privacyToggle__desc}>
                       Grammar checking via LanguageTool sends text to the configured API endpoint.
                       AI Writing Tools sends chapter context to your configured AI endpoint.
@@ -487,31 +670,34 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                   <span className="material-symbols-rounded" style={{ color: 'var(--success, #22c55e)', fontSize: '1.5rem' }}>
                     verified_user
                   </span>
-                </div>
+                </div>}
               </div>
             )}
           </section>
+          )}
 
           {/* Data Management Section */}
-          <section className={styles.section}>
+          {isSectionVisible('data') && (
+          <section className={styles.section} ref={el => { sectionRefs.current.data = el; }}>
             <button className={styles.sectionToggle} onClick={() => toggleSection('data')}>
               <h4>
                 <span className="material-symbols-rounded">database</span>
-                Data Management
+                {highlightMatch('Data Management')}
               </h4>
               <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
-                {collapsedSections.data ? 'expand_more' : 'expand_less'}
+                {isSectionCollapsed('data') ? 'expand_more' : 'expand_less'}
               </span>
             </button>
-            {!collapsedSections.data && (
+            {!isSectionCollapsed('data') && (
               <div className={styles.sectionContent}>
-                <Button variant="danger" onClick={handleResetData}>
+                {isFieldVisible('data', 'resetAllData') && <Button variant="danger" onClick={handleResetData}>
                   <span className="material-symbols-rounded">delete_forever</span>
-                  Reset All Data
-                </Button>
+                  {highlightMatch('Reset All Data')}
+                </Button>}
               </div>
             )}
           </section>
+          )}
         </div>
         {!isMobile && (
           <>

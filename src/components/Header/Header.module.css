@@ -70,11 +70,21 @@
   display: none;
   align-items: center;
   gap: 4px;
+  overflow-x: auto;
+  max-width: min(62vw, 320px);
+  padding: 0 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.mobileQuickActions::-webkit-scrollbar {
+  display: none;
 }
 
 .mobileQuickActionBtn {
   min-width: 44px;
   min-height: 44px;
+  flex: 0 0 auto;
 }
 
 /* Mobile overflow menu — hidden on desktop */
@@ -164,7 +174,7 @@
   .topbar {
     flex-wrap: nowrap;
   }
-  .topbar__status { flex-wrap: nowrap; flex-shrink: 0; gap: 4px; }
+  .topbar__status { flex-wrap: nowrap; flex-shrink: 0; gap: 4px; min-width: 0; }
   .novelTitle {
     max-width: 150px;
     font-size: 0.875rem;
@@ -179,5 +189,9 @@
 }
 
 @media (max-width: 480px) {
-  .novelTitle { max-width: 120px; font-size: 0.8125rem; }
+  .novelTitle { max-width: 110px; font-size: 0.8125rem; }
+  .mobileQuickActions {
+    max-width: min(58vw, 250px);
+    gap: 2px;
+  }
 }
