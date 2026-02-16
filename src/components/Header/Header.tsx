@@ -5,6 +5,7 @@ import { Pill, StatusDot } from '@/components/UI/Pill';
 import { MenuBar } from '@/components/Menu/MenuBar';
 import { Toolbar } from './Toolbar';
 import { getProjectMetrics } from '@/lib/projectMetrics';
+import { getMonthlyHistory } from '@/lib/progressTracker';
 import { COMMAND_IDS, type CommandId } from '@/lib/commands';
 import styles from './Header.module.css';
 
@@ -65,6 +66,11 @@ export function Header({ onAction, onToggleInspector, inspectorOpen }: HeaderPro
 
   const projectMetrics = useMemo(() => getProjectMetrics(state.chapters), [state.chapters]);
   const totalWords = projectMetrics.totalWords;
+  const todayWords = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const todayEntry = getMonthlyHistory().find(d => d.date === today);
+    return todayEntry?.wordsWritten ?? 0;
+  }, [totalWords]);
 
   const activeChapter = projectMetrics.chapters.find(ch => ch.id === state.activeChapterId);
   const chapterWords = activeChapter?.words ?? 0;
@@ -121,7 +127,7 @@ export function Header({ onAction, onToggleInspector, inspectorOpen }: HeaderPro
           {state.settings.dailyWordGoal > 0 && (
             <Pill
               label="Goal"
-              value={`${Math.min(100, Math.round((totalWords / state.settings.dailyWordGoal) * 100))}%`}
+              value={`${Math.min(100, Math.round((todayWords / state.settings.dailyWordGoal) * 100))}%`}
               variant="accent"
             />
           )}
