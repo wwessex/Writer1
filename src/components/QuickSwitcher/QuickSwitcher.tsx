@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { countWords, editorToPlainText } from '@/lib/utils';
+import { COMMAND_IDS, type CommandId } from '@/lib/commands';
 import styles from './QuickSwitcher.module.css';
 
 interface QuickSwitcherProps {
   open: boolean;
   onClose: () => void;
-  onAction?: (action: string) => void;
+  onAction?: (action: CommandId) => void;
 }
 
 interface SwitcherItem {
@@ -19,7 +20,7 @@ interface SwitcherItem {
 }
 
 export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
-  const { state, setActiveChapter, dispatch } = useApp();
+  const { state, setActiveChapter } = useApp();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -40,29 +41,37 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
         icon: isScreenplay ? 'movie' : 'description',
         action: () => {
           setActiveChapter(ch.id);
-          if (state.settings.sidebarHidden) {
-            // Don't toggle sidebar
-          }
           onClose();
         },
       };
     });
 
+    const actionItem = (id: string, title: string, icon: string, command: CommandId): SwitcherItem => ({
+      id,
+      type: 'action',
+      title,
+      icon,
+      action: () => {
+        onAction?.(command);
+        onClose();
+      },
+    });
+
     const actionItems: SwitcherItem[] = [
-      { id: 'act-focus', type: 'action', title: 'Toggle Focus Mode', icon: 'center_focus_strong', action: () => { dispatch({ type: 'TOGGLE_FOCUS_MODE' }); onClose(); } },
-      { id: 'act-sidebar', type: 'action', title: 'Toggle Sidebar', icon: 'side_navigation', action: () => { dispatch({ type: 'TOGGLE_SIDEBAR' }); onClose(); } },
-      { id: 'act-export', type: 'action', title: 'Export...', icon: 'download', action: () => { onAction?.('export'); onClose(); } },
-      { id: 'act-settings', type: 'action', title: 'Settings', icon: 'settings', action: () => { onAction?.('settings'); onClose(); } },
-      { id: 'act-dashboard', type: 'action', title: 'Dashboard', icon: 'dashboard', action: () => { onAction?.('dashboard'); onClose(); } },
-      { id: 'act-analysis', type: 'action', title: 'Writing Analysis', icon: 'analytics', action: () => { onAction?.('analysis'); onClose(); } },
-      { id: 'act-snapshots', type: 'action', title: 'Snapshots', icon: 'history', action: () => { onAction?.('snapshots'); onClose(); } },
-      { id: 'act-characters', type: 'action', title: 'Character & World Bible', icon: 'person', action: () => { onAction?.('characterBible'); onClose(); } },
-      { id: 'act-dark', type: 'action', title: 'True Dark', icon: 'dark_mode', action: () => { dispatch({ type: 'SET_THEME', payload: 'dark' }); onClose(); } },
-      { id: 'act-light', type: 'action', title: 'Warm Light', icon: 'light_mode', action: () => { dispatch({ type: 'SET_THEME', payload: 'light' }); onClose(); } },
+      actionItem('act-focus', 'Toggle Focus Mode', 'center_focus_strong', COMMAND_IDS.TOGGLE_FOCUS_MODE),
+      actionItem('act-sidebar', 'Toggle Sidebar', 'side_navigation', COMMAND_IDS.TOGGLE_SIDEBAR),
+      actionItem('act-export', 'Export...', 'download', COMMAND_IDS.EXPORT),
+      actionItem('act-settings', 'Settings', 'settings', COMMAND_IDS.SETTINGS),
+      actionItem('act-dashboard', 'Dashboard', 'dashboard', COMMAND_IDS.DASHBOARD),
+      actionItem('act-analysis', 'Writing Analysis', 'analytics', COMMAND_IDS.ANALYSIS),
+      actionItem('act-snapshots', 'Snapshots', 'history', COMMAND_IDS.SNAPSHOTS),
+      actionItem('act-characters', 'Character & World Bible', 'person', COMMAND_IDS.CHARACTER_BIBLE),
+      actionItem('act-dark', 'True Dark', 'dark_mode', COMMAND_IDS.THEME_DARK),
+      actionItem('act-light', 'Warm Light', 'light_mode', COMMAND_IDS.THEME_LIGHT),
     ];
 
     return [...chapterItems, ...actionItems];
-  }, [state.chapters, state.projectType, state.settings.sidebarHidden, chapterLabel, isScreenplay, setActiveChapter, dispatch, onAction, onClose]);
+  }, [state.chapters, chapterLabel, isScreenplay, setActiveChapter, onAction, onClose]);
 
   // Filter items by query
   const filteredItems = useMemo(() => {
@@ -74,12 +83,10 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
     );
   }, [items, query]);
 
-  // Reset selection when query changes
   useEffect(() => {
     setSelectedIndex(0);
   }, [query]);
 
-  // Focus input when opened
   useEffect(() => {
     if (open) {
       setQuery('');
@@ -88,7 +95,6 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
     }
   }, [open]);
 
-  // Scroll selected item into view
   useEffect(() => {
     if (!listRef.current) return;
     const selected = listRef.current.children[selectedIndex] as HTMLElement;

@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '@/context/AppContext';
+import { COMMAND_IDS, LOCAL_MENU_COMMANDS, type CommandId } from '@/lib/commands';
 import styles from './Menu.module.css';
 
 interface MenuItem {
   label?: string;
-  action?: string;
+  action?: CommandId;
   shortcut?: string;
   divider?: boolean;
   disabled?: boolean;
@@ -19,98 +20,98 @@ const MENUS: MenuConfig[] = [
   {
     label: 'File',
     items: [
-      { label: 'Projects...', action: 'projects' },
+      { label: 'Projects...', action: COMMAND_IDS.PROJECTS },
       { divider: true },
-      { label: 'New Chapter', action: 'newChapter', shortcut: 'Ctrl+Shift+N' },
+      { label: 'New Chapter', action: COMMAND_IDS.NEW_CHAPTER, shortcut: 'Ctrl+Shift+N' },
       { divider: true },
-      { label: 'Export...', action: 'export', shortcut: 'Ctrl+Shift+E' },
-      { label: 'Import Document...', action: 'importDocument' },
+      { label: 'Export...', action: COMMAND_IDS.EXPORT, shortcut: 'Ctrl+Shift+E' },
+      { label: 'Import Document...', action: COMMAND_IDS.IMPORT_DOCUMENT },
       { divider: true },
-      { label: 'Export Backup', action: 'exportBackup' },
-      { label: 'Import Backup', action: 'importBackup' },
-      { label: 'Export History...', action: 'exportHistory' },
+      { label: 'Export Backup', action: COMMAND_IDS.EXPORT_BACKUP },
+      { label: 'Import Backup', action: COMMAND_IDS.IMPORT_BACKUP },
+      { label: 'Export History...', action: COMMAND_IDS.EXPORT_HISTORY },
       { divider: true },
-      { label: 'Settings', action: 'settings' }
+      { label: 'Settings', action: COMMAND_IDS.SETTINGS }
     ]
   },
   {
     label: 'Edit',
     items: [
-      { label: 'Undo', action: 'undo', shortcut: 'Ctrl+Z' },
-      { label: 'Redo', action: 'redo', shortcut: 'Ctrl+Y' },
+      { label: 'Undo', action: COMMAND_IDS.UNDO, shortcut: 'Ctrl+Z' },
+      { label: 'Redo', action: COMMAND_IDS.REDO, shortcut: 'Ctrl+Y' },
       { divider: true },
-      { label: 'Select All', action: 'selectAll', shortcut: 'Ctrl+A' }
+      { label: 'Select All', action: COMMAND_IDS.SELECT_ALL, shortcut: 'Ctrl+A' }
     ]
   },
   {
     label: 'View',
     items: [
-      { label: 'Toggle Sidebar', action: 'toggleSidebar', shortcut: 'Ctrl+Shift+B' },
-      { label: 'Toggle Inspector', action: 'inspector', shortcut: 'Ctrl+Shift+I' },
-      { label: 'Toggle Page View', action: 'togglePageView' },
-      { label: 'Focus Mode', action: 'toggleFocusMode', shortcut: 'Ctrl+Shift+F' },
+      { label: 'Toggle Sidebar', action: COMMAND_IDS.TOGGLE_SIDEBAR, shortcut: 'Ctrl+Shift+B' },
+      { label: 'Toggle Inspector', action: COMMAND_IDS.INSPECTOR, shortcut: 'Ctrl+Shift+I' },
+      { label: 'Toggle Page View', action: COMMAND_IDS.TOGGLE_PAGE_VIEW },
+      { label: 'Focus Mode', action: COMMAND_IDS.TOGGLE_FOCUS_MODE, shortcut: 'Ctrl+Shift+F' },
       { divider: true },
-      { label: 'Quick Switcher', action: 'quickSwitcher', shortcut: 'Ctrl+K' },
+      { label: 'Quick Switcher', action: COMMAND_IDS.QUICK_SWITCHER, shortcut: 'Ctrl+K' },
       { divider: true },
-      { label: 'True Dark', action: 'themeDark' },
-      { label: 'Warm Light (Default)', action: 'themeLight' },
-      { label: 'High Contrast (Optional)', action: 'themeHighContrast' },
+      { label: 'True Dark', action: COMMAND_IDS.THEME_DARK },
+      { label: 'Warm Light (Default)', action: COMMAND_IDS.THEME_LIGHT },
+      { label: 'High Contrast (Optional)', action: COMMAND_IDS.THEME_HIGH_CONTRAST },
       { divider: true },
-      { label: 'Project Dashboard', action: 'dashboard' }
+      { label: 'Project Dashboard', action: COMMAND_IDS.DASHBOARD }
     ]
   },
   {
     label: 'Insert',
     items: [
-      { label: 'Horizontal Rule', action: 'insertHr' },
-      { label: 'Blockquote', action: 'insertBlockquote' }
+      { label: 'Horizontal Rule', action: COMMAND_IDS.INSERT_HR },
+      { label: 'Blockquote', action: COMMAND_IDS.INSERT_BLOCKQUOTE }
     ]
   },
   {
     label: 'Format',
     items: [
-      { label: 'Bold', action: 'formatBold', shortcut: 'Ctrl+B' },
-      { label: 'Italic', action: 'formatItalic', shortcut: 'Ctrl+I' },
-      { label: 'Underline', action: 'formatUnderline', shortcut: 'Ctrl+U' },
+      { label: 'Bold', action: COMMAND_IDS.FORMAT_BOLD, shortcut: 'Ctrl+B' },
+      { label: 'Italic', action: COMMAND_IDS.FORMAT_ITALIC, shortcut: 'Ctrl+I' },
+      { label: 'Underline', action: COMMAND_IDS.FORMAT_UNDERLINE, shortcut: 'Ctrl+U' },
       { divider: true },
-      { label: 'Heading 1', action: 'formatH1' },
-      { label: 'Heading 2', action: 'formatH2' },
-      { label: 'Paragraph', action: 'formatP' }
+      { label: 'Heading 1', action: COMMAND_IDS.FORMAT_H1 },
+      { label: 'Heading 2', action: COMMAND_IDS.FORMAT_H2 },
+      { label: 'Paragraph', action: COMMAND_IDS.FORMAT_P }
     ]
   },
   {
     label: 'Tools',
     items: [
-      { label: 'Snapshots...', action: 'snapshots' },
-      { label: 'Writing Analysis...', action: 'analysis' },
-      { label: 'Advanced Analytics...', action: 'advancedAnalytics' },
-      { label: 'Word Count...', action: 'wordCount' },
+      { label: 'Snapshots...', action: COMMAND_IDS.SNAPSHOTS },
+      { label: 'Writing Analysis...', action: COMMAND_IDS.ANALYSIS },
+      { label: 'Advanced Analytics...', action: COMMAND_IDS.ADVANCED_ANALYTICS },
+      { label: 'Word Count...', action: COMMAND_IDS.WORD_COUNT },
       { divider: true },
-      { label: 'Character & World Bible...', action: 'characterBible' },
-      { label: 'Scene Templates...', action: 'sceneTemplates' },
+      { label: 'Character & World Bible...', action: COMMAND_IDS.CHARACTER_BIBLE },
+      { label: 'Scene Templates...', action: COMMAND_IDS.SCENE_TEMPLATES },
       { divider: true },
-      { label: 'AI Writing Tools...', action: 'aiWriting' },
-      { label: 'AI Suggestions Panel', action: 'aiPanel' },
-      { label: 'Comments...', action: 'comments' },
+      { label: 'AI Writing Tools...', action: COMMAND_IDS.AI_WRITING },
+      { label: 'AI Suggestions Panel', action: COMMAND_IDS.AI_PANEL },
+      { label: 'Comments...', action: COMMAND_IDS.COMMENTS },
       { divider: true },
-      { label: 'Integrations...', action: 'integrations' }
+      { label: 'Integrations...', action: COMMAND_IDS.INTEGRATIONS }
     ]
   },
   {
     label: 'Help',
     items: [
-      { label: 'Getting Started', action: 'onboarding' },
-      { label: 'About DraftHarbour Studio', action: 'about' }
+      { label: 'Getting Started', action: COMMAND_IDS.ONBOARDING },
+      { label: 'About DraftHarbour Studio', action: COMMAND_IDS.ABOUT }
     ]
   }
 ];
 
 interface MenuBarProps {
-  onAction?: (action: string) => void;
+  onAction?: (action: CommandId) => void;
 }
 
 export function MenuBar({ onAction }: MenuBarProps) {
-  const { state, dispatch } = useApp();
+  const { state } = useApp();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const menuBarRef = useRef<HTMLDivElement>(null);
 
@@ -118,31 +119,15 @@ export function MenuBar({ onAction }: MenuBarProps) {
     setOpenMenu(prev => (prev === menuLabel ? null : menuLabel));
   };
 
-  const handleItemClick = (action: string) => {
+  const handleItemClick = (action: CommandId) => {
     setOpenMenu(null);
 
-    switch (action) {
-      case 'toggleSidebar':
-        dispatch({ type: 'TOGGLE_SIDEBAR' });
-        break;
-      case 'togglePageView':
-        dispatch({ type: 'TOGGLE_PAGE_VIEW' });
-        break;
-      case 'toggleFocusMode':
-        dispatch({ type: 'TOGGLE_FOCUS_MODE' });
-        break;
-      case 'themeDark':
-        dispatch({ type: 'SET_THEME', payload: 'dark' });
-        break;
-      case 'themeLight':
-        dispatch({ type: 'SET_THEME', payload: 'light' });
-        break;
-      case 'themeHighContrast':
-        dispatch({ type: 'SET_THEME', payload: 'high-contrast' });
-        break;
-      default:
-        onAction?.(action);
+    if (LOCAL_MENU_COMMANDS.has(action)) {
+      onAction?.(action);
+      return;
     }
+
+    onAction?.(action);
   };
 
   const handleClickOutside = useCallback((e: MouseEvent) => {
@@ -162,7 +147,7 @@ export function MenuBar({ onAction }: MenuBarProps) {
     <nav className={styles.menuBar} ref={menuBarRef} role="menubar" aria-label="Main menu">
       {MENUS.map(menu => {
         const items = menu.label === 'File'
-          ? menu.items.map(item => item.action === 'newChapter'
+          ? menu.items.map(item => item.action === COMMAND_IDS.NEW_CHAPTER
             ? { ...item, label: state.projectType === 'screenplay' ? 'New Scene' : 'New Chapter' }
             : item)
           : menu.items;

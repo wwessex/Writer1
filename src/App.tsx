@@ -23,6 +23,7 @@ import { useModalState } from '@/hooks/useModalState';
 import { exportBackup, importBackup, createChapter, addChapter } from '@/lib/storage';
 import { importFile, mapImportedContentToProjectType } from '@/lib/import';
 import { downloadFile } from '@/lib/utils';
+import { COMMAND_IDS, type CommandId, runCommand } from '@/lib/commands';
 import './styles/index.css';
 import styles from './App.module.css';
 
@@ -157,113 +158,24 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
   }, [closeModal, updateSettings]);
 
   // Handle menu actions
-  const handleMenuAction = useCallback((action: string) => {
-    switch (action) {
-      case 'newChapter':
-        createNewChapter();
-        showToast('New chapter created', 'success', 'add');
-        break;
-      case 'export':
-        openModal('export');
-        break;
-      case 'importDocument':
-        importInputRef.current?.click();
-        break;
-      case 'exportBackup':
-        handleExportBackup();
-        break;
-      case 'importBackup':
-        fileInputRef.current?.click();
-        break;
-      case 'settings':
-        openModal('settings');
-        break;
-      case 'snapshots':
-        openModal('snapshot');
-        break;
-      case 'analysis':
-        openModal('analysis');
-        break;
-      case 'wordCount':
-        openModal('wordCount');
-        break;
-      case 'dashboard':
-        openModal('dashboard');
-        break;
-      case 'onboarding':
-        openModal('onboarding');
-        break;
-      case 'about':
-        openModal('about');
-        break;
-      case 'characterBible':
-        openModal('characterBible');
-        break;
-      case 'aiWriting':
-        openModal('aiWriting');
-        break;
-      case 'comments':
-        openModal('comments');
-        break;
-      case 'advancedAnalytics':
-        openModal('advancedAnalytics');
-        break;
-      case 'integrations':
-        openModal('integrations');
-        break;
-      case 'projects':
-        openModal('projects');
-        break;
-      case 'sceneTemplates':
-        openModal('sceneTemplates');
-        break;
-      case 'exportHistory':
-        openModal('exportHistory');
-        break;
-      case 'aiPanel':
-        toggleModal('aiPanel');
-        break;
-      case 'inspector':
-        setInspectorOpen(prev => !prev);
-        break;
-      case 'quickSwitcher':
-        setQuickSwitcherOpen(true);
-        break;
-      case 'undo':
-        editor?.chain().focus().undo().run();
-        break;
-      case 'redo':
-        editor?.chain().focus().redo().run();
-        break;
-      case 'selectAll':
-        editor?.commands.selectAll();
-        break;
-      case 'insertHr':
-        editor?.chain().focus().setHorizontalRule().run();
-        break;
-      case 'insertBlockquote':
-        editor?.chain().focus().toggleBlockquote().run();
-        break;
-      case 'formatBold':
-        editor?.chain().focus().toggleBold().run();
-        break;
-      case 'formatItalic':
-        editor?.chain().focus().toggleItalic().run();
-        break;
-      case 'formatUnderline':
-        editor?.chain().focus().toggleUnderline().run();
-        break;
-      case 'formatH1':
-        editor?.chain().focus().toggleHeading({ level: 1 }).run();
-        break;
-      case 'formatH2':
-        editor?.chain().focus().toggleHeading({ level: 2 }).run();
-        break;
-      case 'formatP':
-        editor?.chain().focus().setParagraph().run();
-        break;
-    }
-  }, [createNewChapter, editor, handleExportBackup, openModal, toggleModal, showToast]);
+  const handleMenuAction = useCallback((action: CommandId) => {
+    runCommand(action, {
+      editor,
+      fileInputRef,
+      importInputRef,
+      createChapter: createNewChapter,
+      handleExportBackup,
+      openModal,
+      toggleModal,
+      toggleInspector: () => setInspectorOpen(prev => !prev),
+      openQuickSwitcher: () => setQuickSwitcherOpen(true),
+      toggleSidebar: () => dispatch({ type: 'TOGGLE_SIDEBAR' }),
+      togglePageView: () => dispatch({ type: 'TOGGLE_PAGE_VIEW' }),
+      toggleFocusMode: () => dispatch({ type: 'TOGGLE_FOCUS_MODE' }),
+      setTheme: (theme) => dispatch({ type: 'SET_THEME', payload: theme }),
+      showToast,
+    });
+  }, [createNewChapter, dispatch, editor, handleExportBackup, openModal, toggleModal, showToast]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -279,35 +191,35 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
         switch (e.key.toLowerCase()) {
           case 'n':
             e.preventDefault();
-            createNewChapter();
+            handleMenuAction(COMMAND_IDS.NEW_CHAPTER);
             break;
           case 'e':
             e.preventDefault();
-            openModal('export');
+            handleMenuAction(COMMAND_IDS.EXPORT);
             break;
           case 'b':
             e.preventDefault();
-            dispatch({ type: 'TOGGLE_SIDEBAR' });
+            handleMenuAction(COMMAND_IDS.TOGGLE_SIDEBAR);
             break;
           case 'f':
             e.preventDefault();
-            dispatch({ type: 'TOGGLE_FOCUS_MODE' });
+            handleMenuAction(COMMAND_IDS.TOGGLE_FOCUS_MODE);
             break;
           case 'i':
             e.preventDefault();
-            setInspectorOpen(prev => !prev);
+            handleMenuAction(COMMAND_IDS.INSPECTOR);
             break;
         }
       }
       // Escape to exit focus mode
       if (e.key === 'Escape' && state.settings.focusMode) {
-        dispatch({ type: 'TOGGLE_FOCUS_MODE' });
+        handleMenuAction(COMMAND_IDS.TOGGLE_FOCUS_MODE);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [createNewChapter, dispatch, openModal, state.settings.focusMode]);
+  }, [handleMenuAction, state.settings.focusMode]);
 
   // Show error state
   if (error) {
