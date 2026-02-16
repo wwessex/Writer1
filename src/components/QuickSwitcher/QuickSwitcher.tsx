@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback, useRef, useMemo, type ReactNode } from 'react';
 import { useApp } from '@/context/AppContext';
+import {
+  COMMAND_METADATA,
+  type CommandGroup,
+  type CommandId,
+} from '@/lib/commands';
 import { getProjectMetrics } from '@/lib/projectMetrics';
-import { COMMAND_IDS, type CommandId } from '@/lib/commands';
 import { buildChapterSearchIndex, findChapterContentMatches, normalizeSearchText } from '@/lib/search';
 import styles from './QuickSwitcher.module.css';
 
@@ -14,6 +18,9 @@ interface QuickSwitcherProps {
 type ItemType = 'chapter' | 'action' | 'search-result';
 type SearchMode = ItemType;
 
+const ACTION_FILTERS = ['All', 'Actions', 'Navigation', 'Views', 'AI', 'Project'] as const;
+type ActionFilter = typeof ACTION_FILTERS[number];
+
 interface SwitcherItem {
   id: string;
   type: ItemType;
@@ -23,6 +30,7 @@ interface SwitcherItem {
   lastOpenedAt?: number;
   icon: string;
   snippet?: string;
+  group?: CommandGroup;
   action: () => void;
 }
 
@@ -37,6 +45,7 @@ function scoreItem(item: SwitcherItem, normalizedQuery: string): number {
 
   const title = normalizeSearchText(item.title);
   const subtitle = normalizeSearchText(item.subtitle ?? '');
+  const group = normalizeSearchText(item.group ?? '');
   const queryWords = normalizedQuery.split(/\s+/).filter(Boolean);
 
   let score = 0;
@@ -49,6 +58,7 @@ function scoreItem(item: SwitcherItem, normalizedQuery: string): number {
   if (title.includes(normalizedQuery)) score += 36;
   if (subtitle.startsWith(normalizedQuery)) score += 24;
   if (subtitle.includes(normalizedQuery)) score += 16;
+  if (group.includes(normalizedQuery)) score += 14;
 
   return score;
 }
@@ -75,6 +85,7 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
   const [rawQuery, setRawQuery] = useState('');
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [actionFilter, setActionFilter] = useState<ActionFilter>('All');
   const [recentOpenedMap, setRecentOpenedMap] = useState<Record<string, number>>(() => {
     if (typeof window === 'undefined') return {};
     try {
@@ -125,32 +136,25 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
   }, [projectMetrics.chapters, chapterLabel, isScreenplay, recentOpenedMap, setActiveChapter, onClose]);
 
   const actionItems = useMemo((): SwitcherItem[] => {
-    const actionItem = (id: string, title: string, icon: string, command: CommandId, shortcut?: string): SwitcherItem => ({
-      id,
-      type: 'action',
-      title,
-      icon,
-      shortcut,
-      lastOpenedAt: recentOpenedMap[`action:${id}`],
-      action: () => {
-        onAction?.(command);
-        onClose();
-      },
-    });
-
-    return [
-      actionItem('act-focus', 'Toggle Focus Mode', 'center_focus_strong', COMMAND_IDS.TOGGLE_FOCUS_MODE, 'Ctrl+Shift+F'),
-      actionItem('act-sidebar', 'Toggle Sidebar', 'side_navigation', COMMAND_IDS.TOGGLE_SIDEBAR, 'Ctrl+Shift+B'),
-      actionItem('act-export', 'Export...', 'download', COMMAND_IDS.EXPORT, 'Ctrl+Shift+E'),
-      actionItem('act-settings', 'Settings', 'settings', COMMAND_IDS.SETTINGS),
-      actionItem('act-dashboard', 'Project Dashboard', 'dashboard', COMMAND_IDS.DASHBOARD),
-      actionItem('act-analysis', 'Writing Analysis', 'analytics', COMMAND_IDS.ANALYSIS),
-      actionItem('act-snapshots', 'Snapshots', 'history', COMMAND_IDS.SNAPSHOTS),
-      actionItem('act-characters', 'Character & World Bible', 'person', COMMAND_IDS.CHARACTER_BIBLE),
-      actionItem('act-dark', 'True Dark', 'dark_mode', COMMAND_IDS.THEME_DARK),
-      actionItem('act-light', 'Warm Light', 'light_mode', COMMAND_IDS.THEME_LIGHT),
-    ];
-  }, [onAction, onClose, recentOpenedMap]);
+    return Object.values(COMMAND_METADATA)
+      .filter(metadata => metadata.includeInQuickSwitcher)
+      .filter(metadata => !metadata.projectTypes || metadata.projectTypes.includes(state.projectType))
+      .filter(metadata => actionFilter === 'All' || metadata.group === actionFilter)
+      .map(metadata => ({
+        id: metadata.id,
+        type: 'action' as const,
+        title: metadata.id === 'newChapter' ? (isScreenplay ? 'New Scene' : metadata.label) : metadata.label,
+        subtitle: metadata.group,
+        icon: metadata.icon,
+        shortcut: metadata.shortcut,
+        group: metadata.group,
+        lastOpenedAt: recentOpenedMap[`action:${metadata.id}`],
+        action: () => {
+          onAction?.(metadata.id);
+          onClose();
+        },
+      }));
+  }, [actionFilter, isScreenplay, onAction, onClose, recentOpenedMap, state.projectType]);
 
   const searchResultItems = useMemo((): SwitcherItem[] => {
     const index = buildChapterSearchIndex(state.chapters);
@@ -217,13 +221,14 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
 
   useEffect(() => {
     setSelectedIndex(0);
-  }, [query, searchMode]);
+  }, [query, searchMode, actionFilter]);
 
   useEffect(() => {
     if (open) {
       setRawQuery('');
       setQuery('');
       setSelectedIndex(0);
+      setActionFilter('All');
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
@@ -289,6 +294,20 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
           <kbd className={styles.kbd}>Tab: {searchMode === 'action' ? 'Commands' : searchMode === 'chapter' ? chapterLabel + 's' : 'Content'}</kbd>
           <kbd className={styles.kbd}>Esc</kbd>
         </div>
+        {searchMode === 'action' && (
+          <div className={styles.filterBar}>
+            {ACTION_FILTERS.map(filter => (
+              <button
+                key={filter}
+                className={`${styles.filterChip} ${actionFilter === filter ? styles['filterChip--active'] : ''}`}
+                onClick={() => setActionFilter(filter)}
+                type="button"
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+        )}
         <div className={styles.list} ref={listRef}>
           {filteredItems.length === 0 ? (
             <div className={styles.empty}>No results found</div>
@@ -312,7 +331,7 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
                 <div className={styles.itemMeta}>
                   {item.lastOpenedAt && <span className={styles.itemRecent}>Recent</span>}
                   {item.shortcut && <kbd className={styles.itemShortcut}>{item.shortcut}</kbd>}
-                  <span className={styles.itemType}>{item.type === 'chapter' ? chapterLabel : item.type === 'search-result' ? 'Content' : 'Action'}</span>
+                  <span className={styles.itemType}>{item.type === 'chapter' ? chapterLabel : item.type === 'search-result' ? 'Content' : item.group ?? 'Action'}</span>
                 </div>
               </button>
             ))
