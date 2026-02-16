@@ -150,7 +150,7 @@ const TEMPLATES: SceneTemplate[] = [
 ];
 
 export function SceneTemplatesModal({ open, onClose }: SceneTemplatesModalProps) {
-  const { state, activeChapter, addScene, updateScene } = useApp();
+  const { state, activeChapter, addScene } = useApp();
   const { showToast } = useToast();
   const [selectedTemplate, setSelectedTemplate] = useState<SceneTemplate | null>(null);
   const [activeCategory, setActiveCategory] = useState<'all' | 'structure' | 'genre' | 'pacing'>('all');
@@ -184,19 +184,7 @@ export function SceneTemplatesModal({ open, onClose }: SceneTemplatesModalProps)
       ].join('\n'),
     };
 
-    addScene(activeChapter.id);
-
-
-    // We apply updates through a brief timeout to let the state update
-    setTimeout(() => {
-      const updatedChapter = document.querySelector('[data-chapter-id]');
-      if (updatedChapter) return;
-      // Fallback: update the last scene
-      const lastScene = activeChapter.scenes?.[activeChapter.scenes.length];
-      if (lastScene) {
-        updateScene(activeChapter.id, lastScene.id, sceneData);
-      }
-    }, 100);
+    addScene(activeChapter.id, sceneData);
 
     showToast(`Applied "${selectedTemplate.name}" template`, 'success', 'auto_awesome');
     onClose();

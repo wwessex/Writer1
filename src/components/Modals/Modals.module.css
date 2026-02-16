@@ -2275,6 +2275,19 @@
   margin-left: auto;
 }
 
+.relationshipAdd {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.relationshipAdd select,
+.relationshipAdd input {
+  flex: 1;
+  min-width: 0;
+}
+
 .linkedList {
   display: flex;
   flex-wrap: wrap;

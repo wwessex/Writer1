@@ -71,6 +71,31 @@ export function Editor({ screenplayMode, onToggleScreenplayMode }: EditorProps) 
     editor?.chain().focus().setScreenplayBlock(blockType).run();
   }, [editor]);
 
+  // Typewriter mode: scroll cursor to vertical center on selection change
+  useEffect(() => {
+    if (!editor || !state.settings.typewriterMode) return;
+
+    const handleSelectionUpdate = () => {
+      const { view } = editor;
+      const { from } = view.state.selection;
+      const coords = view.coordsAtPos(from);
+      const editorEl = view.dom.closest(`.${styles.editorContent}`);
+      if (!editorEl || !coords) return;
+
+      const editorRect = editorEl.getBoundingClientRect();
+      const cursorY = coords.top - editorRect.top + editorEl.scrollTop;
+      const targetScrollTop = cursorY - editorRect.height / 2;
+
+      editorEl.scrollTo({
+        top: Math.max(0, targetScrollTop),
+        behavior: 'smooth',
+      });
+    };
+
+    editor.on('selectionUpdate', handleSelectionUpdate);
+    return () => { editor.off('selectionUpdate', handleSelectionUpdate); };
+  }, [editor, state.settings.typewriterMode]);
+
   if (!activeChapter) {
     return (
       <div className={styles.editorPane}>
@@ -88,6 +113,7 @@ export function Editor({ screenplayMode, onToggleScreenplayMode }: EditorProps) 
     state.settings.pageView ? styles['editorPane--pageView'] : '',
     isFocusMode ? styles['editorPane--focusMode'] : '',
     screenplayMode ? styles['editorPane--screenplay'] : '',
+    state.settings.typewriterMode ? styles['editorPane--typewriter'] : '',
   ].filter(Boolean).join(' ');
 
   return (

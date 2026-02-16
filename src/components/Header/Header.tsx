@@ -66,6 +66,23 @@ export function Header({ onAction, onToggleInspector, inspectorOpen }: HeaderPro
   const projectMetrics = useMemo(() => getProjectMetrics(state.chapters), [state.chapters]);
   const totalWords = projectMetrics.totalWords;
 
+  // Session word count: track how many words were added since page load
+  const sessionStartWords = useRef<number | null>(null);
+  const previousNovelId = useRef(state.novelId);
+
+  // Reset baseline on project switch
+  if (previousNovelId.current !== state.novelId) {
+    sessionStartWords.current = totalWords;
+    previousNovelId.current = state.novelId;
+  }
+
+  // Capture initial word count on first meaningful render
+  if (sessionStartWords.current === null) {
+    sessionStartWords.current = totalWords;
+  }
+
+  const sessionWords = Math.max(0, totalWords - (sessionStartWords.current ?? 0));
+
   const activeChapter = projectMetrics.chapters.find(ch => ch.id === state.activeChapterId);
   const chapterWords = activeChapter?.words ?? 0;
 
@@ -113,6 +130,9 @@ export function Header({ onAction, onToggleInspector, inspectorOpen }: HeaderPro
           <StatusDot online={state.isOnline} />
           <Pill label="Ch" value={chapterWords.toLocaleString()} />
           <Pill label="Total" value={totalWords.toLocaleString()} />
+          {sessionWords > 0 && (
+            <Pill label="Session" value={`+${sessionWords.toLocaleString()}`} variant="success" />
+          )}
           <span className={styles.desktopOnlyStats}>
             <Pill label="Para" value={(activeChapter?.paragraphs ?? 0).toLocaleString()} />
             <Pill label="Sent" value={(activeChapter?.sentences ?? 0).toLocaleString()} />

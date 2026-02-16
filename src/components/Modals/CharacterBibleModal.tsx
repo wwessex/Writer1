@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Dialog, Button, Input, Textarea, IconButton } from '@/components/UI';
 import { Select } from '@/components/UI/Select';
+import { useApp } from '@/context/AppContext';
 import { generateId } from '@/lib/utils';
 import type { CharacterEntity, WorldEntry } from '@/types';
 import styles from './Modals.module.css';
@@ -46,6 +47,7 @@ function saveEntities<T>(key: string, entities: T[]) {
 }
 
 export function CharacterBibleModal({ open, onClose }: CharacterBibleModalProps) {
+  const { state } = useApp();
   const [activeTab, setActiveTab] = useState<TabType>('characters');
   const [characters, setCharacters] = useState<CharacterEntity[]>(() => loadEntities(STORAGE_KEY_CHARS));
   const [worldEntries, setWorldEntries] = useState<WorldEntry[]>(() => loadEntities(STORAGE_KEY_WORLD));
@@ -66,7 +68,7 @@ export function CharacterBibleModal({ open, onClose }: CharacterBibleModalProps)
   const addCharacter = () => {
     const newChar: CharacterEntity = {
       id: generateId(),
-      novelId: '',
+      novelId: state.novelId,
       name: 'New Character',
       aliases: [],
       description: '',
@@ -84,7 +86,7 @@ export function CharacterBibleModal({ open, onClose }: CharacterBibleModalProps)
   const addWorldEntry = () => {
     const newEntry: WorldEntry = {
       id: generateId(),
-      novelId: '',
+      novelId: state.novelId,
       category: 'location',
       name: 'New Entry',
       description: '',
@@ -121,19 +123,23 @@ export function CharacterBibleModal({ open, onClose }: CharacterBibleModalProps)
   };
 
   const filteredCharacters = useMemo(() =>
-    characters.filter(c =>
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.description.toLowerCase().includes(searchQuery.toLowerCase())
-    ),
-    [characters, searchQuery]
+    characters
+      .filter(c => c.novelId === '' || c.novelId === state.novelId)
+      .filter(c =>
+        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.description.toLowerCase().includes(searchQuery.toLowerCase())
+      ),
+    [characters, searchQuery, state.novelId]
   );
 
   const filteredWorld = useMemo(() =>
-    worldEntries.filter(e =>
-      e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      e.description.toLowerCase().includes(searchQuery.toLowerCase())
-    ),
-    [worldEntries, searchQuery]
+    worldEntries
+      .filter(e => e.novelId === '' || e.novelId === state.novelId)
+      .filter(e =>
+        e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        e.description.toLowerCase().includes(searchQuery.toLowerCase())
+      ),
+    [worldEntries, searchQuery, state.novelId]
   );
 
   const selectedCharacter = characters.find(c => c.id === selectedId);
@@ -253,6 +259,12 @@ function CharacterEditor({
   onDelete: () => void;
 }) {
   const [newTrait, setNewTrait] = useState('');
+  const [newRelTargetId, setNewRelTargetId] = useState('');
+  const [newRelType, setNewRelType] = useState('');
+
+  const relTargetOptions = allCharacters
+    .filter(c => c.id !== character.id)
+    .map(c => ({ value: c.id, label: c.name }));
 
   const addTrait = () => {
     if (newTrait.trim()) {
@@ -263,6 +275,18 @@ function CharacterEditor({
 
   const removeTrait = (index: number) => {
     onUpdate({ traits: character.traits.filter((_, i) => i !== index) });
+  };
+
+  const addRelationship = () => {
+    if (!newRelTargetId || !newRelType.trim()) return;
+    onUpdate({
+      relationships: [
+        ...character.relationships,
+        { targetId: newRelTargetId, type: newRelType.trim() }
+      ]
+    });
+    setNewRelTargetId('');
+    setNewRelType('');
   };
 
   return (
@@ -345,6 +369,22 @@ function CharacterEditor({
               </div>
             );
           })}
+          {relTargetOptions.length > 0 && (
+            <div className={styles.relationshipAdd}>
+              <Select
+                options={[{ value: '', label: 'Select character...' }, ...relTargetOptions]}
+                value={newRelTargetId}
+                onChange={e => setNewRelTargetId(e.target.value)}
+              />
+              <Input
+                value={newRelType}
+                onChange={e => setNewRelType(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addRelationship(); } }}
+                placeholder="e.g., sibling, mentor"
+              />
+              <IconButton icon="add" label="Add relationship" onClick={addRelationship} />
+            </div>
+          )}
         </div>
       </div>
 
@@ -450,6 +490,23 @@ function WorldEditor({
               </span>
             ) : null;
           })}
+          {characters.filter(c => !entry.linkedCharacters.includes(c.id)).length > 0 && (
+            <Select
+              options={[
+                { value: '', label: 'Add character...' },
+                ...characters
+                  .filter(c => !entry.linkedCharacters.includes(c.id))
+                  .map(c => ({ value: c.id, label: c.name }))
+              ]}
+              value=""
+              onChange={e => {
+                const val = e.target.value;
+                if (val) {
+                  onUpdate({ linkedCharacters: [...entry.linkedCharacters, val] });
+                }
+              }}
+            />
+          )}
         </div>
       </div>
 

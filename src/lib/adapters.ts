@@ -6,6 +6,7 @@
 
 import type { Chapter, ProjectType } from '@/types';
 import type { JSONContent } from '@tiptap/core';
+import { editorToPlainText } from './utils';
 
 // ---- Core Adapter Interface ----
 
@@ -133,7 +134,10 @@ export const scrivenerAdapter: WritingAdapter = {
   },
 
   async exportContent(chapters, title, _projectType) {
-    const content = chapters.map(ch => `# ${ch.title}\n\n`).join('\n');
+    const content = chapters.map(ch => {
+      const text = editorToPlainText(ch.content);
+      return `# ${ch.title}\n\n${text}`;
+    }).join('\n\n---\n\n');
     const blob = new Blob([content], { type: 'text/plain' });
     return {
       success: true,

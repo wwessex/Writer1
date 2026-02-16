@@ -360,3 +360,8 @@
   border-radius: 2px;
   box-shadow: 0 0 0 1px var(--accent);
 }
+
+/* Typewriter mode: extra bottom padding keeps the cursor vertically centered */
+.editorPane--typewriter .editorWrapper :global(.ProseMirror) {
+  padding-bottom: 50vh;
+}

@@ -386,6 +386,17 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                     placeholder="0"
                   />
                 </div>
+                <div className={styles.fieldRow}>
+                  <label className={styles.checkbox}>
+                    <input
+                      type="checkbox"
+                      checked={state.settings.typewriterMode}
+                      onChange={e => updateSettings({ typewriterMode: e.target.checked })}
+                    />
+                    <span>Typewriter Scroll Mode</span>
+                    <HelpTooltip text="Keep the cursor line vertically centered in the editor while typing (Ctrl+Shift+T)" position="right" />
+                  </label>
+                </div>
               </div>
             )}
           </section>

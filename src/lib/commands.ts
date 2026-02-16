@@ -43,6 +43,7 @@ export const COMMAND_IDS = {
   FORMAT_H1: 'formatH1',
   FORMAT_H2: 'formatH2',
   FORMAT_P: 'formatP',
+  TOGGLE_TYPEWRITER_MODE: 'toggleTypewriterMode',
 } as const;
 
 export type CommandId = typeof COMMAND_IDS[keyof typeof COMMAND_IDS];
@@ -60,6 +61,7 @@ export interface CommandContext {
   toggleSidebar: () => void;
   togglePageView: () => void;
   toggleFocusMode: () => void;
+  toggleTypewriterMode: () => void;
   setTheme: (theme: 'dark' | 'light' | 'high-contrast') => void;
   showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning', icon?: string) => void;
   createCommentFromSelection: () => void;
@@ -112,6 +114,7 @@ export const COMMAND_HANDLERS: Record<CommandId, CommandHandler> = {
   [COMMAND_IDS.FORMAT_H1]: ({ editor }) => editor?.chain().focus().toggleHeading({ level: 1 }).run(),
   [COMMAND_IDS.FORMAT_H2]: ({ editor }) => editor?.chain().focus().toggleHeading({ level: 2 }).run(),
   [COMMAND_IDS.FORMAT_P]: ({ editor }) => editor?.chain().focus().setParagraph().run(),
+  [COMMAND_IDS.TOGGLE_TYPEWRITER_MODE]: ({ toggleTypewriterMode }) => toggleTypewriterMode(),
 };
 
 export const LOCAL_MENU_COMMANDS: ReadonlySet<CommandId> = new Set([
