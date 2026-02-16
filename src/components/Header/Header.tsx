@@ -14,16 +14,48 @@ interface HeaderProps {
   inspectorOpen?: boolean;
 }
 
-const MOBILE_MENU_ITEMS: { label: string; action: CommandId; icon: string }[] = [
-  { label: 'Projects...', action: COMMAND_IDS.PROJECTS, icon: 'folder_open' },
-  { label: 'Export...', action: COMMAND_IDS.EXPORT, icon: 'download' },
-  { label: 'Import Document...', action: COMMAND_IDS.IMPORT_DOCUMENT, icon: 'upload' },
-  { label: 'Settings', action: COMMAND_IDS.SETTINGS, icon: 'settings' },
-  { label: 'Focus Mode', action: COMMAND_IDS.TOGGLE_FOCUS_MODE, icon: 'fullscreen' },
-  { label: 'Page View', action: COMMAND_IDS.TOGGLE_PAGE_VIEW, icon: 'article' },
-  { label: 'Snapshots...', action: COMMAND_IDS.SNAPSHOTS, icon: 'history' },
-  { label: 'Writing Analysis...', action: COMMAND_IDS.ANALYSIS, icon: 'analytics' },
-  { label: 'Quick Switcher', action: COMMAND_IDS.QUICK_SWITCHER, icon: 'search' },
+interface MobileMenuItem {
+  label: string;
+  action: CommandId;
+  icon: string;
+}
+
+interface MobileMenuSection {
+  section: 'Write' | 'Navigate' | 'Tools' | 'Project';
+  items: MobileMenuItem[];
+}
+
+const MOBILE_MENU_SECTIONS: MobileMenuSection[] = [
+  {
+    section: 'Write',
+    items: [
+      { label: 'New Chapter', action: COMMAND_IDS.NEW_CHAPTER, icon: 'note_add' },
+      { label: 'Quick Switcher', action: COMMAND_IDS.QUICK_SWITCHER, icon: 'search' },
+    ]
+  },
+  {
+    section: 'Navigate',
+    items: [
+      { label: 'Focus Mode', action: COMMAND_IDS.TOGGLE_FOCUS_MODE, icon: 'fullscreen' },
+      { label: 'Toggle Page View', action: COMMAND_IDS.TOGGLE_PAGE_VIEW, icon: 'article' },
+    ]
+  },
+  {
+    section: 'Tools',
+    items: [
+      { label: 'Snapshots...', action: COMMAND_IDS.SNAPSHOTS, icon: 'history' },
+      { label: 'Writing Analysis...', action: COMMAND_IDS.ANALYSIS, icon: 'analytics' },
+      { label: 'Settings', action: COMMAND_IDS.SETTINGS, icon: 'settings' },
+    ]
+  },
+  {
+    section: 'Project',
+    items: [
+      { label: 'Projects...', action: COMMAND_IDS.PROJECTS, icon: 'folder_open' },
+      { label: 'Export...', action: COMMAND_IDS.EXPORT, icon: 'download' },
+      { label: 'Import Document...', action: COMMAND_IDS.IMPORT_DOCUMENT, icon: 'upload' },
+    ]
+  },
 ];
 
 export function Header({ onAction, onToggleInspector, inspectorOpen }: HeaderProps) {
@@ -43,6 +75,7 @@ export function Header({ onAction, onToggleInspector, inspectorOpen }: HeaderPro
     : 0;
 
   const toggleSidebar = () => dispatch({ type: 'TOGGLE_SIDEBAR' });
+  const newDraftLabel = state.projectType === 'screenplay' ? 'New Scene' : 'New Chapter';
 
   const handleMobileMenuAction = (action: CommandId) => {
     setMobileMenuOpen(false);
@@ -104,6 +137,44 @@ export function Header({ onAction, onToggleInspector, inspectorOpen }: HeaderPro
             className={styles.inspectorBtn}
           />
 
+          <div className={styles.mobileQuickActions}>
+            <IconButton
+              icon="note_add"
+              label={newDraftLabel}
+              variant="ghost"
+              onClick={() => onAction?.(COMMAND_IDS.NEW_CHAPTER)}
+              className={styles.mobileQuickActionBtn}
+            />
+            <IconButton
+              icon="search"
+              label="Quick Switcher"
+              variant="ghost"
+              onClick={() => onAction?.(COMMAND_IDS.QUICK_SWITCHER)}
+              className={styles.mobileQuickActionBtn}
+            />
+            <IconButton
+              icon="download"
+              label="Export..."
+              variant="ghost"
+              onClick={() => onAction?.(COMMAND_IDS.EXPORT)}
+              className={styles.mobileQuickActionBtn}
+            />
+            <IconButton
+              icon="undo"
+              label="Undo"
+              variant="ghost"
+              onClick={() => onAction?.(COMMAND_IDS.UNDO)}
+              className={styles.mobileQuickActionBtn}
+            />
+            <IconButton
+              icon="redo"
+              label="Redo"
+              variant="ghost"
+              onClick={() => onAction?.(COMMAND_IDS.REDO)}
+              className={styles.mobileQuickActionBtn}
+            />
+          </div>
+
           {/* Mobile overflow menu */}
           <div className={styles.mobileOverflow} ref={mobileMenuRef}>
             <IconButton
@@ -115,15 +186,20 @@ export function Header({ onAction, onToggleInspector, inspectorOpen }: HeaderPro
             />
             {mobileMenuOpen && (
               <div className={styles.mobileMenu}>
-                {MOBILE_MENU_ITEMS.map(item => (
-                  <button
-                    key={item.action}
-                    className={styles.mobileMenuItem}
-                    onClick={() => handleMobileMenuAction(item.action)}
-                  >
-                    <span className="material-symbols-rounded">{item.icon}</span>
-                    <span>{item.label}</span>
-                  </button>
+                {MOBILE_MENU_SECTIONS.map(({ section, items }) => (
+                  <div key={section} className={styles.mobileMenuSection}>
+                    <div className={styles.mobileMenuSectionTitle}>{section}</div>
+                    {items.map(item => (
+                      <button
+                        key={item.action}
+                        className={styles.mobileMenuItem}
+                        onClick={() => handleMobileMenuAction(item.action)}
+                      >
+                        <span className="material-symbols-rounded">{item.icon}</span>
+                        <span>{item.action === COMMAND_IDS.NEW_CHAPTER ? newDraftLabel : item.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 ))}
               </div>
             )}
