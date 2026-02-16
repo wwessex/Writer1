@@ -84,6 +84,7 @@ const defaultSettings: AppSettings = {
     lineHeight: 1.75
   },
   onboardingComplete: false,
+  typewriterMode: false,
   sidebarPanels: {}
 };
 
@@ -258,7 +259,7 @@ interface AppContextType {
   canRedoReorder: boolean;
   updateNovelTitle: (title: string) => void;
   updateSettings: (settings: Partial<AppSettings>) => void;
-  addScene: (chapterId: string) => void;
+  addScene: (chapterId: string, initialData?: Partial<Scene>) => string | undefined;
   updateScene: (chapterId: string, sceneId: string, updates: Partial<Scene>) => void;
   deleteScene: (chapterId: string, sceneId: string) => void;
   reorderScenes: (chapterId: string, sceneIds: string[]) => void;
@@ -494,13 +495,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_SETTINGS', payload: settings });
   }, []);
 
-  // Add scene to chapter
-  const addScene = useCallback((chapterId: string) => {
+  // Add scene to chapter (optionally with initial data for templates)
+  const addScene = useCallback((chapterId: string, initialData?: Partial<Scene>): string | undefined => {
     const chapter = getChapterById(chapterId);
-    if (!chapter) return;
+    if (!chapter) return undefined;
 
     const existingScenes = chapter.scenes || [];
-    const newScene: Scene = state.projectType === 'screenplay'
+    const baseScene: Scene = state.projectType === 'screenplay'
       ? {
         id: generateId(),
         title: `Scene ${existingScenes.length + 1}`,
@@ -526,9 +527,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         wordGoal: 0
       };
 
+    const newScene: Scene = initialData ? { ...baseScene, ...initialData } : baseScene;
+
     const updates = { scenes: [...existingScenes, newScene] };
     dispatch({ type: 'UPDATE_CHAPTER', payload: { id: chapterId, updates } });
     storage.updateChapter(chapterId, updates);
+    return newScene.id;
   }, [getChapterById, state.projectType]);
 
   // Update scene

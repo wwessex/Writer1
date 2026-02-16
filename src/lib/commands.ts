@@ -44,6 +44,7 @@ export const COMMAND_IDS = {
   FORMAT_H1: 'formatH1',
   FORMAT_H2: 'formatH2',
   FORMAT_P: 'formatP',
+  TOGGLE_TYPEWRITER_MODE: 'toggleTypewriterMode',
 } as const;
 
 export type CommandId = typeof COMMAND_IDS[keyof typeof COMMAND_IDS];
@@ -102,6 +103,7 @@ export const COMMAND_METADATA: Record<CommandId, CommandMetadata> = {
   [COMMAND_IDS.FORMAT_H1]: { id: COMMAND_IDS.FORMAT_H1, label: 'Heading 1', icon: 'looks_one', group: 'Actions' },
   [COMMAND_IDS.FORMAT_H2]: { id: COMMAND_IDS.FORMAT_H2, label: 'Heading 2', icon: 'looks_two', group: 'Actions' },
   [COMMAND_IDS.FORMAT_P]: { id: COMMAND_IDS.FORMAT_P, label: 'Paragraph', icon: 'subject', group: 'Actions' },
+  [COMMAND_IDS.TOGGLE_TYPEWRITER_MODE]: { id: COMMAND_IDS.TOGGLE_TYPEWRITER_MODE, label: 'Toggle Typewriter Mode', icon: 'keyboard', shortcut: 'Ctrl+Shift+T', group: 'Views', includeInQuickSwitcher: true },
 };
 
 export interface CommandContext {
@@ -117,6 +119,7 @@ export interface CommandContext {
   toggleSidebar: () => void;
   togglePageView: () => void;
   toggleFocusMode: () => void;
+  toggleTypewriterMode: () => void;
   setTheme: (theme: 'dark' | 'light' | 'high-contrast') => void;
   showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning', icon?: string) => void;
   createCommentFromSelection: () => void;
@@ -169,6 +172,7 @@ export const COMMAND_HANDLERS: Record<CommandId, CommandHandler> = {
   [COMMAND_IDS.FORMAT_H1]: ({ editor }) => editor?.chain().focus().toggleHeading({ level: 1 }).run(),
   [COMMAND_IDS.FORMAT_H2]: ({ editor }) => editor?.chain().focus().toggleHeading({ level: 2 }).run(),
   [COMMAND_IDS.FORMAT_P]: ({ editor }) => editor?.chain().focus().setParagraph().run(),
+  [COMMAND_IDS.TOGGLE_TYPEWRITER_MODE]: ({ toggleTypewriterMode }) => toggleTypewriterMode(),
 };
 
 export const LOCAL_MENU_COMMANDS: ReadonlySet<CommandId> = new Set([

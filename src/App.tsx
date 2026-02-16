@@ -253,11 +253,12 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
       toggleSidebar: () => dispatch({ type: 'TOGGLE_SIDEBAR' }),
       togglePageView: () => dispatch({ type: 'TOGGLE_PAGE_VIEW' }),
       toggleFocusMode: () => dispatch({ type: 'TOGGLE_FOCUS_MODE' }),
+      toggleTypewriterMode: () => updateSettings({ typewriterMode: !state.settings.typewriterMode }),
       setTheme: (theme) => dispatch({ type: 'SET_THEME', payload: theme }),
       showToast,
       createCommentFromSelection,
     });
-  }, [createCommentFromSelection, createNewChapter, dispatch, editor, handleExportBackup, openModal, toggleModal, showToast]);
+  }, [createCommentFromSelection, createNewChapter, dispatch, editor, handleExportBackup, openModal, toggleModal, showToast, updateSettings, state.settings.typewriterMode]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -308,6 +309,10 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
           case 'm':
             e.preventDefault();
             handleMenuAction(COMMAND_IDS.ADD_COMMENT);
+            break;
+          case 't':
+            e.preventDefault();
+            handleMenuAction(COMMAND_IDS.TOGGLE_TYPEWRITER_MODE);
             break;
         }
       }

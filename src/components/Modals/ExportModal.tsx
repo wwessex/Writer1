@@ -4,7 +4,7 @@ import { useToast } from '@/components/UI';
 import { HelpTooltip } from '@/components/UI/Tooltip';
 import { useApp } from '@/context/AppContext';
 import type { ExportFormat } from '@/types';
-import { exportToDocx, exportToPdf, exportToRtf, exportToFountain, exportToScreenplayPdf } from '@/lib/export';
+import { exportToDocx, exportToPdf, exportToRtf, exportToFountain, exportToScreenplayPdf, exportToMarkdown, exportToPlainText } from '@/lib/export';
 import type { FountainExportOptions } from '@/lib/export';
 import { recordExport } from '@/lib/exportHistory';
 import { countWords, editorToPlainText } from '@/lib/utils';
@@ -84,6 +84,24 @@ const EXPORT_PRESETS: ExportPreset[] = [
     includeHeadings: true,
     projectTypes: ['book', 'screenplay'],
   },
+  {
+    id: 'markdown',
+    name: 'Markdown Export',
+    icon: 'code',
+    description: 'Clean Markdown with chapter headings, ideal for GitHub, blogs, or static site generators.',
+    format: 'markdown',
+    includeHeadings: true,
+    projectTypes: ['book', 'screenplay'],
+  },
+  {
+    id: 'plain-text-file',
+    name: 'Plain Text File',
+    icon: 'text_snippet',
+    description: 'Simple .txt file with no formatting, maximum compatibility.',
+    format: 'txt',
+    includeHeadings: true,
+    projectTypes: ['book', 'screenplay'],
+  },
 ];
 
 export function ExportModal({ open, onClose }: ExportModalProps) {
@@ -103,7 +121,9 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
     pdf: 'PDF',
     screenplayPdf: 'Screenplay PDF',
     rtf: 'RTF',
-    fountain: 'Fountain'
+    fountain: 'Fountain',
+    markdown: 'Markdown',
+    txt: 'Plain Text'
   };
 
   const totalWords = state.chapters.reduce((sum, ch) => sum + countWords(editorToPlainText(ch.content)), 0);
@@ -131,13 +151,19 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
         case 'rtf':
           await exportToRtf(state.chapters, state.novelTitle, includeHeadings);
           break;
+        case 'markdown':
+          await exportToMarkdown(state.chapters, state.novelTitle, includeHeadings);
+          break;
+        case 'txt':
+          await exportToPlainText(state.chapters, state.novelTitle, includeHeadings);
+          break;
       }
 
       // Record to export history
       const safeTitle = state.novelTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase();
       recordExport({
         format,
-        filename: `${safeTitle}.${format === 'screenplayPdf' ? 'pdf' : format}`,
+        filename: `${safeTitle}.${format === 'screenplayPdf' ? 'pdf' : format === 'markdown' ? 'md' : format}`,
         novelTitle: state.novelTitle,
         chapterCount: state.chapters.length,
         wordCount: totalWords,
@@ -280,6 +306,14 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
               <Button variant="primary" onClick={() => handleExport('rtf')} disabled={exporting}>
                 <span className="material-symbols-rounded">article</span>
                 Export RTF
+              </Button>
+              <Button variant="primary" onClick={() => handleExport('markdown')} disabled={exporting}>
+                <span className="material-symbols-rounded">code</span>
+                Export Markdown
+              </Button>
+              <Button variant="primary" onClick={() => handleExport('txt')} disabled={exporting}>
+                <span className="material-symbols-rounded">text_snippet</span>
+                Export Plain Text
               </Button>
             </>
           )}

@@ -22,33 +22,6 @@ export interface Scene {
   productionTags?: string[];
 }
 
-export type ScreenplayElementType = 'slugLine' | 'action' | 'characterCue' | 'parenthetical' | 'dialogue';
-
-export interface ScreenplayElement {
-  id: string;
-  type: ScreenplayElementType;
-  text: string;
-}
-
-export interface ScreenplayScene {
-  id: string;
-  title: string;
-  summary: string;
-  order: number;
-  elements: ScreenplayElement[];
-}
-
-export interface ScreenplaySection {
-  id: string;
-  novelId: string;
-  order: number;
-  title: string;
-  updatedAt: number;
-  content: JSONContent | null;
-  summary: string;
-  scenes: ScreenplayScene[];
-}
-
 export interface Chapter {
   id: string;
   novelId: string;
@@ -130,6 +103,7 @@ export interface AppSettings {
   quickSwitcherMode: 'chapter' | 'action' | 'search-result';
   typography: TypographySettings;
   onboardingComplete: boolean;
+  typewriterMode: boolean;
   sidebarPanels: SidebarPanelsSettings;
 }
 
@@ -173,19 +147,7 @@ export interface TextAnalysis {
   longSentences: string[];
 }
 
-export interface WindowPosition {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-export interface DailyBaseline {
-  date: string;
-  words: number;
-}
-
-export type ExportFormat = 'docx' | 'pdf' | 'screenplayPdf' | 'rtf' | 'fountain';
+export type ExportFormat = 'docx' | 'pdf' | 'screenplayPdf' | 'rtf' | 'fountain' | 'markdown' | 'txt';
 
 export interface LegacyBackupData {
   version?: 1 | 2;

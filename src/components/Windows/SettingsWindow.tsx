@@ -90,7 +90,8 @@ const SETTINGS_SECTIONS = [
     fields: [
       { id: 'autosaveMs', label: 'Autosave (ms)', keywords: ['autosave', 'save delay'] },
       { id: 'dailyWordGoal', label: 'Daily Word Goal', keywords: ['target', 'daily'] },
-      { id: 'novelWordGoal', label: 'Novel Word Goal', keywords: ['target', 'project goal'] }
+      { id: 'novelWordGoal', label: 'Novel Word Goal', keywords: ['target', 'project goal'] },
+      { id: 'typewriterMode', label: 'Typewriter Mode', keywords: ['scroll', 'cursor', 'center'] }
     ]
   },
   {
@@ -566,6 +567,17 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                     placeholder="0"
                   />
                 </div>}
+                <div className={styles.fieldRow}>
+                  <label className={styles.checkbox}>
+                    <input
+                      type="checkbox"
+                      checked={state.settings.typewriterMode}
+                      onChange={e => updateSettings({ typewriterMode: e.target.checked })}
+                    />
+                    <span>Typewriter Scroll Mode</span>
+                    <HelpTooltip text="Keep the cursor line vertically centered in the editor while typing (Ctrl+Shift+T)" position="right" />
+                  </label>
+                </div>
               </div>
             )}
           </section>
