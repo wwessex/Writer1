@@ -3,6 +3,8 @@
  * Records each export with format, timestamp, and file metadata.
  */
 
+import { generateId } from '@/lib/utils';
+
 const STORAGE_KEY = 'draftharbour_export_history_v1';
 const MAX_HISTORY = 50;
 
@@ -38,7 +40,7 @@ export function recordExport(record: Omit<ExportRecord, 'id' | 'timestamp'>): Ex
   const history = loadHistory();
   const entry: ExportRecord = {
     ...record,
-    id: crypto.randomUUID(),
+    id: generateId(),
     timestamp: Date.now(),
   };
   history.unshift(entry);

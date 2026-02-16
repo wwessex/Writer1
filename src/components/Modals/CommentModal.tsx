@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Dialog, Button, Textarea, IconButton } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
-import { formatDateTime } from '@/lib/utils';
+import { formatDateTime, generateId } from '@/lib/utils';
 import type { Comment, CommentReply } from '@/types';
 import styles from './Modals.module.css';
 
@@ -96,7 +96,7 @@ export function CommentModal({ open, onClose }: CommentModalProps) {
     if (!newCollabName.trim()) return;
     const colors = ['#f87171', '#34d399', '#fbbf24', '#a78bfa', '#fb923c', '#38bdf8'];
     const collab: Collaborator = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       name: newCollabName.trim(),
       role: newCollabRole,
       color: colors[collaborators.length % colors.length],
@@ -137,7 +137,7 @@ export function CommentModal({ open, onClose }: CommentModalProps) {
     if (!activeChapter || !newCommentText.trim()) return;
 
     const comment: Comment = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       chapterId: activeChapter.id,
       anchorOffset: 0,
       anchorLength: 0,
@@ -158,7 +158,7 @@ export function CommentModal({ open, onClose }: CommentModalProps) {
       if (!replyText.trim()) return;
 
       const reply: CommentReply = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         text: replyText.trim(),
         author: 'Author',
         createdAt: Date.now(),

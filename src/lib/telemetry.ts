@@ -4,6 +4,8 @@
  * Context length estimates are redacted to character counts only.
  */
 
+import { generateId } from '@/lib/utils';
+
 const STORAGE_KEY = 'draftharbour_ai_telemetry_v1';
 const OPT_IN_KEY = 'draftharbour_ai_telemetry_optin';
 const MAX_RECORDS = 200;
@@ -64,7 +66,7 @@ export function recordTelemetryEvent(event: Omit<TelemetryEvent, 'id' | 'timesta
   const events = loadEvents();
   events.unshift({
     ...event,
-    id: crypto.randomUUID(),
+    id: generateId(),
     timestamp: Date.now(),
   });
   saveEvents(events);

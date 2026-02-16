@@ -321,7 +321,11 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
           ],
           max_tokens: 10
         }),
-        signal: AbortSignal.timeout(10000)
+        signal: (() => {
+          const controller = new AbortController();
+          setTimeout(() => controller.abort(), 10000);
+          return controller.signal;
+        })()
       });
 
       if (res.ok) {
