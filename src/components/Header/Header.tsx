@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Input, IconButton } from '@/components/UI';
 import { Pill, StatusDot } from '@/components/UI/Pill';
 import { MenuBar } from '@/components/Menu/MenuBar';
 import { Toolbar } from './Toolbar';
-import { countWords, editorToPlainText } from '@/lib/utils';
+import { getProjectMetrics } from '@/lib/projectMetrics';
 import { COMMAND_IDS, type CommandId } from '@/lib/commands';
 import styles from './Header.module.css';
 
@@ -63,16 +63,11 @@ export function Header({ onAction, onToggleInspector, inspectorOpen }: HeaderPro
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
-  // Calculate word counts
-  const totalWords = state.chapters.reduce((sum, ch) => {
-    const text = editorToPlainText(ch.content);
-    return sum + countWords(text);
-  }, 0);
+  const projectMetrics = useMemo(() => getProjectMetrics(state.chapters), [state.chapters]);
+  const totalWords = projectMetrics.totalWords;
 
-  const activeChapter = state.chapters.find(ch => ch.id === state.activeChapterId);
-  const chapterWords = activeChapter
-    ? countWords(editorToPlainText(activeChapter.content))
-    : 0;
+  const activeChapter = projectMetrics.chapters.find(ch => ch.id === state.activeChapterId);
+  const chapterWords = activeChapter?.words ?? 0;
 
   const toggleSidebar = () => dispatch({ type: 'TOGGLE_SIDEBAR' });
   const newDraftLabel = state.projectType === 'screenplay' ? 'New Scene' : 'New Chapter';

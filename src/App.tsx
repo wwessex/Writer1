@@ -307,7 +307,7 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
       <SnapshotModal open={modals.snapshot} onClose={() => closeModal('snapshot')} />
       <AnalysisModal open={modals.analysis} onClose={() => closeModal('analysis')} />
       <WordCountModal open={modals.wordCount} onClose={() => closeModal('wordCount')} />
-      <DashboardModal open={modals.dashboard} onClose={() => closeModal('dashboard')} />
+      <DashboardModal open={modals.dashboard} onClose={() => closeModal('dashboard')} onAction={handleMenuAction} />
       <OnboardingModal open={modals.onboarding} onClose={handleOnboardingClose} />
       <CharacterBibleModal open={modals.characterBible} onClose={() => closeModal('characterBible')} />
       <AIWritingModal open={modals.aiWriting} onClose={() => closeModal('aiWriting')} />

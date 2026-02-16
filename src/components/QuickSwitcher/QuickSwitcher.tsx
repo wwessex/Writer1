@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, type ReactNode } from 'react';
 import { useApp } from '@/context/AppContext';
-import { countWords, editorToPlainText } from '@/lib/utils';
+import { getProjectMetrics } from '@/lib/projectMetrics';
 import { COMMAND_IDS, type CommandId } from '@/lib/commands';
 import { buildChapterSearchIndex, findChapterContentMatches, normalizeSearchText } from '@/lib/search';
 import styles from './QuickSwitcher.module.css';
@@ -91,6 +91,8 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
   const isScreenplay = state.projectType === 'screenplay';
   const chapterLabel = isScreenplay ? 'Scene' : 'Chapter';
 
+  const projectMetrics = useMemo(() => getProjectMetrics(state.chapters), [state.chapters]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(RECENT_ITEMS_STORAGE_KEY, JSON.stringify(recentOpenedMap));
@@ -105,14 +107,13 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
   }, [rawQuery]);
 
   const chapterItems = useMemo((): SwitcherItem[] => {
-    return state.chapters.map((ch, idx) => {
-      const words = countWords(editorToPlainText(ch.content));
+    return projectMetrics.chapters.map((ch, idx) => {
       const itemId = `chapter:${ch.id}`;
       return {
         id: ch.id,
         type: 'chapter',
         title: ch.title || `${chapterLabel} ${idx + 1}`,
-        subtitle: `${words} words`,
+        subtitle: `${ch.words} words`,
         lastOpenedAt: recentOpenedMap[itemId],
         icon: isScreenplay ? 'movie' : 'description',
         action: () => {
@@ -121,7 +122,7 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
         },
       };
     });
-  }, [state.chapters, chapterLabel, isScreenplay, recentOpenedMap, setActiveChapter, onClose]);
+  }, [projectMetrics.chapters, chapterLabel, isScreenplay, recentOpenedMap, setActiveChapter, onClose]);
 
   const actionItems = useMemo((): SwitcherItem[] => {
     const actionItem = (id: string, title: string, icon: string, command: CommandId, shortcut?: string): SwitcherItem => ({
@@ -142,7 +143,7 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
       actionItem('act-sidebar', 'Toggle Sidebar', 'side_navigation', COMMAND_IDS.TOGGLE_SIDEBAR, 'Ctrl+Shift+B'),
       actionItem('act-export', 'Export...', 'download', COMMAND_IDS.EXPORT, 'Ctrl+Shift+E'),
       actionItem('act-settings', 'Settings', 'settings', COMMAND_IDS.SETTINGS),
-      actionItem('act-dashboard', 'Dashboard', 'dashboard', COMMAND_IDS.DASHBOARD),
+      actionItem('act-dashboard', 'Project Dashboard', 'dashboard', COMMAND_IDS.DASHBOARD),
       actionItem('act-analysis', 'Writing Analysis', 'analytics', COMMAND_IDS.ANALYSIS),
       actionItem('act-snapshots', 'Snapshots', 'history', COMMAND_IDS.SNAPSHOTS),
       actionItem('act-characters', 'Character & World Bible', 'person', COMMAND_IDS.CHARACTER_BIBLE),
