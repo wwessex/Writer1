@@ -71,6 +71,32 @@
   line-height: 1.4;
 }
 
+.filterBar {
+  display: flex;
+  gap: 6px;
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.filterChip {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--btn-bg);
+  color: var(--text-muted);
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.filterChip--active {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  color: var(--accent);
+  background: var(--accent-alpha);
+}
+
 .list {
   max-height: 360px;
   overflow-y: auto;
