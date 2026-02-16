@@ -124,12 +124,15 @@ export function Toolbar() {
     }
   };
 
+  const triggerAddComment = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('writer1:add-comment'));
+  }, []);
+
   const isActive = (cmd: string) => {
     if (!editor) return false;
     return editor.isActive(cmd);
   };
 
-  // Mobile: show essential actions and expose extended formatting via a compact popover.
   if (isMobile) {
     return (
       <div className={styles.toolbar}>
@@ -189,6 +192,15 @@ export function Toolbar() {
         <div className={styles.toolbar__divider} />
 
         <div className={styles.toolbar__group}>
+          <Tooltip content="Add Comment (Ctrl+Shift+M)" position="bottom">
+            <IconButton
+              icon="add_comment"
+              label="Add Comment (Ctrl+Shift+M)"
+              variant="ghost"
+              onClick={triggerAddComment}
+              className={styles.toolbarActionBtn}
+            />
+          </Tooltip>
           <Tooltip content={state.projectType === 'screenplay' ? 'New Scene' : 'New Chapter'} position="bottom">
             <IconButton
               icon="note_add"
@@ -224,7 +236,6 @@ export function Toolbar() {
     );
   }
 
-  // Desktop: full toolbar with tooltips
   return (
     <div className={styles.toolbar}>
       <div className={styles.toolbar__group}>
@@ -286,6 +297,17 @@ export function Toolbar() {
             label="Horizontal Rule"
             variant="ghost"
             onClick={() => handleFormatClick('horizontalRule')}
+          />
+        </Tooltip>
+      </div>
+
+      <div className={styles.toolbar__group}>
+        <Tooltip content="Add Comment (Ctrl+Shift+M)" position="bottom">
+          <IconButton
+            icon="add_comment"
+            label="Add Comment (Ctrl+Shift+M)"
+            variant="ghost"
+            onClick={triggerAddComment}
           />
         </Tooltip>
       </div>

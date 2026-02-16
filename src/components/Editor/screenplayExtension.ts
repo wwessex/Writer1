@@ -1,4 +1,5 @@
 import Paragraph from '@tiptap/extension-paragraph';
+import { Mark } from '@tiptap/core';
 import type { ScreenplayBlockType } from '@/types';
 
 const BLOCK_FLOW: ScreenplayBlockType[] = ['scene-heading', 'action', 'character', 'parenthetical', 'dialogue', 'transition'];
@@ -43,6 +44,11 @@ declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     screenplayParagraph: {
       setScreenplayBlock: (blockType: ScreenplayBlockType) => ReturnType;
+    };
+    commentAnchor: {
+      setCommentAnchor: (attrs: { threadId: string; state?: 'open' | 'resolved' }) => ReturnType;
+      scrollToCommentAnchor: (threadId: string) => ReturnType;
+      setCommentAnchorState: (attrs: { threadId: string; state: 'open' | 'resolved' }) => ReturnType;
     };
   }
 }
@@ -131,6 +137,85 @@ export const ScreenplayParagraph = Paragraph.extend<{ screenplayMode: boolean }>
           .setScreenplayBlock(nextType)
           .run();
       },
+    };
+  },
+});
+
+export const CommentAnchorMark = Mark.create({
+  name: 'commentAnchor',
+
+  addAttributes() {
+    return {
+      threadId: {
+        default: null,
+        parseHTML: element => element.getAttribute('data-comment-thread-id'),
+        renderHTML: attributes => {
+          if (!attributes.threadId) return {};
+          return { 'data-comment-thread-id': attributes.threadId };
+        },
+      },
+      state: {
+        default: 'open',
+        parseHTML: element => element.getAttribute('data-comment-thread-state') || 'open',
+        renderHTML: attributes => ({ 'data-comment-thread-state': attributes.state || 'open' }),
+      },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: 'span[data-comment-thread-id]' }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['span', HTMLAttributes, 0];
+  },
+
+  addCommands() {
+    return {
+      setCommentAnchor:
+        attrs =>
+        ({ chain, state }) => {
+          if (state.selection.empty) return false;
+          return chain().setMark(this.name, { threadId: attrs.threadId, state: attrs.state || 'open' }).run();
+        },
+      scrollToCommentAnchor:
+        threadId =>
+        ({ editor }) => {
+          let anchor: { from: number; to: number } | null = null;
+
+          editor.state.doc.descendants((node, pos) => {
+            if (!node.isText || !node.marks.length || anchor) return true;
+            const mark = node.marks.find(m => m.type.name === this.name && m.attrs.threadId === threadId);
+            if (mark) {
+              anchor = { from: pos, to: pos + node.nodeSize };
+              return false;
+            }
+            return true;
+          });
+
+          if (!anchor) return false;
+          editor.chain().focus().setTextSelection(anchor).scrollIntoView().run();
+          return true;
+        },
+      setCommentAnchorState:
+        attrs =>
+        ({ tr, state, dispatch }) => {
+          let didUpdate = false;
+          state.doc.descendants((node, pos) => {
+            if (!node.isText || !node.marks.length) return true;
+            const mark = node.marks.find(m => m.type.name === this.name && m.attrs.threadId === attrs.threadId);
+            if (!mark) return true;
+
+            didUpdate = true;
+            tr.removeMark(pos, pos + node.nodeSize, mark.type);
+            tr.addMark(pos, pos + node.nodeSize, mark.type.create({ ...mark.attrs, state: attrs.state }));
+            return true;
+          });
+
+          if (!didUpdate) return false;
+          if (dispatch) dispatch(tr);
+          return true;
+        },
     };
   },
 });

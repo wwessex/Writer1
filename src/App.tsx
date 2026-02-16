@@ -3,7 +3,7 @@ import { EditorContext, useCurrentEditor, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import HorizontalRule from '@tiptap/extension-horizontal-rule';
-import { ScreenplayParagraph } from '@/components/Editor/screenplayExtension';
+import { ScreenplayParagraph, CommentAnchorMark } from '@/components/Editor/screenplayExtension';
 import { useApp, AppProvider } from '@/context/AppContext';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
@@ -20,10 +20,11 @@ import { SettingsWindow, AboutWindow } from '@/components/Windows';
 import { ToastProvider, useToast } from '@/components/UI';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useModalState } from '@/hooks/useModalState';
-import { exportBackup, importBackup, createChapter, addChapter } from '@/lib/storage';
+import { exportBackup, importBackup, createChapter, addChapter, upsertCommentThread } from '@/lib/storage';
 import { importFile, mapImportedContentToProjectType } from '@/lib/import';
-import { downloadFile } from '@/lib/utils';
+import { downloadFile, generateId } from '@/lib/utils';
 import { COMMAND_IDS, type CommandId, runCommand } from '@/lib/commands';
+import type { CommentThread } from '@/types';
 import './styles/index.css';
 import styles from './App.module.css';
 
@@ -36,11 +37,12 @@ const createExtensions = (screenplayMode: boolean) => [
   }),
   ScreenplayParagraph.configure({ screenplayMode }),
   Underline,
-  HorizontalRule
+  HorizontalRule,
+  CommentAnchorMark
 ];
 
 function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode: boolean; onToggleScreenplayMode: () => void }) {
-  const { state, loadNovel, createChapter: createNewChapter, dispatch, updateSettings } = useApp();
+  const { state, activeChapter, loadNovel, createChapter: createNewChapter, dispatch, updateSettings } = useApp();
   const { editor } = useCurrentEditor();
   const { showToast } = useToast();
   const { modals, openModal, closeModal, toggleModal } = useModalState();
@@ -157,6 +159,58 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
     updateSettings({ onboardingComplete: true });
   }, [closeModal, updateSettings]);
 
+  const createCommentFromSelection = useCallback(() => {
+    if (!editor || !activeChapter) {
+      showToast('Select a chapter and text to add a comment', 'warning');
+      return;
+    }
+
+    const { from, to, empty } = editor.state.selection;
+    if (empty) {
+      showToast('Select text to anchor a comment', 'warning');
+      return;
+    }
+
+    const selectedText = editor.state.doc.textBetween(from, to, ' ').trim();
+    const text = window.prompt('Comment for selected text:');
+    if (!text || !text.trim()) return;
+
+    const threadId = generateId();
+    const now = Date.now();
+    const thread: CommentThread = {
+      id: threadId,
+      chapterId: activeChapter.id,
+      anchor: {
+        from,
+        to,
+        length: Math.max(to - from, 0),
+        selectedText: selectedText || undefined,
+      },
+      resolved: false,
+      createdAt: now,
+      updatedAt: now,
+      comments: [
+        {
+          id: generateId(),
+          text: text.trim(),
+          author: 'Author',
+          createdAt: now,
+        }
+      ],
+    };
+
+    const marked = editor.chain().focus().setCommentAnchor({ threadId, state: 'open' }).run();
+    if (!marked) {
+      showToast('Unable to create comment on current selection', 'error');
+      return;
+    }
+
+    upsertCommentThread(thread);
+    openModal('comments');
+    showToast('Comment added', 'success', 'add_comment');
+  }, [activeChapter, editor, openModal, showToast]);
+
+
   // Handle menu actions
   const handleMenuAction = useCallback((action: CommandId) => {
     runCommand(action, {
@@ -174,8 +228,9 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
       toggleFocusMode: () => dispatch({ type: 'TOGGLE_FOCUS_MODE' }),
       setTheme: (theme) => dispatch({ type: 'SET_THEME', payload: theme }),
       showToast,
+      createCommentFromSelection,
     });
-  }, [createNewChapter, dispatch, editor, handleExportBackup, openModal, toggleModal, showToast]);
+  }, [createCommentFromSelection, createNewChapter, dispatch, editor, handleExportBackup, openModal, toggleModal, showToast]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -209,6 +264,10 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
             e.preventDefault();
             handleMenuAction(COMMAND_IDS.INSPECTOR);
             break;
+          case 'm':
+            e.preventDefault();
+            handleMenuAction(COMMAND_IDS.ADD_COMMENT);
+            break;
         }
       }
       // Escape to exit focus mode
@@ -220,6 +279,12 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleMenuAction, state.settings.focusMode]);
+
+  useEffect(() => {
+    const handleAddComment = () => handleMenuAction(COMMAND_IDS.ADD_COMMENT);
+    window.addEventListener('writer1:add-comment', handleAddComment as EventListener);
+    return () => window.removeEventListener('writer1:add-comment', handleAddComment as EventListener);
+  }, [handleMenuAction]);
 
   // Show error state
   if (error) {

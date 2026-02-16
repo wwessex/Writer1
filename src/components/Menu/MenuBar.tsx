@@ -92,6 +92,7 @@ const MENUS: MenuConfig[] = [
       { divider: true },
       { label: 'AI Writing Tools...', action: COMMAND_IDS.AI_WRITING },
       { label: 'AI Suggestions Panel', action: COMMAND_IDS.AI_PANEL },
+      { label: 'Add Comment', action: COMMAND_IDS.ADD_COMMENT, shortcut: 'Ctrl+Shift+M' },
       { label: 'Comments...', action: COMMAND_IDS.COMMENTS },
       { divider: true },
       { label: 'Integrations...', action: COMMAND_IDS.INTEGRATIONS }

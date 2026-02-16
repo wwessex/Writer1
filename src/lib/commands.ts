@@ -17,6 +17,7 @@ export const COMMAND_IDS = {
   CHARACTER_BIBLE: 'characterBible',
   AI_WRITING: 'aiWriting',
   COMMENTS: 'comments',
+  ADD_COMMENT: 'addComment',
   ADVANCED_ANALYTICS: 'advancedAnalytics',
   INTEGRATIONS: 'integrations',
   PROJECTS: 'projects',
@@ -61,6 +62,7 @@ export interface CommandContext {
   toggleFocusMode: () => void;
   setTheme: (theme: 'dark' | 'light' | 'high-contrast') => void;
   showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning', icon?: string) => void;
+  createCommentFromSelection: () => void;
 }
 
 type CommandHandler = (context: CommandContext) => void;
@@ -84,6 +86,7 @@ export const COMMAND_HANDLERS: Record<CommandId, CommandHandler> = {
   [COMMAND_IDS.CHARACTER_BIBLE]: ({ openModal }) => openModal('characterBible'),
   [COMMAND_IDS.AI_WRITING]: ({ openModal }) => openModal('aiWriting'),
   [COMMAND_IDS.COMMENTS]: ({ openModal }) => openModal('comments'),
+  [COMMAND_IDS.ADD_COMMENT]: ({ createCommentFromSelection }) => createCommentFromSelection(),
   [COMMAND_IDS.ADVANCED_ANALYTICS]: ({ openModal }) => openModal('advancedAnalytics'),
   [COMMAND_IDS.INTEGRATIONS]: ({ openModal }) => openModal('integrations'),
   [COMMAND_IDS.PROJECTS]: ({ openModal }) => openModal('projects'),
