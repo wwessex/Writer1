@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { useApp } from '@/context/AppContext';
+import type { ProjectType, SidebarPanelId } from '@/types';
 import { VirtualChapterList } from './VirtualChapterList';
 import { OutlinePanel } from './OutlinePanel';
 import { ScenePlanner } from './ScenePlanner';
@@ -12,9 +13,22 @@ interface SidebarProps {
   onImportBackup: () => void;
 }
 
+interface SidebarPanelDefinition {
+  id: SidebarPanelId;
+  title: string;
+  collapsible: boolean;
+  render: () => ReactNode;
+}
+
+const FALLBACK_PANEL_ORDER: Record<ProjectType, SidebarPanelId[]> = {
+  book: ['chapters', 'scenePlanner', 'outline'],
+  screenplay: ['chapters', 'outline', 'scenePlanner']
+};
+
 export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
-  const { state, dispatch, undoReorder, canUndoReorder } = useApp();
+  const { state, dispatch, undoReorder, canUndoReorder, updateSettings } = useApp();
   const isHidden = state.settings.sidebarHidden;
+  const sidebarPanels = state.settings.sidebarPanels;
 
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -39,8 +53,57 @@ export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
     }
   };
 
+  const panelDefinitions: SidebarPanelDefinition[] = useMemo(() => [
+    {
+      id: 'chapters',
+      title: 'Chapters',
+      collapsible: false,
+      render: () => (
+        <>
+          <VirtualChapterList />
+          {canUndoReorder && (
+            <div className={styles.sidebar__undoBar}>
+              <Button variant="ghost" size="small" onClick={undoReorder}>
+                <span className="material-symbols-rounded">undo</span>
+                Undo Reorder
+              </Button>
+            </div>
+          )}
+        </>
+      )
+    },
+    {
+      id: 'scenePlanner',
+      title: state.projectType === 'screenplay' ? 'Scene Planner' : 'Scenes',
+      collapsible: true,
+      render: () => <ScenePlanner />
+    },
+    {
+      id: 'outline',
+      title: state.projectType === 'screenplay' ? 'Outline' : 'Chapter Outline',
+      collapsible: true,
+      render: () => <OutlinePanel />
+    }
+  ], [canUndoReorder, undoReorder, state.projectType]);
+
+  const panelOrder = sidebarPanels.order && sidebarPanels.order.length > 0
+    ? sidebarPanels.order
+    : FALLBACK_PANEL_ORDER[state.projectType];
+
   const sidebarClass = `${styles.sidebar} ${isHidden ? styles['sidebar--hidden'] : ''}`;
   const backdropClass = `${styles.backdrop} ${isHidden ? styles['backdrop--hidden'] : styles['backdrop--visible']}`;
+
+  const togglePanelCollapsed = (panelId: SidebarPanelId) => {
+    updateSettings({
+      sidebarPanels: {
+        ...sidebarPanels,
+        collapsed: {
+          ...sidebarPanels.collapsed,
+          [panelId]: !sidebarPanels.collapsed?.[panelId]
+        }
+      }
+    });
+  };
 
   return (
     <>
@@ -61,26 +124,35 @@ export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
           </div>
         )}
         <div className={styles.sidebar__content}>
-          <VirtualChapterList />
-          {canUndoReorder && (
-            <div className={styles.sidebar__undoBar}>
-              <Button variant="ghost" size="small" onClick={undoReorder}>
-                <span className="material-symbols-rounded">undo</span>
-                Undo Reorder
-              </Button>
-            </div>
-          )}
-          {state.projectType === 'screenplay' ? (
-            <>
-              <OutlinePanel />
-              <ScenePlanner />
-            </>
-          ) : (
-            <>
-              <ScenePlanner />
-              <OutlinePanel />
-            </>
-          )}
+          {panelOrder.map(panelId => {
+            const panel = panelDefinitions.find(def => def.id === panelId);
+            if (!panel) return null;
+
+            if (sidebarPanels.visible?.[panel.id] === false) {
+              return null;
+            }
+
+            const isCollapsed = Boolean(sidebarPanels.collapsed?.[panel.id]);
+
+            if (!panel.collapsible) {
+              return <div key={panel.id}>{panel.render()}</div>;
+            }
+
+            return (
+              <section key={panel.id} className={styles.panelSection}>
+                <button
+                  className={styles.panelSection__header}
+                  onClick={() => togglePanelCollapsed(panel.id)}
+                >
+                  <span>{panel.title}</span>
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    {isCollapsed ? 'expand_more' : 'expand_less'}
+                  </span>
+                </button>
+                {!isCollapsed && panel.render()}
+              </section>
+            );
+          })}
         </div>
         <div className={styles.sidebar__footer}>
           <Button variant="ghost" onClick={onExportBackup}>
