@@ -62,6 +62,10 @@
   50% { opacity: 1; }
 }
 
+.desktopOnlyStats {
+  display: contents;
+}
+
 .mobileQuickActions {
   display: none;
   align-items: center;
@@ -171,6 +175,7 @@
   .logo { display: none; }
   .savingStatus { display: none; }
   .inspectorBtn { display: none !important; }
+  .desktopOnlyStats { display: none; }
 }
 
 @media (max-width: 480px) {

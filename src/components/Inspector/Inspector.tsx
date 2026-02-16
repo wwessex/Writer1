@@ -2,7 +2,7 @@ import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Input, Textarea, Button, IconButton } from '@/components/UI';
 import { Select } from '@/components/UI/Select';
-import { countWords, editorToPlainText } from '@/lib/utils';
+import { countWords, countSentences, countParagraphs, countCharacters, editorToPlainText } from '@/lib/utils';
 import { useResizable } from '@/hooks/useResizable';
 import type { ChapterStatus, Scene } from '@/types';
 import styles from './Inspector.module.css';
@@ -42,10 +42,15 @@ export function Inspector({ open, onClose }: InspectorProps) {
 
   const isScreenplay = state.projectType === 'screenplay';
 
-  const chapterWords = useMemo(() => {
-    if (!activeChapter) return 0;
-    return countWords(editorToPlainText(activeChapter.content));
+  const chapterText = useMemo(() => {
+    if (!activeChapter) return '';
+    return editorToPlainText(activeChapter.content);
   }, [activeChapter]);
+
+  const chapterWords = useMemo(() => countWords(chapterText), [chapterText]);
+  const chapterSentences = useMemo(() => countSentences(chapterText), [chapterText]);
+  const chapterParagraphs = useMemo(() => countParagraphs(chapterText), [chapterText]);
+  const chapterCharacters = useMemo(() => countCharacters(chapterText), [chapterText]);
 
   const wordGoalProgress = useMemo(() => {
     if (!activeChapter?.wordGoal || activeChapter.wordGoal <= 0) return 0;
@@ -123,6 +128,18 @@ export function Inspector({ open, onClose }: InspectorProps) {
                     <div className={styles.stat}>
                       <span className={styles.statValue}>{chapterWords.toLocaleString()}</span>
                       <span className={styles.statLabel}>words</span>
+                    </div>
+                    <div className={styles.stat}>
+                      <span className={styles.statValue}>{chapterSentences.toLocaleString()}</span>
+                      <span className={styles.statLabel}>sentences</span>
+                    </div>
+                    <div className={styles.stat}>
+                      <span className={styles.statValue}>{chapterParagraphs.toLocaleString()}</span>
+                      <span className={styles.statLabel}>paragraphs</span>
+                    </div>
+                    <div className={styles.stat}>
+                      <span className={styles.statValue}>{chapterCharacters.toLocaleString()}</span>
+                      <span className={styles.statLabel}>chars</span>
                     </div>
                     {activeChapter.wordGoal > 0 && (
                       <div className={styles.stat}>
