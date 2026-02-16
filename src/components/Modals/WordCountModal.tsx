@@ -1,6 +1,6 @@
 import { Dialog } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
-import { countWords, editorToPlainText } from '@/lib/utils';
+import { getProjectMetrics } from '@/lib/projectMetrics';
 import styles from './Modals.module.css';
 
 interface WordCountModalProps {
@@ -13,13 +13,9 @@ export function WordCountModal({ open, onClose }: WordCountModalProps) {
   const sectionLabel = state.projectType === 'screenplay' ? 'Scene' : 'Chapter';
   const totalLabel = state.projectType === 'screenplay' ? 'Total Project (Scenes)' : 'Total Project';
 
-  const chapterWords = activeChapter
-    ? countWords(editorToPlainText(activeChapter.content))
-    : 0;
-
-  const totalWords = state.chapters.reduce((sum, ch) => {
-    return sum + countWords(editorToPlainText(ch.content));
-  }, 0);
+  const projectMetrics = getProjectMetrics(state.chapters);
+  const chapterWords = projectMetrics.chapters.find(ch => ch.id === activeChapter?.id)?.words ?? 0;
+  const totalWords = projectMetrics.totalWords;
 
   const chapterGoalProgress = activeChapter?.wordGoal
     ? Math.round((chapterWords / activeChapter.wordGoal) * 100)
