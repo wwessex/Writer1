@@ -5,24 +5,25 @@ import { Pill, StatusDot } from '@/components/UI/Pill';
 import { MenuBar } from '@/components/Menu/MenuBar';
 import { Toolbar } from './Toolbar';
 import { countWords, editorToPlainText } from '@/lib/utils';
+import { COMMAND_IDS, type CommandId } from '@/lib/commands';
 import styles from './Header.module.css';
 
 interface HeaderProps {
-  onAction?: (action: string) => void;
+  onAction?: (action: CommandId) => void;
   onToggleInspector?: () => void;
   inspectorOpen?: boolean;
 }
 
-const MOBILE_MENU_ITEMS = [
-  { label: 'Projects...', action: 'projects', icon: 'folder_open' },
-  { label: 'Export...', action: 'export', icon: 'download' },
-  { label: 'Import Document...', action: 'importDocument', icon: 'upload' },
-  { label: 'Settings', action: 'settings', icon: 'settings' },
-  { label: 'Focus Mode', action: 'toggleFocusMode', icon: 'fullscreen' },
-  { label: 'Page View', action: 'togglePageView', icon: 'article' },
-  { label: 'Snapshots...', action: 'snapshots', icon: 'history' },
-  { label: 'Writing Analysis...', action: 'analysis', icon: 'analytics' },
-  { label: 'Quick Switcher', action: 'quickSwitcher', icon: 'search' },
+const MOBILE_MENU_ITEMS: { label: string; action: CommandId; icon: string }[] = [
+  { label: 'Projects...', action: COMMAND_IDS.PROJECTS, icon: 'folder_open' },
+  { label: 'Export...', action: COMMAND_IDS.EXPORT, icon: 'download' },
+  { label: 'Import Document...', action: COMMAND_IDS.IMPORT_DOCUMENT, icon: 'upload' },
+  { label: 'Settings', action: COMMAND_IDS.SETTINGS, icon: 'settings' },
+  { label: 'Focus Mode', action: COMMAND_IDS.TOGGLE_FOCUS_MODE, icon: 'fullscreen' },
+  { label: 'Page View', action: COMMAND_IDS.TOGGLE_PAGE_VIEW, icon: 'article' },
+  { label: 'Snapshots...', action: COMMAND_IDS.SNAPSHOTS, icon: 'history' },
+  { label: 'Writing Analysis...', action: COMMAND_IDS.ANALYSIS, icon: 'analytics' },
+  { label: 'Quick Switcher', action: COMMAND_IDS.QUICK_SWITCHER, icon: 'search' },
 ];
 
 export function Header({ onAction, onToggleInspector, inspectorOpen }: HeaderProps) {
@@ -43,18 +44,9 @@ export function Header({ onAction, onToggleInspector, inspectorOpen }: HeaderPro
 
   const toggleSidebar = () => dispatch({ type: 'TOGGLE_SIDEBAR' });
 
-  const handleMobileMenuAction = (action: string) => {
+  const handleMobileMenuAction = (action: CommandId) => {
     setMobileMenuOpen(false);
-    switch (action) {
-      case 'toggleFocusMode':
-        dispatch({ type: 'TOGGLE_FOCUS_MODE' });
-        break;
-      case 'togglePageView':
-        dispatch({ type: 'TOGGLE_PAGE_VIEW' });
-        break;
-      default:
-        onAction?.(action);
-    }
+    onAction?.(action);
   };
 
   const handleClickOutside = useCallback((e: MouseEvent) => {
