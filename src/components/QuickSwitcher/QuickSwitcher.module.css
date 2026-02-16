@@ -100,6 +100,10 @@
   border-left: 2px solid color-mix(in srgb, var(--text-muted) 50%, transparent);
 }
 
+.item--search-result {
+  border-left: 2px solid color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
 .item:hover,
 .item--selected {
   background: var(--btn-bg);
@@ -135,6 +139,21 @@
 .itemSubtitle {
   font-size: 0.75rem;
   color: var(--text-muted);
+}
+
+.itemSnippet {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.match {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 3px;
 }
 
 .itemMeta {

@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, type ReactNode } from 'react';
 import { useApp } from '@/context/AppContext';
 import { countWords, editorToPlainText } from '@/lib/utils';
 import { COMMAND_IDS, type CommandId } from '@/lib/commands';
+import { buildChapterSearchIndex, findChapterContentMatches, normalizeSearchText } from '@/lib/search';
 import styles from './QuickSwitcher.module.css';
 
 interface QuickSwitcherProps {
@@ -10,42 +11,32 @@ interface QuickSwitcherProps {
   onAction?: (action: CommandId) => void;
 }
 
+type ItemType = 'chapter' | 'action' | 'search-result';
+type SearchMode = ItemType;
+
 interface SwitcherItem {
   id: string;
-  type: 'chapter' | 'action';
+  type: ItemType;
   title: string;
   subtitle?: string;
   shortcut?: string;
   lastOpenedAt?: number;
   icon: string;
+  snippet?: string;
   action: () => void;
 }
 
-type TypeFilter = 'all' | 'chapter' | 'action';
-
 const RECENT_ITEMS_STORAGE_KEY = 'writer1.quickSwitcher.recent';
+const SEARCH_DEBOUNCE_MS = 140;
+const MAX_RESULTS = 40;
 
-function parseQuery(rawQuery: string): { text: string; typeFilter: TypeFilter } {
-  const parts = rawQuery.trim().split(/\s+/).filter(Boolean);
-  const tokens = new Set(parts.filter(part => part.startsWith('@')).map(token => token.toLowerCase()));
-  const text = parts.filter(part => !part.startsWith('@')).join(' ').toLowerCase();
-
-  if (tokens.has('@chapter') && !tokens.has('@action')) {
-    return { text, typeFilter: 'chapter' };
-  }
-
-  if (tokens.has('@action') && !tokens.has('@chapter')) {
-    return { text, typeFilter: 'action' };
-  }
-
-  return { text, typeFilter: 'all' };
-}
+const MODE_ORDER: SearchMode[] = ['action', 'chapter', 'search-result'];
 
 function scoreItem(item: SwitcherItem, normalizedQuery: string): number {
   if (!normalizedQuery) return 0;
 
-  const title = item.title.toLowerCase();
-  const subtitle = item.subtitle?.toLowerCase() ?? '';
+  const title = normalizeSearchText(item.title);
+  const subtitle = normalizeSearchText(item.subtitle ?? '');
   const queryWords = normalizedQuery.split(/\s+/).filter(Boolean);
 
   let score = 0;
@@ -62,8 +53,26 @@ function scoreItem(item: SwitcherItem, normalizedQuery: string): number {
   return score;
 }
 
+function highlightMatch(text: string, query: string): ReactNode {
+  if (!query.trim() || !text) return text;
+  const normalizedQuery = normalizeSearchText(query);
+  const normalizedText = normalizeSearchText(text);
+  const idx = normalizedText.indexOf(normalizedQuery);
+  if (idx === -1) return text;
+
+  const end = idx + normalizedQuery.length;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark className={styles.match}>{text.slice(idx, end)}</mark>
+      {text.slice(end)}
+    </>
+  );
+}
+
 export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
-  const { state, setActiveChapter } = useApp();
+  const { state, setActiveChapter, updateSettings } = useApp();
+  const [rawQuery, setRawQuery] = useState('');
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [recentOpenedMap, setRecentOpenedMap] = useState<Record<string, number>>(() => {
@@ -78,6 +87,7 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
+  const searchMode = state.settings.quickSwitcherMode;
   const isScreenplay = state.projectType === 'screenplay';
   const chapterLabel = isScreenplay ? 'Scene' : 'Chapter';
 
@@ -86,9 +96,16 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
     window.localStorage.setItem(RECENT_ITEMS_STORAGE_KEY, JSON.stringify(recentOpenedMap));
   }, [recentOpenedMap]);
 
-  // Build the list of items
-  const items = useMemo((): SwitcherItem[] => {
-    const chapterItems: SwitcherItem[] = state.chapters.map((ch, idx) => {
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setQuery(rawQuery);
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(handle);
+  }, [rawQuery]);
+
+  const chapterItems = useMemo((): SwitcherItem[] => {
+    return state.chapters.map((ch, idx) => {
       const words = countWords(editorToPlainText(ch.content));
       const itemId = `chapter:${ch.id}`;
       return {
@@ -104,7 +121,9 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
         },
       };
     });
+  }, [state.chapters, chapterLabel, isScreenplay, recentOpenedMap, setActiveChapter, onClose]);
 
+  const actionItems = useMemo((): SwitcherItem[] => {
     const actionItem = (id: string, title: string, icon: string, command: CommandId, shortcut?: string): SwitcherItem => ({
       id,
       type: 'action',
@@ -118,7 +137,7 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
       },
     });
 
-    const actionItems: SwitcherItem[] = [
+    return [
       actionItem('act-focus', 'Toggle Focus Mode', 'center_focus_strong', COMMAND_IDS.TOGGLE_FOCUS_MODE, 'Ctrl+Shift+F'),
       actionItem('act-sidebar', 'Toggle Sidebar', 'side_navigation', COMMAND_IDS.TOGGLE_SIDEBAR, 'Ctrl+Shift+B'),
       actionItem('act-export', 'Export...', 'download', COMMAND_IDS.EXPORT, 'Ctrl+Shift+E'),
@@ -130,48 +149,78 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
       actionItem('act-dark', 'True Dark', 'dark_mode', COMMAND_IDS.THEME_DARK),
       actionItem('act-light', 'Warm Light', 'light_mode', COMMAND_IDS.THEME_LIGHT),
     ];
+  }, [onAction, onClose, recentOpenedMap]);
 
-    return [...chapterItems, ...actionItems];
-  }, [state.chapters, chapterLabel, isScreenplay, setActiveChapter, onAction, onClose, recentOpenedMap]);
+  const searchResultItems = useMemo((): SwitcherItem[] => {
+    const index = buildChapterSearchIndex(state.chapters);
+    const matches = findChapterContentMatches(index, query, MAX_RESULTS);
 
-  // Filter + score items by query
+    return matches.map((match, idx) => ({
+      id: `search:${match.chapterId}:${match.match.start}:${idx}`,
+      type: 'search-result',
+      title: match.chapterTitle,
+      subtitle: `Match in ${chapterLabel.toLowerCase()} content`,
+      snippet: match.snippet,
+      icon: 'find_in_page',
+      lastOpenedAt: recentOpenedMap[`search-result:${match.chapterId}:${match.match.start}`],
+      action: () => {
+        setActiveChapter(match.chapterId);
+        onClose();
+      },
+    }));
+  }, [state.chapters, query, chapterLabel, recentOpenedMap, setActiveChapter, onClose]);
+
   const filteredItems = useMemo(() => {
-    const parsedQuery = parseQuery(query);
-    const typeFilteredItems = items.filter(item => parsedQuery.typeFilter === 'all' || item.type === parsedQuery.typeFilter);
+    const normalizedQuery = normalizeSearchText(query);
+    const allItems = {
+      chapter: chapterItems,
+      action: actionItems,
+      'search-result': searchResultItems,
+    };
 
-    if (!parsedQuery.text) {
-      return [...typeFilteredItems].sort((a, b) => {
-        const recentDiff = (b.lastOpenedAt ?? 0) - (a.lastOpenedAt ?? 0);
-        if (recentDiff !== 0) return recentDiff;
-        if (a.type !== b.type) return a.type === 'chapter' ? -1 : 1;
-        return a.title.localeCompare(b.title);
-      });
+    const typeFilteredItems = allItems[searchMode];
+
+    if (!normalizedQuery) {
+      return [...typeFilteredItems]
+        .sort((a, b) => {
+          const recentDiff = (b.lastOpenedAt ?? 0) - (a.lastOpenedAt ?? 0);
+          if (recentDiff !== 0) return recentDiff;
+          return a.title.localeCompare(b.title);
+        })
+        .slice(0, MAX_RESULTS);
+    }
+
+    if (searchMode === 'search-result') {
+      return typeFilteredItems.slice(0, MAX_RESULTS);
     }
 
     return typeFilteredItems
-      .map(item => ({ item, score: scoreItem(item, parsedQuery.text) }))
+      .map(item => ({ item, score: scoreItem(item, normalizedQuery) }))
       .filter(({ score }) => score > 0)
       .sort((a, b) => {
         if (b.score !== a.score) return b.score - a.score;
         return (b.item.lastOpenedAt ?? 0) - (a.item.lastOpenedAt ?? 0);
       })
-      .map(({ item }) => item);
-  }, [items, query]);
+      .map(({ item }) => item)
+      .slice(0, MAX_RESULTS);
+  }, [actionItems, chapterItems, query, searchMode, searchResultItems]);
 
   const runItemAction = useCallback((item: SwitcherItem) => {
+    const recentId = item.type === 'search-result' ? `search-result:${item.id}` : `${item.type}:${item.id}`;
     setRecentOpenedMap(prev => ({
       ...prev,
-      [`${item.type}:${item.id}`]: Date.now(),
+      [recentId]: Date.now(),
     }));
     item.action();
   }, []);
 
   useEffect(() => {
     setSelectedIndex(0);
-  }, [query]);
+  }, [query, searchMode]);
 
   useEffect(() => {
     if (open) {
+      setRawQuery('');
       setQuery('');
       setSelectedIndex(0);
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -185,6 +234,12 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
       selected.scrollIntoView({ block: 'nearest' });
     }
   }, [selectedIndex]);
+
+  const cycleSearchMode = useCallback(() => {
+    const currentIdx = MODE_ORDER.indexOf(searchMode);
+    const nextMode = MODE_ORDER[(currentIdx + 1) % MODE_ORDER.length];
+    updateSettings({ quickSwitcherMode: nextMode });
+  }, [searchMode, updateSettings]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     switch (e.key) {
@@ -202,12 +257,16 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
           runItemAction(filteredItems[selectedIndex]);
         }
         break;
+      case 'Tab':
+        e.preventDefault();
+        cycleSearchMode();
+        break;
       case 'Escape':
         e.preventDefault();
         onClose();
         break;
     }
-  }, [filteredItems, selectedIndex, onClose, runItemAction]);
+  }, [filteredItems, selectedIndex, onClose, runItemAction, cycleSearchMode]);
 
   if (!open) return null;
 
@@ -219,13 +278,14 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
           <input
             ref={inputRef}
             className={styles.input}
-            value={query}
-            onChange={e => setQuery(e.target.value)}
+            value={rawQuery}
+            onChange={e => setRawQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={`Jump to ${chapterLabel.toLowerCase()}, action... (@chapter @action)`}
+            placeholder={`Quick switch (${chapterLabel.toLowerCase()}, actions, content)`}
             autoComplete="off"
             spellCheck={false}
           />
+          <kbd className={styles.kbd}>Tab: {searchMode === 'action' ? 'Commands' : searchMode === 'chapter' ? chapterLabel + 's' : 'Content'}</kbd>
           <kbd className={styles.kbd}>Esc</kbd>
         </div>
         <div className={styles.list} ref={listRef}>
@@ -241,13 +301,17 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
               >
                 <span className={`material-symbols-rounded ${styles.itemIcon}`}>{item.icon}</span>
                 <div className={styles.itemContent}>
-                  <span className={styles.itemTitle}>{item.title}</span>
-                  {item.subtitle && <span className={styles.itemSubtitle}>{item.subtitle}</span>}
+                  <span className={styles.itemTitle}>{highlightMatch(item.title, query)}</span>
+                  {item.snippet ? (
+                    <span className={styles.itemSnippet}>{highlightMatch(item.snippet, query)}</span>
+                  ) : item.subtitle ? (
+                    <span className={styles.itemSubtitle}>{item.subtitle}</span>
+                  ) : null}
                 </div>
                 <div className={styles.itemMeta}>
                   {item.lastOpenedAt && <span className={styles.itemRecent}>Recent</span>}
                   {item.shortcut && <kbd className={styles.itemShortcut}>{item.shortcut}</kbd>}
-                  <span className={styles.itemType}>{item.type === 'chapter' ? chapterLabel : 'Action'}</span>
+                  <span className={styles.itemType}>{item.type === 'chapter' ? chapterLabel : item.type === 'search-result' ? 'Content' : 'Action'}</span>
                 </div>
               </button>
             ))

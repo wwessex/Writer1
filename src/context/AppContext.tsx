@@ -34,6 +34,7 @@ const defaultSettings: AppSettings = {
   sidebarHidden: isMobile, // Hidden by default on mobile
   pageView: true,
   focusMode: false,
+  quickSwitcherMode: 'chapter',
   typography: {
     fontFamily: 'system',
     fontSize: 16,
@@ -251,7 +252,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (saved) {
       try {
         const settings = JSON.parse(saved);
-        dispatch({ type: 'SET_SETTINGS', payload: settings });
+        dispatch({ type: 'SET_SETTINGS', payload: { ...defaultSettings, ...settings } });
       } catch (e) {
         console.error('Failed to load settings:', e);
       }

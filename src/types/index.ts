@@ -119,6 +119,7 @@ export interface AppSettings {
   sidebarHidden: boolean;
   pageView: boolean;
   focusMode: boolean;
+  quickSwitcherMode: 'chapter' | 'action' | 'search-result';
   typography: TypographySettings;
   onboardingComplete: boolean;
 }
