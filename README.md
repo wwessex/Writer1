@@ -31,6 +31,52 @@ Right-click `index.html` → Open with Live Server.
 ## Install (PWA)
 In Chrome/Edge/Safari (iOS): use "Add to Home Screen" / "Install App".
 
+
+## iOS Native App (Capacitor)
+
+This project now includes Capacitor configuration so the web app can run as a native iOS app.
+
+### Prerequisites
+- macOS with Xcode installed
+- CocoaPods (`sudo gem install cocoapods` if needed)
+
+### Build and sync web assets to native projects
+```bash
+npm run build:native
+```
+
+### Open in Xcode
+```bash
+npm run cap:open:ios
+```
+
+From Xcode, select a simulator/device and run the app.
+
+### Daily workflow
+After web code changes, re-run:
+```bash
+npm run build:native
+```
+
+### Capacitor health check
+If native tooling seems out of sync, run:
+```bash
+npm run cap:doctor
+```
+
+### About iOS icon/splash image files in git
+To keep PR tooling compatible in environments that reject binary files, the repo tracks only the asset catalog metadata (`Contents.json`) for iOS app icons/splash.
+
+After opening in Xcode, add your final icon/splash images in:
+- `ios/App/App/Assets.xcassets/AppIcon.appiconset/`
+- `ios/App/App/Assets.xcassets/Splash.imageset/`
+
+### If GitHub mobile shows “Error creating pull request (400)”
+That error is usually a GitHub client/API issue (not a Capacitor project issue). Workarounds:
+- Refresh and retry after pushing the branch again.
+- Create the PR from github.com in a desktop/mobile browser instead of the GitHub mobile app.
+- Use GitHub CLI: `gh pr create --fill`.
+
 ## Data
 Saved locally in your browser (IndexedDB). Use **Settings → Export Backup** for a JSON backup.
 
