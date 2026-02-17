@@ -93,11 +93,12 @@ function loadConfigs(): IntegrationConfigs {
     const parsed = JSON.parse(data) as Partial<Record<IntegrationType, Partial<IntegrationConfig>>>;
     const scrubSecrets = (raw?: Partial<IntegrationConfig>): Partial<IntegrationConfig> => {
       if (!raw) return {};
-      const { accessToken: _legacyAccessToken, refreshToken: _legacyRefreshToken, apiKey: _legacyApiKey, ...safe } = raw as Partial<IntegrationConfig> & {
+      const { accessToken: _a, refreshToken: _r, apiKey: _k, ...safe } = raw as Partial<IntegrationConfig> & {
         accessToken?: string;
         refreshToken?: string;
         apiKey?: string;
       };
+      void _a; void _r; void _k;
       return safe;
     };
 
