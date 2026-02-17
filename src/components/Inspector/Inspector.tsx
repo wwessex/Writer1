@@ -1,9 +1,10 @@
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Input, Textarea, Button, IconButton } from '@/components/UI';
 import { Select } from '@/components/UI/Select';
 import { countWords, countSentences, countParagraphs, countCharacters, editorToPlainText } from '@/lib/utils';
 import { useResizable } from '@/hooks/useResizable';
+import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 import type { ChapterStatus, Scene } from '@/types';
 import styles from './Inspector.module.css';
 
@@ -22,6 +23,8 @@ interface InspectorProps {
 export function Inspector({ open, onClose }: InspectorProps) {
   const { state, activeChapter, updateChapterImmediate, addScene, updateScene, deleteScene } = useApp();
   const [activeTab, setActiveTab] = useState<'details' | 'scenes' | 'notes'>('details');
+
+  const inspectorRef = useRef<HTMLElement | null>(null);
 
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -67,6 +70,14 @@ export function Inspector({ open, onClose }: InspectorProps) {
     updateScene(activeChapter.id, sceneId, updates);
   }, [activeChapter, updateScene]);
 
+  const isMobileDialogOpen = open && isMobile;
+
+  useModalAccessibility({
+    enabled: isMobileDialogOpen,
+    onRequestClose: onClose,
+    containerRef: inspectorRef,
+  });
+
   if (!open) return null;
 
   const tabs = isScreenplay
@@ -85,9 +96,12 @@ export function Inspector({ open, onClose }: InspectorProps) {
     <>
       <div className={styles.backdrop} onClick={onClose} aria-hidden="true" />
       <aside
+        ref={inspectorRef}
         className={styles.inspector}
-        role="complementary"
+        role={isMobileDialogOpen ? 'dialog' : 'complementary'}
+        aria-modal={isMobileDialogOpen ? 'true' : undefined}
         aria-label="Inspector"
+        tabIndex={isMobileDialogOpen ? -1 : undefined}
         style={!isMobile ? { width: size } : undefined}
       >
         {!isMobile && (
@@ -97,10 +111,15 @@ export function Inspector({ open, onClose }: InspectorProps) {
           />
         )}
         <div className={styles.header}>
-          <div className={styles.tabs}>
+          <div className={styles.tabs} role="tablist" aria-label="Inspector sections">
             {tabs.map(tab => (
               <button
                 key={tab.key}
+                id={`inspector-tab-${tab.key}`}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab.key}
+                aria-controls={`inspector-panel-${tab.key}`}
                 className={`${styles.tab} ${activeTab === tab.key ? styles['tab--active'] : ''}`}
                 onClick={() => setActiveTab(tab.key)}
               >
@@ -122,7 +141,12 @@ export function Inspector({ open, onClose }: InspectorProps) {
             <>
               {/* CHAPTER / SCENE METADATA TAB */}
               {activeTab === 'details' && (
-                <div className={styles.section}>
+                <div
+                  className={styles.section}
+                  role="tabpanel"
+                  id="inspector-panel-details"
+                  aria-labelledby="inspector-tab-details"
+                >
                   {/* Word count card */}
                   <div className={styles.statsCard}>
                     <div className={styles.stat}>
@@ -237,7 +261,12 @@ export function Inspector({ open, onClose }: InspectorProps) {
 
               {/* SCENES TAB — context-sensitive scene fields */}
               {activeTab === 'scenes' && (
-                <div className={styles.section}>
+                <div
+                  className={styles.section}
+                  role="tabpanel"
+                  id="inspector-panel-scenes"
+                  aria-labelledby="inspector-tab-scenes"
+                >
                   {(activeChapter.scenes || []).map(scene => (
                     <div key={scene.id} className={styles.sceneCard}>
                       <div className={styles.sceneCardHeader}>
@@ -328,7 +357,12 @@ export function Inspector({ open, onClose }: InspectorProps) {
 
               {/* NOTES TAB — rich notes + synopsis */}
               {activeTab === 'notes' && (
-                <div className={styles.section}>
+                <div
+                  className={styles.section}
+                  role="tabpanel"
+                  id="inspector-panel-notes"
+                  aria-labelledby="inspector-tab-notes"
+                >
                   <div className={styles.field}>
                     <label className={styles.fieldLabel}>Synopsis</label>
                     <Textarea
