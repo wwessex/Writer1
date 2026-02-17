@@ -2,6 +2,12 @@ import Dexie, { type EntityTable } from 'dexie';
 import type { Novel, Chapter, Snapshot, BackupData, BackupDataV3, LegacyBackupData, ProjectType, CommentThread, DhprojData, DhprojManifest, AppSettings, CharacterEntity, WorldEntry, DhprojIntegrations, IntegrationType, PersistedIntegrationConfig } from '@/types';
 import type { ProgressData, DailyProgress } from '@/lib/progressTracker';
 import { generateId } from '@/lib/utils';
+import {
+  COMMENT_THREADS_STORAGE_PREFIX,
+  INTEGRATIONS_STORAGE_KEY,
+  PROGRESS_STORAGE_KEY,
+  SETTINGS_STORAGE_KEY
+} from '@/lib/storageKeys';
 
 const CURRENT_BACKUP_VERSION = 3;
 const GOAL_TREND_STORAGE_KEY = 'draftharbour_goal_trends_v1';
@@ -14,12 +20,8 @@ export interface GoalTrendSnapshot {
   goalMet: boolean;
 }
 
-const COMMENT_THREADS_STORAGE_PREFIX = 'draftharbour_comment_threads_';
-const SETTINGS_STORAGE_KEY = 'draftharbour_settings_v1';
-const PROGRESS_STORAGE_KEY = 'draftharbour_progress_v1';
 const CHARACTERS_STORAGE_KEY = 'draftharbour_characters';
 const WORLD_ENTRIES_STORAGE_KEY = 'draftharbour_world';
-const INTEGRATIONS_STORAGE_KEY = 'draftharbour_integrations';
 const ALLOWED_INTEGRATION_TYPES: IntegrationType[] = ['scrivener', 'google-drive', 'dropbox'];
 const SUPPORTED_DHPROJ_VERSIONS = new Set<number>([1]);
 

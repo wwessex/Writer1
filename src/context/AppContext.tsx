@@ -12,6 +12,7 @@ import type { Chapter, Novel, AppSettings, AppState, Scene, ProjectType, Sidebar
 import * as storage from '@/lib/storage';
 import { debounce, generateId } from '@/lib/utils';
 import { loadSettingsFromStorage, createSettingsEnvelope } from '@/lib/settingsMigration';
+import { SETTINGS_STORAGE_KEY } from '@/lib/storageKeys';
 
 // Check if mobile viewport (matches the CSS breakpoint)
 const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches;
@@ -268,9 +269,6 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | null>(null);
 
-// Settings storage key
-const SETTINGS_KEY = 'draftharbour_settings_v1';
-
 // Provider component
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
@@ -295,7 +293,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Load settings from localStorage
   useEffect(() => {
     try {
-      const loadedSettings = loadSettingsFromStorage(localStorage.getItem(SETTINGS_KEY), defaultSettings);
+      const loadedSettings = loadSettingsFromStorage(localStorage.getItem(SETTINGS_STORAGE_KEY), defaultSettings);
       dispatch({ type: 'SET_SETTINGS', payload: loadedSettings });
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -319,7 +317,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Save settings to localStorage
   useEffect(() => {
     try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(createSettingsEnvelope(state.settings)));
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(createSettingsEnvelope(state.settings)));
     } catch (error) {
       console.error('Failed to persist settings:', error);
     }
