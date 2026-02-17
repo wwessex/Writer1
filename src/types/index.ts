@@ -319,12 +319,11 @@ export interface IntegrationConfig {
   lastSyncAt?: number;
   accessToken?: string;
   refreshToken?: string;
-  clientId?: string;
 }
 
 export type PersistedIntegrationConfig = Pick<
   IntegrationConfig,
-  'type' | 'enabled' | 'connectionId' | 'providerUserId' | 'scopes' | 'expiresAt' | 'status' | 'folderId' | 'lastSyncAt' | 'accessToken' | 'refreshToken' | 'clientId'
+  'type' | 'enabled' | 'connectionId' | 'providerUserId' | 'scopes' | 'expiresAt' | 'status' | 'folderId' | 'lastSyncAt' | 'accessToken' | 'refreshToken'
 >;
 
 export type DhprojIntegrations = Partial<Record<IntegrationType, PersistedIntegrationConfig>>;
