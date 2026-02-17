@@ -167,18 +167,38 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
     return selected.slice(0, 5);
   }, [aiConfigured, hasNoChapterContent, hasTextSelection]);
 
-  const handleClickOutside = useCallback((e: MouseEvent) => {
-    if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+  // Track whether a touch moved (scrolled) so we don't close the menu on scroll
+  const touchMovedRef = useRef(false);
+
+  const handleTouchStart = useCallback(() => {
+    touchMovedRef.current = false;
+  }, []);
+
+  const handleTouchMove = useCallback(() => {
+    touchMovedRef.current = true;
+  }, []);
+
+  const handleClickOutside = useCallback((e: MouseEvent | TouchEvent) => {
+    // Ignore if this was a scroll gesture, not a tap
+    if (touchMovedRef.current) return;
+    const target = ('touches' in e) ? e.target : e.target;
+    if (mobileMenuRef.current && !mobileMenuRef.current.contains(target as Node)) {
       setMobileMenuOpen(false);
     }
   }, []);
 
   useEffect(() => {
     if (mobileMenuOpen) {
+      document.addEventListener('touchstart', handleTouchStart, { passive: true });
+      document.addEventListener('touchmove', handleTouchMove, { passive: true });
       document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
+      return () => {
+        document.removeEventListener('touchstart', handleTouchStart);
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('click', handleClickOutside);
+      };
     }
-  }, [mobileMenuOpen, handleClickOutside]);
+  }, [mobileMenuOpen, handleClickOutside, handleTouchStart, handleTouchMove]);
 
   return (
     <header className={styles.header}>

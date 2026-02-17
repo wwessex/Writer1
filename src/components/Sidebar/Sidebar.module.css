@@ -59,6 +59,8 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .sidebar__undoBar {

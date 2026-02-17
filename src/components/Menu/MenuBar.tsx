@@ -134,7 +134,20 @@ export function MenuBar({ onAction }: MenuBarProps) {
     onAction?.(action);
   };
 
+  // Track whether a touch moved (scrolled) so we don't close the menu on scroll
+  const touchMovedRef = useRef(false);
+
+  const handleTouchStart = useCallback(() => {
+    touchMovedRef.current = false;
+  }, []);
+
+  const handleTouchMove = useCallback(() => {
+    touchMovedRef.current = true;
+  }, []);
+
   const handleClickOutside = useCallback((e: MouseEvent) => {
+    // Ignore if this was a scroll gesture, not a tap
+    if (touchMovedRef.current) return;
     if (menuBarRef.current && !menuBarRef.current.contains(e.target as Node)) {
       setOpenMenu(null);
     }
@@ -142,10 +155,16 @@ export function MenuBar({ onAction }: MenuBarProps) {
 
   useEffect(() => {
     if (openMenu) {
+      document.addEventListener('touchstart', handleTouchStart, { passive: true });
+      document.addEventListener('touchmove', handleTouchMove, { passive: true });
       document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
+      return () => {
+        document.removeEventListener('touchstart', handleTouchStart);
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('click', handleClickOutside);
+      };
     }
-  }, [openMenu, handleClickOutside]);
+  }, [openMenu, handleClickOutside, handleTouchStart, handleTouchMove]);
 
   return (
     <nav className={styles.menuBar} ref={menuBarRef} role="menubar" aria-label="Main menu">
