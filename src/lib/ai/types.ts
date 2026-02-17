@@ -53,11 +53,21 @@ export interface AIResponse {
 /*  Availability                                                       */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Normalised availability status.
+ *
+ * Chrome ≤ 137 returned  'readily' | 'after-download' | 'no'.
+ * Chrome 138+ returns    'available' | 'downloadable' | 'downloading' | 'unavailable'.
+ *
+ * We normalise both sets into the new vocabulary so the rest of the app
+ * only needs to check the current values.
+ */
 export type AvailabilityStatus =
-  | 'readily'        // Ready to use immediately
-  | 'after-download' // Available after model download
-  | 'no'            // Not available on this platform / browser
-  | 'unknown';      // Cannot determine
+  | 'available'      // Ready to use immediately  (was 'readily')
+  | 'downloadable'   // Available after model download (was 'after-download')
+  | 'downloading'    // Model download in progress (new in Chrome 138)
+  | 'unavailable'    // Not available on this platform / browser (was 'no')
+  | 'unknown';       // Cannot determine
 
 export interface ChromeAIAvailability {
   languageModel: AvailabilityStatus;

@@ -1,32 +1,68 @@
 /**
  * Chrome Built-in AI feature detection.
  *
- * Each API exposes a static `availability()` method that returns
- * 'readily' | 'after-download' | 'no'. We wrap these in a safe
- * helper that returns 'no' when the global doesn't exist (i.e. the
- * browser does not support the API at all).
+ * Chrome ≤ 137 exposed `availability()` returning 'readily' | 'after-download' | 'no'.
+ * Chrome 138+ changed to 'available' | 'downloadable' | 'downloading' | 'unavailable'.
+ *
+ * We accept both old and new values and normalise them into the current
+ * vocabulary so the rest of the app only needs to handle one set.
+ *
+ * APIs are checked first as top-level globals (LanguageModel, Summarizer,
+ * Writer, Rewriter) and then via the `self.ai` namespace as a fallback,
+ * since some Chrome builds expose them there instead.
  */
 
 import type { AvailabilityStatus, ChromeAIAvailability } from './types';
 
 /* ------------------------------------------------------------------ */
+/*  Normalisation map — old values → new vocabulary                    */
+/* ------------------------------------------------------------------ */
+
+const NORMALISE: Record<string, AvailabilityStatus> = {
+  // New values (Chrome 138+)
+  available: 'available',
+  downloadable: 'downloadable',
+  downloading: 'downloading',
+  unavailable: 'unavailable',
+  // Legacy values (Chrome ≤ 137)
+  readily: 'available',
+  'after-download': 'downloadable',
+  no: 'unavailable',
+};
+
+/* ------------------------------------------------------------------ */
 /*  Internal helpers                                                   */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Resolve an API object by name, trying the top-level global first and
+ * then the `self.ai` namespace (e.g. `self.ai.languageModel`).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function resolveAPI(globalName: string): any {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const top = (globalThis as any)[globalName];
+  if (top) return top;
+
+  // Fallback: self.ai namespace uses camelCase names
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ai = (globalThis as any).ai ?? (typeof self !== 'undefined' ? (self as any).ai : undefined);
+  if (!ai) return undefined;
+
+  const camelName = globalName.charAt(0).toLowerCase() + globalName.slice(1);
+  return ai[camelName] ?? undefined;
+}
+
 async function checkAPI(globalName: string): Promise<AvailabilityStatus> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const api = (globalThis as any)[globalName];
+    const api = resolveAPI(globalName);
     if (!api || typeof api.availability !== 'function') {
-      return 'no';
+      return 'unavailable';
     }
     const result: string = await api.availability();
-    if (result === 'readily' || result === 'after-download' || result === 'no') {
-      return result as AvailabilityStatus;
-    }
-    return 'unknown';
+    return NORMALISE[result] ?? 'unknown';
   } catch {
-    return 'no';
+    return 'unavailable';
   }
 }
 
@@ -49,6 +85,6 @@ export async function checkChromeAIAvailability(): Promise<ChromeAIAvailability>
 export async function isChromeAIAvailable(): Promise<boolean> {
   const result = await checkChromeAIAvailability();
   return Object.values(result).some(
-    (s) => s === 'readily' || s === 'after-download',
+    (s) => s === 'available' || s === 'downloadable' || s === 'downloading',
   );
 }

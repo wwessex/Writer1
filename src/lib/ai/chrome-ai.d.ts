@@ -1,8 +1,13 @@
 /**
  * TypeScript declarations for Chrome Built-in AI APIs.
  *
- * These APIs are available in Chrome 137+ on supported platforms
+ * These APIs are available in Chrome 138+ (stable) on supported platforms
  * (macOS 13+, Windows 10+, Linux). They run Gemini Nano on-device.
+ *
+ * Chrome ≤ 137 returned 'readily' | 'after-download' | 'no' from availability().
+ * Chrome 138+ returns  'available' | 'downloadable' | 'downloading' | 'unavailable'.
+ *
+ * We declare the union of both sets so the code compiles against any version.
  *
  * @see https://developer.chrome.com/docs/ai/built-in-apis
  */
@@ -10,6 +15,16 @@
 /* ------------------------------------------------------------------ */
 /*  Shared                                                             */
 /* ------------------------------------------------------------------ */
+
+/** Return type of availability() — union of old (≤ 137) and new (138+) values. */
+type ChromeAIAvailabilityResult =
+  | 'readily'        // Legacy (≤ 137): ready immediately
+  | 'after-download' // Legacy (≤ 137): needs download
+  | 'no'             // Legacy (≤ 137): not available
+  | 'available'      // 138+: ready immediately
+  | 'downloadable'   // 138+: needs download
+  | 'downloading'    // 138+: download in progress
+  | 'unavailable';   // 138+: not available
 
 interface AICreateMonitor {
   addEventListener(
@@ -28,6 +43,10 @@ interface LanguageModelCreateOptions {
   topK?: number;
   signal?: AbortSignal;
   monitor?: (monitor: AICreateMonitor) => void;
+  /** Chrome 140+: declare expected input modalities / languages. */
+  expectedInputs?: Array<{ type: string; languages?: string[] }>;
+  /** Chrome 140+: declare expected output modalities / languages. */
+  expectedOutputs?: Array<{ type: string; languages?: string[] }>;
 }
 
 interface LanguageModelSession {
@@ -40,7 +59,7 @@ interface LanguageModelSession {
 }
 
 interface LanguageModelAPI {
-  availability(): Promise<'readily' | 'after-download' | 'no'>;
+  availability(options?: Record<string, unknown>): Promise<ChromeAIAvailabilityResult>;
   create(options?: LanguageModelCreateOptions): Promise<LanguageModelSession>;
 }
 
@@ -67,7 +86,7 @@ interface SummarizerSession {
 }
 
 interface SummarizerAPI {
-  availability(): Promise<'readily' | 'after-download' | 'no'>;
+  availability(options?: Record<string, unknown>): Promise<ChromeAIAvailabilityResult>;
   create(options?: SummarizerCreateOptions): Promise<SummarizerSession>;
 }
 
@@ -94,7 +113,7 @@ interface WriterSession {
 }
 
 interface WriterAPI {
-  availability(): Promise<'readily' | 'after-download' | 'no'>;
+  availability(options?: Record<string, unknown>): Promise<ChromeAIAvailabilityResult>;
   create(options?: WriterCreateOptions): Promise<WriterSession>;
 }
 
@@ -121,7 +140,7 @@ interface RewriterSession {
 }
 
 interface RewriterAPI {
-  availability(): Promise<'readily' | 'after-download' | 'no'>;
+  availability(options?: Record<string, unknown>): Promise<ChromeAIAvailabilityResult>;
   create(options?: RewriterCreateOptions): Promise<RewriterSession>;
 }
 
