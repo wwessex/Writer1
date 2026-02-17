@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { Novel, Chapter, Snapshot, BackupData, BackupDataV3, LegacyBackupData, ProjectType, CommentThread, DhprojData, DhprojManifest, AppSettings, CharacterEntity, WorldEntry } from '@/types';
+import type { ProgressData, DailyProgress } from '@/lib/progressTracker';
 import { generateId } from '@/lib/utils';
 
 const CURRENT_BACKUP_VERSION = 3;
@@ -15,6 +16,7 @@ export interface GoalTrendSnapshot {
 
 const COMMENT_THREADS_STORAGE_PREFIX = 'draftharbour_comment_threads_';
 const SETTINGS_STORAGE_KEY = 'draftharbour_settings_v1';
+const PROGRESS_STORAGE_KEY = 'draftharbour_progress_v1';
 const CHARACTERS_STORAGE_KEY = 'draftharbour_characters';
 const WORLD_ENTRIES_STORAGE_KEY = 'draftharbour_world';
 const SUPPORTED_DHPROJ_VERSIONS = new Set<number>([1]);
@@ -460,6 +462,90 @@ export async function clearAllData(): Promise<void> {
     .forEach(key => localStorage.removeItem(key));
 }
 
+
+function isDailyProgress(entry: unknown): entry is DailyProgress {
+  if (!entry || typeof entry !== 'object') return false;
+
+  const candidate = entry as Partial<DailyProgress>;
+  return (
+    typeof candidate.date === 'string' &&
+    typeof candidate.wordsWritten === 'number' &&
+    Number.isFinite(candidate.wordsWritten) &&
+    typeof candidate.wordsAtStart === 'number' &&
+    Number.isFinite(candidate.wordsAtStart) &&
+    typeof candidate.goalMet === 'boolean' &&
+    typeof candidate.sessions === 'number' &&
+    Number.isFinite(candidate.sessions)
+  );
+}
+
+function isWritingStreak(streak: unknown): streak is ProgressData['streak'] {
+  if (!streak || typeof streak !== 'object') return false;
+
+  const candidate = streak as Partial<ProgressData['streak']>;
+  return (
+    typeof candidate.current === 'number' &&
+    Number.isFinite(candidate.current) &&
+    typeof candidate.longest === 'number' &&
+    Number.isFinite(candidate.longest) &&
+    typeof candidate.lastActiveDate === 'string'
+  );
+}
+
+function isProgressData(progress: unknown): progress is ProgressData {
+  if (!progress || typeof progress !== 'object') return false;
+
+  const candidate = progress as Partial<ProgressData>;
+  return (
+    Array.isArray(candidate.dailyHistory) &&
+    candidate.dailyHistory.every(isDailyProgress) &&
+    isWritingStreak(candidate.streak) &&
+    typeof candidate.totalSessions === 'number' &&
+    Number.isFinite(candidate.totalSessions) &&
+    typeof candidate.totalWordsAllTime === 'number' &&
+    Number.isFinite(candidate.totalWordsAllTime)
+  );
+}
+
+function mergeProgressData(localProgress: ProgressData, importedProgress: ProgressData): ProgressData {
+  const mergedByDate = new Map<string, DailyProgress>();
+
+  for (const entry of importedProgress.dailyHistory) {
+    mergedByDate.set(entry.date, entry);
+  }
+
+  for (const entry of localProgress.dailyHistory) {
+    const existing = mergedByDate.get(entry.date);
+    if (!existing) {
+      mergedByDate.set(entry.date, entry);
+      continue;
+    }
+
+    mergedByDate.set(entry.date, {
+      date: entry.date,
+      wordsWritten: Math.max(existing.wordsWritten, entry.wordsWritten),
+      wordsAtStart: Math.min(existing.wordsAtStart, entry.wordsAtStart),
+      goalMet: existing.goalMet || entry.goalMet,
+      sessions: Math.max(existing.sessions, entry.sessions),
+    });
+  }
+
+  const dailyHistory = Array.from(mergedByDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+  return {
+    dailyHistory,
+    streak: {
+      current: Math.max(importedProgress.streak.current, localProgress.streak.current),
+      longest: Math.max(importedProgress.streak.longest, localProgress.streak.longest),
+      lastActiveDate: importedProgress.streak.lastActiveDate > localProgress.streak.lastActiveDate
+        ? importedProgress.streak.lastActiveDate
+        : localProgress.streak.lastActiveDate,
+    },
+    totalSessions: Math.max(importedProgress.totalSessions, localProgress.totalSessions),
+    totalWordsAllTime: Math.max(importedProgress.totalWordsAllTime, localProgress.totalWordsAllTime),
+  };
+}
+
 // Project file (.dhproj) operations
 export async function exportDhproj(novelId: string): Promise<Blob> {
   const novel = await getNovel(novelId);
@@ -479,6 +565,17 @@ export async function exportDhproj(novelId: string): Promise<Blob> {
 
   // Read goal trends
   const goalTrends = loadGoalTrendSnapshots();
+
+  let progress: ProgressData | undefined;
+  try {
+    const raw = localStorage.getItem(PROGRESS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (isProgressData(parsed)) {
+        progress = parsed;
+      }
+    }
+  } catch { /* ignore parse errors */ }
 
   const characters = loadStoredEntities<CharacterEntity>(CHARACTERS_STORAGE_KEY)
     .filter(isCharacterEntity)
@@ -503,6 +600,7 @@ export async function exportDhproj(novelId: string): Promise<Blob> {
     commentThreads,
     settings,
     goalTrends,
+    progress,
     characters,
     worldEntries,
   };
@@ -581,6 +679,9 @@ export async function importDhproj(file: File): Promise<Novel> {
   }
   if (candidate.worldEntries !== undefined && !Array.isArray(candidate.worldEntries)) {
     throw new Error('Invalid .dhproj file: malformed payload (worldEntries must be an array)');
+  }
+  if (candidate.progress !== undefined && !isProgressData(candidate.progress)) {
+    throw new Error('Invalid .dhproj file: malformed payload (progress shape is invalid)');
   }
 
   const data = candidate as DhprojData;
@@ -690,6 +791,25 @@ export async function importDhproj(file: File): Promise<Novel> {
         upsertGoalTrendSnapshot(entry as GoalTrendSnapshot);
       }
     }
+  }
+
+  // Restore writing progress if present (older .dhproj files may not include this field)
+  if (data.progress) {
+    try {
+      const existingRaw = localStorage.getItem(PROGRESS_STORAGE_KEY);
+      const existingParsed = existingRaw ? JSON.parse(existingRaw) : undefined;
+      const localProgress = isProgressData(existingParsed)
+        ? existingParsed
+        : {
+            dailyHistory: [],
+            streak: { current: 0, longest: 0, lastActiveDate: '' },
+            totalSessions: 0,
+            totalWordsAllTime: 0,
+          };
+
+      const mergedProgress = mergeProgressData(localProgress, data.progress);
+      localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(mergedProgress));
+    } catch { /* ignore parse errors */ }
   }
 
   return novel;
