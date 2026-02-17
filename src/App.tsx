@@ -24,11 +24,9 @@ import { ToastProvider, useToast } from '@/components/UI';
 import { Tooltip } from '@/components/UI/Tooltip';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useModalState } from '@/hooks/useModalState';
-import { exportBackup, importBackup, exportDhproj, importDhproj, createChapter, addChapter, upsertCommentThread } from '@/lib/storage';
-import { importFile, mapImportedContentToProjectType } from '@/lib/import';
-import { downloadFile, generateId } from '@/lib/utils';
-import { COMMAND_IDS, type CommandId, runCommand } from '@/lib/commands';
-import type { CommentThread } from '@/types';
+import { useProjectFileActions } from '@/hooks/useProjectFileActions';
+import { useCommentActions } from '@/hooks/useCommentActions';
+import { useAppKeyboardShortcuts } from '@/hooks/useAppKeyboardShortcuts';
 import './styles/index.css';
 import styles from './App.module.css';
 
@@ -62,9 +60,16 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
   const [hasTextSelection, setHasTextSelection] = useState(false);
   const findReplace = useFindReplace(editor);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const importInputRef = useRef<HTMLInputElement>(null);
-  const projectFileInputRef = useRef<HTMLInputElement>(null);
+  const {
+    fileInputRef,
+    importInputRef,
+    projectFileInputRef,
+    handleExportBackup,
+    handleSaveProjectFile,
+    handleOpenProjectFile,
+    handleImportBackup,
+    handleImportDocument,
+  } = useProjectFileActions({ state, loadNovel, showToast });
 
   // Load novel on mount
   useEffect(() => {
@@ -112,277 +117,37 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
     };
   }, [editor]);
 
-  // Export backup
-  const handleExportBackup = useCallback(async () => {
-    try {
-      const backup = await exportBackup(state.novelId, true);
-      const json = JSON.stringify(backup, null, 2);
-      downloadFile(json, `${state.novelTitle}-backup.json`);
-      showToast('Backup exported successfully', 'success', 'download_done');
-    } catch (err) {
-      console.error('Backup export failed:', err);
-      showToast('Failed to export backup', 'error');
-    }
-  }, [state.novelId, state.novelTitle, showToast]);
-
-  // Save project file (.dhproj)
-  const handleSaveProjectFile = useCallback(async () => {
-    try {
-      const blob = await exportDhproj(state.novelId);
-      downloadFile(blob, `${state.novelTitle}.dhproj`);
-      showToast('Project file saved', 'success', 'save');
-    } catch (err) {
-      console.error('Project file save failed:', err);
-      showToast('Failed to save project file', 'error');
-    }
-  }, [state.novelId, state.novelTitle, showToast]);
-
-  // Open project file (.dhproj)
-  const handleOpenProjectFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      await importDhproj(file);
-      showToast('Project file opened successfully. Reloading...', 'success');
-      setTimeout(() => window.location.reload(), 1000);
-    } catch (err) {
-      console.error('Project file open failed:', err);
-      showToast('Failed to open project file. Check the file format.', 'error');
-    }
-
-    e.target.value = '';
-  };
-
-  // Import backup
-  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      const backup = JSON.parse(text);
-      await importBackup(backup);
-      showToast('Backup imported successfully. Reloading...', 'success');
-      setTimeout(() => window.location.reload(), 1000);
-    } catch (err) {
-      console.error('Backup import failed:', err);
-      showToast('Failed to import backup. Check the file format.', 'error');
-    }
-
-    e.target.value = '';
-  };
-
-  // Import document
-  const handleImportDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const result = await importFile(file);
-
-      for (let i = 0; i < result.sections.length; i++) {
-        const importedSection = result.sections[i];
-        const chapter = createChapter(
-          state.novelId,
-          state.chapters.length + i,
-          importedSection.title,
-          state.projectType
-        );
-        chapter.content = mapImportedContentToProjectType(importedSection.content, state.projectType);
-        await addChapter(chapter);
-      }
-
-      const sectionLabel = state.projectType === 'screenplay' ? 'scene' : 'chapter';
-      showToast(
-        `Imported ${result.sections.length} ${sectionLabel}${result.sections.length !== 1 ? 's' : ''}`,
-        'success',
-        'upload_file'
-      );
-
-      if (result.notices.length > 0) {
-        const firstNotice = result.notices[0];
-        showToast(
-          `Imported with ${result.notices.length} note${result.notices.length !== 1 ? 's' : ''}: ${firstNotice.message}`,
-          'info'
-        );
-      }
-
-      await loadNovel();
-    } catch (err) {
-      console.error('Document import failed:', err);
-      showToast('Failed to import document. Check the file format.', 'error');
-    }
-
-    e.target.value = '';
-  };
-
   const handleOnboardingClose = useCallback(() => {
     closeModal('onboarding');
     updateSettings({ onboardingComplete: true });
   }, [closeModal, updateSettings]);
 
-  const createCommentFromSelection = useCallback(() => {
-    if (!editor || !activeChapter) {
-      showToast('Select a chapter and text to add a comment', 'warning');
-      return;
-    }
+  const { createCommentFromSelection } = useCommentActions({
+    editor,
+    activeChapter,
+    openModal: (id) => openModal(id),
+    showToast,
+  });
 
-    const { from, to, empty } = editor.state.selection;
-    if (empty) {
-      showToast('Select text to anchor a comment', 'warning');
-      return;
-    }
-
-    const selectedText = editor.state.doc.textBetween(from, to, ' ').trim();
-    const text = window.prompt('Comment for selected text:');
-    if (!text || !text.trim()) return;
-
-    const threadId = generateId();
-    const now = Date.now();
-    const thread: CommentThread = {
-      id: threadId,
-      chapterId: activeChapter.id,
-      anchor: {
-        from,
-        to,
-        length: Math.max(to - from, 0),
-        selectedText: selectedText || undefined,
-      },
-      resolved: false,
-      createdAt: now,
-      updatedAt: now,
-      comments: [
-        {
-          id: generateId(),
-          text: text.trim(),
-          author: 'Author',
-          createdAt: now,
-        }
-      ],
-    };
-
-    const marked = editor.chain().focus().setCommentAnchor({ threadId, state: 'open' }).run();
-    if (!marked) {
-      showToast('Unable to create comment on current selection', 'error');
-      return;
-    }
-
-    upsertCommentThread(thread);
-    openModal('comments');
-    showToast('Comment added', 'success', 'add_comment');
-  }, [activeChapter, editor, openModal, showToast]);
-
-
-  // Handle menu actions
-  const handleMenuAction = useCallback((action: CommandId) => {
-    runCommand(action, {
-      editor,
-      fileInputRef,
-      importInputRef,
-      projectFileInputRef,
-      createChapter: createNewChapter,
-      handleExportBackup,
-      handleSaveProjectFile,
-      openModal,
-      toggleModal,
-      toggleInspector: () => setInspectorOpen(prev => !prev),
-      openQuickSwitcher: () => setQuickSwitcherOpen(true),
-      toggleSidebar: () => dispatch({ type: 'TOGGLE_SIDEBAR' }),
-      togglePageView: () => dispatch({ type: 'TOGGLE_PAGE_VIEW' }),
-      toggleFocusMode: () => dispatch({ type: 'TOGGLE_FOCUS_MODE' }),
-      toggleTypewriterMode: () => updateSettings({ typewriterMode: !state.settings.typewriterMode }),
-      setTheme: (theme) => dispatch({ type: 'SET_THEME', payload: theme }),
-      showToast,
-      createCommentFromSelection,
-    });
-  }, [createCommentFromSelection, createNewChapter, dispatch, editor, handleExportBackup, handleSaveProjectFile, openModal, toggleModal, showToast, updateSettings, state.settings.typewriterMode]);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Find: Ctrl/Cmd+F (no shift)
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f' && !e.shiftKey) {
-        e.preventDefault();
-        findReplace.open(false);
-        return;
-      }
-
-      // Find & Replace: Ctrl/Cmd+H
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'h' && !e.shiftKey) {
-        e.preventDefault();
-        findReplace.open(true);
-        return;
-      }
-
-      // Save Project File: Ctrl/Cmd+S
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && !e.shiftKey) {
-        e.preventDefault();
-        handleMenuAction(COMMAND_IDS.SAVE_PROJECT_FILE);
-        return;
-      }
-
-      // Open Project File: Ctrl/Cmd+O
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o' && !e.shiftKey) {
-        e.preventDefault();
-        handleMenuAction(COMMAND_IDS.OPEN_PROJECT_FILE);
-        return;
-      }
-
-      // Quick Switcher: Ctrl/Cmd+K
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && !e.shiftKey) {
-        e.preventDefault();
-        setQuickSwitcherOpen(prev => !prev);
-        return;
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
-        switch (e.key.toLowerCase()) {
-          case 'n':
-            e.preventDefault();
-            handleMenuAction(COMMAND_IDS.NEW_CHAPTER);
-            break;
-          case 'e':
-            e.preventDefault();
-            handleMenuAction(COMMAND_IDS.EXPORT);
-            break;
-          case 'b':
-            e.preventDefault();
-            handleMenuAction(COMMAND_IDS.TOGGLE_SIDEBAR);
-            break;
-          case 'f':
-            e.preventDefault();
-            handleMenuAction(COMMAND_IDS.TOGGLE_FOCUS_MODE);
-            break;
-          case 'i':
-            e.preventDefault();
-            handleMenuAction(COMMAND_IDS.INSPECTOR);
-            break;
-          case 'm':
-            e.preventDefault();
-            handleMenuAction(COMMAND_IDS.ADD_COMMENT);
-            break;
-          case 't':
-            e.preventDefault();
-            handleMenuAction(COMMAND_IDS.TOGGLE_TYPEWRITER_MODE);
-            break;
-        }
-      }
-      // Escape to exit focus mode
-      if (e.key === 'Escape' && state.settings.focusMode) {
-        handleMenuAction(COMMAND_IDS.TOGGLE_FOCUS_MODE);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleMenuAction, state.settings.focusMode, findReplace]);
-
-  useEffect(() => {
-    const handleAddComment = () => handleMenuAction(COMMAND_IDS.ADD_COMMENT);
-    window.addEventListener('writer1:add-comment', handleAddComment as EventListener);
-    return () => window.removeEventListener('writer1:add-comment', handleAddComment as EventListener);
-  }, [handleMenuAction]);
+  const { handleMenuAction } = useAppKeyboardShortcuts({
+    editor,
+    findReplace,
+    fileInputRef,
+    importInputRef,
+    projectFileInputRef,
+    createChapter: createNewChapter,
+    handleExportBackup,
+    handleSaveProjectFile,
+    openModal,
+    toggleModal,
+    dispatch,
+    updateSettings,
+    settings: state.settings,
+    showToast,
+    createCommentFromSelection,
+    setInspectorOpen,
+    setQuickSwitcherOpen,
+  });
 
   // Show error state
   if (error) {
