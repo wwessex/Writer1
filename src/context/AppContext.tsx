@@ -8,87 +8,18 @@ import {
   useRef,
   type ReactNode
 } from 'react';
-import type { Chapter, Novel, AppSettings, AppState, Scene, ProjectType, SidebarPanelId, SidebarPanelsSettings } from '@/types';
+import type { Chapter, Novel, AppSettings, AppState, Scene, ProjectType } from '@/types';
 import * as storage from '@/lib/storage';
 import { debounce, generateId } from '@/lib/utils';
 import { loadSettingsFromStorage, createSettingsEnvelope } from '@/lib/settingsMigration';
 import { SETTINGS_STORAGE_KEY } from '@/lib/storageKeys';
+import { createDefaultSettings, mergeSettings, normalizeSidebarPanels, type SettingsUpdate } from './appSettings';
 
 // Check if mobile viewport (matches the CSS breakpoint)
 const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches;
 
-
-const BASE_SIDEBAR_PANEL_ORDER: SidebarPanelId[] = ['chapters', 'scenePlanner', 'outline'];
-
-const sidebarPanelsForProjectType = (projectType: ProjectType): SidebarPanelsSettings => ({
-  order: projectType === 'screenplay'
-    ? ['chapters', 'outline', 'scenePlanner']
-    : [...BASE_SIDEBAR_PANEL_ORDER],
-  collapsed: {
-    chapters: false,
-    scenePlanner: false,
-    outline: false
-  },
-  visible: {
-    chapters: true,
-    scenePlanner: true,
-    outline: true
-  }
-});
-
-const normalizeSidebarPanels = (
-  rawPanels: SidebarPanelsSettings | undefined,
-  projectType: ProjectType
-): SidebarPanelsSettings => {
-  const defaults = sidebarPanelsForProjectType(projectType);
-  const rawOrder = rawPanels?.order || [];
-  const dedupedKnown = rawOrder.filter((id, index): id is SidebarPanelId =>
-    BASE_SIDEBAR_PANEL_ORDER.includes(id) && rawOrder.indexOf(id) === index
-  );
-  const missing = BASE_SIDEBAR_PANEL_ORDER.filter(id => !dedupedKnown.includes(id));
-
-  return {
-    order: [...dedupedKnown, ...missing],
-    collapsed: {
-      ...defaults.collapsed,
-      ...rawPanels?.collapsed
-    },
-    visible: {
-      ...defaults.visible,
-      ...rawPanels?.visible
-    }
-  };
-};
-
 // Default settings
-const defaultSettings: AppSettings = {
-  autosaveMs: 800,
-  dailyWordGoal: 0,
-  novelWordGoal: 0,
-  sync: {
-    novelId: '',
-    url: '',
-    auth: ''
-  },
-  assist: {
-    languageToolEnabled: false,
-    languageToolUrl: 'https://api.languagetool.org/v2/check',
-    languageToolLanguage: 'en-US'
-  },
-  theme: 'light',
-  sidebarHidden: isMobile, // Hidden by default on mobile
-  pageView: true,
-  focusMode: false,
-  quickSwitcherMode: 'chapter',
-  typography: {
-    fontFamily: 'system',
-    fontSize: 16,
-    lineHeight: 1.75
-  },
-  onboardingComplete: false,
-  typewriterMode: false,
-  sidebarPanels: {}
-};
+const defaultSettings: AppSettings = createDefaultSettings(isMobile);
 
 // Initial state
 const initialState: AppState = {
@@ -113,7 +44,7 @@ type AppAction =
   | { type: 'DELETE_CHAPTER'; payload: string }
   | { type: 'REORDER_CHAPTERS'; payload: string[] }
   | { type: 'SET_NOVEL_TITLE'; payload: string }
-  | { type: 'SET_SETTINGS'; payload: Partial<AppSettings> }
+  | { type: 'SET_SETTINGS'; payload: SettingsUpdate }
   | { type: 'SET_ONLINE'; payload: boolean }
   | { type: 'SET_SAVING'; payload: boolean }
   | { type: 'TOGGLE_SIDEBAR' }
@@ -189,7 +120,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'SET_SETTINGS':
       return {
         ...state,
-        settings: { ...state.settings, ...action.payload }
+        settings: mergeSettings(state.settings, action.payload)
       };
 
     case 'SET_ONLINE':
@@ -260,7 +191,7 @@ interface AppContextType {
   canUndoReorder: boolean;
   canRedoReorder: boolean;
   updateNovelTitle: (title: string) => void;
-  updateSettings: (settings: Partial<AppSettings>) => void;
+  updateSettings: (settings: SettingsUpdate) => void;
   addScene: (chapterId: string, initialData?: Partial<Scene>) => string | undefined;
   updateScene: (chapterId: string, sceneId: string, updates: Partial<Scene>) => void;
   deleteScene: (chapterId: string, sceneId: string) => void;
@@ -485,7 +416,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [state.novelId]);
 
   // Update settings
-  const updateSettings = useCallback((settings: Partial<AppSettings>) => {
+  const updateSettings = useCallback((settings: SettingsUpdate) => {
     dispatch({ type: 'SET_SETTINGS', payload: settings });
   }, []);
 
