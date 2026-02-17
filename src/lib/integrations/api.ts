@@ -14,8 +14,8 @@ export interface ProviderConnectionMetadata {
   scopes: string[];
   expiresAt: number;
   status: ProviderConnectionStatus;
-  accessToken: string;
-  refreshToken?: string;
+  sessionToken: string;
+  sessionExpiresAt?: number;
 }
 
 export interface ProviderConnectionResponse {
@@ -98,6 +98,57 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   return payload as T;
 }
 
+
+export interface ProviderSessionIntrospectionResponse {
+  provider: IntegrationType;
+  active: boolean;
+  connectionId?: string;
+  expiresAt?: number;
+}
+
+export async function createProviderSession(provider: IntegrationType, connectionId: string): Promise<ProviderConnectionResponse> {
+  ensureOAuthProvider(provider);
+
+  return fetchJson<ProviderConnectionResponse>(`/api/integrations/providers/${provider}/token/create`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ connectionId }),
+  });
+}
+
+export async function introspectProviderSession(provider: IntegrationType, sessionToken: string): Promise<ProviderSessionIntrospectionResponse> {
+  ensureOAuthProvider(provider);
+
+  return fetchJson<ProviderSessionIntrospectionResponse>(`/api/integrations/providers/${provider}/token/introspect`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ sessionToken }),
+  });
+}
+
+export async function revokeProviderSession(
+  provider: IntegrationType,
+  connectionId: string,
+  sessionToken?: string
+): Promise<{ provider: IntegrationType; revoked: true }> {
+  ensureOAuthProvider(provider);
+
+  return fetchJson<{ provider: IntegrationType; revoked: true }>(`/api/integrations/providers/${provider}/token/revoke`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ connectionId, sessionToken }),
+  });
+}
+
 export async function fetchProviderMetadata(): Promise<ProvidersMetadataResponse> {
   return fetchJson<ProvidersMetadataResponse>('/api/integrations/providers', {
     method: 'GET',
@@ -151,8 +202,7 @@ export async function connectProvider(provider: IntegrationType): Promise<Provid
 
 export async function disconnectProvider(
   provider: IntegrationType,
-  connectionId: string,
-  accessToken?: string
+  connectionId: string
 ): Promise<{ provider: IntegrationType; disconnected: true }> {
   ensureOAuthProvider(provider);
 
@@ -171,7 +221,7 @@ export async function disconnectProvider(
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      body: JSON.stringify({ connectionId, accessToken }),
+      body: JSON.stringify({ connectionId }),
     }
   );
 }
@@ -181,8 +231,7 @@ export async function disconnectProvider(
  */
 export async function refreshProviderConnection(
   provider: IntegrationType,
-  connectionId: string,
-  refreshToken?: string
+  connectionId: string
 ): Promise<ProviderConnectionResponse> {
   ensureOAuthProvider(provider);
 
@@ -193,19 +242,13 @@ export async function refreshProviderConnection(
     });
   }
 
-  if (!refreshToken) {
-    throw new IntegrationApiError(
-      'Refresh token is required to refresh the connection. Try disconnecting and reconnecting.',
-      { code: 'UNAUTHORIZED', status: 401 }
-    );
-  }
 
-  return fetchJson<ProviderConnectionResponse>(`/api/integrations/providers/${provider}/refresh`, {
+  return fetchJson<ProviderConnectionResponse>(`/api/integrations/providers/${provider}/token/refresh`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify({ connectionId, refreshToken }),
+    body: JSON.stringify({ connectionId }),
   });
 }

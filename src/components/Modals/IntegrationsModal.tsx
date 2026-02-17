@@ -15,6 +15,8 @@ import {
   disconnectProvider,
   fetchProviderMetadata,
   refreshProviderConnection,
+  introspectProviderSession,
+  revokeProviderSession,
   type ProviderConnectionMetadata,
   type ProviderPublicMetadata,
 } from '@/lib/integrations/api';
@@ -72,8 +74,6 @@ function createSafePersistedConfig(config: IntegrationConfig): PersistedIntegrat
     status: config.status,
     folderId: config.folderId,
     lastSyncAt: config.lastSyncAt,
-    accessToken: config.accessToken,
-    refreshToken: config.refreshToken,
   };
 }
 
@@ -91,11 +91,26 @@ function loadConfigs(): IntegrationConfigs {
     }
 
     const parsed = JSON.parse(data) as Partial<Record<IntegrationType, Partial<IntegrationConfig>>>;
-    return {
-      scrivener: normalizeConfig('scrivener', parsed.scrivener),
-      'google-drive': normalizeConfig('google-drive', parsed['google-drive']),
-      dropbox: normalizeConfig('dropbox', parsed.dropbox),
+    const scrubSecrets = (raw?: Partial<IntegrationConfig>): Partial<IntegrationConfig> => {
+      if (!raw) return {};
+      const { accessToken: _legacyAccessToken, refreshToken: _legacyRefreshToken, apiKey: _legacyApiKey, ...safe } = raw as Partial<IntegrationConfig> & {
+        accessToken?: string;
+        refreshToken?: string;
+        apiKey?: string;
+      };
+      return safe;
     };
+
+    const normalized = {
+      scrivener: normalizeConfig('scrivener', scrubSecrets(parsed.scrivener)),
+      'google-drive': normalizeConfig('google-drive', scrubSecrets(parsed['google-drive'])),
+      dropbox: normalizeConfig('dropbox', scrubSecrets(parsed.dropbox)),
+    };
+
+    // Persist back immediately to scrub any legacy secrets from localStorage.
+    saveConfigs(normalized);
+
+    return normalized;
   } catch {
     return defaults;
   }
@@ -189,8 +204,7 @@ function mapMetadataToConfig(metadata: ProviderConnectionMetadata): Partial<Inte
     scopes: metadata.scopes,
     expiresAt: metadata.expiresAt,
     status: metadata.status,
-    accessToken: metadata.accessToken,
-    refreshToken: metadata.refreshToken,
+    sessionToken: metadata.sessionToken,
   };
 }
 
@@ -252,6 +266,25 @@ export function IntegrationsModal({ open, onClose }: IntegrationsModalProps) {
     },
     [configs, updateConfig]
   );
+
+  useEffect(() => {
+    if (!open) return;
+
+    (['google-drive', 'dropbox'] as const).forEach((provider) => {
+      const cfg = configs[provider];
+      if (!cfg.sessionToken) return;
+
+      void introspectProviderSession(provider, cfg.sessionToken)
+        .then((result) => {
+          if (!result.active) {
+            updateConfig(provider, { sessionToken: undefined, status: 'disconnected' });
+          }
+        })
+        .catch(() => {
+          updateConfig(provider, { sessionToken: undefined, status: 'error' });
+        });
+    });
+  }, [open, configs, updateConfig]);
 
   return (
     <>
@@ -495,7 +528,7 @@ function GoogleDriveCard({ config, metadata, appState, onToggle, onUpdate, onApp
             Connect Account
           </Button>
           <Button variant="default" disabled={operationState === 'loading' || !config.connectionId} onClick={() => run(async () => {
-            const result = await refreshProviderConnection('google-drive', config.connectionId!, config.refreshToken);
+            const result = await refreshProviderConnection('google-drive', config.connectionId!);
             onUpdate(mapMetadataToConfig(result.connection));
             return 'Google connection refreshed.';
           })}>
@@ -503,28 +536,29 @@ function GoogleDriveCard({ config, metadata, appState, onToggle, onUpdate, onApp
             Refresh Auth
           </Button>
           <Button variant="default" disabled={operationState === 'loading' || !config.connectionId} onClick={() => run(async () => {
-            await disconnectProvider('google-drive', config.connectionId!, config.accessToken);
-            onUpdate({ connectionId: undefined, providerUserId: undefined, scopes: undefined, expiresAt: undefined, status: 'disconnected', accessToken: undefined, refreshToken: undefined });
+            await revokeProviderSession('google-drive', config.connectionId!, config.sessionToken);
+            await disconnectProvider('google-drive', config.connectionId!);
+            onUpdate({ connectionId: undefined, providerUserId: undefined, scopes: undefined, expiresAt: undefined, status: 'disconnected', sessionToken: undefined });
             return 'Google account disconnected.';
           })}>
             <span className="material-symbols-rounded">link_off</span>
             Disconnect
           </Button>
-          <Button variant="default" disabled={operationState === 'loading' || !config.accessToken} onClick={() => run(async () => {
+          <Button variant="default" disabled={operationState === 'loading' || !config.sessionToken} onClick={() => run(async () => {
             const result = await testIntegrationConnection('google-drive', config);
             return result.message;
           })}>
             <span className="material-symbols-rounded">wifi_tethering</span>
             Test
           </Button>
-          <Button variant="default" disabled={operationState === 'loading' || !config.accessToken} onClick={() => run(async () => {
+          <Button variant="default" disabled={operationState === 'loading' || !config.sessionToken} onClick={() => run(async () => {
             const result = await pushIntegrationData('google-drive', config, appState);
             return result.message;
           })}>
             <span className="material-symbols-rounded">cloud_upload</span>
             Push
           </Button>
-          <Button variant="default" disabled={operationState === 'loading' || !config.accessToken} onClick={() => run(async () => {
+          <Button variant="default" disabled={operationState === 'loading' || !config.sessionToken} onClick={() => run(async () => {
             const result = await pullIntegrationData('google-drive', config, appState);
             onApplyPull(result);
             return `Pulled ${result.chapterUpdates.length} chapter(s) from Google Drive.`;
@@ -532,7 +566,7 @@ function GoogleDriveCard({ config, metadata, appState, onToggle, onUpdate, onApp
             <span className="material-symbols-rounded">cloud_download</span>
             Pull
           </Button>
-          <Button variant="default" disabled={operationState === 'loading' || !config.accessToken} onClick={() => run(async () => {
+          <Button variant="default" disabled={operationState === 'loading' || !config.sessionToken} onClick={() => run(async () => {
             const revisions = await listIntegrationRevisions('google-drive', config);
             return `Found ${revisions.length} remote revision(s).`;
           })}>
@@ -617,7 +651,7 @@ function DropboxCard({ config, metadata, appState, onToggle, onUpdate, onApplyPu
             Connect Account
           </Button>
           <Button variant="default" disabled={operationState === 'loading' || !config.connectionId} onClick={() => run(async (cardConfig) => {
-            const result = await refreshProviderConnection('dropbox', config.connectionId!, config.refreshToken);
+            const result = await refreshProviderConnection('dropbox', config.connectionId!);
             onUpdate(mapMetadataToConfig(result.connection));
             return `Dropbox connection refreshed for ${cardConfig.folderId || '/DraftHarbour'}.`;
           })}>
@@ -625,28 +659,29 @@ function DropboxCard({ config, metadata, appState, onToggle, onUpdate, onApplyPu
             Refresh Auth
           </Button>
           <Button variant="default" disabled={operationState === 'loading' || !config.connectionId} onClick={() => run(async () => {
-            await disconnectProvider('dropbox', config.connectionId!, config.accessToken);
-            onUpdate({ connectionId: undefined, providerUserId: undefined, scopes: undefined, expiresAt: undefined, status: 'disconnected', accessToken: undefined, refreshToken: undefined });
+            await revokeProviderSession('dropbox', config.connectionId!, config.sessionToken);
+            await disconnectProvider('dropbox', config.connectionId!);
+            onUpdate({ connectionId: undefined, providerUserId: undefined, scopes: undefined, expiresAt: undefined, status: 'disconnected', sessionToken: undefined });
             return 'Dropbox account disconnected.';
           })}>
             <span className="material-symbols-rounded">link_off</span>
             Disconnect
           </Button>
-          <Button variant="default" disabled={operationState === 'loading' || !config.accessToken} onClick={() => run(async (cardConfig) => {
+          <Button variant="default" disabled={operationState === 'loading' || !config.sessionToken} onClick={() => run(async (cardConfig) => {
             const result = await testIntegrationConnection('dropbox', cardConfig);
             return result.message;
           })}>
             <span className="material-symbols-rounded">wifi_tethering</span>
             Test Connection
           </Button>
-          <Button variant="default" disabled={operationState === 'loading' || !config.accessToken} onClick={() => run(async (cardConfig) => {
+          <Button variant="default" disabled={operationState === 'loading' || !config.sessionToken} onClick={() => run(async (cardConfig) => {
             const result = await pushIntegrationData('dropbox', cardConfig, appState);
             return result.message;
           })}>
             <span className="material-symbols-rounded">cloud_upload</span>
             Push
           </Button>
-          <Button variant="default" disabled={operationState === 'loading' || !config.accessToken} onClick={() => run(async (cardConfig) => {
+          <Button variant="default" disabled={operationState === 'loading' || !config.sessionToken} onClick={() => run(async (cardConfig) => {
             const result = await pullIntegrationData('dropbox', cardConfig, appState);
             onApplyPull(result);
             return `Pulled ${result.chapterUpdates.length} chapter(s) from Dropbox.`;
@@ -654,7 +689,7 @@ function DropboxCard({ config, metadata, appState, onToggle, onUpdate, onApplyPu
             <span className="material-symbols-rounded">cloud_download</span>
             Pull
           </Button>
-          <Button variant="default" disabled={operationState === 'loading' || !config.accessToken} onClick={() => run(async (cardConfig) => {
+          <Button variant="default" disabled={operationState === 'loading' || !config.sessionToken} onClick={() => run(async (cardConfig) => {
             const revisions = await listIntegrationRevisions('dropbox', cardConfig);
             return `Found ${revisions.length} remote revision(s).`;
           })}>

@@ -14,13 +14,13 @@ const APP_FOLDER_NAME = 'DraftHarbour';
 const MANIFEST_NAME = '_manifest.json';
 
 function ensureToken(config: IntegrationConfig): string {
-  if (!config.accessToken) {
+  if (!config.sessionToken) {
     throw new IntegrationApiError(
-      'Google Drive access token is missing. Connect your account first.',
+      'Google Drive session token is missing. Connect your account first.',
       { code: 'UNAUTHORIZED', status: 401 }
     );
   }
-  return config.accessToken;
+  return config.sessionToken;
 }
 
 async function driveFetch(url: string, token: string, options: RequestInit = {}): Promise<Response> {

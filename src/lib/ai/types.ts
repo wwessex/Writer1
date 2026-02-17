@@ -16,8 +16,8 @@ export interface AIProviderConfig {
   provider: AIProviderType;
   /** OpenAI-compatible endpoint URL (only for openai-compatible) */
   endpoint?: string;
-  /** Bearer token / API key (only for openai-compatible) */
-  apiKey?: string;
+  /** Short-lived server-issued AI session token (only for openai-compatible) */
+  sessionToken?: string;
   /** Model identifier (only for openai-compatible, defaults to gpt-4o) */
   model?: string;
 }

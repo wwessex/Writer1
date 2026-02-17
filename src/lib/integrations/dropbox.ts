@@ -13,13 +13,13 @@ const DROPBOX_CONTENT = 'https://content.dropboxapi.com/2';
 const MANIFEST_FILE = '_manifest.json';
 
 function ensureToken(config: IntegrationConfig): string {
-  if (!config.accessToken) {
+  if (!config.sessionToken) {
     throw new IntegrationApiError(
-      'Dropbox access token is missing. Connect your account first.',
+      'Dropbox session token is missing. Connect your account first.',
       { code: 'UNAUTHORIZED', status: 401 }
     );
   }
-  return config.accessToken;
+  return config.sessionToken;
 }
 
 function getFolderPath(config: IntegrationConfig): string {
