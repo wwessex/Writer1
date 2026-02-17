@@ -185,6 +185,8 @@ export interface DhprojData {
   commentThreads: CommentThread[];
   settings: Partial<AppSettings>;
   goalTrends: unknown[];
+  characters?: CharacterEntity[];
+  worldEntries?: WorldEntry[];
 }
 
 // Character and World Bible types
