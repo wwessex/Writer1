@@ -96,7 +96,6 @@
 /* Mobile overflow menu — hidden on desktop */
 .mobileOverflow {
   display: none;
-  position: relative;
 }
 
 .mobileOverflowBtn {
@@ -106,9 +105,9 @@
 
 .mobileMenu {
   position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 300;
+  top: 8px;
+  right: clamp(8px, 2vw, 16px);
+  z-index: 250;
   width: min(280px, calc(100vw - 16px));
   max-height: min(70vh, 420px);
   overflow: hidden;
@@ -123,6 +122,20 @@
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   touch-action: pan-y;
+}
+
+.mobileMenuLayer {
+  position: absolute;
+  top: 52px;
+  left: 0;
+  right: 0;
+  z-index: 240;
+  display: none;
+  pointer-events: none;
+}
+
+.mobileMenuLayer .mobileMenu {
+  pointer-events: auto;
 }
 
 .mobileMenuScrollable {
@@ -224,6 +237,7 @@
   .menuBtn { display: flex !important; min-width: 44px; min-height: 44px; }
   .mobileOverflow { display: block; }
   .mobileQuickActions { display: flex; }
+  .mobileMenuLayer { display: block; }
   .topbar {
     flex-wrap: nowrap;
   }
