@@ -211,7 +211,7 @@ export interface CharacterEntity {
 export interface WorldEntry {
   id: string;
   novelId: string;
-  category: 'location' | 'lore' | 'item' | 'event' | 'organization' | 'other';
+  category: 'location' | 'lore' | 'item' | 'event' | 'organisation' | 'other';
   name: string;
   description: string;
   tags: string[];

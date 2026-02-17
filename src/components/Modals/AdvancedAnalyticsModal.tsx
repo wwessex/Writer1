@@ -17,11 +17,11 @@ const POSITIVE_WORDS = new Set([
   'triumph', 'victory', 'success', 'celebrate', 'admire', 'adore', 'bliss',
   'brave', 'charming', 'confident', 'creative', 'eager', 'elegant', 'enchant',
   'enjoy', 'faith', 'free', 'friend', 'fun', 'generous', 'glory', 'grace',
-  'harmony', 'heal', 'hero', 'honest', 'honor', 'humble', 'inspire', 'jolly',
+  'harmony', 'heal', 'hero', 'honest', 'honour', 'humble', 'inspire', 'jolly',
   'keen', 'lively', 'loyal', 'magic', 'mercy', 'merry', 'noble', 'nurture',
   'optimistic', 'paradise', 'passion', 'proud', 'pure', 'radiant', 'rejoice',
   'relief', 'resilient', 'safe', 'serene', 'sincere', 'strong', 'sweet',
-  'tender', 'treasure', 'trust', 'uplift', 'valiant', 'vibrant', 'vigor',
+  'tender', 'treasure', 'trust', 'uplift', 'valiant', 'vibrant', 'vigour',
   'virtue', 'vivid', 'welcome', 'wise', 'worthy', 'zeal', 'blessing',
   'courage', 'dream', 'embrace', 'flourish', 'forgive', 'glow', 'gratitude',
   'heaven', 'innocence', 'jubilant', 'kissed', 'light', 'miracle', 'overcome',
@@ -386,7 +386,7 @@ export function AdvancedAnalyticsModal({ open, onClose }: AdvancedAnalyticsModal
   if (!activeChapter) {
     return (
       <Dialog open={open} onClose={onClose} title="Advanced Analytics" size="large">
-        <p className={styles.emptyMessage}>Select a chapter to analyze</p>
+        <p className={styles.emptyMessage}>Select a chapter to analyse</p>
       </Dialog>
     );
   }
@@ -399,7 +399,7 @@ export function AdvancedAnalyticsModal({ open, onClose }: AdvancedAnalyticsModal
         title={`Advanced Analytics - ${activeChapter.title}`}
         size="large"
       >
-        <p className={styles.emptyMessage}>No text to analyze. Start writing to see analytics.</p>
+        <p className={styles.emptyMessage}>No text to analyse. Start writing to see analytics.</p>
       </Dialog>
     );
   }
@@ -733,7 +733,7 @@ export function AdvancedAnalyticsModal({ open, onClose }: AdvancedAnalyticsModal
                 Pacing Heatmap
               </h4>
               <p className={styles.advancedAnalytics__hint}>
-                Visualizes pacing across all chapters. Short sentences and high dialogue create faster pacing.
+                Visualises pacing across all chapters. Short sentences and high dialogue create faster pacing.
                 Long sentences and low dialogue create slower, more contemplative sections.
               </p>
               {pacingData.length > 0 ? (

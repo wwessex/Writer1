@@ -26,7 +26,7 @@ const WORLD_CATEGORY_OPTIONS = [
   { value: 'lore', label: 'Lore' },
   { value: 'item', label: 'Item' },
   { value: 'event', label: 'Event' },
-  { value: 'organization', label: 'Organization' },
+  { value: 'organisation', label: 'Organisation' },
   { value: 'other', label: 'Other' }
 ];
 

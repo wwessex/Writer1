@@ -51,7 +51,7 @@ const BOOK_PRESET_PROMPTS: PresetPrompt[] = [
   },
   {
     id: 'summarize',
-    label: 'Summarize',
+    label: 'Summarise',
     icon: 'summarize',
     prompt:
       'Provide a concise summary of the chapter text. Highlight the key events, character developments, and themes.'
