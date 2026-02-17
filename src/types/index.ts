@@ -293,6 +293,9 @@ export interface ConflictInfo {
   chapterId: string;
   localVersion: number;
   remoteVersion: number;
+  provider?: IntegrationType;
+  localRevisionId?: string;
+  remoteRevisionId?: string;
   localContent: JSONContent | null;
   remoteContent: JSONContent | null;
   baseContent?: JSONContent | null;
