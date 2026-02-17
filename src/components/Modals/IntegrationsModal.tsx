@@ -70,6 +70,9 @@ function createSafePersistedConfig(config: IntegrationConfig): PersistedIntegrat
     status: config.status,
     folderId: config.folderId,
     lastSyncAt: config.lastSyncAt,
+    accessToken: config.accessToken,
+    refreshToken: config.refreshToken,
+    clientId: config.clientId,
   };
 }
 
@@ -185,6 +188,8 @@ function mapMetadataToConfig(metadata: ProviderConnectionMetadata): Partial<Inte
     scopes: metadata.scopes,
     expiresAt: metadata.expiresAt,
     status: metadata.status,
+    accessToken: metadata.accessToken,
+    refreshToken: metadata.refreshToken,
   };
 }
 
@@ -400,7 +405,7 @@ function ScrivenerCard({ config, appState, onToggle, onUpdate, onApplyPull }: In
     >
       <div className={styles.integrationCard__section}>
         <p className={styles.integrationCard__hint}>
-          Transfer your work between DraftHarbour Studio and Scrivener with adapter-backed pull/push operations.
+          Import chapters from a zipped .scriv project or export your work as a Scrivener-compatible ZIP file.
         </p>
         <div className={styles.integrationCard__actions}>
           <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async () => {
@@ -427,8 +432,9 @@ function ScrivenerCard({ config, appState, onToggle, onUpdate, onApplyPull }: In
 
 function GoogleDriveCard({ config, appState, onToggle, onUpdate, onApplyPull }: IntegrationCardBaseProps) {
   const status = getConnectionStatus(config);
+  const [clientId, setClientId] = useState(config.clientId || '');
   const [operationState, setOperationState] = useState<OperationState>('idle');
-  const [operationMessage, setOperationMessage] = useState('Use secure OAuth to connect your Google account.');
+  const [operationMessage, setOperationMessage] = useState('Enter your Google OAuth Client ID to get started.');
 
   const run = useCallback(async (task: () => Promise<string>) => {
     setOperationState('loading');
@@ -447,22 +453,33 @@ function GoogleDriveCard({ config, appState, onToggle, onUpdate, onApplyPull }: 
   return (
     <CardShell
       icon="docs"
-      title="Google Docs"
-      description="Securely connect with OAuth and sync chapters to Google Docs"
+      title="Google Drive"
+      description="Securely connect with OAuth and sync chapters to Google Drive"
       enabled={config.enabled}
       status={status}
       lastSyncAt={config.lastSyncAt}
       onToggle={onToggle}
     >
       <div className={styles.integrationCard__section}>
-        <p className={styles.integrationCard__hint}>
-          Authenticate through the secure broker. Only connection metadata is stored in this browser.
-        </p>
+        <div className={styles.integrationCard__field}>
+          <label className={styles.integrationCard__label}>OAuth Client ID</label>
+          <Input
+            value={clientId}
+            onChange={(e) => {
+              setClientId(e.target.value);
+              onUpdate({ clientId: e.target.value });
+            }}
+            placeholder="your-app.apps.googleusercontent.com"
+          />
+          <p className={styles.integrationCard__fieldHint}>
+            Create a Google Cloud OAuth 2.0 Client ID for web applications. Set the redirect URI to this page's URL.
+          </p>
+        </div>
 
         <div className={styles.integrationCard__actions}>
-          <Button variant="primary" disabled={operationState === 'loading'} onClick={() => run(async () => {
+          <Button variant="primary" disabled={operationState === 'loading' || !clientId} onClick={() => run(async () => {
             onUpdate({ status: 'pending' });
-            const result = await connectProvider('google-drive');
+            const result = await connectProvider('google-drive', clientId);
             onUpdate(mapMetadataToConfig(result.connection));
             const connectResult = await connectIntegration('google-drive', {
               ...config,
@@ -474,7 +491,7 @@ function GoogleDriveCard({ config, appState, onToggle, onUpdate, onApplyPull }: 
             Connect Account
           </Button>
           <Button variant="default" disabled={operationState === 'loading' || !config.connectionId} onClick={() => run(async () => {
-            const result = await refreshProviderConnection('google-drive', config.connectionId!);
+            const result = await refreshProviderConnection('google-drive', config.connectionId!, config.refreshToken, config.clientId);
             onUpdate(mapMetadataToConfig(result.connection));
             return 'Google connection refreshed.';
           })}>
@@ -482,28 +499,28 @@ function GoogleDriveCard({ config, appState, onToggle, onUpdate, onApplyPull }: 
             Refresh Auth
           </Button>
           <Button variant="default" disabled={operationState === 'loading' || !config.connectionId} onClick={() => run(async () => {
-            await disconnectProvider('google-drive', config.connectionId!);
-            onUpdate({ connectionId: undefined, providerUserId: undefined, scopes: undefined, expiresAt: undefined, status: 'disconnected' });
+            await disconnectProvider('google-drive', config.connectionId!, config.accessToken);
+            onUpdate({ connectionId: undefined, providerUserId: undefined, scopes: undefined, expiresAt: undefined, status: 'disconnected', accessToken: undefined, refreshToken: undefined });
             return 'Google account disconnected.';
           })}>
             <span className="material-symbols-rounded">link_off</span>
             Disconnect
           </Button>
-          <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async () => {
+          <Button variant="default" disabled={operationState === 'loading' || !config.accessToken} onClick={() => run(async () => {
             const result = await testIntegrationConnection('google-drive', config);
             return result.message;
           })}>
             <span className="material-symbols-rounded">wifi_tethering</span>
             Test
           </Button>
-          <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async () => {
+          <Button variant="default" disabled={operationState === 'loading' || !config.accessToken} onClick={() => run(async () => {
             const result = await pushIntegrationData('google-drive', config, appState);
             return result.message;
           })}>
             <span className="material-symbols-rounded">cloud_upload</span>
             Push
           </Button>
-          <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async () => {
+          <Button variant="default" disabled={operationState === 'loading' || !config.accessToken} onClick={() => run(async () => {
             const result = await pullIntegrationData('google-drive', config, appState);
             onApplyPull(result);
             return `Pulled ${result.chapterUpdates.length} chapter(s) from Google Drive.`;
@@ -511,7 +528,7 @@ function GoogleDriveCard({ config, appState, onToggle, onUpdate, onApplyPull }: 
             <span className="material-symbols-rounded">cloud_download</span>
             Pull
           </Button>
-          <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async () => {
+          <Button variant="default" disabled={operationState === 'loading' || !config.accessToken} onClick={() => run(async () => {
             const revisions = await listIntegrationRevisions('google-drive', config);
             return `Found ${revisions.length} remote revision(s).`;
           })}>
@@ -528,9 +545,10 @@ function GoogleDriveCard({ config, appState, onToggle, onUpdate, onApplyPull }: 
 
 function DropboxCard({ config, appState, onToggle, onUpdate, onApplyPull }: IntegrationCardBaseProps) {
   const status = getConnectionStatus(config);
+  const [clientId, setClientId] = useState(config.clientId || '');
   const [folder, setFolder] = useState(config.folderId || '/DraftHarbour');
   const [operationState, setOperationState] = useState<OperationState>('idle');
-  const [operationMessage, setOperationMessage] = useState('Use secure OAuth to connect your Dropbox account.');
+  const [operationMessage, setOperationMessage] = useState('Enter your Dropbox App Key to get started.');
 
   const run = useCallback(async (task: (cardConfig: IntegrationConfig) => Promise<string>) => {
     setOperationState('loading');
@@ -538,17 +556,18 @@ function DropboxCard({ config, appState, onToggle, onUpdate, onApplyPull }: Inte
       const cardConfig: IntegrationConfig = {
         ...config,
         folderId: folder,
+        clientId,
       };
       const message = await task(cardConfig);
       const syncedAt = Date.now();
-      onUpdate({ folderId: folder, lastSyncAt: syncedAt });
+      onUpdate({ folderId: folder, clientId, lastSyncAt: syncedAt });
       setOperationState('success');
       setOperationMessage(message);
     } catch (error) {
       setOperationState('error');
       setOperationMessage(error instanceof Error ? error.message : 'Unexpected integration error.');
     }
-  }, [config, folder, onUpdate]);
+  }, [config, folder, clientId, onUpdate]);
 
   return (
     <CardShell
@@ -562,6 +581,21 @@ function DropboxCard({ config, appState, onToggle, onUpdate, onApplyPull }: Inte
     >
       <div className={styles.integrationCard__section}>
         <div className={styles.integrationCard__field}>
+          <label className={styles.integrationCard__label}>Dropbox App Key</label>
+          <Input
+            value={clientId}
+            onChange={(e) => {
+              setClientId(e.target.value);
+              onUpdate({ clientId: e.target.value });
+            }}
+            placeholder="your-dropbox-app-key"
+          />
+          <p className={styles.integrationCard__fieldHint}>
+            Create a Dropbox App at the Dropbox App Console. Use the App Key as your Client ID. Set the redirect URI to this page's URL.
+          </p>
+        </div>
+
+        <div className={styles.integrationCard__field}>
           <label className={styles.integrationCard__label}>Sync Folder Path</label>
           <Input
             value={folder}
@@ -569,14 +603,14 @@ function DropboxCard({ config, appState, onToggle, onUpdate, onApplyPull }: Inte
             placeholder="/DraftHarbour"
           />
           <p className={styles.integrationCard__fieldHint}>
-            Choose the Dropbox folder where novel backups will be stored. OAuth tokens stay in the broker backend.
+            The Dropbox folder where novel backups will be stored.
           </p>
         </div>
 
         <div className={styles.integrationCard__actions}>
-          <Button variant="primary" disabled={operationState === 'loading'} onClick={() => run(async (cardConfig) => {
+          <Button variant="primary" disabled={operationState === 'loading' || !clientId} onClick={() => run(async (cardConfig) => {
             onUpdate({ status: 'pending' });
-            const result = await connectProvider('dropbox');
+            const result = await connectProvider('dropbox', clientId);
             onUpdate(mapMetadataToConfig(result.connection));
             const connectResult = await connectIntegration('dropbox', {
               ...cardConfig,
@@ -588,7 +622,7 @@ function DropboxCard({ config, appState, onToggle, onUpdate, onApplyPull }: Inte
             Connect Account
           </Button>
           <Button variant="default" disabled={operationState === 'loading' || !config.connectionId} onClick={() => run(async (cardConfig) => {
-            const result = await refreshProviderConnection('dropbox', config.connectionId!);
+            const result = await refreshProviderConnection('dropbox', config.connectionId!, config.refreshToken, config.clientId);
             onUpdate(mapMetadataToConfig(result.connection));
             return `Dropbox connection refreshed for ${cardConfig.folderId || '/DraftHarbour'}.`;
           })}>
@@ -596,28 +630,28 @@ function DropboxCard({ config, appState, onToggle, onUpdate, onApplyPull }: Inte
             Refresh Auth
           </Button>
           <Button variant="default" disabled={operationState === 'loading' || !config.connectionId} onClick={() => run(async () => {
-            await disconnectProvider('dropbox', config.connectionId!);
-            onUpdate({ connectionId: undefined, providerUserId: undefined, scopes: undefined, expiresAt: undefined, status: 'disconnected' });
+            await disconnectProvider('dropbox', config.connectionId!, config.accessToken);
+            onUpdate({ connectionId: undefined, providerUserId: undefined, scopes: undefined, expiresAt: undefined, status: 'disconnected', accessToken: undefined, refreshToken: undefined });
             return 'Dropbox account disconnected.';
           })}>
             <span className="material-symbols-rounded">link_off</span>
             Disconnect
           </Button>
-          <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async (cardConfig) => {
+          <Button variant="default" disabled={operationState === 'loading' || !config.accessToken} onClick={() => run(async (cardConfig) => {
             const result = await testIntegrationConnection('dropbox', cardConfig);
             return result.message;
           })}>
             <span className="material-symbols-rounded">wifi_tethering</span>
             Test Connection
           </Button>
-          <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async (cardConfig) => {
+          <Button variant="default" disabled={operationState === 'loading' || !config.accessToken} onClick={() => run(async (cardConfig) => {
             const result = await pushIntegrationData('dropbox', cardConfig, appState);
             return result.message;
           })}>
             <span className="material-symbols-rounded">cloud_upload</span>
             Push
           </Button>
-          <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async (cardConfig) => {
+          <Button variant="default" disabled={operationState === 'loading' || !config.accessToken} onClick={() => run(async (cardConfig) => {
             const result = await pullIntegrationData('dropbox', cardConfig, appState);
             onApplyPull(result);
             return `Pulled ${result.chapterUpdates.length} chapter(s) from Dropbox.`;
@@ -625,7 +659,7 @@ function DropboxCard({ config, appState, onToggle, onUpdate, onApplyPull }: Inte
             <span className="material-symbols-rounded">cloud_download</span>
             Pull
           </Button>
-          <Button variant="default" disabled={operationState === 'loading'} onClick={() => run(async (cardConfig) => {
+          <Button variant="default" disabled={operationState === 'loading' || !config.accessToken} onClick={() => run(async (cardConfig) => {
             const revisions = await listIntegrationRevisions('dropbox', cardConfig);
             return `Found ${revisions.length} remote revision(s).`;
           })}>
