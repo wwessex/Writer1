@@ -24,7 +24,7 @@ export function loadAIConfig(): AIProviderConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      return { provider: 'chrome-ai' };
+      return { provider: 'managed-cloud' };
     }
 
     const parsed = JSON.parse(raw);
@@ -38,7 +38,7 @@ export function loadAIConfig(): AIProviderConfig {
           model: parsed.model,
         };
       }
-      return { provider: 'chrome-ai' };
+      return { provider: 'managed-cloud' };
     }
 
     const safeConfig = parsed as AIProviderConfig & { apiKey?: string };
@@ -57,7 +57,7 @@ export function loadAIConfig(): AIProviderConfig {
       sessionToken: safeConfig.sessionToken,
     };
   } catch {
-    return { provider: 'chrome-ai' };
+    return { provider: 'managed-cloud' };
   }
 }
 
@@ -80,10 +80,17 @@ export function saveAIConfig(config: AIProviderConfig): void {
 export function createProvider(config: AIProviderConfig): AIProvider {
   switch (config.provider) {
     case 'openai-compatible':
+    case 'managed-cloud':
       return new OpenAIProvider(config);
-    case 'chrome-ai':
+    case 'chrome-ai': {
+      const chromeProvider = new ChromeAIProvider();
+      if (chromeProvider.isAvailable()) {
+        return chromeProvider;
+      }
+      return new OpenAIProvider({ provider: 'managed-cloud', model: config.model });
+    }
     default:
-      return new ChromeAIProvider();
+      return new OpenAIProvider({ provider: 'managed-cloud', model: config.model });
   }
 }
 
@@ -94,11 +101,11 @@ export function createProvider(config: AIProviderConfig): AIProvider {
 /**
  * Detect the best available provider.
  * Returns 'chrome-ai' when on a supported Chrome build,
- * otherwise falls back to 'openai-compatible'.
+ * otherwise falls back to 'managed-cloud'.
  */
 export async function detectBestProvider(): Promise<AIProviderType> {
   if (await isChromeAIAvailable()) {
     return 'chrome-ai';
   }
-  return 'openai-compatible';
+  return 'managed-cloud';
 }

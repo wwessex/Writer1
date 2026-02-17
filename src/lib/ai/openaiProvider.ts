@@ -6,12 +6,14 @@ import { getBrokerBaseUrl, isAIDeveloperModeEnabled } from '@/lib/featureFlags';
 import type { AIProvider, AIProviderConfig, AIRequest, AIResponse } from './types';
 
 export class OpenAIProvider implements AIProvider {
-  readonly type = 'openai-compatible' as const;
+  readonly type: AIProviderConfig['provider'];
 
-  constructor(private config: AIProviderConfig) {}
+  constructor(private config: AIProviderConfig) {
+    this.type = config.provider;
+  }
 
   isAvailable(): boolean {
-    if (!isAIDeveloperModeEnabled()) {
+    if (this.config.provider === 'managed-cloud' || !isAIDeveloperModeEnabled()) {
       return true;
     }
     return !!(this.config.endpoint?.trim() && this.config.sessionToken?.trim());
@@ -19,7 +21,7 @@ export class OpenAIProvider implements AIProvider {
 
   async execute(request: AIRequest): Promise<AIResponse> {
     if (!this.isAvailable()) {
-      throw new Error('OpenAI provider is not configured. Set an API endpoint and session token.');
+      throw new Error('Custom provider is not configured. Set an API endpoint and session token.');
     }
 
     const start = Date.now();
@@ -27,7 +29,9 @@ export class OpenAIProvider implements AIProvider {
       ? `Here is the current ${request.projectType === 'screenplay' ? 'scene' : 'chapter'} text for context:\n\n---\n${request.context}\n---\n\n${request.prompt}`
       : request.prompt;
 
-    if (!isAIDeveloperModeEnabled()) {
+    const useManagedBroker = this.config.provider === 'managed-cloud' || !isAIDeveloperModeEnabled();
+
+    if (useManagedBroker) {
       const brokerRes = await fetch(`${getBrokerBaseUrl()}/api/ai/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -47,7 +51,7 @@ export class OpenAIProvider implements AIProvider {
       const brokerData = await brokerRes.json() as { text: string };
       return {
         text: brokerData.text,
-        provider: 'openai-compatible',
+        provider: this.config.provider,
         latencyMs: Date.now() - start,
       };
     }
@@ -88,7 +92,7 @@ export class OpenAIProvider implements AIProvider {
 
     return {
       text,
-      provider: 'openai-compatible',
+      provider: this.config.provider,
       latencyMs: Date.now() - start,
     };
   }
