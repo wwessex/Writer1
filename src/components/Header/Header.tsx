@@ -96,7 +96,6 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
       setMobileMenuOpen(prev => !prev);
       return;
     }
-
     dispatch({ type: 'TOGGLE_SIDEBAR' });
   }, [dispatch]);
   const hasNoChapterContent = totalWords === 0;
@@ -185,12 +184,36 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
     <header className={styles.header}>
       <div className={styles.topbar}>
         <div className={styles.topbar__brand}>
-          <IconButton
-            icon="menu"
-            label="Toggle menu"
-            onClick={handleMenuButtonClick}
-            className={styles.menuBtn}
-          />
+          <div className={styles.burgerMenu} ref={mobileMenuRef}>
+            <IconButton
+              icon="menu"
+              label="Toggle menu"
+              onClick={handleMenuButtonClick}
+              className={styles.menuBtn}
+            />
+            {mobileMenuOpen && (
+              <div className={styles.mobileMenu}>
+                {MOBILE_MENU_SECTIONS.map(({ section, items }) => (
+                  <div key={section} className={styles.mobileMenuSection}>
+                    <div className={styles.mobileMenuSectionTitle}>{section}</div>
+                    {items.map(commandId => {
+                      const command = getCommandPresentation(commandId);
+                      return (
+                        <button
+                          key={commandId}
+                          className={styles.mobileMenuItem}
+                          onClick={() => dispatchCommand(commandId)}
+                        >
+                          <span className="material-symbols-rounded">{command.icon}</span>
+                          <span>{command.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <img src={`${import.meta.env.BASE_URL}assets/${state.settings.theme === 'light' ? 'icon-black' : 'icon-blue'}-64.png`} alt="DraftHarbour" className={styles.logo} />
           <Input
             variant="title"
@@ -247,8 +270,8 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
             })}
           </div>
 
-          {/* Mobile overflow menu */}
-          <div className={styles.mobileOverflow} ref={mobileMenuRef}>
+          {/* Mobile overflow menu toggle */}
+          <div className={styles.mobileOverflow}>
             <IconButton
               icon="more_vert"
               label="More options"
@@ -256,29 +279,6 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
               onClick={() => setMobileMenuOpen(prev => !prev)}
               className={styles.mobileOverflowBtn}
             />
-            {mobileMenuOpen && (
-              <div className={styles.mobileMenu}>
-                {MOBILE_MENU_SECTIONS.map(({ section, items }) => (
-                  <div key={section} className={styles.mobileMenuSection}>
-                    <div className={styles.mobileMenuSectionTitle}>{section}</div>
-                    {items.map(commandId => {
-                      const command = getCommandPresentation(commandId);
-
-                      return (
-                        <button
-                          key={commandId}
-                          className={styles.mobileMenuItem}
-                          onClick={() => dispatchCommand(commandId)}
-                        >
-                          <span className="material-symbols-rounded">{command.icon}</span>
-                          <span>{command.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>
