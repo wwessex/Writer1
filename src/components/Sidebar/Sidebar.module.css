@@ -61,6 +61,7 @@
   flex-direction: column;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  padding-bottom: var(--mobile-panel-padding-bottom);
 }
 
 .sidebar__undoBar {
@@ -104,6 +105,8 @@
     min-width: 0;
     max-width: 320px;
     box-shadow: var(--shadow-overlay, 0 16px 48px rgba(0,0,0,0.4));
+    padding-bottom: var(--mobile-panel-padding-bottom);
+    max-height: var(--mobile-viewport-height);
     transform: translateX(0);
     transition: transform 0.25s ease-out;
   }
@@ -149,4 +152,16 @@
 
 .panelSection__header:hover {
   background: var(--panel-subtle, rgba(127, 127, 127, 0.08));
+}
+
+@media (max-width: 820px) and (max-height: 500px) {
+  .sidebar {
+    width: min(88%, 300px);
+  }
+}
+
+@media (max-width: 820px) and (max-height: 420px) {
+  .sidebar {
+    width: min(92%, 280px);
+  }
 }

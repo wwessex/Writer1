@@ -101,6 +101,7 @@
   flex: 1;
   overflow-y: auto;
   padding: var(--space-2);
+  padding-bottom: var(--mobile-panel-padding-bottom);
 }
 
 .empty {
@@ -275,8 +276,8 @@
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    height: min(70vh, calc(100dvh - 120px));
-    max-height: min(70vh, calc(100dvh - 120px));
+    height: min(calc(var(--mobile-overlay-max-height) - var(--mobile-nav-offset)), 70dvh);
+    max-height: min(calc(var(--mobile-overlay-max-height) - var(--mobile-nav-offset)), 70dvh);
     border-left: none;
     border-top: 1px solid var(--border);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
@@ -287,5 +288,19 @@
   @keyframes slideUpSheet {
     from { transform: translateY(100%); }
     to { transform: translateY(0); }
+  }
+}
+
+@media (max-width: 820px) and (max-height: 500px) {
+  .inspector {
+    height: calc(var(--mobile-viewport-height) - 88px - var(--mobile-safe-top));
+    max-height: calc(var(--mobile-viewport-height) - 88px - var(--mobile-safe-top));
+  }
+}
+
+@media (max-width: 820px) and (max-height: 420px) {
+  .inspector {
+    height: calc(var(--mobile-viewport-height) - 72px - var(--mobile-safe-top));
+    max-height: calc(var(--mobile-viewport-height) - 72px - var(--mobile-safe-top));
   }
 }
