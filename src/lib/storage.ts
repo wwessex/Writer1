@@ -15,6 +15,7 @@ export interface GoalTrendSnapshot {
 
 const COMMENT_THREADS_STORAGE_PREFIX = 'draftharbour_comment_threads_';
 const SETTINGS_STORAGE_KEY = 'draftharbour_settings_v1';
+const SUPPORTED_DHPROJ_VERSIONS = new Set<number>([1]);
 
 class DraftHarbourDB extends Dexie {
   novels!: EntityTable<Novel, 'id'>;
@@ -465,21 +466,79 @@ export async function importDhproj(file: File): Promise<Novel> {
   const JSZip = (await import('jszip')).default;
   const zip = await JSZip.loadAsync(file);
 
+  const manifestFile = zip.file('manifest.json');
+  if (manifestFile) {
+    let manifestRaw: string;
+    try {
+      manifestRaw = await manifestFile.async('string');
+    } catch {
+      throw new Error('Invalid .dhproj file: unable to read manifest.json');
+    }
+
+    let manifestData: unknown;
+    try {
+      manifestData = JSON.parse(manifestRaw);
+    } catch {
+      throw new Error('Invalid .dhproj file: malformed manifest.json');
+    }
+
+    const manifest = manifestData as Partial<DhprojManifest>;
+    if (manifest.format !== 'dhproj') {
+      throw new Error('Invalid .dhproj file: manifest format must be "dhproj"');
+    }
+
+    if (!SUPPORTED_DHPROJ_VERSIONS.has(Number(manifest.version))) {
+      throw new Error(`Unsupported .dhproj version: ${String(manifest.version)}`);
+    }
+  }
+
   const projectFile = zip.file('project.json');
   if (!projectFile) throw new Error('Invalid .dhproj file: missing project.json');
 
-  const raw = await projectFile.async('string');
-  const data = JSON.parse(raw) as DhprojData;
+  let raw: string;
+  try {
+    raw = await projectFile.async('string');
+  } catch {
+    throw new Error('Invalid .dhproj file: unable to read project.json');
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('Invalid .dhproj file: malformed project.json');
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('Invalid .dhproj file: malformed payload (expected object)');
+  }
+
+  const candidate = parsed as Partial<DhprojData>;
+  if (!candidate.project || typeof candidate.project !== 'object') {
+    throw new Error('Invalid .dhproj file: malformed payload (missing project)');
+  }
+  if (!Array.isArray(candidate.sections)) {
+    throw new Error('Invalid .dhproj file: malformed payload (sections must be an array)');
+  }
+  if (!candidate.projectType || (candidate.projectType !== 'book' && candidate.projectType !== 'screenplay')) {
+    throw new Error('Invalid .dhproj file: malformed payload (invalid projectType)');
+  }
+
+  const data = candidate as DhprojData;
+  const projectId = typeof data.project.id === 'string' ? data.project.id : undefined;
+  if (!projectId) {
+    throw new Error('Invalid .dhproj file: malformed payload (project.id is required)');
+  }
 
   // Remap IDs so the imported project doesn't collide with existing data
   const newNovelId = generateId();
   const idMap = new Map<string, string>();
-  idMap.set(data.project.id, newNovelId);
+  idMap.set(projectId, newNovelId);
 
   const novel: Novel = {
     ...data.project,
     id: newNovelId,
-    projectType: data.projectType,
+    projectType: normalizeProjectType(data.projectType),
     updatedAt: Date.now(),
   };
 
@@ -489,13 +548,15 @@ export async function importDhproj(file: File): Promise<Novel> {
     return { ...chapter, id: newId, novelId: newNovelId, updatedAt: Date.now() };
   });
 
-  const snapshots: Snapshot[] = (data.snapshots || []).map(snapshot => ({
+  const snapshotsSource = Array.isArray(data.snapshots) ? data.snapshots : [];
+  const snapshots: Snapshot[] = snapshotsSource.map(snapshot => ({
     ...snapshot,
     id: generateId(),
     chapterId: idMap.get(snapshot.chapterId) || snapshot.chapterId,
   }));
 
-  const commentThreads = (data.commentThreads || []).map(thread => ({
+  const commentThreadsSource = Array.isArray(data.commentThreads) ? data.commentThreads : [];
+  const commentThreads = commentThreadsSource.map(thread => ({
     ...thread,
     chapterId: idMap.get(thread.chapterId) || thread.chapterId,
   }));
