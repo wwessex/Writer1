@@ -29,7 +29,7 @@ const BASE_STEPS: OnboardingStep[] = [
   },
   {
     icon: 'menu_book',
-    title: 'Organize Your Work',
+    title: 'Organise Your Work',
     description: 'Create chapters in the sidebar, then break each chapter into scenes for detailed planning. Drag to reorder and add metadata like status, POV, and tags.',
     tips: [
       'Click the + button in the sidebar to create your first chapter',
@@ -54,7 +54,7 @@ const BASE_STEPS: OnboardingStep[] = [
     description: 'Use AI tools for brainstorming, continuity checks, and grammar fixes. Works with any OpenAI-compatible API (OpenAI, Ollama, LM Studio).',
     tips: [
       'Open Tools > AI Writing to configure your API endpoint and key',
-      'Preset prompts cover common tasks: continue writing, summarize, expand',
+      'Preset prompts cover common tasks: continue writing, summarise, expand',
       'Your API key is stored only in your browser\'s localStorage'
     ]
   },

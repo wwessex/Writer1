@@ -78,7 +78,7 @@ export function AnalysisModal({ open, onClose }: AnalysisModalProps) {
       <Dialog open={open} onClose={onClose} title="Writing Analysis" size="large">
         <div className={styles.analysisEmptyState}>
           <span className={`material-symbols-rounded ${styles.analysisEmptyState__icon}`}>analytics</span>
-          <p className={styles.emptyMessage}>Select a {sectionLabel} to analyze</p>
+          <p className={styles.emptyMessage}>Select a {sectionLabel} to analyse</p>
           <p className={styles.analysisEmptyState__hint}>
             Choose a {sectionLabel} from the sidebar first. Analysis includes readability scores, repeated word detection, pacing checks, and optional grammar checking.
           </p>
@@ -210,7 +210,7 @@ export function AnalysisModal({ open, onClose }: AnalysisModalProps) {
               ))}
             </div>
           ) : (
-            <p className={styles.emptyMessage}>Click "Run Grammar Check" to analyze</p>
+            <p className={styles.emptyMessage}>Click "Run Grammar Check" to analyse</p>
           )}
         </div>
       </div>

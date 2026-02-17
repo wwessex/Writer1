@@ -86,12 +86,12 @@ const SETTINGS_SECTIONS = [
   {
     id: 'app',
     title: 'Application',
-    keywords: ['app', 'behavior', 'productivity'],
+    keywords: ['app', 'behaviour', 'productivity'],
     fields: [
       { id: 'autosaveMs', label: 'Autosave (ms)', keywords: ['autosave', 'save delay'] },
       { id: 'dailyWordGoal', label: 'Daily Word Goal', keywords: ['target', 'daily'] },
       { id: 'novelWordGoal', label: 'Novel Word Goal', keywords: ['target', 'project goal'] },
-      { id: 'typewriterMode', label: 'Typewriter Mode', keywords: ['scroll', 'cursor', 'center'] }
+      { id: 'typewriterMode', label: 'Typewriter Mode', keywords: ['scroll', 'cursor', 'centre'] }
     ]
   },
   {
