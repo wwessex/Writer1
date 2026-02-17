@@ -30,6 +30,12 @@ export function VirtualChapterList() {
   const sectionLabel = isScreenplay ? 'Scenes' : 'Chapters';
   const singularLabel = isScreenplay ? 'Scene' : 'Chapter';
 
+  // Disable drag on touch/mobile devices to prevent interference with scroll
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  useEffect(() => {
+    setIsTouchDevice(window.matchMedia('(pointer: coarse)').matches);
+  }, []);
+
   const hasActiveFilters = statusFilter !== 'all' || productionTagFilter !== 'all';
 
   const [dragState, setDragState] = useState<DragState>({
@@ -170,11 +176,11 @@ export function VirtualChapterList() {
           right: 0,
           height: `${ITEM_HEIGHT}px`
         } : undefined}
-        draggable
-        onDragStart={e => handleDragStart(e, chapter.id)}
-        onDragOver={e => handleDragOver(e, chapter.id)}
-        onDragEnd={handleDragEnd}
-        onDrop={e => handleDrop(e, chapter.id)}
+        draggable={!isTouchDevice}
+        onDragStart={!isTouchDevice ? (e => handleDragStart(e, chapter.id)) : undefined}
+        onDragOver={!isTouchDevice ? (e => handleDragOver(e, chapter.id)) : undefined}
+        onDragEnd={!isTouchDevice ? handleDragEnd : undefined}
+        onDrop={!isTouchDevice ? (e => handleDrop(e, chapter.id)) : undefined}
         onClick={() => handleChapterSelect(chapter.id)}
         role="option"
         aria-selected={isActive}

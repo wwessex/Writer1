@@ -3,6 +3,8 @@
   flex: 1;
   padding: var(--space-2, 16px);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .outline__empty {

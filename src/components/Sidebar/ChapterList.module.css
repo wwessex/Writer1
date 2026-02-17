@@ -63,6 +63,8 @@
   gap: 4px;
   max-height: 300px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Chapter card — bento style */

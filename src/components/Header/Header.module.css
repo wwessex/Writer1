@@ -118,6 +118,8 @@
   box-shadow: var(--shadow-float, 0 8px 24px rgba(0,0,0,0.25));
   animation: mobileMenuIn 0.15s ease-out;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
 .mobileMenuSection {

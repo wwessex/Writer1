@@ -49,11 +49,16 @@
   right: 0;
   z-index: 260;
   min-width: 210px;
+  max-height: min(60vh, 360px);
+  overflow-y: auto;
   padding: 8px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-card, 12px);
   box-shadow: var(--shadow-float, 0 8px 24px rgba(0,0,0,0.25));
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .moreFormattingItem {

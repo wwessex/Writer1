@@ -82,16 +82,28 @@ export function Toolbar() {
     };
   }, [isMobile]);
 
+  // Track whether a touch moved (scrolled) so we don't close the menu on scroll
+  const touchMovedRef = useRef(false);
+
   useEffect(() => {
+    const handleTouchStart = () => { touchMovedRef.current = false; };
+    const handleTouchMove = () => { touchMovedRef.current = true; };
     const handleClickOutside = (event: MouseEvent) => {
+      if (touchMovedRef.current) return;
       if (moreFormattingRef.current && !moreFormattingRef.current.contains(event.target as Node)) {
         setMoreFormattingOpen(false);
       }
     };
 
     if (moreFormattingOpen) {
+      document.addEventListener('touchstart', handleTouchStart, { passive: true });
+      document.addEventListener('touchmove', handleTouchMove, { passive: true });
       document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
+      return () => {
+        document.removeEventListener('touchstart', handleTouchStart);
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('click', handleClickOutside);
+      };
     }
   }, [moreFormattingOpen]);
 
