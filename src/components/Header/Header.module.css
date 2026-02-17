@@ -2,6 +2,7 @@
 .header {
   position: sticky;
   top: 0;
+  /* Layer baseline for mobile overlays: header (200), backdrops (240), sheets (250), transient menus (300+) */
   z-index: 200;
   background: var(--panel);
   border-bottom: 1px solid var(--border-subtle, var(--border));
