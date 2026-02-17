@@ -24,6 +24,7 @@ type ActionFilter = typeof ACTION_FILTERS[number];
 interface SwitcherItem {
   id: string;
   type: ItemType;
+  recentKey: string;
   title: string;
   subtitle?: string;
   shortcut?: string;
@@ -39,6 +40,12 @@ const SEARCH_DEBOUNCE_MS = 140;
 const MAX_RESULTS = 40;
 
 const MODE_ORDER: SearchMode[] = ['action', 'chapter', 'search-result'];
+
+const MODE_LABELS: Record<SearchMode, string> = {
+  action: 'Actions',
+  chapter: 'Chapters',
+  'search-result': 'Content',
+};
 
 function scoreItem(item: SwitcherItem, normalizedQuery: string): number {
   if (!normalizedQuery) return 0;
@@ -123,6 +130,7 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
       return {
         id: ch.id,
         type: 'chapter',
+        recentKey: `chapter:${ch.id}`,
         title: ch.title || `${chapterLabel} ${idx + 1}`,
         subtitle: `${ch.words} words`,
         lastOpenedAt: recentOpenedMap[itemId],
@@ -143,6 +151,7 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
       .map(metadata => ({
         id: metadata.id,
         type: 'action' as const,
+        recentKey: `action:${metadata.id}`,
         title: metadata.id === 'newChapter' ? (isScreenplay ? 'New Scene' : metadata.label) : metadata.label,
         subtitle: metadata.group,
         icon: metadata.icon,
@@ -163,6 +172,7 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
     return matches.map((match, idx) => ({
       id: `search:${match.chapterId}:${match.match.start}:${idx}`,
       type: 'search-result',
+      recentKey: `search-result:${match.chapterId}:${match.match.start}`,
       title: match.chapterTitle,
       subtitle: `Match in ${chapterLabel.toLowerCase()} content`,
       snippet: match.snippet,
@@ -211,10 +221,9 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
   }, [actionItems, chapterItems, query, searchMode, searchResultItems]);
 
   const runItemAction = useCallback((item: SwitcherItem) => {
-    const recentId = item.type === 'search-result' ? `search-result:${item.id}` : `${item.type}:${item.id}`;
     setRecentOpenedMap(prev => ({
       ...prev,
-      [recentId]: Date.now(),
+      [item.recentKey]: Date.now(),
     }));
     item.action();
   }, []);
@@ -248,6 +257,15 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
   }, [searchMode, updateSettings]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.ctrlKey && !e.shiftKey && !e.altKey) {
+      const modeFromShortcut = e.key === '1' ? 'action' : e.key === '2' ? 'chapter' : e.key === '3' ? 'search-result' : null;
+      if (modeFromShortcut) {
+        e.preventDefault();
+        updateSettings({ quickSwitcherMode: modeFromShortcut });
+        return;
+      }
+    }
+
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
@@ -272,7 +290,7 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
         onClose();
         break;
     }
-  }, [filteredItems, selectedIndex, onClose, runItemAction, cycleSearchMode]);
+  }, [filteredItems, selectedIndex, onClose, runItemAction, cycleSearchMode, updateSettings]);
 
   if (!open) return null;
 
@@ -293,6 +311,20 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
           />
           <kbd className={styles.kbd}>Tab: {searchMode === 'action' ? 'Commands' : searchMode === 'chapter' ? chapterLabel + 's' : 'Content'}</kbd>
           <kbd className={styles.kbd}>Esc</kbd>
+        </div>
+        <div className={styles.modeBar} role="tablist" aria-label="Quick switch mode">
+            {MODE_ORDER.map((mode, idx) => (
+              <button
+                key={mode}
+                className={`${styles.modeChip} ${searchMode === mode ? styles['modeChip--active'] : ''}`}
+                type="button"
+                role="tab"
+                aria-selected={searchMode === mode}
+                onClick={() => updateSettings({ quickSwitcherMode: mode })}
+              >
+                {MODE_LABELS[mode]} <kbd className={styles.modeShortcut}>Ctrl+{idx + 1}</kbd>
+              </button>
+            ))}
         </div>
         {searchMode === 'action' && (
           <div className={styles.filterBar}>
