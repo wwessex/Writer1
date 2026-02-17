@@ -36,10 +36,11 @@ const MOBILE_SECTION_BY_MENU_LABEL: Record<string, MobileMenuSection['section']>
 };
 
 export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSelection = false }: HeaderProps) {
-  const { state, dispatch, updateNovelTitle } = useApp();
+  const { state, updateNovelTitle } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuRootRef = useRef<HTMLDivElement>(null);
   const mobileMenuListRef = useRef<HTMLDivElement>(null);
+  const burgerRef = useRef<HTMLDivElement>(null);
   const [mobileMenuHasMore, setMobileMenuHasMore] = useState(false);
 
   const projectMetrics = useMemo(() => getProjectMetrics(state.chapters), [state.chapters]);
@@ -68,8 +69,8 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
   const chapterWords = activeChapter?.words ?? 0;
 
   const handleMenuButtonClick = useCallback(() => {
-    dispatch({ type: 'TOGGLE_SIDEBAR' });
-  }, [dispatch]);
+    setMobileMenuOpen(prev => !prev);
+  }, []);
   const hasNoChapterContent = totalWords === 0;
   const aiConfigured = useMemo(() => {
     const provider = createProvider(loadAIConfig());
@@ -169,7 +170,11 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
   }, [aiConfigured, hasNoChapterContent, hasTextSelection]);
 
   const handlePointerDownOutside = useCallback((event: PointerEvent) => {
-    if (mobileMenuRootRef.current && !mobileMenuRootRef.current.contains(event.target as Node)) {
+    const target = event.target as Node;
+    if (
+      mobileMenuRootRef.current && !mobileMenuRootRef.current.contains(target) &&
+      !(burgerRef.current && burgerRef.current.contains(target))
+    ) {
       setMobileMenuOpen(false);
     }
   }, []);
@@ -230,10 +235,10 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
     <header className={styles.header}>
       <div className={styles.topbar}>
         <div className={styles.topbar__brand}>
-          <div className={styles.burgerMenu}>
+          <div className={styles.burgerMenu} ref={burgerRef}>
             <IconButton
               icon="menu"
-              label="Toggle sidebar"
+              label="Open menu"
               onClick={handleMenuButtonClick}
               className={styles.menuBtn}
             />
@@ -294,16 +299,6 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
             })}
           </div>
 
-          {/* Mobile overflow menu toggle */}
-          <div className={styles.mobileOverflow}>
-            <IconButton
-              icon="more_vert"
-              label="Open command menu"
-              variant="ghost"
-              onClick={() => setMobileMenuOpen(prev => !prev)}
-              className={styles.mobileOverflowBtn}
-            />
-          </div>
         </div>
       </div>
       {mobileMenuOpen && (
