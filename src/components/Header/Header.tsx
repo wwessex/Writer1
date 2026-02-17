@@ -38,7 +38,7 @@ const MOBILE_SECTION_BY_MENU_LABEL: Record<string, MobileMenuSection['section']>
 export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSelection = false }: HeaderProps) {
   const { state, dispatch, updateNovelTitle } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRootRef = useRef<HTMLDivElement>(null);
   const mobileMenuListRef = useRef<HTMLDivElement>(null);
   const [mobileMenuHasMore, setMobileMenuHasMore] = useState(false);
 
@@ -68,10 +68,6 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
   const chapterWords = activeChapter?.words ?? 0;
 
   const handleMenuButtonClick = useCallback(() => {
-    if (window.matchMedia('(max-width: 820px)').matches) {
-      setMobileMenuOpen(prev => !prev);
-      return;
-    }
     dispatch({ type: 'TOGGLE_SIDEBAR' });
   }, [dispatch]);
   const hasNoChapterContent = totalWords === 0;
@@ -172,22 +168,8 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
     return selected.slice(0, 5);
   }, [aiConfigured, hasNoChapterContent, hasTextSelection]);
 
-  // Track whether a touch moved (scrolled) so we don't close the menu on scroll
-  const touchMovedRef = useRef(false);
-
-  const handleTouchStart = useCallback(() => {
-    touchMovedRef.current = false;
-  }, []);
-
-  const handleTouchMove = useCallback(() => {
-    touchMovedRef.current = true;
-  }, []);
-
-  const handleClickOutside = useCallback((e: MouseEvent | TouchEvent) => {
-    // Ignore if this was a scroll gesture, not a tap
-    if (touchMovedRef.current) return;
-    const target = ('touches' in e) ? e.target : e.target;
-    if (mobileMenuRef.current && !mobileMenuRef.current.contains(target as Node)) {
+  const handlePointerDownOutside = useCallback((event: PointerEvent) => {
+    if (mobileMenuRootRef.current && !mobileMenuRootRef.current.contains(event.target as Node)) {
       setMobileMenuOpen(false);
     }
   }, []);
@@ -213,75 +195,48 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
   }, []);
 
   useEffect(() => {
-    if (mobileMenuOpen) {
-      document.addEventListener('touchstart', handleTouchStart, { passive: true });
-      document.addEventListener('touchmove', handleTouchMove, { passive: true });
-      document.addEventListener('click', handleClickOutside);
-      updateMobileMenuMoreState();
-      const frameId = window.requestAnimationFrame(updateMobileMenuMoreState);
-
-      const mobileMenuNode = mobileMenuListRef.current;
-      if (mobileMenuNode) {
-        mobileMenuNode.addEventListener('scroll', updateMobileMenuMoreState, { passive: true });
-      }
-
-      window.addEventListener('resize', updateMobileMenuMoreState);
-      return () => {
-        document.removeEventListener('touchstart', handleTouchStart);
-        document.removeEventListener('touchmove', handleTouchMove);
-        document.removeEventListener('click', handleClickOutside);
-        if (mobileMenuNode) {
-          mobileMenuNode.removeEventListener('scroll', updateMobileMenuMoreState);
-        }
-        window.cancelAnimationFrame(frameId);
-        window.removeEventListener('resize', updateMobileMenuMoreState);
-      };
+    if (!mobileMenuOpen) {
+      return;
     }
-  }, [mobileMenuOpen, handleClickOutside, handleTouchStart, handleTouchMove, updateMobileMenuMoreState]);
+
+    updateMobileMenuMoreState();
+    const frameId = window.requestAnimationFrame(updateMobileMenuMoreState);
+    const mobileMenuNode = mobileMenuListRef.current;
+
+    document.addEventListener('pointerdown', handlePointerDownOutside, true);
+    if (mobileMenuNode) {
+      mobileMenuNode.addEventListener('scroll', updateMobileMenuMoreState, { passive: true });
+    }
+
+    const handleViewportChange = () => {
+      setMobileMenuOpen(false);
+    };
+
+    window.addEventListener('resize', handleViewportChange);
+    window.addEventListener('orientationchange', handleViewportChange);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDownOutside, true);
+      if (mobileMenuNode) {
+        mobileMenuNode.removeEventListener('scroll', updateMobileMenuMoreState);
+      }
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener('resize', handleViewportChange);
+      window.removeEventListener('orientationchange', handleViewportChange);
+    };
+  }, [mobileMenuOpen, handlePointerDownOutside, updateMobileMenuMoreState]);
 
   return (
     <header className={styles.header}>
       <div className={styles.topbar}>
         <div className={styles.topbar__brand}>
-          <div className={styles.burgerMenu} ref={mobileMenuRef}>
+          <div className={styles.burgerMenu}>
             <IconButton
               icon="menu"
-              label="Toggle menu"
+              label="Toggle sidebar"
               onClick={handleMenuButtonClick}
               className={styles.menuBtn}
             />
-            {mobileMenuOpen && (
-              <div className={styles.mobileMenu}>
-                <div className={styles.mobileMenuScrollable} ref={mobileMenuListRef}>
-                  {mobileMenuSections.map(({ section, items }) => (
-                    <div key={section} className={styles.mobileMenuSection}>
-                      <div className={styles.mobileMenuSectionTitle}>{section}</div>
-                      {items.map(commandId => {
-                        const command = getCommandPresentation(commandId);
-                        return (
-                          <button
-                            key={commandId}
-                            className={styles.mobileMenuItem}
-                            onClick={() => dispatchCommand(commandId)}
-                          >
-                            <span className="material-symbols-rounded">{command.icon}</span>
-                            <span>{command.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-                <button
-                  className={`${styles.mobileMenuMoreBtn} ${!mobileMenuHasMore ? styles['mobileMenuMoreBtn--end'] : ''}`}
-                  onClick={handleMobileMenuMoreClick}
-                  disabled={!mobileMenuHasMore}
-                >
-                  <span>{mobileMenuHasMore ? 'More' : 'End'}</span>
-                  <span className="material-symbols-rounded">{mobileMenuHasMore ? 'expand_more' : 'check'}</span>
-                </button>
-              </div>
-            )}
           </div>
           <img src={`${import.meta.env.BASE_URL}assets/${state.settings.theme === 'light' ? 'icon-black' : 'icon-blue'}-64.png`} alt="DraftHarbour" className={styles.logo} />
           <Input
@@ -343,7 +298,7 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
           <div className={styles.mobileOverflow}>
             <IconButton
               icon="more_vert"
-              label="More options"
+              label="Open command menu"
               variant="ghost"
               onClick={() => setMobileMenuOpen(prev => !prev)}
               className={styles.mobileOverflowBtn}
@@ -351,6 +306,40 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
           </div>
         </div>
       </div>
+      {mobileMenuOpen && (
+        <div className={styles.mobileMenuLayer} ref={mobileMenuRootRef}>
+          <div className={styles.mobileMenu}>
+            <div className={styles.mobileMenuScrollable} ref={mobileMenuListRef}>
+              {mobileMenuSections.map(({ section, items }) => (
+                <div key={section} className={styles.mobileMenuSection}>
+                  <div className={styles.mobileMenuSectionTitle}>{section}</div>
+                  {items.map(commandId => {
+                    const command = getCommandPresentation(commandId);
+                    return (
+                      <button
+                        key={commandId}
+                        className={styles.mobileMenuItem}
+                        onClick={() => dispatchCommand(commandId)}
+                      >
+                        <span className="material-symbols-rounded">{command.icon}</span>
+                        <span>{command.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            <button
+              className={`${styles.mobileMenuMoreBtn} ${!mobileMenuHasMore ? styles['mobileMenuMoreBtn--end'] : ''}`}
+              onClick={handleMobileMenuMoreClick}
+              disabled={!mobileMenuHasMore}
+            >
+              <span>{mobileMenuHasMore ? 'More' : 'End'}</span>
+              <span className="material-symbols-rounded">{mobileMenuHasMore ? 'expand_more' : 'check'}</span>
+            </button>
+          </div>
+        </div>
+      )}
       <MenuBar onAction={onAction} />
       <Toolbar />
     </header>
