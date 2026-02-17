@@ -185,6 +185,8 @@ export interface DhprojData {
   commentThreads: CommentThread[];
   settings: Partial<AppSettings>;
   goalTrends: unknown[];
+  // OAuth/session tokens are intentionally excluded from persisted/imported integration state.
+  integrations?: DhprojIntegrations;
   characters?: CharacterEntity[];
   worldEntries?: WorldEntry[];
 }
@@ -314,3 +316,10 @@ export interface IntegrationConfig {
   folderId?: string;
   lastSyncAt?: number;
 }
+
+export type PersistedIntegrationConfig = Pick<
+  IntegrationConfig,
+  'type' | 'enabled' | 'connectionId' | 'providerUserId' | 'scopes' | 'expiresAt' | 'status' | 'folderId' | 'lastSyncAt'
+>;
+
+export type DhprojIntegrations = Partial<Record<IntegrationType, PersistedIntegrationConfig>>;

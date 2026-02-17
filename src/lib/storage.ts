@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Novel, Chapter, Snapshot, BackupData, BackupDataV3, LegacyBackupData, ProjectType, CommentThread, DhprojData, DhprojManifest, AppSettings, CharacterEntity, WorldEntry } from '@/types';
+import type { Novel, Chapter, Snapshot, BackupData, BackupDataV3, LegacyBackupData, ProjectType, CommentThread, DhprojData, DhprojManifest, AppSettings, CharacterEntity, WorldEntry, DhprojIntegrations, IntegrationType, PersistedIntegrationConfig } from '@/types';
 import { generateId } from '@/lib/utils';
 
 const CURRENT_BACKUP_VERSION = 3;
@@ -17,6 +17,8 @@ const COMMENT_THREADS_STORAGE_PREFIX = 'draftharbour_comment_threads_';
 const SETTINGS_STORAGE_KEY = 'draftharbour_settings_v1';
 const CHARACTERS_STORAGE_KEY = 'draftharbour_characters';
 const WORLD_ENTRIES_STORAGE_KEY = 'draftharbour_world';
+const INTEGRATIONS_STORAGE_KEY = 'draftharbour_integrations';
+const ALLOWED_INTEGRATION_TYPES: IntegrationType[] = ['scrivener', 'google-drive', 'dropbox'];
 const SUPPORTED_DHPROJ_VERSIONS = new Set<number>([1]);
 
 class DraftHarbourDB extends Dexie {
@@ -447,6 +449,60 @@ export function getGoalTrendSnapshots(days: number = 8): GoalTrendSnapshot[] {
   return entries.slice(-days);
 }
 
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function sanitizePersistedIntegrationConfig(type: IntegrationType, value: unknown): PersistedIntegrationConfig | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const status = value.status;
+  const safeStatus = status === 'disconnected' || status === 'pending' || status === 'connected' || status === 'error'
+    ? status
+    : undefined;
+
+  return {
+    type,
+    enabled: typeof value.enabled === 'boolean' ? value.enabled : false,
+    connectionId: typeof value.connectionId === 'string' ? value.connectionId : undefined,
+    providerUserId: typeof value.providerUserId === 'string' ? value.providerUserId : undefined,
+    scopes: Array.isArray(value.scopes) ? value.scopes.filter((scope): scope is string => typeof scope === 'string') : undefined,
+    expiresAt: typeof value.expiresAt === 'number' ? value.expiresAt : undefined,
+    status: safeStatus,
+    folderId: typeof value.folderId === 'string' ? value.folderId : undefined,
+    lastSyncAt: typeof value.lastSyncAt === 'number' ? value.lastSyncAt : undefined,
+  };
+}
+
+function readPersistedIntegrationsFromStorage(): DhprojIntegrations | undefined {
+  const raw = localStorage.getItem(INTEGRATIONS_STORAGE_KEY);
+  if (!raw) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isRecord(parsed)) {
+      return undefined;
+    }
+
+    const integrations: DhprojIntegrations = {};
+    for (const type of ALLOWED_INTEGRATION_TYPES) {
+      const safeConfig = sanitizePersistedIntegrationConfig(type, parsed[type]);
+      if (safeConfig) {
+        integrations[type] = safeConfig;
+      }
+    }
+
+    return Object.keys(integrations).length > 0 ? integrations : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // Clear all data
 export async function clearAllData(): Promise<void> {
   await db.transaction('rw', [db.novels, db.chapters, db.snapshots], async () => {
@@ -486,6 +542,8 @@ export async function exportDhproj(novelId: string): Promise<Blob> {
   const worldEntries = loadStoredEntities<WorldEntry>(WORLD_ENTRIES_STORAGE_KEY)
     .filter(isWorldEntry)
     .filter(entry => entry.novelId === novelId);
+  // Safe persisted integration data contains connection metadata only (never OAuth/session tokens).
+  const integrations = readPersistedIntegrationsFromStorage();
 
   const manifest: DhprojManifest = {
     format: 'dhproj',
@@ -503,6 +561,7 @@ export async function exportDhproj(novelId: string): Promise<Blob> {
     commentThreads,
     settings,
     goalTrends,
+    integrations,
     characters,
     worldEntries,
   };
@@ -581,6 +640,17 @@ export async function importDhproj(file: File): Promise<Novel> {
   }
   if (candidate.worldEntries !== undefined && !Array.isArray(candidate.worldEntries)) {
     throw new Error('Invalid .dhproj file: malformed payload (worldEntries must be an array)');
+  }
+  if (candidate.integrations !== undefined) {
+    if (!isRecord(candidate.integrations)) {
+      throw new Error('Invalid .dhproj file: malformed payload (integrations must be an object)');
+    }
+
+    const integrationKeys = Object.keys(candidate.integrations);
+    const hasInvalidIntegrationKey = integrationKeys.some(key => !ALLOWED_INTEGRATION_TYPES.includes(key as IntegrationType));
+    if (hasInvalidIntegrationKey) {
+      throw new Error('Invalid .dhproj file: malformed payload (unsupported integration provider key)');
+    }
   }
 
   const data = candidate as DhprojData;
@@ -689,6 +759,32 @@ export async function importDhproj(file: File): Promise<Novel> {
       ) {
         upsertGoalTrendSnapshot(entry as GoalTrendSnapshot);
       }
+    }
+  }
+
+
+  if (data.integrations && typeof data.integrations === 'object') {
+    try {
+      const existingRaw = localStorage.getItem(INTEGRATIONS_STORAGE_KEY);
+      const existingParsed = existingRaw ? JSON.parse(existingRaw) as unknown : {};
+      const existing = isRecord(existingParsed) ? existingParsed : {};
+      const merged: DhprojIntegrations = {};
+
+      for (const type of ALLOWED_INTEGRATION_TYPES) {
+        const safeExisting = sanitizePersistedIntegrationConfig(type, existing[type]);
+        const safeImported = sanitizePersistedIntegrationConfig(type, (data.integrations as Record<string, unknown>)[type]);
+        const resolved = safeImported ?? safeExisting;
+        if (resolved) {
+          merged[type] = resolved;
+        }
+      }
+
+      if (Object.keys(merged).length > 0) {
+        // By design, only safe metadata is persisted; OAuth/session tokens are excluded.
+        localStorage.setItem(INTEGRATIONS_STORAGE_KEY, JSON.stringify(merged));
+      }
+    } catch {
+      /* ignore */
     }
   }
 
