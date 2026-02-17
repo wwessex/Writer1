@@ -317,11 +317,14 @@ export interface IntegrationConfig {
   status?: 'disconnected' | 'pending' | 'connected' | 'error';
   folderId?: string;
   lastSyncAt?: number;
+  accessToken?: string;
+  refreshToken?: string;
+  clientId?: string;
 }
 
 export type PersistedIntegrationConfig = Pick<
   IntegrationConfig,
-  'type' | 'enabled' | 'connectionId' | 'providerUserId' | 'scopes' | 'expiresAt' | 'status' | 'folderId' | 'lastSyncAt'
+  'type' | 'enabled' | 'connectionId' | 'providerUserId' | 'scopes' | 'expiresAt' | 'status' | 'folderId' | 'lastSyncAt' | 'accessToken' | 'refreshToken' | 'clientId'
 >;
 
 export type DhprojIntegrations = Partial<Record<IntegrationType, PersistedIntegrationConfig>>;
