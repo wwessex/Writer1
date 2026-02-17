@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useApp } from '@/context/AppContext';
 import type { ProjectType, SidebarPanelId } from '@/types';
 import { VirtualChapterList } from './VirtualChapterList';
@@ -6,6 +6,7 @@ import { OutlinePanel } from './OutlinePanel';
 import { ScenePlanner } from './ScenePlanner';
 import { Button, IconButton } from '@/components/UI';
 import { useResizable } from '@/hooks/useResizable';
+import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 import styles from './Sidebar.module.css';
 
 interface SidebarProps {
@@ -30,6 +31,8 @@ export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
   const isHidden = state.settings.sidebarHidden;
   const sidebarPanels = state.settings.sidebarPanels;
 
+  const sidebarRef = useRef<HTMLElement | null>(null);
+
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 820);
@@ -52,6 +55,14 @@ export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
       dispatch({ type: 'TOGGLE_SIDEBAR' });
     }
   };
+
+  const isMobileDialogOpen = isMobile && !isHidden;
+
+  useModalAccessibility({
+    enabled: isMobileDialogOpen,
+    onRequestClose: closeSidebar,
+    containerRef: sidebarRef,
+  });
 
   const panelDefinitions: SidebarPanelDefinition[] = useMemo(() => [
     {
@@ -109,9 +120,26 @@ export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
     <>
       <div className={backdropClass} onClick={closeSidebar} aria-hidden="true" />
       <aside
+        ref={sidebarRef}
         className={sidebarClass}
+        role={isMobileDialogOpen ? 'dialog' : 'complementary'}
+        aria-modal={isMobileDialogOpen ? 'true' : undefined}
+        aria-label="Sidebar"
+        tabIndex={isMobileDialogOpen ? -1 : undefined}
         style={!isMobile && !isHidden ? { width: size } : undefined}
       >
+        <h2 className="sr-only">Sidebar</h2>
+        {isMobileDialogOpen && (
+          <div className={styles.sidebar__collapseBar}>
+            <IconButton
+              icon="close"
+              label="Close sidebar"
+              variant="ghost"
+              onClick={closeSidebar}
+              className={styles.collapseBtn}
+            />
+          </div>
+        )}
         {!isMobile && !isHidden && (
           <div className={styles.sidebar__collapseBar}>
             <IconButton
@@ -141,7 +169,10 @@ export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
             return (
               <section key={panel.id} className={styles.panelSection}>
                 <button
+                  type="button"
                   className={styles.panelSection__header}
+                  aria-expanded={!isCollapsed}
+                  aria-controls={`sidebar-panel-${panel.id}`}
                   onClick={() => togglePanelCollapsed(panel.id)}
                 >
                   <span>{panel.title}</span>
@@ -149,7 +180,7 @@ export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
                     {isCollapsed ? 'expand_more' : 'expand_less'}
                   </span>
                 </button>
-                {!isCollapsed && panel.render()}
+                {!isCollapsed && <div id={`sidebar-panel-${panel.id}`}>{panel.render()}</div>}
               </section>
             );
           })}
