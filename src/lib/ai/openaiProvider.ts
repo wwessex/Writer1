@@ -1,12 +1,8 @@
 /**
  * OpenAI-compatible chat completion provider.
- *
- * Extracted from the inline fetch logic previously in AIWritingModal
- * and AISuggestionsPanel. Works with any endpoint that speaks the
- * OpenAI chat completions format (OpenAI, Anthropic via proxy,
- * Ollama, LM Studio, etc.).
  */
 
+import { getBrokerBaseUrl, isAIDeveloperModeEnabled } from '@/lib/featureFlags';
 import type { AIProvider, AIProviderConfig, AIRequest, AIResponse } from './types';
 
 export class OpenAIProvider implements AIProvider {
@@ -15,6 +11,9 @@ export class OpenAIProvider implements AIProvider {
   constructor(private config: AIProviderConfig) {}
 
   isAvailable(): boolean {
+    if (!isAIDeveloperModeEnabled()) {
+      return true;
+    }
     return !!(this.config.endpoint?.trim() && this.config.sessionToken?.trim());
   }
 
@@ -24,10 +23,34 @@ export class OpenAIProvider implements AIProvider {
     }
 
     const start = Date.now();
-
     const fullPrompt = request.context
       ? `Here is the current ${request.projectType === 'screenplay' ? 'scene' : 'chapter'} text for context:\n\n---\n${request.context}\n---\n\n${request.prompt}`
       : request.prompt;
+
+    if (!isAIDeveloperModeEnabled()) {
+      const brokerRes = await fetch(`${getBrokerBaseUrl()}/api/ai/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          prompt: fullPrompt,
+          projectType: request.projectType,
+          model: this.config.model || 'gpt-4o',
+        }),
+        signal: request.signal,
+      });
+
+      if (!brokerRes.ok) {
+        const body = await brokerRes.text().catch(() => '');
+        throw new Error(`Broker AI request failed (${brokerRes.status}): ${body || brokerRes.statusText}`);
+      }
+
+      const brokerData = await brokerRes.json() as { text: string };
+      return {
+        text: brokerData.text,
+        provider: 'openai-compatible',
+        latencyMs: Date.now() - start,
+      };
+    }
 
     const res = await fetch(this.config.endpoint!, {
       method: 'POST',
@@ -53,9 +76,7 @@ export class OpenAIProvider implements AIProvider {
 
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      throw new Error(
-        `API request failed (${res.status}): ${body || res.statusText}`,
-      );
+      throw new Error(`API request failed (${res.status}): ${body || res.statusText}`);
     }
 
     const data = await res.json();
