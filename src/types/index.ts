@@ -169,6 +169,24 @@ export interface BackupDataV3 {
 
 export type BackupData = LegacyBackupData | BackupDataV3;
 
+export interface DhprojManifest {
+  format: 'dhproj';
+  version: 1;
+  appVersion: string;
+  createdAt: string;
+}
+
+export interface DhprojData {
+  manifest: DhprojManifest;
+  project: Project;
+  projectType: ProjectType;
+  sections: Section[];
+  snapshots: Snapshot[];
+  commentThreads: CommentThread[];
+  settings: Partial<AppSettings>;
+  goalTrends: unknown[];
+}
+
 // Character and World Bible types
 export interface CharacterEntity {
   id: string;

@@ -22,7 +22,7 @@ import { SettingsWindow, AboutWindow } from '@/components/Windows';
 import { ToastProvider, useToast } from '@/components/UI';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useModalState } from '@/hooks/useModalState';
-import { exportBackup, importBackup, createChapter, addChapter, upsertCommentThread } from '@/lib/storage';
+import { exportBackup, importBackup, exportDhproj, importDhproj, createChapter, addChapter, upsertCommentThread } from '@/lib/storage';
 import { importFile, mapImportedContentToProjectType } from '@/lib/import';
 import { downloadFile, generateId } from '@/lib/utils';
 import { COMMAND_IDS, type CommandId, runCommand } from '@/lib/commands';
@@ -58,6 +58,7 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const projectFileInputRef = useRef<HTMLInputElement>(null);
 
   // Load novel on mount
   useEffect(() => {
@@ -117,6 +118,35 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
       showToast('Failed to export backup', 'error');
     }
   }, [state.novelId, state.novelTitle, showToast]);
+
+  // Save project file (.dhproj)
+  const handleSaveProjectFile = useCallback(async () => {
+    try {
+      const blob = await exportDhproj(state.novelId);
+      downloadFile(blob, `${state.novelTitle}.dhproj`);
+      showToast('Project file saved', 'success', 'save');
+    } catch (err) {
+      console.error('Project file save failed:', err);
+      showToast('Failed to save project file', 'error');
+    }
+  }, [state.novelId, state.novelTitle, showToast]);
+
+  // Open project file (.dhproj)
+  const handleOpenProjectFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      await importDhproj(file);
+      showToast('Project file opened successfully. Reloading...', 'success');
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (err) {
+      console.error('Project file open failed:', err);
+      showToast('Failed to open project file. Check the file format.', 'error');
+    }
+
+    e.target.value = '';
+  };
 
   // Import backup
   const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -244,8 +274,10 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
       editor,
       fileInputRef,
       importInputRef,
+      projectFileInputRef,
       createChapter: createNewChapter,
       handleExportBackup,
+      handleSaveProjectFile,
       openModal,
       toggleModal,
       toggleInspector: () => setInspectorOpen(prev => !prev),
@@ -258,7 +290,7 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
       showToast,
       createCommentFromSelection,
     });
-  }, [createCommentFromSelection, createNewChapter, dispatch, editor, handleExportBackup, openModal, toggleModal, showToast, updateSettings, state.settings.typewriterMode]);
+  }, [createCommentFromSelection, createNewChapter, dispatch, editor, handleExportBackup, handleSaveProjectFile, openModal, toggleModal, showToast, updateSettings, state.settings.typewriterMode]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -274,6 +306,20 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'h' && !e.shiftKey) {
         e.preventDefault();
         findReplace.open(true);
+        return;
+      }
+
+      // Save Project File: Ctrl/Cmd+S
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && !e.shiftKey) {
+        e.preventDefault();
+        handleMenuAction(COMMAND_IDS.SAVE_PROJECT_FILE);
+        return;
+      }
+
+      // Open Project File: Ctrl/Cmd+O
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o' && !e.shiftKey) {
+        e.preventDefault();
+        handleMenuAction(COMMAND_IDS.OPEN_PROJECT_FILE);
         return;
       }
 
@@ -487,6 +533,14 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
         type="file"
         accept=".docx,.rtf,.txt,.fountain,.spmd"
         onChange={handleImportDocument}
+        style={{ display: 'none' }}
+        aria-hidden="true"
+      />
+      <input
+        ref={projectFileInputRef}
+        type="file"
+        accept=".dhproj"
+        onChange={handleOpenProjectFile}
         style={{ display: 'none' }}
         aria-hidden="true"
       />

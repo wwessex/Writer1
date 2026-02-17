@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Novel, Chapter, Snapshot, BackupData, BackupDataV3, LegacyBackupData, ProjectType, CommentThread } from '@/types';
+import type { Novel, Chapter, Snapshot, BackupData, BackupDataV3, LegacyBackupData, ProjectType, CommentThread, DhprojData, DhprojManifest, AppSettings } from '@/types';
 import { generateId } from '@/lib/utils';
 
 const CURRENT_BACKUP_VERSION = 3;
@@ -14,6 +14,7 @@ export interface GoalTrendSnapshot {
 }
 
 const COMMENT_THREADS_STORAGE_PREFIX = 'draftharbour_comment_threads_';
+const SETTINGS_STORAGE_KEY = 'draftharbour_settings_v1';
 
 class DraftHarbourDB extends Dexie {
   novels!: EntityTable<Novel, 'id'>;
@@ -412,4 +413,126 @@ export async function clearAllData(): Promise<void> {
   Object.keys(localStorage)
     .filter(key => key.startsWith(COMMENT_THREADS_STORAGE_PREFIX))
     .forEach(key => localStorage.removeItem(key));
+}
+
+// Project file (.dhproj) operations
+export async function exportDhproj(novelId: string): Promise<Blob> {
+  const novel = await getNovel(novelId);
+  if (!novel) throw new Error('Novel not found');
+
+  const chapters = await getChapters(novelId);
+  const chapterIds = chapters.map(c => c.id);
+  const snapshots = await db.snapshots.where('chapterId').anyOf(chapterIds).toArray();
+  const commentThreads = getCommentThreadsForChapters(chapterIds);
+
+  // Read settings from localStorage
+  let settings: Partial<AppSettings> = {};
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (raw) settings = JSON.parse(raw);
+  } catch { /* ignore parse errors */ }
+
+  // Read goal trends
+  const goalTrends = loadGoalTrendSnapshots();
+
+  const manifest: DhprojManifest = {
+    format: 'dhproj',
+    version: 1,
+    appVersion: '1.0.0',
+    createdAt: new Date().toISOString(),
+  };
+
+  const data: DhprojData = {
+    manifest,
+    project: novel,
+    projectType: novel.projectType || 'book',
+    sections: chapters,
+    snapshots,
+    commentThreads,
+    settings,
+    goalTrends,
+  };
+
+  const JSZip = (await import('jszip')).default;
+  const zip = new JSZip();
+  zip.file('manifest.json', JSON.stringify(manifest, null, 2));
+  zip.file('project.json', JSON.stringify(data, null, 2));
+
+  return zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+}
+
+export async function importDhproj(file: File): Promise<Novel> {
+  const JSZip = (await import('jszip')).default;
+  const zip = await JSZip.loadAsync(file);
+
+  const projectFile = zip.file('project.json');
+  if (!projectFile) throw new Error('Invalid .dhproj file: missing project.json');
+
+  const raw = await projectFile.async('string');
+  const data = JSON.parse(raw) as DhprojData;
+
+  // Remap IDs so the imported project doesn't collide with existing data
+  const newNovelId = generateId();
+  const idMap = new Map<string, string>();
+  idMap.set(data.project.id, newNovelId);
+
+  const novel: Novel = {
+    ...data.project,
+    id: newNovelId,
+    projectType: data.projectType,
+    updatedAt: Date.now(),
+  };
+
+  const chapters: Chapter[] = data.sections.map(chapter => {
+    const newId = generateId();
+    idMap.set(chapter.id, newId);
+    return { ...chapter, id: newId, novelId: newNovelId, updatedAt: Date.now() };
+  });
+
+  const snapshots: Snapshot[] = (data.snapshots || []).map(snapshot => ({
+    ...snapshot,
+    id: generateId(),
+    chapterId: idMap.get(snapshot.chapterId) || snapshot.chapterId,
+  }));
+
+  const commentThreads = (data.commentThreads || []).map(thread => ({
+    ...thread,
+    chapterId: idMap.get(thread.chapterId) || thread.chapterId,
+  }));
+
+  await db.transaction('rw', [db.novels, db.chapters, db.snapshots], async () => {
+    await db.novels.add(novel);
+    await db.chapters.bulkAdd(chapters);
+    if (snapshots.length > 0) {
+      await db.snapshots.bulkAdd(snapshots);
+    }
+  });
+
+  // Restore comment threads
+  commentThreads.forEach(thread => upsertCommentThread(thread));
+
+  // Restore settings if present
+  if (data.settings && typeof data.settings === 'object') {
+    try {
+      const existingRaw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      const existing = existingRaw ? JSON.parse(existingRaw) : {};
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ ...existing, ...data.settings }));
+    } catch { /* ignore */ }
+  }
+
+  // Restore goal trends if present
+  if (Array.isArray(data.goalTrends)) {
+    for (const entry of data.goalTrends) {
+      if (
+        entry &&
+        typeof entry === 'object' &&
+        'date' in entry &&
+        typeof (entry as GoalTrendSnapshot).date === 'string'
+      ) {
+        upsertGoalTrendSnapshot(entry as GoalTrendSnapshot);
+      }
+    }
+  }
+
+  return novel;
 }
