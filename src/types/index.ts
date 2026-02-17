@@ -317,13 +317,13 @@ export interface IntegrationConfig {
   status?: 'disconnected' | 'pending' | 'connected' | 'error';
   folderId?: string;
   lastSyncAt?: number;
-  accessToken?: string;
-  refreshToken?: string;
+  /** Short-lived server-issued session artifact used as Bearer token. */
+  sessionToken?: string;
 }
 
 export type PersistedIntegrationConfig = Pick<
   IntegrationConfig,
-  'type' | 'enabled' | 'connectionId' | 'providerUserId' | 'scopes' | 'expiresAt' | 'status' | 'folderId' | 'lastSyncAt' | 'accessToken' | 'refreshToken'
+  'type' | 'enabled' | 'connectionId' | 'providerUserId' | 'scopes' | 'expiresAt' | 'status' | 'folderId' | 'lastSyncAt'
 >;
 
 export type DhprojIntegrations = Partial<Record<IntegrationType, PersistedIntegrationConfig>>;

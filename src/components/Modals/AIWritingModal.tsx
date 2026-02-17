@@ -202,7 +202,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   const isConfigured =
     config.provider === 'chrome-ai'
       ? chromeAIAvailable
-      : !!(config.endpoint?.trim() && config.apiKey?.trim());
+      : !!(config.endpoint?.trim() && config.sessionToken?.trim());
 
   // Reset transient state when the modal opens/closes
   useEffect(() => {
@@ -236,7 +236,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         setError(
           config.provider === 'chrome-ai'
             ? 'Chrome AI is not available in this browser. Switch to OpenAI-Compatible API in Settings, or use Chrome 137+ on a supported platform.'
-            : 'AI is not configured yet. Open Settings to set your API endpoint and API key.'
+            : 'AI is not configured yet. Open Settings to set your API endpoint and session token.'
         );
         return;
       }
@@ -302,8 +302,8 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   };
 
   const handleTestConnection = async () => {
-    if (!config.endpoint?.trim() || !config.apiKey?.trim()) {
-      showToast('Enter both an API endpoint and API key first', 'warning');
+    if (!config.endpoint?.trim() || !config.sessionToken?.trim()) {
+      showToast('Enter both an API endpoint and session token first', 'warning');
       return;
     }
     setTestingConnection(true);
@@ -312,7 +312,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${config.apiKey}`
+          Authorization: `Bearer ${config.sessionToken}`
         },
         body: JSON.stringify({
           model: config.model || 'gpt-4o',
@@ -411,7 +411,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
                 <span className="material-symbols-rounded">memory</span>
                 <span className={styles.aiProviderOptionText}>
                   <strong>Chrome Built-in AI</strong>
-                  <small>Free, on-device, no API key needed</small>
+                  <small>Free, on-device, no session token needed</small>
                 </span>
                 {chromeAIStatus === 'readily' && (
                   <span className={styles.aiBadge} data-status="ready">Ready</span>
@@ -451,12 +451,12 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
                   />
                 </label>
                 <label className={styles.aiLabel}>
-                  API Key
+                  Session Token
                   <Input
                     type="password"
-                    placeholder="sk-..."
-                    value={config.apiKey || ''}
-                    onChange={e => updateConfig({ apiKey: e.target.value })}
+                    placeholder="session-token"
+                    value={config.sessionToken || ''}
+                    onChange={e => updateConfig({ sessionToken: e.target.value })}
                   />
                 </label>
               </div>
@@ -465,7 +465,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
                   variant="default"
                   size="small"
                   onClick={handleTestConnection}
-                  disabled={testingConnection || !config.endpoint?.trim() || !config.apiKey?.trim()}
+                  disabled={testingConnection || !config.endpoint?.trim() || !config.sessionToken?.trim()}
                 >
                   <span className="material-symbols-rounded">wifi_tethering</span>
                   {testingConnection ? 'Testing...' : 'Test Connection'}
@@ -473,7 +473,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
               </div>
               <div className={styles.aiPrivacyNote}>
                 <span className="material-symbols-rounded">shield</span>
-                <span>Your API key is stored only in your browser&apos;s localStorage and is sent only to the endpoint you configure. No data is shared with DraftHarbour Studio servers.</span>
+                <span>Your session token is stored only in your browser&apos;s localStorage and is sent only to the endpoint you configure. No data is shared with DraftHarbour Studio servers.</span>
               </div>
             </>
           )}
@@ -512,7 +512,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
                 <button className={styles.aiNoticeLink} onClick={() => setShowSettings(true)}>
                   Settings
                 </button>{' '}
-                to enter your API endpoint and API key.
+                to enter your API endpoint and session token.
                 <br /><br />
                 <strong>Compatible services:</strong> OpenAI, Anthropic (via proxy), Ollama, LM Studio, or any OpenAI-compatible API.
                 <br />

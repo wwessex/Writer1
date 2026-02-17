@@ -15,12 +15,12 @@ export class OpenAIProvider implements AIProvider {
   constructor(private config: AIProviderConfig) {}
 
   isAvailable(): boolean {
-    return !!(this.config.endpoint?.trim() && this.config.apiKey?.trim());
+    return !!(this.config.endpoint?.trim() && this.config.sessionToken?.trim());
   }
 
   async execute(request: AIRequest): Promise<AIResponse> {
     if (!this.isAvailable()) {
-      throw new Error('OpenAI provider is not configured. Set an API endpoint and key.');
+      throw new Error('OpenAI provider is not configured. Set an API endpoint and session token.');
     }
 
     const start = Date.now();
@@ -33,7 +33,7 @@ export class OpenAIProvider implements AIProvider {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.config.apiKey}`,
+        Authorization: `Bearer ${this.config.sessionToken}`,
       },
       body: JSON.stringify({
         model: this.config.model || 'gpt-4o',

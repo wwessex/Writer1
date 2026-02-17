@@ -4,8 +4,8 @@
  * Manages the `draftharbour_ai_config` localStorage key and creates
  * the appropriate AIProvider instance based on the stored config.
  *
- * Handles migration from the legacy format (endpoint + apiKey only,
- * no provider field) to the new format that includes a provider selector.
+ * Handles migration from legacy formats while scrubbing sensitive API keys
+ * from persisted localStorage payloads.
  */
 
 import type { AIProviderConfig, AIProviderType, AIProvider } from './types';
@@ -29,20 +29,33 @@ export function loadAIConfig(): AIProviderConfig {
 
     const parsed = JSON.parse(raw);
 
-    // Migrate legacy format: { endpoint, apiKey } with no provider field
+    // Legacy payloads may include raw `apiKey`; scrub and avoid persistence of secrets.
     if (!parsed.provider) {
-      if (parsed.endpoint && parsed.apiKey) {
+      if (parsed.endpoint) {
         return {
           provider: 'openai-compatible',
           endpoint: parsed.endpoint,
-          apiKey: parsed.apiKey,
           model: parsed.model,
         };
       }
       return { provider: 'chrome-ai' };
     }
 
-    return parsed as AIProviderConfig;
+    const safeConfig = parsed as AIProviderConfig & { apiKey?: string };
+    if ('apiKey' in safeConfig) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        provider: safeConfig.provider,
+        endpoint: safeConfig.endpoint,
+        model: safeConfig.model,
+      }));
+    }
+
+    return {
+      provider: safeConfig.provider,
+      endpoint: safeConfig.endpoint,
+      model: safeConfig.model,
+      sessionToken: safeConfig.sessionToken,
+    };
   } catch {
     return { provider: 'chrome-ai' };
   }
@@ -50,7 +63,13 @@ export function loadAIConfig(): AIProviderConfig {
 
 /** Save AI config to localStorage. */
 export function saveAIConfig(config: AIProviderConfig): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  const safeConfig: AIProviderConfig = {
+    provider: config.provider,
+    endpoint: config.endpoint,
+    model: config.model,
+    sessionToken: config.sessionToken,
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(safeConfig));
 }
 
 /* ------------------------------------------------------------------ */
