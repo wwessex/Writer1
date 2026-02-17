@@ -20,6 +20,19 @@ const LINE_SPACING_OPTIONS = [
   { value: '2', label: 'Double' }
 ];
 
+const FONT_FAMILY_OPTIONS = [
+  { value: 'default', label: 'Default' },
+  { value: 'serif', label: 'Serif' },
+  { value: 'sans-serif', label: 'Sans Serif' },
+  { value: 'monospace', label: 'Monospace' },
+  { value: '"Georgia", serif', label: 'Georgia' },
+  { value: '"Palatino Linotype", "Book Antiqua", Palatino, serif', label: 'Palatino' },
+  { value: '"Times New Roman", Times, serif', label: 'Times' },
+  { value: '"Courier New", Courier, monospace', label: 'Courier' },
+  { value: '"Trebuchet MS", Helvetica, sans-serif', label: 'Trebuchet' },
+  { value: '"Verdana", Geneva, sans-serif', label: 'Verdana' },
+];
+
 const FORMAT_COMMANDS = [
   { icon: 'format_bold', cmd: 'bold', label: 'Bold', shortcut: 'Ctrl+B' },
   { icon: 'format_italic', cmd: 'italic', label: 'Italic', shortcut: 'Ctrl+I' },
@@ -146,6 +159,7 @@ export function Toolbar() {
   };
 
   const [lineSpacing, setLineSpacing] = useState('1.5');
+  const [fontFamily, setFontFamily] = useState('default');
 
   const handleLineSpacingChange = (value: string) => {
     setLineSpacing(value);
@@ -153,6 +167,36 @@ export function Toolbar() {
     const editorElement = editor.view.dom as HTMLElement;
     editorElement.style.lineHeight = value;
   };
+
+  const handleFontFamilyChange = (value: string) => {
+    setFontFamily(value);
+    if (!editor) return;
+    const editorElement = editor.view.dom as HTMLElement;
+    editorElement.style.fontFamily = value === 'default' ? '' : value;
+  };
+
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  const handleInsertImage = useCallback(() => {
+    imageInputRef.current?.click();
+  }, []);
+
+  const handleImageFileSelected = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editor) return;
+
+    if (!file.type.startsWith('image/')) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const src = reader.result as string;
+      editor.chain().focus().setImage({ src }).run();
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }, [editor]);
 
   const handleFormatClick = (cmd: string) => {
     if (!editor) return;
@@ -314,12 +358,22 @@ export function Toolbar() {
   return (
     <div className={styles.toolbar}>
       <div className={styles.toolbar__group}>
-        <Select
-          options={STYLE_OPTIONS}
-          value={getCurrentStyle()}
-          onChange={e => handleStyleChange(e.target.value)}
-          className={styles.styleSelect}
-        />
+        <Tooltip content="Paragraph style" position="bottom">
+          <Select
+            options={STYLE_OPTIONS}
+            value={getCurrentStyle()}
+            onChange={e => handleStyleChange(e.target.value)}
+            className={styles.styleSelect}
+          />
+        </Tooltip>
+        <Tooltip content="Font family" position="bottom">
+          <Select
+            options={FONT_FAMILY_OPTIONS}
+            value={fontFamily}
+            onChange={e => handleFontFamilyChange(e.target.value)}
+            className={styles.fontSelect}
+          />
+        </Tooltip>
       </div>
 
       <div className={styles.toolbar__divider} />
@@ -374,6 +428,21 @@ export function Toolbar() {
             onClick={() => handleFormatClick('horizontalRule')}
           />
         </Tooltip>
+        <Tooltip content="Insert Image" position="bottom">
+          <IconButton
+            icon="image"
+            label="Insert Image"
+            variant="ghost"
+            onClick={handleInsertImage}
+          />
+        </Tooltip>
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handleImageFileSelected}
+        />
       </div>
 
       <div className={styles.toolbar__group}>

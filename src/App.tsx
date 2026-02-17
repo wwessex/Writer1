@@ -3,6 +3,7 @@ import { EditorContext, useCurrentEditor, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import HorizontalRule from '@tiptap/extension-horizontal-rule';
+import Image from '@tiptap/extension-image';
 import { ScreenplayParagraph, CommentAnchorMark } from '@/components/Editor/screenplayExtension';
 import { FindReplaceExtension } from '@/lib/findReplaceExtension';
 import { useApp, AppProvider } from '@/context/AppContext';
@@ -41,6 +42,10 @@ const createExtensions = (screenplayMode: boolean) => [
   ScreenplayParagraph.configure({ screenplayMode }),
   Underline,
   HorizontalRule,
+  Image.configure({
+    inline: false,
+    allowBase64: true,
+  }),
   CommentAnchorMark,
   FindReplaceExtension,
 ];
