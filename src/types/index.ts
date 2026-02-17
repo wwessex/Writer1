@@ -1,4 +1,5 @@
 import type { JSONContent } from '@tiptap/core';
+import type { ProgressData } from '@/lib/progressTracker';
 
 export type ProjectType = 'book' | 'screenplay';
 
@@ -185,6 +186,7 @@ export interface DhprojData {
   commentThreads: CommentThread[];
   settings: Partial<AppSettings>;
   goalTrends: unknown[];
+  progress?: ProgressData;
   characters?: CharacterEntity[];
   worldEntries?: WorldEntry[];
 }
