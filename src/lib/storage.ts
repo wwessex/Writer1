@@ -25,6 +25,46 @@ const WORLD_ENTRIES_STORAGE_KEY = 'draftharbour_world';
 const ALLOWED_INTEGRATION_TYPES: IntegrationType[] = ['scrivener', 'google-drive', 'dropbox'];
 const SUPPORTED_DHPROJ_VERSIONS = new Set<number>([1]);
 
+export function mergeImportedSettings(existingRaw: string | null, importedSettings: Partial<AppSettings>): Record<string, unknown> {
+  let existingParsed: unknown = {};
+  try {
+    existingParsed = existingRaw ? JSON.parse(existingRaw) as unknown : {};
+  } catch {
+    existingParsed = {};
+  }
+
+  const existing = isRecord(existingParsed) ? existingParsed : {};
+  return { ...existing, ...importedSettings };
+}
+
+export function mergeImportedIntegrations(
+  existingRaw: string | null,
+  importedIntegrations: Record<string, unknown>
+): DhprojIntegrations {
+  let existingParsed: unknown = {};
+  try {
+    existingParsed = existingRaw ? JSON.parse(existingRaw) as unknown : {};
+  } catch {
+    existingParsed = {};
+  }
+
+  const existing = isRecord(existingParsed) ? existingParsed : {};
+  const merged: DhprojIntegrations = {};
+
+  for (const type of ALLOWED_INTEGRATION_TYPES) {
+    if (Object.prototype.hasOwnProperty.call(existing, type)) {
+      merged[type] = existing[type] as PersistedIntegrationConfig;
+    }
+
+    const safeImported = sanitizeImportedIntegrationConfig(type, importedIntegrations[type]);
+    if (safeImported) {
+      merged[type] = safeImported;
+    }
+  }
+
+  return merged;
+}
+
 class DraftHarbourDB extends Dexie {
   novels!: EntityTable<Novel, 'id'>;
   chapters!: EntityTable<Chapter, 'id'>;
@@ -67,7 +107,7 @@ function normalizeNovel(novel: Novel): Novel {
   };
 }
 
-function upgradeBackup(backup: BackupData): BackupDataV3 {
+export function upgradeBackup(backup: BackupData): BackupDataV3 {
   if (backup.version === 3 && 'project' in backup && 'sections' in backup) {
     return {
       ...backup,
@@ -844,8 +884,8 @@ export async function importDhproj(file: File): Promise<Novel> {
   if (data.settings && typeof data.settings === 'object') {
     try {
       const existingRaw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-      const existing = existingRaw ? JSON.parse(existingRaw) : {};
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ ...existing, ...data.settings }));
+      const mergedSettings = mergeImportedSettings(existingRaw, data.settings);
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(mergedSettings));
     } catch { /* ignore */ }
   }
 
@@ -886,20 +926,7 @@ export async function importDhproj(file: File): Promise<Novel> {
   if (data.integrations && typeof data.integrations === 'object') {
     try {
       const existingRaw = localStorage.getItem(INTEGRATIONS_STORAGE_KEY);
-      const existingParsed = existingRaw ? JSON.parse(existingRaw) as unknown : {};
-      const existing = isRecord(existingParsed) ? existingParsed : {};
-      const merged: DhprojIntegrations = {};
-
-      for (const type of ALLOWED_INTEGRATION_TYPES) {
-        if (Object.prototype.hasOwnProperty.call(existing, type)) {
-          merged[type] = existing[type] as PersistedIntegrationConfig;
-        }
-
-        const safeImported = sanitizeImportedIntegrationConfig(type, (data.integrations as Record<string, unknown>)[type]);
-        if (safeImported) {
-          merged[type] = safeImported;
-        }
-      }
+      const merged = mergeImportedIntegrations(existingRaw, data.integrations as Record<string, unknown>);
 
       if (Object.keys(merged).length > 0) {
         // By design, only safe metadata is persisted; OAuth/session tokens are excluded.
