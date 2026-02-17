@@ -454,7 +454,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
-function sanitizePersistedIntegrationConfig(type: IntegrationType, value: unknown): PersistedIntegrationConfig | null {
+function sanitizeImportedIntegrationConfig(type: IntegrationType, value: unknown): PersistedIntegrationConfig | null {
   if (!isRecord(value)) {
     return null;
   }
@@ -477,7 +477,7 @@ function sanitizePersistedIntegrationConfig(type: IntegrationType, value: unknow
   };
 }
 
-function readPersistedIntegrationsFromStorage(): DhprojIntegrations | undefined {
+function readSafePersistedIntegrationsFromStorage(): DhprojIntegrations | undefined {
   const raw = localStorage.getItem(INTEGRATIONS_STORAGE_KEY);
   if (!raw) {
     return undefined;
@@ -489,15 +489,14 @@ function readPersistedIntegrationsFromStorage(): DhprojIntegrations | undefined 
       return undefined;
     }
 
-    const integrations: DhprojIntegrations = {};
-    for (const type of ALLOWED_INTEGRATION_TYPES) {
-      const safeConfig = sanitizePersistedIntegrationConfig(type, parsed[type]);
-      if (safeConfig) {
-        integrations[type] = safeConfig;
-      }
+    const integrationKeys = Object.keys(parsed);
+    const hasInvalidIntegrationKey = integrationKeys.some(key => !ALLOWED_INTEGRATION_TYPES.includes(key as IntegrationType));
+    if (hasInvalidIntegrationKey) {
+      return undefined;
     }
 
-    return Object.keys(integrations).length > 0 ? integrations : undefined;
+    // Values are already sanitized by createSafePersistedConfig before being written to localStorage.
+    return parsed as DhprojIntegrations;
   } catch {
     return undefined;
   }
@@ -543,7 +542,7 @@ export async function exportDhproj(novelId: string): Promise<Blob> {
     .filter(isWorldEntry)
     .filter(entry => entry.novelId === novelId);
   // Safe persisted integration data contains connection metadata only (never OAuth/session tokens).
-  const integrations = readPersistedIntegrationsFromStorage();
+  const integrations = readSafePersistedIntegrationsFromStorage();
 
   const manifest: DhprojManifest = {
     format: 'dhproj',
@@ -771,11 +770,13 @@ export async function importDhproj(file: File): Promise<Novel> {
       const merged: DhprojIntegrations = {};
 
       for (const type of ALLOWED_INTEGRATION_TYPES) {
-        const safeExisting = sanitizePersistedIntegrationConfig(type, existing[type]);
-        const safeImported = sanitizePersistedIntegrationConfig(type, (data.integrations as Record<string, unknown>)[type]);
-        const resolved = safeImported ?? safeExisting;
-        if (resolved) {
-          merged[type] = resolved;
+        if (Object.prototype.hasOwnProperty.call(existing, type)) {
+          merged[type] = existing[type] as PersistedIntegrationConfig;
+        }
+
+        const safeImported = sanitizeImportedIntegrationConfig(type, (data.integrations as Record<string, unknown>)[type]);
+        if (safeImported) {
+          merged[type] = safeImported;
         }
       }
 

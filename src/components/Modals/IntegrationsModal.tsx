@@ -16,7 +16,7 @@ import {
   refreshProviderConnection,
   type ProviderConnectionMetadata,
 } from '@/lib/integrations/api';
-import type { AppState, Chapter, ConflictInfo, ConflictResolutionOption, IntegrationConfig, IntegrationType, PersistedIntegrationConfig } from '@/types';
+import type { AppState, Chapter, ConflictInfo, ConflictResolutionOption, IntegrationConfig, IntegrationType } from '@/types';
 import styles from './Modals.module.css';
 
 interface IntegrationsModalProps {
@@ -25,6 +25,11 @@ interface IntegrationsModalProps {
 }
 
 const STORAGE_KEY = 'draftharbour_integrations';
+
+type PersistedIntegrationConfig = Pick<
+  IntegrationConfig,
+  'type' | 'enabled' | 'connectionId' | 'providerUserId' | 'scopes' | 'expiresAt' | 'status' | 'folderId' | 'lastSyncAt'
+>;
 
 interface IntegrationConfigs {
   scrivener: IntegrationConfig;
