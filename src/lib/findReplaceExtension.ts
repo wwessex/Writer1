@@ -80,7 +80,7 @@ export const FindReplaceExtension = Extension.create<object, FindReplaceStorage>
   },
 
   addProseMirrorPlugins() {
-    const extension = this;
+    const storage = this.storage;
 
     return [
       new Plugin({
@@ -90,7 +90,6 @@ export const FindReplaceExtension = Extension.create<object, FindReplaceStorage>
             return DecorationSet.empty;
           },
           apply(_tr, _oldDecorations, _oldState, newState) {
-            const storage = extension.storage;
             if (!storage.searchTerm) {
               storage.matches = [];
               return DecorationSet.empty;
