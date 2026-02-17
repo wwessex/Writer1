@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Novel, Chapter, Snapshot, BackupData, BackupDataV3, LegacyBackupData, ProjectType, CommentThread, DhprojData, DhprojManifest, AppSettings } from '@/types';
+import type { Novel, Chapter, Snapshot, BackupData, BackupDataV3, LegacyBackupData, ProjectType, CommentThread, DhprojData, DhprojManifest, AppSettings, CharacterEntity, WorldEntry } from '@/types';
 import { generateId } from '@/lib/utils';
 
 const CURRENT_BACKUP_VERSION = 3;
@@ -15,6 +15,8 @@ export interface GoalTrendSnapshot {
 
 const COMMENT_THREADS_STORAGE_PREFIX = 'draftharbour_comment_threads_';
 const SETTINGS_STORAGE_KEY = 'draftharbour_settings_v1';
+const CHARACTERS_STORAGE_KEY = 'draftharbour_characters';
+const WORLD_ENTRIES_STORAGE_KEY = 'draftharbour_world';
 const SUPPORTED_DHPROJ_VERSIONS = new Set<number>([1]);
 
 class DraftHarbourDB extends Dexie {
@@ -382,6 +384,48 @@ function saveGoalTrendSnapshots(entries: GoalTrendSnapshot[]): void {
   localStorage.setItem(GOAL_TREND_STORAGE_KEY, JSON.stringify(entries.slice(-MAX_GOAL_TREND_ENTRIES)));
 }
 
+function loadStoredEntities<T>(key: string): T[] {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function isCharacterEntity(value: unknown): value is CharacterEntity {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<CharacterEntity>;
+  return typeof candidate.id === 'string'
+    && typeof candidate.novelId === 'string'
+    && typeof candidate.name === 'string'
+    && Array.isArray(candidate.aliases)
+    && typeof candidate.description === 'string'
+    && typeof candidate.role === 'string'
+    && Array.isArray(candidate.traits)
+    && typeof candidate.notes === 'string'
+    && Array.isArray(candidate.relationships)
+    && typeof candidate.createdAt === 'number'
+    && typeof candidate.updatedAt === 'number';
+}
+
+function isWorldEntry(value: unknown): value is WorldEntry {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<WorldEntry>;
+  return typeof candidate.id === 'string'
+    && typeof candidate.novelId === 'string'
+    && typeof candidate.category === 'string'
+    && typeof candidate.name === 'string'
+    && typeof candidate.description === 'string'
+    && Array.isArray(candidate.tags)
+    && Array.isArray(candidate.linkedCharacters)
+    && typeof candidate.notes === 'string'
+    && typeof candidate.createdAt === 'number'
+    && typeof candidate.updatedAt === 'number';
+}
+
 export function upsertGoalTrendSnapshot(snapshot: GoalTrendSnapshot): GoalTrendSnapshot[] {
   const entries = loadGoalTrendSnapshots();
   const existingIdx = entries.findIndex(item => item.date === snapshot.date);
@@ -436,6 +480,13 @@ export async function exportDhproj(novelId: string): Promise<Blob> {
   // Read goal trends
   const goalTrends = loadGoalTrendSnapshots();
 
+  const characters = loadStoredEntities<CharacterEntity>(CHARACTERS_STORAGE_KEY)
+    .filter(isCharacterEntity)
+    .filter(character => character.novelId === novelId);
+  const worldEntries = loadStoredEntities<WorldEntry>(WORLD_ENTRIES_STORAGE_KEY)
+    .filter(isWorldEntry)
+    .filter(entry => entry.novelId === novelId);
+
   const manifest: DhprojManifest = {
     format: 'dhproj',
     version: 1,
@@ -452,6 +503,8 @@ export async function exportDhproj(novelId: string): Promise<Blob> {
     commentThreads,
     settings,
     goalTrends,
+    characters,
+    worldEntries,
   };
 
   const JSZip = (await import('jszip')).default;
@@ -523,6 +576,12 @@ export async function importDhproj(file: File): Promise<Novel> {
   if (!candidate.projectType || (candidate.projectType !== 'book' && candidate.projectType !== 'screenplay')) {
     throw new Error('Invalid .dhproj file: malformed payload (invalid projectType)');
   }
+  if (candidate.characters !== undefined && !Array.isArray(candidate.characters)) {
+    throw new Error('Invalid .dhproj file: malformed payload (characters must be an array)');
+  }
+  if (candidate.worldEntries !== undefined && !Array.isArray(candidate.worldEntries)) {
+    throw new Error('Invalid .dhproj file: malformed payload (worldEntries must be an array)');
+  }
 
   const data = candidate as DhprojData;
   const projectId = typeof data.project.id === 'string' ? data.project.id : undefined;
@@ -561,6 +620,26 @@ export async function importDhproj(file: File): Promise<Novel> {
     chapterId: idMap.get(thread.chapterId) || thread.chapterId,
   }));
 
+  const importedCharactersSource = Array.isArray(data.characters) ? data.characters : [];
+  const importedCharacters = importedCharactersSource
+    .filter(isCharacterEntity)
+    .filter(character => character.novelId === projectId)
+    .map(character => ({
+      ...character,
+      novelId: newNovelId,
+    }));
+  const importedCharacterIds = new Set(importedCharacters.map(character => character.id));
+
+  const importedWorldEntriesSource = Array.isArray(data.worldEntries) ? data.worldEntries : [];
+  const importedWorldEntries = importedWorldEntriesSource
+    .filter(isWorldEntry)
+    .filter(entry => entry.novelId === projectId)
+    .map(entry => ({
+      ...entry,
+      novelId: newNovelId,
+      linkedCharacters: entry.linkedCharacters.filter(characterId => importedCharacterIds.has(characterId)),
+    }));
+
   await db.transaction('rw', [db.novels, db.chapters, db.snapshots], async () => {
     await db.novels.add(novel);
     await db.chapters.bulkAdd(chapters);
@@ -571,6 +650,24 @@ export async function importDhproj(file: File): Promise<Novel> {
 
   // Restore comment threads
   commentThreads.forEach(thread => upsertCommentThread(thread));
+
+  if (importedCharactersSource.length > 0) {
+    const existingCharacters = loadStoredEntities<CharacterEntity>(CHARACTERS_STORAGE_KEY).filter(isCharacterEntity);
+    const mergedCharacters = [
+      ...existingCharacters.filter(character => character.novelId !== newNovelId),
+      ...importedCharacters,
+    ];
+    localStorage.setItem(CHARACTERS_STORAGE_KEY, JSON.stringify(mergedCharacters));
+  }
+
+  if (importedWorldEntriesSource.length > 0) {
+    const existingWorldEntries = loadStoredEntities<WorldEntry>(WORLD_ENTRIES_STORAGE_KEY).filter(isWorldEntry);
+    const mergedWorldEntries = [
+      ...existingWorldEntries.filter(entry => entry.novelId !== newNovelId),
+      ...importedWorldEntries,
+    ];
+    localStorage.setItem(WORLD_ENTRIES_STORAGE_KEY, JSON.stringify(mergedWorldEntries));
+  }
 
   // Restore settings if present
   if (data.settings && typeof data.settings === 'object') {
