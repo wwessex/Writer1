@@ -28,14 +28,9 @@ jobs:
       - name: Build static site
         run: npm run build
 
-      - name: Create ZIP archive for cPanel upload
-        run: |
-          cd dist
-          zip -r ../static-site.zip .
-
-      - name: Upload ZIP artifact
+      - name: Upload static site artifact
         uses: actions/upload-artifact@v4
         with:
-          name: static-site-zip
-          path: static-site.zip
+          name: static-site
+          path: dist
           if-no-files-found: error
