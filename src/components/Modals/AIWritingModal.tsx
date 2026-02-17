@@ -189,12 +189,13 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         checkChromeAIAvailability().then(result => {
           // Use the best status across all APIs
           const statuses = Object.values(result);
-          if (statuses.includes('readily')) setChromeAIStatus('readily');
-          else if (statuses.includes('after-download')) setChromeAIStatus('after-download');
-          else setChromeAIStatus('no');
+          if (statuses.includes('available')) setChromeAIStatus('available');
+          else if (statuses.includes('downloading')) setChromeAIStatus('downloading');
+          else if (statuses.includes('downloadable')) setChromeAIStatus('downloadable');
+          else setChromeAIStatus('unavailable');
         });
       } else {
-        setChromeAIStatus('no');
+        setChromeAIStatus('unavailable');
       }
     });
   }, []);
@@ -569,7 +570,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
           </h4>
           {loading && (
             <p className={styles.loadingText}>
-              {config.provider === 'chrome-ai' && chromeAIStatus === 'after-download'
+              {config.provider === 'chrome-ai' && (chromeAIStatus === 'downloadable' || chromeAIStatus === 'downloading')
                 ? 'Downloading AI model...'
                 : 'Generating response...'}
             </p>

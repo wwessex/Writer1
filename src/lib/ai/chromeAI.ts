@@ -52,8 +52,12 @@ export class ChromeAIProvider implements AIProvider {
   readonly type = 'chrome-ai' as const;
 
   isAvailable(): boolean {
+    // Check top-level global first, then self.ai namespace
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return typeof (globalThis as any).LanguageModel !== 'undefined';
+    if (typeof (globalThis as any).LanguageModel !== 'undefined') return true;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ai = (globalThis as any).ai;
+    return !!(ai && typeof ai.languageModel !== 'undefined');
   }
 
   async execute(request: AIRequest): Promise<AIResponse> {
