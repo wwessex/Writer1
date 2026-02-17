@@ -91,7 +91,14 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
   const activeChapter = projectMetrics.chapters.find(ch => ch.id === state.activeChapterId);
   const chapterWords = activeChapter?.words ?? 0;
 
-  const toggleSidebar = () => dispatch({ type: 'TOGGLE_SIDEBAR' });
+  const handleMenuButtonClick = useCallback(() => {
+    if (window.matchMedia('(max-width: 820px)').matches) {
+      setMobileMenuOpen(prev => !prev);
+      return;
+    }
+
+    dispatch({ type: 'TOGGLE_SIDEBAR' });
+  }, [dispatch]);
   const hasNoChapterContent = totalWords === 0;
   const aiConfigured = useMemo(() => {
     const provider = createProvider(loadAIConfig());
@@ -180,8 +187,8 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
         <div className={styles.topbar__brand}>
           <IconButton
             icon="menu"
-            label="Toggle sidebar"
-            onClick={toggleSidebar}
+            label="Toggle menu"
+            onClick={handleMenuButtonClick}
             className={styles.menuBtn}
           />
           <img src={`${import.meta.env.BASE_URL}assets/${state.settings.theme === 'light' ? 'icon-black' : 'icon-blue'}-64.png`} alt="DraftHarbour" className={styles.logo} />
