@@ -11,6 +11,7 @@ import {
 import type { Chapter, Novel, AppSettings, AppState, Scene, ProjectType, SidebarPanelId, SidebarPanelsSettings } from '@/types';
 import * as storage from '@/lib/storage';
 import { debounce, generateId } from '@/lib/utils';
+import { loadSettingsFromStorage, createSettingsEnvelope } from '@/lib/settingsMigration';
 
 // Check if mobile viewport (matches the CSS breakpoint)
 const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches;
@@ -293,21 +294,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Load settings from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem(SETTINGS_KEY);
-    if (saved) {
-      try {
-        const settings = JSON.parse(saved);
-        const mergedSettings = { ...defaultSettings, ...settings };
-        dispatch({
-          type: 'SET_SETTINGS',
-          payload: {
-            ...mergedSettings,
-            sidebarPanels: settings?.sidebarPanels || {}
-          }
-        });
-      } catch (e) {
-        console.error('Failed to load settings:', e);
-      }
+    try {
+      const loadedSettings = loadSettingsFromStorage(localStorage.getItem(SETTINGS_KEY), defaultSettings);
+      dispatch({ type: 'SET_SETTINGS', payload: loadedSettings });
+    } catch (error) {
+      console.error('Failed to load settings:', error);
+      dispatch({ type: 'SET_SETTINGS', payload: defaultSettings });
     }
   }, []);
 
@@ -326,7 +318,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Save settings to localStorage
   useEffect(() => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(createSettingsEnvelope(state.settings)));
+    } catch (error) {
+      console.error('Failed to persist settings:', error);
+    }
   }, [state.settings]);
 
   // Apply theme
