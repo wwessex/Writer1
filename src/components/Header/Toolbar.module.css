@@ -28,7 +28,14 @@
 }
 
 .styleSelect {
-  width: 112px;
+  width: 122px;
+  min-height: 36px;
+  padding: 6px 8px;
+  font-size: 0.75rem;
+}
+
+.lineSpacingSelect {
+  width: 82px;
   min-height: 36px;
   padding: 6px 8px;
   font-size: 0.75rem;

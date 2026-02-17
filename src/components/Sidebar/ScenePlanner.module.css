@@ -40,7 +40,6 @@
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
-  max-height: 400px;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
@@ -247,7 +246,105 @@
 .sceneCard__actions {
   display: flex;
   justify-content: flex-end;
+  gap: 0.375rem;
   margin-top: 0.5rem;
   padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Resizable summary textarea */
+.sceneCard__body textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+/* Pop-out scene editor overlay */
+.popoutOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  animation: popoutFadeIn 0.15s ease-out;
+}
+
+@keyframes popoutFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.popoutEditor {
+  width: min(600px, 90vw);
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card, 12px);
+  box-shadow: var(--shadow-float, 0 8px 24px rgba(0, 0, 0, 0.25));
+  animation: popoutSlideIn 0.2s ease-out;
+}
+
+@keyframes popoutSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.popoutEditor__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.popoutEditor__title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.popoutEditor__body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.popoutEditor__body label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.25rem;
+}
+
+.popoutEditor__body textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.popoutEditor__fieldRow {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.popoutEditor__fieldRow > * {
+  flex: 1;
+}
+
+.popoutEditor__footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.75rem 1.25rem;
   border-top: 1px solid var(--border);
 }

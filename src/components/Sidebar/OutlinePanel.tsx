@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Input, Textarea, Button, IconButton } from '@/components/UI';
 import { Select } from '@/components/UI/Select';
+import { countWords, editorToPlainText } from '@/lib/utils';
 import type { ChapterStatus, Scene } from '@/types';
 import styles from './OutlinePanel.module.css';
 
@@ -13,8 +14,9 @@ const STATUS_OPTIONS = [
 ];
 
 export function OutlinePanel() {
-  const { state, activeChapter, updateChapterImmediate, addScene, updateScene, deleteScene } = useApp();
+  const { state, activeChapter, setActiveChapter, updateChapterImmediate, addScene, updateScene, deleteScene } = useApp();
   const [expandedSections, setExpandedSections] = useState({
+    quickJump: true,
     details: true,
     scenes: false
   });
@@ -58,6 +60,43 @@ export function OutlinePanel() {
 
   return (
     <section className={styles.outline}>
+      {/* Quick Jump — compact chapter/scene navigation */}
+      <div className={styles.section}>
+        <button
+          className={styles.section__header}
+          onClick={() => toggleSection('quickJump')}
+        >
+          <span className="material-symbols-rounded">
+            {expandedSections.quickJump ? 'expand_more' : 'chevron_right'}
+          </span>
+          <span>Quick Jump</span>
+        </button>
+        {expandedSections.quickJump && (
+          <div className={styles.section__content}>
+            <div className={styles.quickJumpList}>
+              {state.chapters.map((ch, idx) => {
+                const isActive = ch.id === state.activeChapterId;
+                const words = countWords(editorToPlainText(ch.content));
+                return (
+                  <button
+                    key={ch.id}
+                    className={`${styles.quickJumpItem} ${isActive ? styles['quickJumpItem--active'] : ''}`}
+                    onClick={() => setActiveChapter(ch.id)}
+                  >
+                    <span className={styles.quickJumpItem__number}>{idx + 1}</span>
+                    <span className={styles.quickJumpItem__title}>{ch.title}</span>
+                    <span className={`${styles.quickJumpItem__status} ${styles[`quickJumpItem__status--${ch.status}`]}`}>
+                      {ch.status === 'planned' ? '' : ch.status.charAt(0).toUpperCase()}
+                    </span>
+                    <span className={styles.quickJumpItem__words}>{words.toLocaleString()}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className={styles.section}>
         <button
           className={styles.section__header}

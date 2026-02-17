@@ -5,6 +5,7 @@ import { VirtualChapterList } from './VirtualChapterList';
 import { OutlinePanel } from './OutlinePanel';
 import { ScenePlanner } from './ScenePlanner';
 import { Button, IconButton } from '@/components/UI';
+import { Tooltip } from '@/components/UI/Tooltip';
 import { useResizable } from '@/hooks/useResizable';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 import styles from './Sidebar.module.css';
@@ -131,24 +132,28 @@ export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
         <h2 className="sr-only">Sidebar</h2>
         {isMobileDialogOpen && (
           <div className={styles.sidebar__collapseBar}>
-            <IconButton
-              icon="close"
-              label="Close sidebar"
-              variant="ghost"
-              onClick={closeSidebar}
-              className={styles.collapseBtn}
-            />
+            <Tooltip content="Close sidebar" position="right">
+              <IconButton
+                icon="close"
+                label="Close sidebar"
+                variant="ghost"
+                onClick={closeSidebar}
+                className={styles.collapseBtn}
+              />
+            </Tooltip>
           </div>
         )}
         {!isMobile && !isHidden && (
           <div className={styles.sidebar__collapseBar}>
-            <IconButton
-              icon="chevron_left"
-              label="Collapse sidebar (Ctrl+Shift+B)"
-              variant="ghost"
-              onClick={closeSidebar}
-              className={styles.collapseBtn}
-            />
+            <Tooltip content="Collapse sidebar (Ctrl+Shift+B)" position="right">
+              <IconButton
+                icon="chevron_left"
+                label="Collapse sidebar (Ctrl+Shift+B)"
+                variant="ghost"
+                onClick={closeSidebar}
+                className={styles.collapseBtn}
+              />
+            </Tooltip>
           </div>
         )}
         <div className={styles.sidebar__content}>
@@ -168,18 +173,20 @@ export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
 
             return (
               <section key={panel.id} className={styles.panelSection}>
-                <button
-                  type="button"
-                  className={styles.panelSection__header}
-                  aria-expanded={!isCollapsed}
-                  aria-controls={`sidebar-panel-${panel.id}`}
-                  onClick={() => togglePanelCollapsed(panel.id)}
-                >
-                  <span>{panel.title}</span>
-                  <span className="material-symbols-rounded" aria-hidden="true">
-                    {isCollapsed ? 'expand_more' : 'expand_less'}
-                  </span>
-                </button>
+                <Tooltip content={isCollapsed ? `Show ${panel.title}` : `Hide ${panel.title}`} position="right">
+                  <button
+                    type="button"
+                    className={styles.panelSection__header}
+                    aria-expanded={!isCollapsed}
+                    aria-controls={`sidebar-panel-${panel.id}`}
+                    onClick={() => togglePanelCollapsed(panel.id)}
+                  >
+                    <span>{panel.title}</span>
+                    <span className="material-symbols-rounded" aria-hidden="true">
+                      {isCollapsed ? 'expand_more' : 'expand_less'}
+                    </span>
+                  </button>
+                </Tooltip>
                 {!isCollapsed && <div id={`sidebar-panel-${panel.id}`}>{panel.render()}</div>}
               </section>
             );

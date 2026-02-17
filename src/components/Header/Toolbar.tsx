@@ -9,7 +9,15 @@ import styles from './Toolbar.module.css';
 const STYLE_OPTIONS = [
   { value: 'p', label: 'Paragraph' },
   { value: 'h1', label: 'Heading 1' },
-  { value: 'h2', label: 'Heading 2' }
+  { value: 'h2', label: 'Heading 2' },
+  { value: 'h3', label: 'Heading 3' },
+  { value: 'h4', label: 'Heading 4' }
+];
+
+const LINE_SPACING_OPTIONS = [
+  { value: '1', label: 'Single' },
+  { value: '1.5', label: '1.5' },
+  { value: '2', label: 'Double' }
 ];
 
 const FORMAT_COMMANDS = [
@@ -111,6 +119,8 @@ export function Toolbar() {
     if (!editor) return 'p';
     if (editor.isActive('heading', { level: 1 })) return 'h1';
     if (editor.isActive('heading', { level: 2 })) return 'h2';
+    if (editor.isActive('heading', { level: 3 })) return 'h3';
+    if (editor.isActive('heading', { level: 4 })) return 'h4';
     return 'p';
   }, [editor]);
 
@@ -124,9 +134,24 @@ export function Toolbar() {
       case 'h2':
         editor.chain().focus().toggleHeading({ level: 2 }).run();
         break;
+      case 'h3':
+        editor.chain().focus().toggleHeading({ level: 3 }).run();
+        break;
+      case 'h4':
+        editor.chain().focus().toggleHeading({ level: 4 }).run();
+        break;
       default:
         editor.chain().focus().setParagraph().run();
     }
+  };
+
+  const [lineSpacing, setLineSpacing] = useState('1.5');
+
+  const handleLineSpacingChange = (value: string) => {
+    setLineSpacing(value);
+    if (!editor) return;
+    const editorElement = editor.view.dom as HTMLElement;
+    editorElement.style.lineHeight = value;
   };
 
   const handleFormatClick = (cmd: string) => {
@@ -358,6 +383,19 @@ export function Toolbar() {
             label="Add Comment (Ctrl+Shift+M)"
             variant="ghost"
             onClick={triggerAddComment}
+          />
+        </Tooltip>
+      </div>
+
+      <div className={styles.toolbar__divider} />
+
+      <div className={styles.toolbar__group}>
+        <Tooltip content="Line Spacing" position="bottom">
+          <Select
+            options={LINE_SPACING_OPTIONS}
+            value={lineSpacing}
+            onChange={e => handleLineSpacingChange(e.target.value)}
+            className={styles.lineSpacingSelect}
           />
         </Tooltip>
       </div>

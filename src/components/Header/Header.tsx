@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Input, IconButton } from '@/components/UI';
+import { Tooltip } from '@/components/UI/Tooltip';
 import { Pill, StatusDot } from '@/components/UI/Pill';
 import { MenuBar } from '@/components/Menu/MenuBar';
 import { Toolbar } from './Toolbar';
@@ -274,14 +275,16 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
           {state.isSaving && (
             <span className={styles.savingStatus}>Saving...</span>
           )}
-          <IconButton
-            icon="info"
-            label="Toggle inspector (Ctrl+Shift+I)"
-            variant="ghost"
-            active={inspectorOpen}
-            onClick={onToggleInspector}
-            className={styles.inspectorBtn}
-          />
+          <Tooltip content="Toggle inspector (Ctrl+Shift+I)" position="bottom">
+            <IconButton
+              icon="info"
+              label="Toggle inspector (Ctrl+Shift+I)"
+              variant="ghost"
+              active={inspectorOpen}
+              onClick={onToggleInspector}
+              className={styles.inspectorBtn}
+            />
+          </Tooltip>
 
           <div className={styles.mobileQuickActions}>
             {quickActionCommands.map(commandId => {

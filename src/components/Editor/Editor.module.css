@@ -214,6 +214,20 @@
   margin: 1.25em 0 0.5em;
 }
 
+.editorWrapper :global(.ProseMirror) h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 1.1em 0 0.4em;
+}
+
+.editorWrapper :global(.ProseMirror) h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 1em 0 0.35em;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 .editorWrapper :global(.ProseMirror) ul,
 .editorWrapper :global(.ProseMirror) ol {
   margin: 0 0 1em;

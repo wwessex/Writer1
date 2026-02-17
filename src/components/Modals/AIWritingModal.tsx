@@ -436,6 +436,21 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
 
           <details open={showCustomProvider} onToggle={e => setShowCustomProvider((e.target as HTMLDetailsElement).open)}>
             <summary className={styles.aiNoticeLink}>Custom provider (advanced)</summary>
+
+            <div className={styles.aiSetupGuide}>
+              <span className="material-symbols-rounded">help_outline</span>
+              <div>
+                <strong>How to set up a custom AI provider:</strong>
+                <ol className={styles.aiSetupSteps}>
+                  <li>Sign up for an API key at your chosen provider (e.g. <strong>OpenAI</strong> at platform.openai.com, or any OpenAI-compatible service).</li>
+                  <li>Copy the <strong>API endpoint</strong> (e.g. <code className={styles.aiCode}>https://api.openai.com/v1/chat/completions</code>).</li>
+                  <li>Paste your <strong>API key</strong> into the Session Token field below.</li>
+                  <li>Click <strong>Test Connection</strong> to verify everything works.</li>
+                </ol>
+                <p className={styles.aiSetupNote}>Your API key is stored locally in your browser and is never sent anywhere except the endpoint you specify.</p>
+              </div>
+            </div>
+
             <div className={styles.aiSettingsFields}>
               <label className={styles.aiLabel}>
                 API Endpoint
@@ -446,10 +461,10 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
                 />
               </label>
               <label className={styles.aiLabel}>
-                Session Token
+                Session Token / API Key
                 <Input
                   type="password"
-                  placeholder="session-token"
+                  placeholder="sk-..."
                   value={config.sessionToken || ''}
                   onChange={e => updateConfig({ sessionToken: e.target.value })}
                 />
@@ -497,7 +512,8 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
             <button className={styles.aiNoticeLink} onClick={() => setShowSettings(true)}>
               Settings
             </button>{' '}
-            and expand <em>Custom provider (advanced)</em> to enter endpoint and session token.
+            and expand <em>Custom provider (advanced)</em> to enter your API endpoint and key.
+            You can get an API key from providers like OpenAI (platform.openai.com) or any OpenAI-compatible service.
           </div>
         </div>
       )}

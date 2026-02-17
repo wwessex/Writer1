@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Input, Textarea, Button, IconButton } from '@/components/UI';
+import { Tooltip } from '@/components/UI/Tooltip';
 import { Select } from '@/components/UI/Select';
 import { countWords, countSentences, countParagraphs, countCharacters, editorToPlainText } from '@/lib/utils';
 import { useResizable } from '@/hooks/useResizable';
@@ -128,7 +129,9 @@ export function Inspector({ open, onClose }: InspectorProps) {
               </button>
             ))}
           </div>
-          <IconButton icon="chevron_right" label="Collapse inspector" variant="ghost" onClick={onClose} className={styles.closeBtn} />
+          <Tooltip content="Collapse inspector (Ctrl+Shift+I)" position="left">
+            <IconButton icon="chevron_right" label="Collapse inspector" variant="ghost" onClick={onClose} className={styles.closeBtn} />
+          </Tooltip>
         </div>
 
         <div className={styles.body}>
@@ -275,12 +278,14 @@ export function Inspector({ open, onClose }: InspectorProps) {
                           onChange={e => handleSceneChange(scene.id, { title: e.target.value })}
                           placeholder={isScreenplay ? 'Scene heading' : 'Scene title'}
                         />
-                        <IconButton
-                          icon="delete"
-                          label="Delete scene"
-                          variant="ghost"
-                          onClick={() => activeChapter && deleteScene(activeChapter.id, scene.id)}
-                        />
+                        <Tooltip content="Delete scene" position="left">
+                          <IconButton
+                            icon="delete"
+                            label="Delete scene"
+                            variant="ghost"
+                            onClick={() => activeChapter && deleteScene(activeChapter.id, scene.id)}
+                          />
+                        </Tooltip>
                       </div>
                       <Textarea
                         value={scene.summary}
@@ -348,10 +353,12 @@ export function Inspector({ open, onClose }: InspectorProps) {
                       )}
                     </div>
                   ))}
-                  <Button variant="ghost" onClick={() => activeChapter && addScene(activeChapter.id)} className={styles.addBtn}>
-                    <span className="material-symbols-rounded">add</span>
-                    Add Scene
-                  </Button>
+                  <Tooltip content="Add a new scene to this chapter" position="top">
+                    <Button variant="ghost" onClick={() => activeChapter && addScene(activeChapter.id)} className={styles.addBtn}>
+                      <span className="material-symbols-rounded">add</span>
+                      Add Scene
+                    </Button>
+                  </Tooltip>
                 </div>
               )}
 
