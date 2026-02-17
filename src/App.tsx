@@ -3,6 +3,7 @@ import { EditorContext, useCurrentEditor, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import HorizontalRule from '@tiptap/extension-horizontal-rule';
+import Image from '@tiptap/extension-image';
 import { ScreenplayParagraph, CommentAnchorMark } from '@/components/Editor/screenplayExtension';
 import { FindReplaceExtension } from '@/lib/findReplaceExtension';
 import { useApp, AppProvider } from '@/context/AppContext';
@@ -20,6 +21,7 @@ import {
 import { AISuggestionsPanel } from '@/components/Panels';
 import { SettingsWindow, AboutWindow } from '@/components/Windows';
 import { ToastProvider, useToast } from '@/components/UI';
+import { Tooltip } from '@/components/UI/Tooltip';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useModalState } from '@/hooks/useModalState';
 import { exportBackup, importBackup, exportDhproj, importDhproj, createChapter, addChapter, upsertCommentThread } from '@/lib/storage';
@@ -33,13 +35,17 @@ import styles from './App.module.css';
 const createExtensions = (screenplayMode: boolean) => [
   StarterKit.configure({
     heading: {
-      levels: [1, 2]
+      levels: [1, 2, 3, 4]
     },
     paragraph: false
   }),
   ScreenplayParagraph.configure({ screenplayMode }),
   Underline,
   HorizontalRule,
+  Image.configure({
+    inline: false,
+    allowBase64: true,
+  }),
   CommentAnchorMark,
   FindReplaceExtension,
 ];
@@ -430,14 +436,16 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
       <FindReplace controls={findReplace} />
       <main className={layoutClass} role="main">
         {state.settings.sidebarHidden && (
-          <button
-            className={styles.expandTab}
-            onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
-            aria-label="Expand sidebar (Ctrl+Shift+B)"
-            title="Expand sidebar"
-          >
-            <span className="material-symbols-rounded">chevron_right</span>
-          </button>
+          <Tooltip content="Expand sidebar (Ctrl+Shift+B)" position="right">
+            <button
+              className={styles.expandTab}
+              onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
+              aria-label="Expand sidebar (Ctrl+Shift+B)"
+              title="Expand sidebar"
+            >
+              <span className="material-symbols-rounded">chevron_right</span>
+            </button>
+          </Tooltip>
         )}
         <Sidebar
           onExportBackup={handleExportBackup}
@@ -445,14 +453,16 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
         />
         <Editor screenplayMode={screenplayMode} onToggleScreenplayMode={onToggleScreenplayMode} />
         {!inspectorOpen && (
-          <button
-            className={`${styles.expandTab} ${styles['expandTab--right']}`}
-            onClick={() => setInspectorOpen(true)}
-            aria-label="Expand inspector (Ctrl+Shift+I)"
-            title="Expand inspector"
-          >
-            <span className="material-symbols-rounded">chevron_left</span>
-          </button>
+          <Tooltip content="Expand inspector (Ctrl+Shift+I)" position="left">
+            <button
+              className={`${styles.expandTab} ${styles['expandTab--right']}`}
+              onClick={() => setInspectorOpen(true)}
+              aria-label="Expand inspector (Ctrl+Shift+I)"
+              title="Expand inspector"
+            >
+              <span className="material-symbols-rounded">chevron_left</span>
+            </button>
+          </Tooltip>
         )}
         <Inspector open={inspectorOpen} onClose={() => setInspectorOpen(false)} />
         <AISuggestionsPanel open={modals.aiPanel} onClose={() => closeModal('aiPanel')} />

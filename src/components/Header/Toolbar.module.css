@@ -28,7 +28,21 @@
 }
 
 .styleSelect {
-  width: 112px;
+  width: 122px;
+  min-height: 36px;
+  padding: 6px 8px;
+  font-size: 0.75rem;
+}
+
+.fontSelect {
+  width: 110px;
+  min-height: 36px;
+  padding: 6px 8px;
+  font-size: 0.75rem;
+}
+
+.lineSpacingSelect {
+  width: 82px;
   min-height: 36px;
   padding: 6px 8px;
   font-size: 0.75rem;
@@ -101,6 +115,7 @@
   .toolbar__spacer { display: none; }
   .toolbar__divider { margin: 0 2px; }
   .styleSelect { width: 94px; font-size: 0.6875rem; min-height: 34px; padding: 4px 6px; }
+  .fontSelect { width: 86px; font-size: 0.6875rem; min-height: 34px; padding: 4px 6px; }
 }
 
 /* Scroll hint wrapper — gradient overlays for overflow indication */

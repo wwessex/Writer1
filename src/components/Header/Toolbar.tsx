@@ -9,7 +9,28 @@ import styles from './Toolbar.module.css';
 const STYLE_OPTIONS = [
   { value: 'p', label: 'Paragraph' },
   { value: 'h1', label: 'Heading 1' },
-  { value: 'h2', label: 'Heading 2' }
+  { value: 'h2', label: 'Heading 2' },
+  { value: 'h3', label: 'Heading 3' },
+  { value: 'h4', label: 'Heading 4' }
+];
+
+const LINE_SPACING_OPTIONS = [
+  { value: '1', label: 'Single' },
+  { value: '1.5', label: '1.5' },
+  { value: '2', label: 'Double' }
+];
+
+const FONT_FAMILY_OPTIONS = [
+  { value: 'default', label: 'Default' },
+  { value: 'serif', label: 'Serif' },
+  { value: 'sans-serif', label: 'Sans Serif' },
+  { value: 'monospace', label: 'Monospace' },
+  { value: '"Georgia", serif', label: 'Georgia' },
+  { value: '"Palatino Linotype", "Book Antiqua", Palatino, serif', label: 'Palatino' },
+  { value: '"Times New Roman", Times, serif', label: 'Times' },
+  { value: '"Courier New", Courier, monospace', label: 'Courier' },
+  { value: '"Trebuchet MS", Helvetica, sans-serif', label: 'Trebuchet' },
+  { value: '"Verdana", Geneva, sans-serif', label: 'Verdana' },
 ];
 
 const FORMAT_COMMANDS = [
@@ -111,6 +132,8 @@ export function Toolbar() {
     if (!editor) return 'p';
     if (editor.isActive('heading', { level: 1 })) return 'h1';
     if (editor.isActive('heading', { level: 2 })) return 'h2';
+    if (editor.isActive('heading', { level: 3 })) return 'h3';
+    if (editor.isActive('heading', { level: 4 })) return 'h4';
     return 'p';
   }, [editor]);
 
@@ -124,10 +147,56 @@ export function Toolbar() {
       case 'h2':
         editor.chain().focus().toggleHeading({ level: 2 }).run();
         break;
+      case 'h3':
+        editor.chain().focus().toggleHeading({ level: 3 }).run();
+        break;
+      case 'h4':
+        editor.chain().focus().toggleHeading({ level: 4 }).run();
+        break;
       default:
         editor.chain().focus().setParagraph().run();
     }
   };
+
+  const [lineSpacing, setLineSpacing] = useState('1.5');
+  const [fontFamily, setFontFamily] = useState('default');
+
+  const handleLineSpacingChange = (value: string) => {
+    setLineSpacing(value);
+    if (!editor) return;
+    const editorElement = editor.view.dom as HTMLElement;
+    editorElement.style.lineHeight = value;
+  };
+
+  const handleFontFamilyChange = (value: string) => {
+    setFontFamily(value);
+    if (!editor) return;
+    const editorElement = editor.view.dom as HTMLElement;
+    editorElement.style.fontFamily = value === 'default' ? '' : value;
+  };
+
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  const handleInsertImage = useCallback(() => {
+    imageInputRef.current?.click();
+  }, []);
+
+  const handleImageFileSelected = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editor) return;
+
+    if (!file.type.startsWith('image/')) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const src = reader.result as string;
+      editor.chain().focus().setImage({ src }).run();
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }, [editor]);
 
   const handleFormatClick = (cmd: string) => {
     if (!editor) return;
@@ -289,12 +358,22 @@ export function Toolbar() {
   return (
     <div className={styles.toolbar}>
       <div className={styles.toolbar__group}>
-        <Select
-          options={STYLE_OPTIONS}
-          value={getCurrentStyle()}
-          onChange={e => handleStyleChange(e.target.value)}
-          className={styles.styleSelect}
-        />
+        <Tooltip content="Paragraph style" position="bottom">
+          <Select
+            options={STYLE_OPTIONS}
+            value={getCurrentStyle()}
+            onChange={e => handleStyleChange(e.target.value)}
+            className={styles.styleSelect}
+          />
+        </Tooltip>
+        <Tooltip content="Font family" position="bottom">
+          <Select
+            options={FONT_FAMILY_OPTIONS}
+            value={fontFamily}
+            onChange={e => handleFontFamilyChange(e.target.value)}
+            className={styles.fontSelect}
+          />
+        </Tooltip>
       </div>
 
       <div className={styles.toolbar__divider} />
@@ -349,6 +428,21 @@ export function Toolbar() {
             onClick={() => handleFormatClick('horizontalRule')}
           />
         </Tooltip>
+        <Tooltip content="Insert Image" position="bottom">
+          <IconButton
+            icon="image"
+            label="Insert Image"
+            variant="ghost"
+            onClick={handleInsertImage}
+          />
+        </Tooltip>
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handleImageFileSelected}
+        />
       </div>
 
       <div className={styles.toolbar__group}>
@@ -358,6 +452,19 @@ export function Toolbar() {
             label="Add Comment (Ctrl+Shift+M)"
             variant="ghost"
             onClick={triggerAddComment}
+          />
+        </Tooltip>
+      </div>
+
+      <div className={styles.toolbar__divider} />
+
+      <div className={styles.toolbar__group}>
+        <Tooltip content="Line Spacing" position="bottom">
+          <Select
+            options={LINE_SPACING_OPTIONS}
+            value={lineSpacing}
+            onChange={e => handleLineSpacingChange(e.target.value)}
+            className={styles.lineSpacingSelect}
           />
         </Tooltip>
       </div>

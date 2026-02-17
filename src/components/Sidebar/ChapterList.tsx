@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { useApp } from '@/context/AppContext';
 import { IconButton, Button } from '@/components/UI';
+import { Tooltip } from '@/components/UI/Tooltip';
 import { countWords, editorToPlainText, formatRelativeTime } from '@/lib/utils';
 import styles from './ChapterList.module.css';
 
@@ -77,12 +78,14 @@ export function ChapterList() {
     <section className={styles.chapterList} role="navigation" aria-label={state.projectType === 'screenplay' ? 'Scenes' : 'Chapters'}>
       <div className={styles.chapterList__header}>
         <h3 className={styles.chapterList__title}>{state.projectType === 'screenplay' ? 'Scenes' : 'Chapters'}</h3>
-        <IconButton
-          icon="add"
-          label={state.projectType === 'screenplay' ? 'New Scene' : 'New Chapter'}
-          variant="ghost"
-          onClick={createChapter}
-        />
+        <Tooltip content={state.projectType === 'screenplay' ? 'Create a new scene' : 'Create a new chapter'} position="bottom">
+          <IconButton
+            icon="add"
+            label={state.projectType === 'screenplay' ? 'New Scene' : 'New Chapter'}
+            variant="ghost"
+            onClick={createChapter}
+          />
+        </Tooltip>
       </div>
       <div className={styles.chapterList__items} role="listbox" aria-label={state.projectType === 'screenplay' ? 'Scene list' : 'Chapter list'}>
         {state.chapters.map((chapter, index) => {

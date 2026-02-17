@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { IconButton, Button, Input, Textarea } from '@/components/UI';
+import { Tooltip } from '@/components/UI/Tooltip';
 import { Select } from '@/components/UI/Select';
 import type { Scene } from '@/types';
 import styles from './ScenePlanner.module.css';
@@ -15,6 +16,7 @@ const STATUS_OPTIONS = [
 export function ScenePlanner() {
   const { state, activeChapter, addScene, updateScene, deleteScene, reorderScenes } = useApp();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [popoutSceneId, setPopoutSceneId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'planned' | 'draft' | 'revised' | 'final'>('all');
   const [productionTagFilter, setProductionTagFilter] = useState('all');
   const [dragState, setDragState] = useState<{
@@ -122,7 +124,9 @@ export function ScenePlanner() {
           {isScreenplay ? 'Scene Planner' : 'Scenes'}
           {filteredScenes.length > 0 && <span className={styles.scenePlanner__count}>{filteredScenes.length}</span>}
         </h3>
-        <IconButton icon="add" label="Add Scene" variant="ghost" onClick={handleAddScene} />
+        <Tooltip content="Add a new scene" position="bottom">
+          <IconButton icon="add" label="Add Scene" variant="ghost" onClick={handleAddScene} />
+        </Tooltip>
       </div>
 
       <div className={styles.scenePlanner__items}>
@@ -158,17 +162,21 @@ export function ScenePlanner() {
               onDrop={e => handleDrop(e, scene.id)}
             >
               <div className={styles.sceneCard__header} onClick={() => setExpandedId(isExpanded ? null : scene.id)}>
-                <span className={styles.sceneCard__drag}>
-                  <span className="material-symbols-rounded">drag_indicator</span>
-                </span>
+                <Tooltip content="Drag to reorder" position="left">
+                  <span className={styles.sceneCard__drag}>
+                    <span className="material-symbols-rounded">drag_indicator</span>
+                  </span>
+                </Tooltip>
                 <span className={styles.sceneCard__number}>{index + 1}</span>
                 <span className={styles.sceneCard__title}>{scene.title || 'Untitled Scene'}</span>
                 <span className={`${styles.sceneCard__status} ${styles[`sceneCard__status--${scene.status}`]}`}>
                   {scene.status}
                 </span>
-                <span className="material-symbols-rounded">
-                  {isExpanded ? 'expand_less' : 'expand_more'}
-                </span>
+                <Tooltip content={isExpanded ? 'Collapse scene details' : 'Expand scene details'} position="left">
+                  <span className="material-symbols-rounded">
+                    {isExpanded ? 'expand_less' : 'expand_more'}
+                  </span>
+                </Tooltip>
               </div>
 
               {isExpanded && (
@@ -187,7 +195,7 @@ export function ScenePlanner() {
                       value={scene.summary}
                       onChange={e => handleUpdate(scene.id, { summary: e.target.value })}
                       placeholder="What happens in this scene..."
-                      rows={3}
+                      rows={4}
                     />
                   </div>
                   <div className={styles.sceneCard__fieldRow}>
@@ -269,6 +277,12 @@ export function ScenePlanner() {
                   )}
 
                   <div className={styles.sceneCard__actions}>
+                    <Tooltip content="Edit scene in expanded view" position="top">
+                      <Button variant="ghost" size="small" onClick={() => setPopoutSceneId(scene.id)}>
+                        <span className="material-symbols-rounded">open_in_full</span>
+                        Expand
+                      </Button>
+                    </Tooltip>
                     <Button variant="danger" size="small" onClick={() => handleDelete(scene.id)}>
                       <span className="material-symbols-rounded">delete</span>
                       Delete
@@ -298,6 +312,122 @@ export function ScenePlanner() {
           No scenes match current filters. Adjust the status or tag filter above.
         </p>
       )}
+
+      {/* Pop-out scene editor overlay */}
+      {popoutSceneId && (() => {
+        const popoutScene = scenes.find(s => s.id === popoutSceneId);
+        if (!popoutScene) return null;
+        return (
+          <div className={styles.popoutOverlay} onClick={e => { if (e.target === e.currentTarget) setPopoutSceneId(null); }}>
+            <div className={styles.popoutEditor}>
+              <div className={styles.popoutEditor__header}>
+                <h3 className={styles.popoutEditor__title}>{popoutScene.title || 'Untitled Scene'}</h3>
+                <IconButton icon="close" label="Close" variant="ghost" onClick={() => setPopoutSceneId(null)} />
+              </div>
+              <div className={styles.popoutEditor__body}>
+                <div>
+                  <label>Title</label>
+                  <Input
+                    value={popoutScene.title}
+                    onChange={e => handleUpdate(popoutScene.id, { title: e.target.value })}
+                    placeholder="Scene title"
+                  />
+                </div>
+                <div>
+                  <label>Summary</label>
+                  <Textarea
+                    value={popoutScene.summary}
+                    onChange={e => handleUpdate(popoutScene.id, { summary: e.target.value })}
+                    placeholder="Describe what happens in this scene in detail..."
+                    rows={6}
+                  />
+                </div>
+                <div className={styles.popoutEditor__fieldRow}>
+                  <div>
+                    <label>Status</label>
+                    <Select
+                      options={STATUS_OPTIONS}
+                      value={popoutScene.status}
+                      onChange={e => handleUpdate(popoutScene.id, { status: e.target.value as Scene['status'] })}
+                    />
+                  </div>
+                  <div>
+                    <label>Production Tags</label>
+                    <Input
+                      value={(popoutScene.productionTags || []).join(', ')}
+                      onChange={e => handleUpdate(popoutScene.id, { productionTags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })}
+                      placeholder="vfx, stunt"
+                    />
+                  </div>
+                </div>
+                {isScreenplay && (
+                  <>
+                    <div className={styles.popoutEditor__fieldRow}>
+                      <div>
+                        <label>Slug Line</label>
+                        <Input
+                          value={popoutScene.slugLine || ''}
+                          onChange={e => handleUpdate(popoutScene.id, { slugLine: e.target.value })}
+                          placeholder="INT. OFFICE - DAY"
+                        />
+                      </div>
+                      <div>
+                        <label>Location</label>
+                        <Input
+                          value={popoutScene.location || ''}
+                          onChange={e => handleUpdate(popoutScene.id, { location: e.target.value })}
+                          placeholder="Office"
+                        />
+                      </div>
+                    </div>
+                    <div className={styles.popoutEditor__fieldRow}>
+                      <div>
+                        <label>INT/EXT</label>
+                        <Select
+                          options={[
+                            { value: 'INT', label: 'INT' },
+                            { value: 'EXT', label: 'EXT' },
+                            { value: 'INT/EXT', label: 'INT/EXT' }
+                          ]}
+                          value={popoutScene.interiorExterior || 'INT'}
+                          onChange={e => handleUpdate(popoutScene.id, { interiorExterior: e.target.value as Scene['interiorExterior'] })}
+                        />
+                      </div>
+                      <div>
+                        <label>Time</label>
+                        <Select
+                          options={[
+                            { value: 'DAY', label: 'DAY' },
+                            { value: 'NIGHT', label: 'NIGHT' },
+                            { value: 'DAWN', label: 'DAWN' },
+                            { value: 'DUSK', label: 'DUSK' }
+                          ]}
+                          value={popoutScene.timeOfDay || 'DAY'}
+                          onChange={e => handleUpdate(popoutScene.id, { timeOfDay: e.target.value as Scene['timeOfDay'] })}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label>Page Estimate</label>
+                      <Input
+                        type="number"
+                        value={popoutScene.pageEstimate || ''}
+                        onChange={e => handleUpdate(popoutScene.id, { pageEstimate: parseInt(e.target.value) || 0 })}
+                        placeholder="1"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className={styles.popoutEditor__footer}>
+                <Button variant="primary" onClick={() => setPopoutSceneId(null)}>
+                  Done
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </section>
   );
 }
