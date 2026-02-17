@@ -44,7 +44,7 @@ export interface OAuthTokenResponse {
 
 /**
  * Open a popup window for OAuth authorization and wait for the redirect with auth code.
- * Returns the authorization code from the callback URL.
+ * Returns the callback URL for server-side completion (e.g., opaque connect token).
  */
 export function openOAuthPopup(authUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -84,14 +84,13 @@ export function openOAuthPopup(authUrl: string): Promise<string> {
           clearInterval(interval);
 
           const params = new URL(currentUrl).searchParams;
-          const code = params.get('code');
           const error = params.get('error');
           const errorDescription = params.get('error_description');
 
           popup.close();
 
-          if (code) {
-            resolve(code);
+          if (!error) {
+            resolve(currentUrl);
           } else {
             reject(new Error(errorDescription || error || 'Authorization was denied.'));
           }
