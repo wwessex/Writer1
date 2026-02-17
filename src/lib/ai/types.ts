@@ -1,8 +1,9 @@
 /**
  * Shared types for the AI provider abstraction layer.
  *
- * Two providers are supported:
+ * Three providers are supported:
  * - chrome-ai  : Chrome Built-in AI (Gemini Nano, on-device, free, no API key)
+ * - managed-cloud : DraftHarbour managed cloud AI endpoint (default cloud fallback)
  * - openai-compatible : Any OpenAI-compatible chat completion endpoint
  */
 
@@ -10,7 +11,7 @@
 /*  Provider & config                                                  */
 /* ------------------------------------------------------------------ */
 
-export type AIProviderType = 'chrome-ai' | 'openai-compatible';
+export type AIProviderType = 'chrome-ai' | 'managed-cloud' | 'openai-compatible';
 
 export interface AIProviderConfig {
   provider: AIProviderType;

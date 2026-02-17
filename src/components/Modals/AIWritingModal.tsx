@@ -9,6 +9,7 @@ import {
   createProvider,
   isChromeAIAvailable,
   checkChromeAIAvailability,
+  detectBestProvider,
 } from '@/lib/ai';
 import type { AIProviderConfig, AvailabilityStatus } from '@/lib/ai';
 import type { ProjectType } from '@/types';
@@ -155,6 +156,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   const [config, setConfig] = useState<AIProviderConfig>(loadAIConfig);
   const [showSettings, setShowSettings] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
+  const [showCustomProvider, setShowCustomProvider] = useState(false);
 
   // Chrome AI availability
   const [chromeAIAvailable, setChromeAIAvailable] = useState(false);
@@ -200,9 +202,11 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   /* ----- Provider logic --------------------------------------------- */
 
   const isConfigured =
-    config.provider === 'chrome-ai'
-      ? chromeAIAvailable
-      : !!(config.endpoint?.trim() && config.sessionToken?.trim());
+    config.provider === 'openai-compatible'
+      ? !!(config.endpoint?.trim() && config.sessionToken?.trim())
+      : config.provider === 'chrome-ai'
+        ? chromeAIAvailable
+        : true;
 
   // Reset transient state when the modal opens/closes
   useEffect(() => {
@@ -211,8 +215,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       setError(null);
       setPrompt('');
       setLoading(false);
-      // Auto-open settings panel when AI is not configured
-      if (!isConfigured) {
+      if (config.provider === 'openai-compatible' && !isConfigured) {
         setShowSettings(true);
       }
     } else {
@@ -220,6 +223,24 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+
+  useEffect(() => {
+    if (config.provider === 'openai-compatible') {
+      return;
+    }
+
+    detectBestProvider().then(bestProvider => {
+      setConfig(prev => {
+        if (prev.provider === 'openai-compatible' || prev.provider === bestProvider) {
+          return prev;
+        }
+        const next = { ...prev, provider: bestProvider };
+        saveAIConfig(next);
+        return next;
+      });
+    });
+  }, [chromeAIAvailable, config.provider]);
 
   // Scroll response area when new content arrives
   useEffect(() => {
@@ -233,11 +254,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       if (!promptText.trim()) return;
 
       if (!isConfigured) {
-        setError(
-          config.provider === 'chrome-ai'
-            ? 'Chrome AI is not available in this browser. Switch to OpenAI-Compatible API in Settings, or use Chrome 137+ on a supported platform.'
-            : 'AI is not configured yet. Open Settings to set your API endpoint and session token.'
-        );
+        setError('Custom provider is not configured yet. Open Settings → Custom provider to set endpoint and session token.');
         return;
       }
 
@@ -344,7 +361,8 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
 
   /* ----- Helpers ---------------------------------------------------- */
 
-  const providerLabel = config.provider === 'chrome-ai' ? 'Chrome AI' : 'API';
+  const providerModeLabel = config.provider === 'chrome-ai' ? 'Using local AI' : 'Using cloud AI';
+  const providerLabel = `AI ready · ${providerModeLabel}`;
   const providerIcon = config.provider === 'chrome-ai' ? 'memory' : 'cloud';
 
   /* ----- Render ----------------------------------------------------- */
@@ -397,94 +415,71 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
             AI Configuration
           </h4>
 
-          {/* Provider selector */}
-          <div className={styles.aiProviderSelector}>
-            <label className={styles.aiLabel}>AI Provider</label>
-            <div className={styles.aiProviderOptions}>
-              <button
-                className={`${styles.aiProviderOption} ${
-                  config.provider === 'chrome-ai' ? styles['aiProviderOption--active'] : ''
-                }`}
-                onClick={() => updateConfig({ provider: 'chrome-ai' })}
-                disabled={!chromeAIAvailable}
-              >
-                <span className="material-symbols-rounded">memory</span>
-                <span className={styles.aiProviderOptionText}>
-                  <strong>Chrome Built-in AI</strong>
-                  <small>Free, on-device, no session token needed</small>
-                </span>
-                {chromeAIStatus === 'readily' && (
-                  <span className={styles.aiBadge} data-status="ready">Ready</span>
-                )}
-                {chromeAIStatus === 'after-download' && (
-                  <span className={styles.aiBadge} data-status="download">Download needed</span>
-                )}
-                {chromeAIStatus === 'no' && (
-                  <span className={styles.aiBadge} data-status="unavailable">Not available</span>
-                )}
-              </button>
-              <button
-                className={`${styles.aiProviderOption} ${
-                  config.provider === 'openai-compatible' ? styles['aiProviderOption--active'] : ''
-                }`}
-                onClick={() => updateConfig({ provider: 'openai-compatible' })}
-              >
-                <span className="material-symbols-rounded">cloud</span>
-                <span className={styles.aiProviderOptionText}>
-                  <strong>OpenAI-Compatible API</strong>
-                  <small>OpenAI, Anthropic, Ollama, LM Studio</small>
-                </span>
-              </button>
-            </div>
+          <div className={styles.aiPrivacyNote}>
+            <span className="material-symbols-rounded">auto_awesome</span>
+            <span>
+              {config.provider === 'chrome-ai'
+                ? 'Using local AI. Chrome built-in models run directly on your device when available.'
+                : 'Using cloud AI. Requests are routed through the managed DraftHarbour cloud endpoint.'}
+            </span>
           </div>
 
-          {/* OpenAI-compatible settings (only shown when that provider is selected) */}
-          {config.provider === 'openai-compatible' && (
-            <>
-              <div className={styles.aiSettingsFields}>
-                <label className={styles.aiLabel}>
-                  API Endpoint
-                  <Input
-                    placeholder="https://api.openai.com/v1/chat/completions"
-                    value={config.endpoint || ''}
-                    onChange={e => updateConfig({ endpoint: e.target.value })}
-                  />
-                </label>
-                <label className={styles.aiLabel}>
-                  Session Token
-                  <Input
-                    type="password"
-                    placeholder="session-token"
-                    value={config.sessionToken || ''}
-                    onChange={e => updateConfig({ sessionToken: e.target.value })}
-                  />
-                </label>
-              </div>
-              <div className={styles.aiSettingsActions}>
-                <Button
-                  variant="default"
-                  size="small"
-                  onClick={handleTestConnection}
-                  disabled={testingConnection || !config.endpoint?.trim() || !config.sessionToken?.trim()}
-                >
-                  <span className="material-symbols-rounded">wifi_tethering</span>
-                  {testingConnection ? 'Testing...' : 'Test Connection'}
-                </Button>
-              </div>
-              <div className={styles.aiPrivacyNote}>
-                <span className="material-symbols-rounded">shield</span>
-                <span>Your session token is stored only in your browser&apos;s localStorage and is sent only to the endpoint you configure. No data is shared with DraftHarbour Studio servers.</span>
-              </div>
-            </>
-          )}
+          <div className={styles.aiPrivacyNote}>
+            <span className="material-symbols-rounded">shield</span>
+            <span>
+              {chromeAIAvailable
+                ? 'Chrome AI detected. Writer will prefer local AI automatically.'
+                : 'Chrome AI unavailable here. Writer automatically uses managed cloud AI.'}
+            </span>
+          </div>
 
-          {/* Chrome AI info */}
-          {config.provider === 'chrome-ai' && chromeAIAvailable && (
-            <div className={styles.aiPrivacyNote}>
-              <span className="material-symbols-rounded">shield</span>
-              <span>Chrome AI runs entirely on your device. Your writing never leaves your computer.</span>
+          <details open={showCustomProvider} onToggle={e => setShowCustomProvider((e.target as HTMLDetailsElement).open)}>
+            <summary className={styles.aiNoticeLink}>Custom provider (advanced)</summary>
+            <div className={styles.aiSettingsFields}>
+              <label className={styles.aiLabel}>
+                API Endpoint
+                <Input
+                  placeholder="https://api.openai.com/v1/chat/completions"
+                  value={config.endpoint || ''}
+                  onChange={e => updateConfig({ endpoint: e.target.value })}
+                />
+              </label>
+              <label className={styles.aiLabel}>
+                Session Token
+                <Input
+                  type="password"
+                  placeholder="session-token"
+                  value={config.sessionToken || ''}
+                  onChange={e => updateConfig({ sessionToken: e.target.value })}
+                />
+              </label>
             </div>
-          )}
+            <div className={styles.aiSettingsActions}>
+              <Button
+                variant="default"
+                size="small"
+                onClick={handleTestConnection}
+                disabled={testingConnection || !config.endpoint?.trim() || !config.sessionToken?.trim()}
+              >
+                <span className="material-symbols-rounded">wifi_tethering</span>
+                {testingConnection ? 'Testing...' : 'Test Connection'}
+              </Button>
+              <Button
+                variant="ghost"
+                size="small"
+                onClick={() => updateConfig({ provider: 'openai-compatible' })}
+              >
+                Use Custom Provider
+              </Button>
+              <Button
+                variant="ghost"
+                size="small"
+                onClick={() => updateConfig({ provider: chromeAIAvailable ? 'chrome-ai' : 'managed-cloud' })}
+              >
+                Use Automatic Mode
+              </Button>
+            </div>
+          </details>
 
           <p className={styles.aiSettingsHint}>
             Settings are stored locally in your browser.
@@ -493,33 +488,15 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       )}
 
       {/* Unconfigured notice */}
-      {!isConfigured && !showSettings && (
+      {!isConfigured && !showSettings && config.provider === 'openai-compatible' && (
         <div className={styles.aiNotice}>
           <span className="material-symbols-rounded">info</span>
           <div>
-            {config.provider === 'chrome-ai' ? (
-              <>
-                <strong>Chrome AI is not available in this browser.</strong>{' '}
-                Use Chrome 137+ on a supported platform for free on-device AI, or open{' '}
-                <button className={styles.aiNoticeLink} onClick={() => setShowSettings(true)}>
-                  Settings
-                </button>{' '}
-                to configure an OpenAI-compatible API instead.
-              </>
-            ) : (
-              <>
-                <strong>AI is not configured yet.</strong> Open{' '}
-                <button className={styles.aiNoticeLink} onClick={() => setShowSettings(true)}>
-                  Settings
-                </button>{' '}
-                to enter your API endpoint and session token.
-                <br /><br />
-                <strong>Compatible services:</strong> OpenAI, Anthropic (via proxy), Ollama, LM Studio, or any OpenAI-compatible API.
-                <br />
-                <strong>Example endpoint:</strong>{' '}
-                <code className={styles.aiCode}>https://api.openai.com/v1/chat/completions</code>
-              </>
-            )}
+            <strong>Custom provider needs setup.</strong> Open{' '}
+            <button className={styles.aiNoticeLink} onClick={() => setShowSettings(true)}>
+              Settings
+            </button>{' '}
+            and expand <em>Custom provider (advanced)</em> to enter endpoint and session token.
           </div>
         </div>
       )}
