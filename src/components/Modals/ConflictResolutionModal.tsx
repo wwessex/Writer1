@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog, Button } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
 import { editorToPlainText } from '@/lib/utils';
@@ -12,9 +12,20 @@ interface ConflictResolutionModalProps {
   onResolve: (resolution: ConflictResolutionOption) => void;
 }
 
+function providerLabel(provider?: string): string {
+  if (!provider) return 'your cloud integration';
+  if (provider === 'google-drive') return 'Google Drive';
+  if (provider === 'dropbox') return 'Dropbox';
+  return provider;
+}
+
 export function ConflictResolutionModal({ open, onClose, conflict, onResolve }: ConflictResolutionModalProps) {
   const { state } = useApp();
   const [selectedResolution, setSelectedResolution] = useState<ConflictResolutionOption>('local');
+
+  useEffect(() => {
+    setSelectedResolution('local');
+  }, [conflict?.chapterId, conflict?.remoteRevisionId]);
 
   if (!conflict) {
     return (
@@ -60,9 +71,14 @@ export function ConflictResolutionModal({ open, onClose, conflict, onResolve }: 
         <div className={styles.conflictWarning}>
           <span className="material-symbols-rounded">warning</span>
           <p>
-            The chapter <strong>"{chapter?.title || 'Unknown'}"</strong> has diverged.
-            Choose an action: keep local, keep remote, or start from a manual merge draft.
+            We found conflicting changes for <strong>"{chapter?.title || 'Unknown'}"</strong> while syncing with <strong>{providerLabel(conflict.provider)}</strong>.
+            Review both versions below and choose the safest recovery action.
           </p>
+        </div>
+
+        <div className={styles.integrationCard__fieldHint}>
+          Context: Provider revision <strong>{conflict.remoteRevisionId || 'unknown'}</strong>
+          {conflict.localRevisionId ? <> · Local revision <strong>{conflict.localRevisionId}</strong></> : null}
         </div>
 
         <div className={styles.conflictOptions}>
@@ -122,7 +138,7 @@ export function ConflictResolutionModal({ open, onClose, conflict, onResolve }: 
               <div className={styles.diffPane__content}>{localPreview || <em>Empty</em>}</div>
             </div>
             <div className={styles.diffPane}>
-              <div className={styles.diffPane__header}>Remote</div>
+              <div className={styles.diffPane__header}>Remote ({providerLabel(conflict.provider)})</div>
               <div className={styles.diffPane__content}>{remotePreview || <em>Empty</em>}</div>
             </div>
           </div>

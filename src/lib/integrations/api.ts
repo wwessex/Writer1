@@ -28,6 +28,10 @@ export interface ProviderPublicMetadata {
   displayName: string;
   available: boolean;
   scopes: string[];
+  accountEmail?: string;
+  accountDisplayName?: string;
+  healthStatus?: 'healthy' | 'degraded' | 'error' | 'unknown';
+  healthMessage?: string;
   authStartUrl?: string;
 }
 
@@ -104,6 +108,7 @@ export interface ProviderSessionIntrospectionResponse {
   active: boolean;
   connectionId?: string;
   expiresAt?: number;
+  status?: ProviderConnectionStatus;
 }
 
 export async function createProviderSession(provider: IntegrationType, connectionId: string): Promise<ProviderConnectionResponse> {
