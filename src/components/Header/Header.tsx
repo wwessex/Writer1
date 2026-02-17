@@ -8,6 +8,7 @@ import { getProjectMetrics } from '@/lib/projectMetrics';
 import { getMonthlyHistory } from '@/lib/progressTracker';
 import { createProvider, loadAIConfig } from '@/lib/ai';
 import { COMMAND_IDS, COMMAND_METADATA, type CommandId } from '@/lib/commands';
+import { APP_MENUS } from '@/lib/menuConfig';
 import styles from './Header.module.css';
 
 interface HeaderProps {
@@ -22,49 +23,24 @@ interface MobileMenuSection {
   items: CommandId[];
 }
 
-const MOBILE_MENU_SECTIONS: MobileMenuSection[] = [
-  {
-    section: 'Write',
-    items: [
-      COMMAND_IDS.NEW_CHAPTER,
-      COMMAND_IDS.QUICK_SWITCHER,
-      COMMAND_IDS.ADD_COMMENT,
-      COMMAND_IDS.FORMAT_BOLD,
-      COMMAND_IDS.FORMAT_ITALIC,
-    ]
-  },
-  {
-    section: 'Navigate',
-    items: [
-      COMMAND_IDS.TOGGLE_FOCUS_MODE,
-      COMMAND_IDS.TOGGLE_PAGE_VIEW,
-      COMMAND_IDS.UNDO,
-      COMMAND_IDS.REDO,
-    ]
-  },
-  {
-    section: 'Tools',
-    items: [
-      COMMAND_IDS.AI_PANEL,
-      COMMAND_IDS.SNAPSHOTS,
-      COMMAND_IDS.ANALYSIS,
-      COMMAND_IDS.SETTINGS,
-    ]
-  },
-  {
-    section: 'Project',
-    items: [
-      COMMAND_IDS.PROJECTS,
-      COMMAND_IDS.EXPORT,
-      COMMAND_IDS.IMPORT_DOCUMENT,
-    ]
-  },
-];
+const MOBILE_SECTION_ORDER: MobileMenuSection['section'][] = ['Write', 'Navigate', 'Tools', 'Project'];
+
+const MOBILE_SECTION_BY_MENU_LABEL: Record<string, MobileMenuSection['section']> = {
+  File: 'Project',
+  Edit: 'Navigate',
+  View: 'Navigate',
+  Insert: 'Write',
+  Format: 'Write',
+  Tools: 'Tools',
+  Help: 'Tools',
+};
 
 export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSelection = false }: HeaderProps) {
   const { state, dispatch, updateNovelTitle } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuListRef = useRef<HTMLDivElement>(null);
+  const [mobileMenuHasMore, setMobileMenuHasMore] = useState(false);
 
   const projectMetrics = useMemo(() => getProjectMetrics(state.chapters), [state.chapters]);
   const totalWords = projectMetrics.totalWords;
@@ -134,6 +110,35 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
     onAction?.(action);
   }, [onAction]);
 
+  const mobileMenuSections = useMemo(() => {
+    const sectionMap = new Map<MobileMenuSection['section'], CommandId[]>(
+      MOBILE_SECTION_ORDER.map(section => [section, []])
+    );
+
+    APP_MENUS.forEach(menu => {
+      const section = MOBILE_SECTION_BY_MENU_LABEL[menu.label];
+      if (!section) {
+        return;
+      }
+
+      const target = sectionMap.get(section);
+      if (!target) {
+        return;
+      }
+
+      menu.items.forEach(item => {
+        if (!item.action || target.includes(item.action)) {
+          return;
+        }
+        target.push(item.action);
+      });
+    });
+
+    return MOBILE_SECTION_ORDER
+      .map(section => ({ section, items: sectionMap.get(section) ?? [] }))
+      .filter(({ items }) => items.length > 0);
+  }, []);
+
   const quickActionCommands = useMemo(() => {
     const selected: CommandId[] = [];
     const addUnique = (command: CommandId) => {
@@ -187,18 +192,52 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
     }
   }, []);
 
+  const updateMobileMenuMoreState = useCallback(() => {
+    const node = mobileMenuListRef.current;
+    if (!node) {
+      setMobileMenuHasMore(false);
+      return;
+    }
+
+    const remaining = node.scrollHeight - node.scrollTop - node.clientHeight;
+    setMobileMenuHasMore(remaining > 12);
+  }, []);
+
+  const handleMobileMenuMoreClick = useCallback(() => {
+    const node = mobileMenuListRef.current;
+    if (!node) {
+      return;
+    }
+
+    node.scrollBy({ top: Math.max(120, Math.round(node.clientHeight * 0.75)), behavior: 'smooth' });
+  }, []);
+
   useEffect(() => {
     if (mobileMenuOpen) {
       document.addEventListener('touchstart', handleTouchStart, { passive: true });
       document.addEventListener('touchmove', handleTouchMove, { passive: true });
       document.addEventListener('click', handleClickOutside);
+      updateMobileMenuMoreState();
+      const frameId = window.requestAnimationFrame(updateMobileMenuMoreState);
+
+      const mobileMenuNode = mobileMenuListRef.current;
+      if (mobileMenuNode) {
+        mobileMenuNode.addEventListener('scroll', updateMobileMenuMoreState, { passive: true });
+      }
+
+      window.addEventListener('resize', updateMobileMenuMoreState);
       return () => {
         document.removeEventListener('touchstart', handleTouchStart);
         document.removeEventListener('touchmove', handleTouchMove);
         document.removeEventListener('click', handleClickOutside);
+        if (mobileMenuNode) {
+          mobileMenuNode.removeEventListener('scroll', updateMobileMenuMoreState);
+        }
+        window.cancelAnimationFrame(frameId);
+        window.removeEventListener('resize', updateMobileMenuMoreState);
       };
     }
-  }, [mobileMenuOpen, handleClickOutside, handleTouchStart, handleTouchMove]);
+  }, [mobileMenuOpen, handleClickOutside, handleTouchStart, handleTouchMove, updateMobileMenuMoreState]);
 
   return (
     <header className={styles.header}>
@@ -213,24 +252,34 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
             />
             {mobileMenuOpen && (
               <div className={styles.mobileMenu}>
-                {MOBILE_MENU_SECTIONS.map(({ section, items }) => (
-                  <div key={section} className={styles.mobileMenuSection}>
-                    <div className={styles.mobileMenuSectionTitle}>{section}</div>
-                    {items.map(commandId => {
-                      const command = getCommandPresentation(commandId);
-                      return (
-                        <button
-                          key={commandId}
-                          className={styles.mobileMenuItem}
-                          onClick={() => dispatchCommand(commandId)}
-                        >
-                          <span className="material-symbols-rounded">{command.icon}</span>
-                          <span>{command.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ))}
+                <div className={styles.mobileMenuScrollable} ref={mobileMenuListRef}>
+                  {mobileMenuSections.map(({ section, items }) => (
+                    <div key={section} className={styles.mobileMenuSection}>
+                      <div className={styles.mobileMenuSectionTitle}>{section}</div>
+                      {items.map(commandId => {
+                        const command = getCommandPresentation(commandId);
+                        return (
+                          <button
+                            key={commandId}
+                            className={styles.mobileMenuItem}
+                            onClick={() => dispatchCommand(commandId)}
+                          >
+                            <span className="material-symbols-rounded">{command.icon}</span>
+                            <span>{command.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  className={`${styles.mobileMenuMoreBtn} ${!mobileMenuHasMore ? styles['mobileMenuMoreBtn--end'] : ''}`}
+                  onClick={handleMobileMenuMoreClick}
+                  disabled={!mobileMenuHasMore}
+                >
+                  <span>{mobileMenuHasMore ? 'More' : 'End'}</span>
+                  <span className="material-symbols-rounded">{mobileMenuHasMore ? 'expand_more' : 'check'}</span>
+                </button>
               </div>
             )}
           </div>
