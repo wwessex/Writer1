@@ -32,7 +32,14 @@ export class OpenAIProvider implements AIProvider {
     const useManagedBroker = this.config.provider === 'managed-cloud' || !isAIDeveloperModeEnabled();
 
     if (useManagedBroker) {
-      const brokerRes = await fetch(`${getBrokerBaseUrl()}/api/ai/generate`, {
+      const brokerBase = getBrokerBaseUrl();
+      if (!brokerBase && import.meta.env.PROD) {
+        throw new Error(
+          'AI broker endpoint is not configured. Please switch to a custom OpenAI-compatible provider in the AI settings and supply your own API endpoint and session token.',
+        );
+      }
+
+      const brokerRes = await fetch(`${brokerBase}/api/ai/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
@@ -45,6 +52,11 @@ export class OpenAIProvider implements AIProvider {
 
       if (!brokerRes.ok) {
         const body = await brokerRes.text().catch(() => '');
+        if (brokerRes.status === 404) {
+          throw new Error(
+            'AI broker endpoint not found (404). The broker URL may be misconfigured or the server does not support the /api/ai/generate route. Switch to a custom OpenAI-compatible provider in AI settings.',
+          );
+        }
         throw new Error(`Broker AI request failed (${brokerRes.status}): ${body || brokerRes.statusText}`);
       }
 
