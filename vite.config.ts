@@ -2,11 +2,55 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
+import { handleBrokerRequest } from './src/server/integrationBroker';
+
+function integrationBrokerPlugin() {
+  return {
+    name: 'integration-broker',
+    configureServer(server: { middlewares: { use: (handler: (req: { method?: string; url?: string; on: (event: string, cb: (chunk?: unknown) => void) => void }, res: { statusCode: number; setHeader: (name: string, value: string) => void; end: (body: string) => void }, next: () => void) => void) => void } }) {
+      server.middlewares.use((req, res, next) => {
+        const method = req.method || 'GET';
+        const url = req.url || '/';
+        const pathOnly = url.split('?')[0];
+
+        if (!pathOnly.startsWith('/api/')) {
+          next();
+          return;
+        }
+
+        let raw = '';
+        req.on('data', (chunk) => {
+          const textChunk = typeof chunk === 'string' ? chunk : String(chunk ?? '');
+          raw += textChunk;
+        });
+        req.on('end', async () => {
+          let body: unknown = {};
+          try {
+            body = raw ? JSON.parse(raw) : {};
+          } catch {
+            body = {};
+          }
+
+          const result = await handleBrokerRequest({ method, path: pathOnly, body });
+          if (!result) {
+            next();
+            return;
+          }
+
+          res.statusCode = result.status;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify(result.body));
+        });
+      });
+    },
+  };
+}
 
 export default defineConfig({
   base: './',
   plugins: [
     react(),
+    integrationBrokerPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['assets/favicon.ico', 'assets/apple-touch-icon.png', 'assets/*.png', 'assets/*.svg', 'brand/*.svg'],
