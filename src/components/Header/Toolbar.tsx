@@ -311,6 +311,7 @@ export function Toolbar() {
                 label={label}
                 variant="ghost"
                 active={isActive(cmd)}
+                onPointerDown={(e: React.PointerEvent) => e.preventDefault()}
                 onClick={() => handleFormatClick(cmd)}
                 className={styles.toolbarActionBtn}
               />
@@ -322,6 +323,7 @@ export function Toolbar() {
                 label="More formatting"
                 variant="ghost"
                 active={moreFormattingOpen}
+                onPointerDown={(e: React.PointerEvent) => e.preventDefault()}
                 onClick={() => setMoreFormattingOpen(prev => !prev)}
                 className={styles.toolbarActionBtn}
               />
@@ -331,6 +333,7 @@ export function Toolbar() {
                     <button
                       key={cmd}
                       className={styles.moreFormattingItem}
+                      onPointerDown={(e) => e.preventDefault()}
                       onClick={() => {
                         handleFormatClick(cmd);
                         setMoreFormattingOpen(false);
@@ -375,6 +378,7 @@ export function Toolbar() {
               icon="undo"
               label="Undo"
               variant="ghost"
+              onPointerDown={(e: React.PointerEvent) => e.preventDefault()}
               onClick={() => handleFormatClick('undo')}
               disabled={!editor?.can().undo()}
               className={styles.toolbarActionBtn}
@@ -383,6 +387,7 @@ export function Toolbar() {
               icon="redo"
               label="Redo"
               variant="ghost"
+              onPointerDown={(e: React.PointerEvent) => e.preventDefault()}
               onClick={() => handleFormatClick('redo')}
               disabled={!editor?.can().redo()}
               className={styles.toolbarActionBtn}

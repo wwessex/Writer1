@@ -240,6 +240,7 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
             <IconButton
               icon="menu"
               label="Open menu"
+              onPointerDown={(e: React.PointerEvent) => e.preventDefault()}
               onClick={handleMenuButtonClick}
               className={styles.menuBtn}
             />
@@ -295,6 +296,7 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
                   icon={command.icon}
                   label={command.label}
                   variant="ghost"
+                  onPointerDown={(e: React.PointerEvent) => e.preventDefault()}
                   onClick={() => dispatchCommand(commandId)}
                   className={styles.mobileQuickActionBtn}
                 />
@@ -317,6 +319,7 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
                       <button
                         key={commandId}
                         className={styles.mobileMenuItem}
+                        onPointerDown={(e) => e.preventDefault()}
                         onClick={() => dispatchCommand(commandId)}
                       >
                         <span className="material-symbols-rounded">{command.icon}</span>
