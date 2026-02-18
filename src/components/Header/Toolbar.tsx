@@ -28,6 +28,7 @@ const FONT_FAMILY_OPTIONS = [
   { value: '"Georgia", serif', label: 'Georgia' },
   { value: '"Palatino Linotype", "Book Antiqua", Palatino, serif', label: 'Palatino' },
   { value: '"Times New Roman", Times, serif', label: 'Times' },
+  { value: '"Courier Prime", "Courier New", Courier, monospace', label: 'Courier Prime' },
   { value: '"Courier New", Courier, monospace', label: 'Courier' },
   { value: '"Trebuchet MS", Helvetica, sans-serif', label: 'Trebuchet' },
   { value: '"Verdana", Geneva, sans-serif', label: 'Verdana' },
@@ -161,6 +162,29 @@ export function Toolbar() {
   const [lineSpacing, setLineSpacing] = useState('1.5');
   const [fontFamily, setFontFamily] = useState('default');
 
+  // Sync the font dropdown with the current selection's font
+  useEffect(() => {
+    if (!editor) return;
+
+    const updateFontFromSelection = () => {
+      const attrs = editor.getAttributes('textStyle');
+      if (attrs.fontFamily) {
+        // Find matching option or fall back to showing the raw value
+        const match = FONT_FAMILY_OPTIONS.find(opt => opt.value === attrs.fontFamily);
+        setFontFamily(match ? match.value : attrs.fontFamily);
+      } else {
+        setFontFamily('default');
+      }
+    };
+
+    editor.on('selectionUpdate', updateFontFromSelection);
+    editor.on('transaction', updateFontFromSelection);
+    return () => {
+      editor.off('selectionUpdate', updateFontFromSelection);
+      editor.off('transaction', updateFontFromSelection);
+    };
+  }, [editor]);
+
   const handleLineSpacingChange = (value: string) => {
     setLineSpacing(value);
     if (!editor) return;
@@ -171,8 +195,22 @@ export function Toolbar() {
   const handleFontFamilyChange = (value: string) => {
     setFontFamily(value);
     if (!editor) return;
-    const editorElement = editor.view.dom as HTMLElement;
-    editorElement.style.fontFamily = value === 'default' ? '' : value;
+
+    const { from, to } = editor.state.selection;
+    const hasSelection = from !== to;
+
+    if (hasSelection) {
+      // Apply font only to the selected text via inline mark
+      if (value === 'default') {
+        editor.chain().focus().unsetFontFamily().run();
+      } else {
+        editor.chain().focus().setFontFamily(value).run();
+      }
+    } else {
+      // No selection: set editor-wide default font
+      const editorElement = editor.view.dom as HTMLElement;
+      editorElement.style.fontFamily = value === 'default' ? '' : value;
+    }
   };
 
   const imageInputRef = useRef<HTMLInputElement>(null);

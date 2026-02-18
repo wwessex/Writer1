@@ -4,6 +4,8 @@ import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import HorizontalRule from '@tiptap/extension-horizontal-rule';
 import Image from '@tiptap/extension-image';
+import TextStyle from '@tiptap/extension-text-style';
+import FontFamily from '@tiptap/extension-font-family';
 import { ScreenplayParagraph, CommentAnchorMark } from '@/components/Editor/screenplayExtension';
 import { FindReplaceExtension } from '@/lib/findReplaceExtension';
 import { useApp, AppProvider } from '@/context/AppContext';
@@ -44,6 +46,8 @@ const createExtensions = (screenplayMode: boolean) => [
     inline: false,
     allowBase64: true,
   }),
+  TextStyle,
+  FontFamily,
   CommentAnchorMark,
   FindReplaceExtension,
 ];
