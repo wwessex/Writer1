@@ -10,6 +10,7 @@
  */
 
 import type { AIProvider, AIRequest, AIResponse } from './types';
+import { isChromeBrowser } from './availability';
 
 /* ------------------------------------------------------------------ */
 /*  Action → API routing                                               */
@@ -52,6 +53,8 @@ export class ChromeAIProvider implements AIProvider {
   readonly type = 'chrome-ai' as const;
 
   isAvailable(): boolean {
+    // Only real Chrome ships functional Built-in AI APIs.
+    if (!isChromeBrowser()) return false;
     // Check top-level global first, then self.ai namespace
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (typeof (globalThis as any).LanguageModel !== 'undefined') return true;

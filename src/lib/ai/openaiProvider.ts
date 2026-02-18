@@ -13,8 +13,12 @@ export class OpenAIProvider implements AIProvider {
   }
 
   isAvailable(): boolean {
-    if (this.config.provider === 'managed-cloud' || !isAIDeveloperModeEnabled()) {
-      return true;
+    if (this.config.provider === 'managed-cloud') {
+      // managed-cloud requires a broker URL to function
+      return !!getBrokerBaseUrl();
+    }
+    if (!isAIDeveloperModeEnabled()) {
+      return !!getBrokerBaseUrl();
     }
     return !!(this.config.endpoint?.trim() && this.config.sessionToken?.trim());
   }
@@ -33,9 +37,9 @@ export class OpenAIProvider implements AIProvider {
 
     if (useManagedBroker) {
       const brokerBase = getBrokerBaseUrl();
-      if (!brokerBase && import.meta.env.PROD) {
+      if (!brokerBase) {
         throw new Error(
-          'AI broker endpoint is not configured. Please switch to a custom OpenAI-compatible provider in the AI settings and supply your own API endpoint and session token.',
+          'Cloud AI is not available. To use AI features, open Settings in the AI panel and expand "Custom provider (advanced)" to connect your own OpenAI-compatible API endpoint and key (e.g. from platform.openai.com). Alternatively, use Google Chrome which supports free on-device AI.',
         );
       }
 
@@ -54,7 +58,7 @@ export class OpenAIProvider implements AIProvider {
         const body = await brokerRes.text().catch(() => '');
         if (brokerRes.status === 404) {
           throw new Error(
-            'AI broker endpoint not found (404). The broker URL may be misconfigured or the server does not support the /api/ai/generate route. Switch to a custom OpenAI-compatible provider in AI settings.',
+            'Cloud AI endpoint not found (404). Please switch to a custom OpenAI-compatible provider in Settings → Custom provider (advanced) and supply your own API endpoint and key.',
           );
         }
         throw new Error(`Broker AI request failed (${brokerRes.status}): ${body || brokerRes.statusText}`);

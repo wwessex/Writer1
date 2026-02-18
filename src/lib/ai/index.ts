@@ -18,9 +18,11 @@ export {
   saveAIConfig,
   createProvider,
   detectBestProvider,
+  isChromeWithoutAI,
 } from './providerManager';
 
 export {
   checkChromeAIAvailability,
   isChromeAIAvailable,
+  isChromeBrowser,
 } from './availability';

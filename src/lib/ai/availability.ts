@@ -15,6 +15,39 @@
 import type { AvailabilityStatus, ChromeAIAvailability } from './types';
 
 /* ------------------------------------------------------------------ */
+/*  Browser guard — only real Chrome ships usable Built-in AI APIs     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Return `true` only when running inside Google Chrome (not Edge, Brave,
+ * Opera, or other Chromium forks that may expose `self.ai` stubs).
+ *
+ * Uses the modern `NavigatorUAData` API first (Chromium 90+) and falls
+ * back to the classic `navigator.userAgent` string.
+ */
+export function isChromeBrowser(): boolean {
+  try {
+    // Modern: navigator.userAgentData.brands
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const uaData = (navigator as any).userAgentData;
+    if (uaData?.brands) {
+      const brands: { brand: string }[] = uaData.brands;
+      const hasChrome = brands.some(b => b.brand === 'Google Chrome');
+      // Edge injects "Microsoft Edge" and Brave injects "Brave"
+      const hasEdge = brands.some(b => b.brand === 'Microsoft Edge');
+      const hasBrave = brands.some(b => b.brand === 'Brave');
+      return hasChrome && !hasEdge && !hasBrave;
+    }
+  } catch {
+    // ignore — fall through to UA string
+  }
+
+  // Legacy: user-agent string check
+  const ua = navigator.userAgent;
+  return /Chrome\/\d+/.test(ua) && !/Edg\//.test(ua) && !/OPR\//.test(ua) && !/Brave/.test(ua);
+}
+
+/* ------------------------------------------------------------------ */
 /*  Normalisation map — old values → new vocabulary                    */
 /* ------------------------------------------------------------------ */
 
@@ -72,6 +105,17 @@ async function checkAPI(globalName: string): Promise<AvailabilityStatus> {
 
 /** Check availability of all four Chrome Built-in AI APIs. */
 export async function checkChromeAIAvailability(): Promise<ChromeAIAvailability> {
+  // Only real Chrome ships functional Built-in AI; other Chromium forks
+  // (Edge, Brave, Opera …) may expose stubs that don't actually work.
+  if (!isChromeBrowser()) {
+    return {
+      languageModel: 'unavailable',
+      summarizer: 'unavailable',
+      writer: 'unavailable',
+      rewriter: 'unavailable',
+    };
+  }
+
   const [languageModel, summarizer, writer, rewriter] = await Promise.all([
     checkAPI('LanguageModel'),
     checkAPI('Summarizer'),
@@ -83,6 +127,7 @@ export async function checkChromeAIAvailability(): Promise<ChromeAIAvailability>
 
 /** Quick boolean: is at least one Chrome AI API usable? */
 export async function isChromeAIAvailable(): Promise<boolean> {
+  if (!isChromeBrowser()) return false;
   const result = await checkChromeAIAvailability();
   return Object.values(result).some(
     (s) => s === 'available' || s === 'downloadable' || s === 'downloading',

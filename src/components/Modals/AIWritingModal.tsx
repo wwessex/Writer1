@@ -10,7 +10,9 @@ import {
   isChromeAIAvailable,
   checkChromeAIAvailability,
   detectBestProvider,
+  isChromeBrowser,
 } from '@/lib/ai';
+import { getBrokerBaseUrl } from '@/lib/featureFlags';
 import type { AIProviderConfig, AvailabilityStatus } from '@/lib/ai';
 import type { ProjectType } from '@/types';
 import styles from './Modals.module.css';
@@ -207,7 +209,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       ? !!(config.endpoint?.trim() && config.sessionToken?.trim())
       : config.provider === 'chrome-ai'
         ? chromeAIAvailable
-        : true;
+        : /* managed-cloud */ !!getBrokerBaseUrl();
 
   // Reset transient state when the modal opens/closes
   useEffect(() => {
@@ -430,7 +432,9 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
             <span>
               {chromeAIAvailable
                 ? 'Chrome AI detected. Writer will prefer local AI automatically.'
-                : 'Chrome AI unavailable here. Writer automatically uses managed cloud AI.'}
+                : isChromeBrowser()
+                  ? 'Chrome AI is not yet available on this device. Enable "Optimization Guide On Device Model" in chrome://flags and restart Chrome.'
+                  : 'Chrome AI requires Google Chrome. To use AI features in this browser, set up a custom provider below.'}
             </span>
           </div>
 
@@ -504,16 +508,29 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       )}
 
       {/* Unconfigured notice */}
-      {!isConfigured && !showSettings && config.provider === 'openai-compatible' && (
+      {!isConfigured && !showSettings && (
         <div className={styles.aiNotice}>
           <span className="material-symbols-rounded">info</span>
           <div>
-            <strong>Custom provider needs setup.</strong> Open{' '}
-            <button className={styles.aiNoticeLink} onClick={() => setShowSettings(true)}>
-              Settings
-            </button>{' '}
-            and expand <em>Custom provider (advanced)</em> to enter your API endpoint and key.
-            You can get an API key from providers like OpenAI (platform.openai.com) or any OpenAI-compatible service.
+            {config.provider === 'openai-compatible' ? (
+              <>
+                <strong>Custom provider needs setup.</strong> Open{' '}
+                <button className={styles.aiNoticeLink} onClick={() => setShowSettings(true)}>
+                  Settings
+                </button>{' '}
+                and expand <em>Custom provider (advanced)</em> to enter your API endpoint and key.
+                You can get an API key from providers like OpenAI (platform.openai.com) or any OpenAI-compatible service.
+              </>
+            ) : (
+              <>
+                <strong>AI is not configured yet.</strong> Open{' '}
+                <button className={styles.aiNoticeLink} onClick={() => setShowSettings(true)}>
+                  Settings
+                </button>{' '}
+                and expand <em>Custom provider (advanced)</em> to connect your own OpenAI-compatible API.
+                {!isChromeBrowser() && ' Alternatively, use Google Chrome for free on-device AI.'}
+              </>
+            )}
           </div>
         </div>
       )}
