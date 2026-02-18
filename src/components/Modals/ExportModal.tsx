@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Dialog, Button } from '@/components/UI';
 import { useToast } from '@/components/UI';
 import { HelpTooltip } from '@/components/UI/Tooltip';
 import { useApp } from '@/context/AppContext';
-import type { ExportFormat } from '@/types';
+import type { ExportFormat, ExportProfile, ManuscriptLocale, ManuscriptExportOptions } from '@/types';
 import { exportToDocx, exportToPdf, exportToRtf, exportToFountain, exportToScreenplayPdf, exportToMarkdown, exportToPlainText } from '@/lib/export';
 import type { FountainExportOptions } from '@/lib/export';
+import { getProfileDefaults, validateExport, getValidationIssues, hasValidationErrors } from '@/lib/exportValidation';
 import { recordExport } from '@/lib/exportHistory';
 import { countWords, editorToPlainText } from '@/lib/utils';
 import styles from './Modals.module.css';
@@ -26,17 +27,29 @@ interface ExportPreset {
   includeHeadings: boolean;
   projectTypes: ('book' | 'screenplay')[];
   fountainOptions?: Partial<FountainExportOptions>;
+  profile?: ExportProfile;
 }
 
 const EXPORT_PRESETS: ExportPreset[] = [
   {
-    id: 'manuscript',
-    name: 'Manuscript Submission',
+    id: 'submission-us',
+    name: 'US Manuscript Submission',
     icon: 'send',
-    description: 'Standard DOCX with chapter headings, suitable for agent/editor submission.',
+    description: 'Industry-standard DOCX: Times New Roman 12pt, double-spaced, US Letter, headers, title page.',
     format: 'docx',
     includeHeadings: true,
     projectTypes: ['book'],
+    profile: 'submission',
+  },
+  {
+    id: 'submission-uk',
+    name: 'UK Manuscript Submission',
+    icon: 'send',
+    description: 'Industry-standard DOCX: Times New Roman 12pt, double-spaced, A4, headers, title page.',
+    format: 'docx',
+    includeHeadings: true,
+    projectTypes: ['book'],
+    profile: 'submission',
   },
   {
     id: 'reading-copy',
@@ -46,6 +59,16 @@ const EXPORT_PRESETS: ExportPreset[] = [
     format: 'pdf',
     includeHeadings: true,
     projectTypes: ['book'],
+  },
+  {
+    id: 'print-ready',
+    name: 'Print-Ready PDF',
+    icon: 'print',
+    description: 'PDF with embedded fonts, proper margins, justified text for print-on-demand.',
+    format: 'pdf',
+    includeHeadings: true,
+    projectTypes: ['book'],
+    profile: 'print',
   },
   {
     id: 'plain-text',
@@ -104,15 +127,36 @@ const EXPORT_PRESETS: ExportPreset[] = [
   },
 ];
 
+type ExportTab = 'presets' | 'manuscript' | 'custom';
+
 export function ExportModal({ open, onClose }: ExportModalProps) {
   const { state } = useApp();
   const { showToast } = useToast();
-  const [includeHeadings, setIncludeHeadings] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [activeTab, setActiveTab] = useState<ExportTab>('presets');
+
+  // Manuscript settings
+  const [profile, setProfile] = useState<ExportProfile>('submission');
+  const [locale, setLocale] = useState<ManuscriptLocale>('en-US');
+  const [authorName, setAuthorName] = useState('');
+  const [authorSurname, setAuthorSurname] = useState('');
+  const [shortTitle, setShortTitle] = useState('');
+  const [manuscriptFormat, setManuscriptFormat] = useState<ExportFormat>('docx');
+  const [fontSizePt, setFontSizePt] = useState(12);
+  const [lineSpacing, setLineSpacing] = useState(2.0);
+  const [firstLineIndentIn, setFirstLineIndentIn] = useState(0.5);
+  const [marginIn, setMarginIn] = useState(1.0);
+  const [alignment, setAlignment] = useState<ManuscriptExportOptions['alignment']>('left');
+  const [chapterStartsNewPage, setChapterStartsNewPage] = useState(true);
+  const [includeTitlePage, setIncludeTitlePage] = useState(true);
+  const [pageNumbering, setPageNumbering] = useState(true);
+  const [sceneBreakMarker, setSceneBreakMarker] = useState('* * *');
+
+  // Custom export settings
+  const [includeHeadings, setIncludeHeadings] = useState(true);
   const [includeSectionTitles, setIncludeSectionTitles] = useState(true);
   const [includeMetadataBlock, setIncludeMetadataBlock] = useState(true);
   const [filenameConvention, setFilenameConvention] = useState<FountainExportOptions['filenameConvention']>('title');
-  const [showPresets, setShowPresets] = useState(true);
 
   const isScreenplay = state.projectType === 'screenplay';
 
@@ -123,20 +167,73 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
     rtf: 'RTF',
     fountain: 'Fountain',
     markdown: 'Markdown',
-    txt: 'Plain Text'
+    txt: 'Plain Text',
   };
 
   const totalWords = state.chapters.reduce((sum, ch) => sum + countWords(editorToPlainText(ch.content)), 0);
 
-  const handleExport = async (format: ExportFormat, presetId?: string) => {
+  // Build current manuscript options from state
+  const buildManuscriptOptions = useCallback((): ManuscriptExportOptions => {
+    const defaults = getProfileDefaults(profile, locale);
+    return {
+      ...defaults,
+      fontSizePt,
+      lineSpacing,
+      firstLineIndentIn,
+      marginIn,
+      alignment,
+      chapterStartsNewPage,
+      includeTitlePage,
+      pageNumbering,
+      sceneBreakMarker,
+      authorName,
+      headerContent: { authorSurname, shortTitle },
+      includeHeadings: true,
+    };
+  }, [profile, locale, fontSizePt, lineSpacing, firstLineIndentIn, marginIn,
+    alignment, chapterStartsNewPage, includeTitlePage, pageNumbering,
+    sceneBreakMarker, authorName, authorSurname, shortTitle]);
+
+  // Validation results for manuscript tab
+  const validationResults = useMemo(() => {
+    if (activeTab !== 'manuscript') return [];
+    const opts = buildManuscriptOptions();
+    return validateExport(opts, state.chapters, manuscriptFormat);
+  }, [activeTab, buildManuscriptOptions, state.chapters, manuscriptFormat]);
+
+  const validationIssues = useMemo(() => getValidationIssues(validationResults), [validationResults]);
+  const hasErrors = useMemo(() => hasValidationErrors(validationResults), [validationResults]);
+
+  // Apply profile defaults when profile or locale changes
+  const handleProfileChange = (newProfile: ExportProfile) => {
+    setProfile(newProfile);
+    const defaults = getProfileDefaults(newProfile, locale);
+    setFontSizePt(defaults.fontSizePt);
+    setLineSpacing(defaults.lineSpacing);
+    setFirstLineIndentIn(defaults.firstLineIndentIn);
+    setMarginIn(defaults.marginIn);
+    setAlignment(defaults.alignment);
+    setChapterStartsNewPage(defaults.chapterStartsNewPage);
+    setIncludeTitlePage(defaults.includeTitlePage);
+    setPageNumbering(defaults.pageNumbering);
+    setSceneBreakMarker(defaults.sceneBreakMarker);
+  };
+
+  const handleLocaleChange = (newLocale: ManuscriptLocale) => {
+    setLocale(newLocale);
+    const defaults = getProfileDefaults(profile, newLocale);
+    setMarginIn(defaults.marginIn);
+  };
+
+  const handleExport = async (format: ExportFormat, presetId?: string, manuscriptOpts?: ManuscriptExportOptions) => {
     setExporting(true);
     try {
       switch (format) {
         case 'docx':
-          await exportToDocx(state.chapters, state.novelTitle, includeHeadings);
+          await exportToDocx(state.chapters, state.novelTitle, includeHeadings, manuscriptOpts);
           break;
         case 'pdf':
-          await exportToPdf(state.chapters, state.novelTitle, includeHeadings);
+          await exportToPdf(state.chapters, state.novelTitle, includeHeadings, manuscriptOpts);
           break;
         case 'screenplayPdf':
           await exportToScreenplayPdf(state.chapters, state.novelTitle);
@@ -149,7 +246,7 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
           });
           break;
         case 'rtf':
-          await exportToRtf(state.chapters, state.novelTitle, includeHeadings);
+          await exportToRtf(state.chapters, state.novelTitle, includeHeadings, manuscriptOpts);
           break;
         case 'markdown':
           await exportToMarkdown(state.chapters, state.novelTitle, includeHeadings);
@@ -181,8 +278,16 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
   };
 
   const handlePresetExport = async (preset: ExportPreset) => {
+    let manuscriptOpts: ManuscriptExportOptions | undefined;
+
+    if (preset.profile) {
+      const presetLocale: ManuscriptLocale = preset.id.includes('-uk') ? 'en-GB' : 'en-US';
+      manuscriptOpts = getProfileDefaults(preset.profile, presetLocale);
+      manuscriptOpts.authorName = authorName;
+      manuscriptOpts.headerContent = { authorSurname, shortTitle: shortTitle || state.novelTitle.substring(0, 30) };
+    }
+
     if (preset.fountainOptions) {
-      // Apply preset fountain options before exporting
       setIncludeSectionTitles(preset.fountainOptions.includeSectionTitles ?? true);
       setIncludeMetadataBlock(preset.fountainOptions.includeMetadataBlock ?? true);
       if (preset.fountainOptions.filenameConvention) {
@@ -190,27 +295,62 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
       }
     }
     setIncludeHeadings(preset.includeHeadings);
-    await handleExport(preset.format, preset.id);
+    await handleExport(preset.format, preset.id, manuscriptOpts);
+  };
+
+  const handleManuscriptExport = async () => {
+    if (hasErrors) {
+      showToast('Fix validation errors before exporting.', 'error', 'error');
+      return;
+    }
+    const opts = buildManuscriptOptions();
+    await handleExport(manuscriptFormat, `manuscript-${profile}`, opts);
   };
 
   const filteredPresets = EXPORT_PRESETS.filter(p => p.projectTypes.includes(state.projectType));
 
   return (
     <Dialog open={open} onClose={onClose} title="Export" size="medium">
-      {/* Presets Section */}
-      <div className={styles.exportPresetsSection}>
+      {/* Tab bar */}
+      <div className={styles.exportTabBar}>
         <button
-          className={styles.exportPresetsToggle}
-          onClick={() => setShowPresets(!showPresets)}
+          className={`${styles.exportTab} ${activeTab === 'presets' ? styles.exportTabActive : ''}`}
+          onClick={() => setActiveTab('presets')}
         >
           <span className="material-symbols-rounded">auto_awesome</span>
-          <span>Quick Export Presets</span>
-          <span className="material-symbols-rounded">
-            {showPresets ? 'expand_less' : 'expand_more'}
-          </span>
+          Quick Presets
         </button>
+        {!isScreenplay && (
+          <button
+            className={`${styles.exportTab} ${activeTab === 'manuscript' ? styles.exportTabActive : ''}`}
+            onClick={() => setActiveTab('manuscript')}
+          >
+            <span className="material-symbols-rounded">edit_document</span>
+            Manuscript
+          </button>
+        )}
+        <button
+          className={`${styles.exportTab} ${activeTab === 'custom' ? styles.exportTabActive : ''}`}
+          onClick={() => setActiveTab('custom')}
+        >
+          <span className="material-symbols-rounded">tune</span>
+          Custom
+        </button>
+      </div>
 
-        {showPresets && (
+      {/* ── Presets Tab ── */}
+      {activeTab === 'presets' && (
+        <div className={styles.exportPresetsSection}>
+          {/* Author info hint for manuscript presets */}
+          {!isScreenplay && (
+            <div className={styles.exportAuthorHint}>
+              <span className="material-symbols-rounded">info</span>
+              <span>
+                Set your name in the Manuscript tab for title pages and headers.
+              </span>
+            </div>
+          )}
+
           <div className={styles.exportPresetsList}>
             {filteredPresets.map(preset => (
               <button
@@ -228,97 +368,309 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
               </button>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Manual Options */}
-      <div className={styles.exportManualSection}>
-        <p className={styles.exportOptionHeading}>Custom Export</p>
-
-        {!isScreenplay && (
-          <div className={styles.exportOptions}>
-            <label className={styles.checkbox}>
-              <input
-                type="checkbox"
-                checked={includeHeadings}
-                onChange={e => setIncludeHeadings(e.target.checked)}
-              />
-              <span>Include chapter headings</span>
-              <HelpTooltip text="When enabled, each chapter title appears as a heading in the exported document" position="right" />
-            </label>
-          </div>
-        )}
-
-        {isScreenplay && (
-          <div className={styles.exportOptions}>
-            <label className={styles.checkbox}>
-              <input
-                type="checkbox"
-                checked={includeSectionTitles}
-                onChange={e => setIncludeSectionTitles(e.target.checked)}
-              />
-              <span>Include section titles as Fountain sections</span>
-            </label>
-            <label className={styles.checkbox}>
-              <input
-                type="checkbox"
-                checked={includeMetadataBlock}
-                onChange={e => setIncludeMetadataBlock(e.target.checked)}
-              />
-              <span>Include Fountain metadata block</span>
-            </label>
+      {/* ── Manuscript Tab ── */}
+      {activeTab === 'manuscript' && !isScreenplay && (
+        <div className={styles.exportManuscriptSection}>
+          {/* Profile & Locale row */}
+          <div className={styles.exportRow}>
             <label className={styles.exportField}>
-              <span>Filename convention</span>
+              <span>Profile</span>
               <select
-                value={filenameConvention}
-                onChange={e => setFilenameConvention(e.target.value as FountainExportOptions['filenameConvention'])}
+                value={profile}
+                onChange={e => handleProfileChange(e.target.value as ExportProfile)}
               >
-                <option value="title">{`{title}.fountain`}</option>
-                <option value="title-screenplay">{`{title}.screenplay.fountain`}</option>
-                <option value="title-fountain">{`{title}.fountain-export.fountain`}</option>
+                <option value="submission">Submission Manuscript</option>
+                <option value="print">Print-Ready</option>
+                <option value="custom">Custom</option>
+              </select>
+            </label>
+
+            <label className={styles.exportField}>
+              <span>Locale</span>
+              <select
+                value={locale}
+                onChange={e => handleLocaleChange(e.target.value as ManuscriptLocale)}
+              >
+                <option value="en-US">en-US (US Letter)</option>
+                <option value="en-GB">en-GB (A4)</option>
+              </select>
+            </label>
+
+            <label className={styles.exportField}>
+              <span>Format</span>
+              <select
+                value={manuscriptFormat}
+                onChange={e => setManuscriptFormat(e.target.value as ExportFormat)}
+              >
+                <option value="docx">DOCX</option>
+                <option value="pdf">PDF</option>
+                <option value="rtf">RTF</option>
               </select>
             </label>
           </div>
-        )}
 
-        <div className={styles.exportButtons}>
-          {isScreenplay ? (
-            <>
-              <Button variant="primary" onClick={() => handleExport('screenplayPdf')} disabled={exporting}>
-                <span className="material-symbols-rounded">picture_as_pdf</span>
-                Export Screenplay PDF
-              </Button>
-              <Button variant="primary" onClick={() => handleExport('fountain')} disabled={exporting}>
-                <span className="material-symbols-rounded">article</span>
-                Export Fountain
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="primary" onClick={() => handleExport('docx')} disabled={exporting}>
-                <span className="material-symbols-rounded">description</span>
-                Export DOCX
-              </Button>
-              <Button variant="primary" onClick={() => handleExport('pdf')} disabled={exporting}>
-                <span className="material-symbols-rounded">picture_as_pdf</span>
-                Export PDF
-              </Button>
-              <Button variant="primary" onClick={() => handleExport('rtf')} disabled={exporting}>
-                <span className="material-symbols-rounded">article</span>
-                Export RTF
-              </Button>
-              <Button variant="primary" onClick={() => handleExport('markdown')} disabled={exporting}>
-                <span className="material-symbols-rounded">code</span>
-                Export Markdown
-              </Button>
-              <Button variant="primary" onClick={() => handleExport('txt')} disabled={exporting}>
-                <span className="material-symbols-rounded">text_snippet</span>
-                Export Plain Text
-              </Button>
-            </>
+          {/* Author info */}
+          <p className={styles.exportOptionHeading}>Author Information</p>
+          <div className={styles.exportRow}>
+            <label className={styles.exportField}>
+              <span>Full Name</span>
+              <input
+                type="text"
+                value={authorName}
+                onChange={e => setAuthorName(e.target.value)}
+                placeholder="e.g. Jane Smith"
+                className={styles.exportInput}
+              />
+            </label>
+            <label className={styles.exportField}>
+              <span>Surname (for header)</span>
+              <input
+                type="text"
+                value={authorSurname}
+                onChange={e => setAuthorSurname(e.target.value)}
+                placeholder="e.g. Smith"
+                className={styles.exportInput}
+              />
+            </label>
+            <label className={styles.exportField}>
+              <span>Short Title (for header)</span>
+              <input
+                type="text"
+                value={shortTitle}
+                onChange={e => setShortTitle(e.target.value)}
+                placeholder={state.novelTitle.substring(0, 30)}
+                className={styles.exportInput}
+              />
+            </label>
+          </div>
+
+          {/* Typography & Layout */}
+          <p className={styles.exportOptionHeading}>Typography &amp; Layout</p>
+          <div className={styles.exportRow}>
+            <label className={styles.exportField}>
+              <span>Font Size (pt)</span>
+              <select value={fontSizePt} onChange={e => setFontSizePt(Number(e.target.value))}>
+                <option value={10}>10</option>
+                <option value={11}>11</option>
+                <option value={12}>12</option>
+                <option value={14}>14</option>
+              </select>
+            </label>
+            <label className={styles.exportField}>
+              <span>Line Spacing</span>
+              <select value={lineSpacing} onChange={e => setLineSpacing(Number(e.target.value))}>
+                <option value={1.0}>Single (1.0)</option>
+                <option value={1.15}>1.15</option>
+                <option value={1.5}>1.5</option>
+                <option value={2.0}>Double (2.0)</option>
+              </select>
+            </label>
+            <label className={styles.exportField}>
+              <span>Alignment</span>
+              <select value={alignment} onChange={e => setAlignment(e.target.value as ManuscriptExportOptions['alignment'])}>
+                <option value="left">Left</option>
+                <option value="justified">Justified</option>
+                <option value="center">Center</option>
+              </select>
+            </label>
+          </div>
+
+          <div className={styles.exportRow}>
+            <label className={styles.exportField}>
+              <span>First-line Indent (in)</span>
+              <select value={firstLineIndentIn} onChange={e => setFirstLineIndentIn(Number(e.target.value))}>
+                <option value={0}>None</option>
+                <option value={0.3}>0.3"</option>
+                <option value={0.5}>0.5"</option>
+              </select>
+            </label>
+            <label className={styles.exportField}>
+              <span>Margins (in)</span>
+              <select value={marginIn} onChange={e => setMarginIn(Number(e.target.value))}>
+                <option value={0.75}>0.75"</option>
+                <option value={1.0}>1.0"</option>
+                <option value={1.25}>1.25"</option>
+              </select>
+            </label>
+            <label className={styles.exportField}>
+              <span>Scene Break</span>
+              <select value={sceneBreakMarker} onChange={e => setSceneBreakMarker(e.target.value)}>
+                <option value="* * *">* * *</option>
+                <option value="***">***</option>
+                <option value="# # #"># # #</option>
+                <option value="~">~</option>
+              </select>
+            </label>
+          </div>
+
+          {/* Structure options */}
+          <p className={styles.exportOptionHeading}>Structure</p>
+          <div className={styles.exportOptions}>
+            <label className={styles.checkbox}>
+              <input
+                type="checkbox"
+                checked={includeTitlePage}
+                onChange={e => setIncludeTitlePage(e.target.checked)}
+              />
+              <span>Include title page</span>
+              <HelpTooltip text="Adds a standard title page with title, author name, and word count" position="right" />
+            </label>
+            <label className={styles.checkbox}>
+              <input
+                type="checkbox"
+                checked={chapterStartsNewPage}
+                onChange={e => setChapterStartsNewPage(e.target.checked)}
+              />
+              <span>Each chapter starts on a new page</span>
+            </label>
+            <label className={styles.checkbox}>
+              <input
+                type="checkbox"
+                checked={pageNumbering}
+                onChange={e => setPageNumbering(e.target.checked)}
+              />
+              <span>Page numbering</span>
+            </label>
+          </div>
+
+          {/* Validation results */}
+          {validationIssues.length > 0 && (
+            <div className={styles.exportValidation}>
+              <p className={styles.exportOptionHeading}>Preflight Check</p>
+              {validationIssues.map(issue => (
+                <div
+                  key={issue.ruleId}
+                  className={`${styles.exportValidationItem} ${
+                    issue.severity === 'error'
+                      ? styles.exportValidationError
+                      : issue.severity === 'warning'
+                        ? styles.exportValidationWarning
+                        : styles.exportValidationInfo
+                  }`}
+                >
+                  <span className="material-symbols-rounded">
+                    {issue.severity === 'error' ? 'error' : issue.severity === 'warning' ? 'warning' : 'info'}
+                  </span>
+                  <span>{issue.message}</span>
+                </div>
+              ))}
+            </div>
           )}
+
+          {validationIssues.length === 0 && (
+            <div className={styles.exportValidationPass}>
+              <span className="material-symbols-rounded">check_circle</span>
+              <span>All preflight checks passed</span>
+            </div>
+          )}
+
+          <div className={styles.exportButtons} style={{ marginTop: '1rem' }}>
+            <Button
+              variant="primary"
+              onClick={handleManuscriptExport}
+              disabled={exporting || hasErrors}
+            >
+              <span className="material-symbols-rounded">download</span>
+              Export {FORMAT_LABELS[manuscriptFormat]}
+              {profile === 'submission' ? ' (Submission)' : profile === 'print' ? ' (Print-Ready)' : ''}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ── Custom Tab ── */}
+      {activeTab === 'custom' && (
+        <div className={styles.exportManualSection}>
+          <p className={styles.exportOptionHeading}>Custom Export</p>
+
+          {!isScreenplay && (
+            <div className={styles.exportOptions}>
+              <label className={styles.checkbox}>
+                <input
+                  type="checkbox"
+                  checked={includeHeadings}
+                  onChange={e => setIncludeHeadings(e.target.checked)}
+                />
+                <span>Include chapter headings</span>
+                <HelpTooltip text="When enabled, each chapter title appears as a heading in the exported document" position="right" />
+              </label>
+            </div>
+          )}
+
+          {isScreenplay && (
+            <div className={styles.exportOptions}>
+              <label className={styles.checkbox}>
+                <input
+                  type="checkbox"
+                  checked={includeSectionTitles}
+                  onChange={e => setIncludeSectionTitles(e.target.checked)}
+                />
+                <span>Include section titles as Fountain sections</span>
+              </label>
+              <label className={styles.checkbox}>
+                <input
+                  type="checkbox"
+                  checked={includeMetadataBlock}
+                  onChange={e => setIncludeMetadataBlock(e.target.checked)}
+                />
+                <span>Include Fountain metadata block</span>
+              </label>
+              <label className={styles.exportField}>
+                <span>Filename convention</span>
+                <select
+                  value={filenameConvention}
+                  onChange={e => setFilenameConvention(e.target.value as FountainExportOptions['filenameConvention'])}
+                >
+                  <option value="title">{`{title}.fountain`}</option>
+                  <option value="title-screenplay">{`{title}.screenplay.fountain`}</option>
+                  <option value="title-fountain">{`{title}.fountain-export.fountain`}</option>
+                </select>
+              </label>
+            </div>
+          )}
+
+          <div className={styles.exportButtons}>
+            {isScreenplay ? (
+              <>
+                <Button variant="primary" onClick={() => handleExport('screenplayPdf')} disabled={exporting}>
+                  <span className="material-symbols-rounded">picture_as_pdf</span>
+                  Export Screenplay PDF
+                </Button>
+                <Button variant="primary" onClick={() => handleExport('fountain')} disabled={exporting}>
+                  <span className="material-symbols-rounded">article</span>
+                  Export Fountain
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="primary" onClick={() => handleExport('docx')} disabled={exporting}>
+                  <span className="material-symbols-rounded">description</span>
+                  Export DOCX
+                </Button>
+                <Button variant="primary" onClick={() => handleExport('pdf')} disabled={exporting}>
+                  <span className="material-symbols-rounded">picture_as_pdf</span>
+                  Export PDF
+                </Button>
+                <Button variant="primary" onClick={() => handleExport('rtf')} disabled={exporting}>
+                  <span className="material-symbols-rounded">article</span>
+                  Export RTF
+                </Button>
+                <Button variant="primary" onClick={() => handleExport('markdown')} disabled={exporting}>
+                  <span className="material-symbols-rounded">code</span>
+                  Export Markdown
+                </Button>
+                <Button variant="primary" onClick={() => handleExport('txt')} disabled={exporting}>
+                  <span className="material-symbols-rounded">text_snippet</span>
+                  Export Plain Text
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {exporting && (
         <p className={styles.exportStatus}>Exporting...</p>

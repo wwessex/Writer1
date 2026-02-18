@@ -3464,7 +3464,144 @@
 
 .exportManualSection {
   padding-top: 0.75rem;
-  border-top: 1px solid var(--border);
+}
+
+/* ── Export Tab Bar ── */
+.exportTabBar {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+
+.exportTab {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.exportTab:hover {
+  color: var(--text);
+}
+
+.exportTab .material-symbols-rounded {
+  font-size: 1rem;
+}
+
+.exportTabActive {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ── Manuscript Section ── */
+.exportManuscriptSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.exportRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.exportInput {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 0.5rem 0.625rem;
+  font-size: 0.8125rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.exportInput:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.exportAuthorHint {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--accent-alpha, rgba(96, 165, 250, 0.06));
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.exportAuthorHint .material-symbols-rounded {
+  font-size: 1rem;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* ── Validation ── */
+.exportValidation {
+  margin-top: 0.75rem;
+}
+
+.exportValidationItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  margin-bottom: 0.375rem;
+}
+
+.exportValidationItem .material-symbols-rounded {
+  font-size: 1rem;
+  flex-shrink: 0;
+  margin-top: 0.0625rem;
+}
+
+.exportValidationError {
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+}
+
+.exportValidationWarning {
+  background: rgba(245, 158, 11, 0.08);
+  color: #f59e0b;
+}
+
+.exportValidationInfo {
+  background: rgba(96, 165, 250, 0.08);
+  color: var(--accent);
+}
+
+.exportValidationPass {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background: rgba(34, 197, 94, 0.08);
+  color: #22c55e;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  margin-top: 0.75rem;
+}
+
+.exportValidationPass .material-symbols-rounded {
+  font-size: 1.125rem;
 }
 
 /* =========================================================
