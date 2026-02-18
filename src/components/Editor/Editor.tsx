@@ -9,6 +9,7 @@ const FONT_MAP: Record<string, string> = {
   system: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   serif: 'Georgia, "Times New Roman", Times, serif',
   mono: '"Courier New", Courier, monospace',
+  'courier-prime': '"Courier Prime", "Courier New", Courier, monospace',
   merriweather: 'Merriweather, Georgia, serif',
   lora: 'Lora, Georgia, serif',
 };
