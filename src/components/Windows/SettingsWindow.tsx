@@ -30,6 +30,7 @@ const FONT_OPTIONS = [
   { value: 'system', label: 'System Default' },
   { value: 'serif', label: 'Serif (Georgia)' },
   { value: 'mono', label: 'Monospace' },
+  { value: 'courier-prime', label: 'Courier Prime' },
   { value: 'merriweather', label: 'Merriweather' },
   { value: 'lora', label: 'Lora' }
 ];
