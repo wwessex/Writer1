@@ -11,7 +11,7 @@
 import type { AIProviderConfig, AIProviderType, AIProvider } from './types';
 import { ChromeAIProvider } from './chromeAI';
 import { OpenAIProvider } from './openaiProvider';
-import { isChromeAIAvailable } from './availability';
+import { isChromeAIAvailable, isChromeBrowser } from './availability';
 
 const STORAGE_KEY = 'draftharbour_ai_config';
 
@@ -100,12 +100,21 @@ export function createProvider(config: AIProviderConfig): AIProvider {
 
 /**
  * Detect the best available provider.
- * Returns 'chrome-ai' when on a supported Chrome build,
- * otherwise falls back to 'managed-cloud'.
+ * Returns 'chrome-ai' when on a supported Chrome build with the APIs
+ * available, otherwise falls back to 'managed-cloud'.
  */
 export async function detectBestProvider(): Promise<AIProviderType> {
   if (await isChromeAIAvailable()) {
     return 'chrome-ai';
   }
   return 'managed-cloud';
+}
+
+/**
+ * True when the user is in Chrome but the on-device AI APIs
+ * are not yet available (model not downloaded, flag not enabled, etc.).
+ * Useful for showing targeted guidance in the UI.
+ */
+export function isChromeWithoutAI(): boolean {
+  return isChromeBrowser() && !new ChromeAIProvider().isAvailable();
 }
