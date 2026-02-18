@@ -67,10 +67,22 @@ export function openOAuthPopup(authUrl: string): Promise<string> {
     const redirectUri = getRedirectUri();
     let resolved = false;
 
+    // Timeout after 2 minutes to prevent indefinite polling
+    const POPUP_TIMEOUT_MS = 120_000;
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        clearInterval(interval);
+        try { popup.close(); } catch { /* ignore */ }
+        reject(new Error('OAuth authorization timed out. Please try again.'));
+      }
+    }, POPUP_TIMEOUT_MS);
+
     const interval = setInterval(() => {
       try {
         if (popup.closed) {
           clearInterval(interval);
+          clearTimeout(timeout);
           if (!resolved) {
             reject(new Error('OAuth popup was closed before authorization completed.'));
           }
@@ -82,6 +94,7 @@ export function openOAuthPopup(authUrl: string): Promise<string> {
         if (currentUrl && currentUrl.startsWith(redirectUri)) {
           resolved = true;
           clearInterval(interval);
+          clearTimeout(timeout);
 
           const params = new URL(currentUrl).searchParams;
           const error = params.get('error');

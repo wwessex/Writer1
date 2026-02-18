@@ -14,6 +14,11 @@ if ('caches' in window) {
   });
 }
 
+// Safety net: log unhandled promise rejections so they don't vanish silently.
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('[unhandled rejection]', event.reason);
+});
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
