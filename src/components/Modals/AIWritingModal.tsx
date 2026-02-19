@@ -11,6 +11,8 @@ import {
   checkChromeAIAvailability,
   detectBestProvider,
   isChromeBrowser,
+  SERVER_PROXY_MODELS,
+  SERVER_PROXY_LABELS,
 } from '@/lib/ai';
 import { getBrokerBaseUrl } from '@/lib/featureFlags';
 import type { AIProviderConfig, AvailabilityStatus } from '@/lib/ai';
@@ -205,11 +207,13 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   /* ----- Provider logic --------------------------------------------- */
 
   const isConfigured =
-    config.provider === 'openai-compatible'
-      ? !!(config.endpoint?.trim() && config.sessionToken?.trim())
-      : config.provider === 'chrome-ai'
-        ? chromeAIAvailable
-        : /* managed-cloud */ !!getBrokerBaseUrl();
+    config.provider === 'server-proxy'
+      ? !!(config.serverProxy?.serverProvider && config.serverProxy?.model)
+      : config.provider === 'openai-compatible'
+        ? !!(config.endpoint?.trim() && config.sessionToken?.trim())
+        : config.provider === 'chrome-ai'
+          ? chromeAIAvailable
+          : /* managed-cloud */ !!getBrokerBaseUrl();
 
   // Reset transient state when the modal opens/closes
   useEffect(() => {
@@ -229,13 +233,13 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
 
 
   useEffect(() => {
-    if (config.provider === 'openai-compatible') {
+    if (config.provider === 'openai-compatible' || config.provider === 'server-proxy') {
       return;
     }
 
     detectBestProvider().then(bestProvider => {
       setConfig(prev => {
-        if (prev.provider === 'openai-compatible' || prev.provider === bestProvider) {
+        if (prev.provider === 'openai-compatible' || prev.provider === 'server-proxy' || prev.provider === bestProvider) {
           return prev;
         }
         const next = { ...prev, provider: bestProvider };
@@ -362,11 +366,59 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
     }
   };
 
+  const handleTestServerProxy = async () => {
+    if (!config.serverProxy?.model) {
+      showToast('Select a provider and model first', 'warning');
+      return;
+    }
+    setTestingConnection(true);
+    try {
+      const base = getBrokerBaseUrl();
+      const body: Record<string, unknown> = {
+        provider: config.serverProxy.serverProvider,
+        model: config.serverProxy.model,
+        prompt: 'Say "Connection successful" in exactly two words.',
+        projectType: 'book',
+      };
+      if (config.serverProxy.userApiKey?.trim()) {
+        body.userApiKey = config.serverProxy.userApiKey;
+      }
+      const res = await fetch(`${base}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(body),
+        signal: (() => {
+          const controller = new AbortController();
+          setTimeout(() => controller.abort(), 15000);
+          return controller.signal;
+        })(),
+      });
+      if (res.ok) {
+        showToast('Connection successful', 'success', 'check_circle');
+      } else {
+        const errBody = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
+        showToast(`Connection failed (${res.status}): ${(errBody.error || res.statusText).slice(0, 100)}`, 'error');
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      showToast(`Connection failed: ${message}`, 'error');
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+
   /* ----- Helpers ---------------------------------------------------- */
 
-  const providerModeLabel = config.provider === 'chrome-ai' ? 'Using local AI' : 'Using cloud AI';
+  const providerModeLabel =
+    config.provider === 'chrome-ai' ? 'Using local AI'
+    : config.provider === 'server-proxy'
+      ? `Using ${SERVER_PROXY_LABELS[config.serverProxy?.serverProvider ?? 'groq']}`
+    : 'Using cloud AI';
   const providerLabel = `AI ready · ${providerModeLabel}`;
-  const providerIcon = config.provider === 'chrome-ai' ? 'memory' : 'cloud';
+  const providerIcon =
+    config.provider === 'chrome-ai' ? 'memory'
+    : config.provider === 'server-proxy' ? 'dns'
+    : 'cloud';
 
   /* ----- Render ----------------------------------------------------- */
 
@@ -423,7 +475,9 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
             <span>
               {config.provider === 'chrome-ai'
                 ? 'Using local AI. Chrome built-in models run directly on your device when available.'
-                : 'Using cloud AI. Requests are routed through the managed DraftHarbour cloud endpoint.'}
+                : config.provider === 'server-proxy'
+                  ? `Using ${SERVER_PROXY_LABELS[config.serverProxy?.serverProvider ?? 'groq']}. Requests are routed through the DraftHarbour server proxy. API keys stay server-side.`
+                  : 'Using cloud AI. Requests are routed through the managed DraftHarbour cloud endpoint.'}
             </span>
           </div>
 
@@ -434,8 +488,97 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
                 ? 'Chrome AI detected. Writer will prefer local AI automatically.'
                 : isChromeBrowser()
                   ? 'Chrome AI is not yet available on this device. Enable "Optimization Guide On Device Model" in chrome://flags and restart Chrome.'
-                  : 'Chrome AI requires Google Chrome. To use AI features in this browser, set up a custom provider below.'}
+                  : 'Chrome AI requires Google Chrome. To use AI features in this browser, set up a server provider or custom provider below.'}
             </span>
+          </div>
+
+          {/* Server AI providers (Groq / OpenRouter / Gemini) */}
+          <div className={styles.aiProviderSelector}>
+            <h5>Server AI Providers</h5>
+            <p className={styles.aiSettingsHint}>
+              API keys are managed server-side. Optionally bring your own key below.
+            </p>
+            <div className={styles.aiProviderOptions}>
+              {(['groq', 'openrouter', 'gemini'] as const).map(sp => (
+                <button
+                  key={sp}
+                  className={`${styles.aiProviderOption} ${
+                    config.provider === 'server-proxy' && config.serverProxy?.serverProvider === sp
+                      ? styles['aiProviderOption--active'] : ''
+                  }`}
+                  onClick={() => {
+                    const defaultModel = SERVER_PROXY_MODELS[sp][0].id;
+                    updateConfig({
+                      provider: 'server-proxy',
+                      serverProxy: {
+                        serverProvider: sp,
+                        model: config.serverProxy?.serverProvider === sp
+                          ? (config.serverProxy.model || defaultModel)
+                          : defaultModel,
+                        userApiKey: config.serverProxy?.userApiKey,
+                      },
+                    });
+                  }}
+                >
+                  <span className="material-symbols-rounded">dns</span>
+                  <div className={styles.aiProviderOptionText}>
+                    <strong>{SERVER_PROXY_LABELS[sp]}</strong>
+                    <small>Server-managed</small>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {config.provider === 'server-proxy' && config.serverProxy && (
+              <div className={styles.aiSettingsFields}>
+                <label className={styles.aiLabel}>
+                  Model
+                  <select
+                    value={config.serverProxy.model}
+                    onChange={e => updateConfig({
+                      serverProxy: { ...config.serverProxy!, model: e.target.value },
+                    })}
+                    className={styles.aiSelect}
+                  >
+                    {SERVER_PROXY_MODELS[config.serverProxy.serverProvider].map(m => (
+                      <option key={m.id} value={m.id}>{m.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className={styles.aiLabel}>
+                  Your API Key (optional — leave blank to use server key)
+                  <Input
+                    type="password"
+                    placeholder="Enter your own API key..."
+                    value={config.serverProxy.userApiKey || ''}
+                    onChange={e => updateConfig({
+                      serverProxy: { ...config.serverProxy!, userApiKey: e.target.value },
+                    })}
+                  />
+                </label>
+              </div>
+            )}
+
+            {config.provider === 'server-proxy' && (
+              <div className={styles.aiSettingsActions}>
+                <Button
+                  variant="default"
+                  size="small"
+                  onClick={() => handleTestServerProxy()}
+                  disabled={testingConnection || !config.serverProxy?.model}
+                >
+                  <span className="material-symbols-rounded">wifi_tethering</span>
+                  {testingConnection ? 'Testing...' : 'Test Connection'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="small"
+                  onClick={() => updateConfig({ provider: chromeAIAvailable ? 'chrome-ai' : 'managed-cloud' })}
+                >
+                  Use Automatic Mode
+                </Button>
+              </div>
+            )}
           </div>
 
           <details open={showCustomProvider} onToggle={e => setShowCustomProvider((e.target as HTMLDetailsElement).open)}>

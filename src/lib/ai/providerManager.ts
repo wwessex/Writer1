@@ -11,6 +11,7 @@
 import type { AIProviderConfig, AIProviderType, AIProvider } from './types';
 import { ChromeAIProvider } from './chromeAI';
 import { OpenAIProvider } from './openaiProvider';
+import { ServerProxyProvider } from './serverProxyProvider';
 import { isChromeAIAvailable, isChromeBrowser } from './availability';
 
 const STORAGE_KEY = 'draftharbour_ai_config';
@@ -55,6 +56,7 @@ export function loadAIConfig(): AIProviderConfig {
       endpoint: safeConfig.endpoint,
       model: safeConfig.model,
       sessionToken: safeConfig.sessionToken,
+      serverProxy: safeConfig.serverProxy,
     };
   } catch {
     return { provider: 'managed-cloud' };
@@ -68,6 +70,7 @@ export function saveAIConfig(config: AIProviderConfig): void {
     endpoint: config.endpoint,
     model: config.model,
     sessionToken: config.sessionToken,
+    serverProxy: config.serverProxy,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(safeConfig));
 }
@@ -79,6 +82,8 @@ export function saveAIConfig(config: AIProviderConfig): void {
 /** Create the appropriate AIProvider instance from a config. */
 export function createProvider(config: AIProviderConfig): AIProvider {
   switch (config.provider) {
+    case 'server-proxy':
+      return new ServerProxyProvider(config);
     case 'openai-compatible':
     case 'managed-cloud':
       return new OpenAIProvider(config);

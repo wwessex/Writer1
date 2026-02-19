@@ -8,10 +8,13 @@ export type {
   AIProvider,
   AvailabilityStatus,
   ChromeAIAvailability,
+  ServerProxyProviderType,
+  ServerProxyConfig,
 } from './types';
 
 export { ChromeAIProvider } from './chromeAI';
 export { OpenAIProvider } from './openaiProvider';
+export { ServerProxyProvider, SERVER_PROXY_MODELS, SERVER_PROXY_LABELS } from './serverProxyProvider';
 
 export {
   loadAIConfig,

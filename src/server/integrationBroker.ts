@@ -94,6 +94,123 @@ async function generateAI(body: Record<string, unknown>) {
   return { text: data.choices?.[0]?.message?.content || '' };
 }
 
+/* ------------------------------------------------------------------ */
+/*  Multi-provider server proxy (Groq / OpenRouter / Gemini)           */
+/* ------------------------------------------------------------------ */
+
+const MAX_INPUT_CHARS = 12000;
+
+async function generateServerProxy(body: Record<string, unknown>) {
+  const provider = body.provider as string;
+  const model = body.model as string;
+  const prompt = body.prompt as string;
+  const projectType = (body.projectType as string) || 'book';
+  const userApiKey = body.userApiKey as string | undefined;
+
+  if (!provider || !model || !prompt) {
+    throw new BrokerError('Missing required fields: provider, prompt, model.', 400);
+  }
+
+  if (prompt.length > MAX_INPUT_CHARS) {
+    throw new BrokerError(`Input exceeds maximum length of ${MAX_INPUT_CHARS} characters.`, 400);
+  }
+
+  const systemPrompt = `You are a helpful creative writing assistant for ${
+    projectType === 'screenplay' ? 'screenplays' : 'books'
+  }. Respond in plain text with clear formatting.`;
+
+  const resolveKey = (envVar: string): string => {
+    const key = userApiKey || process.env[envVar];
+    if (!key) throw new BrokerError(`No API key configured for ${provider}. Set ${envVar} env variable or provide your own key.`, 500);
+    return key;
+  };
+
+  switch (provider) {
+    case 'groq': {
+      const apiKey = resolveKey('BROKER_GROQ_API_KEY');
+      const response = await retryingFetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: prompt }],
+          max_tokens: 4096,
+          temperature: 0.7,
+        }),
+      });
+      await mustOk('Groq', response);
+      const data = await response.json() as {
+        choices?: Array<{ message?: { content?: string } }>;
+        usage?: { prompt_tokens?: number; completion_tokens?: number };
+      };
+      return {
+        text: data.choices?.[0]?.message?.content || '',
+        model,
+        provider: 'groq',
+        usage: { promptTokens: data.usage?.prompt_tokens, completionTokens: data.usage?.completion_tokens },
+      };
+    }
+
+    case 'openrouter': {
+      const apiKey = resolveKey('BROKER_OPENROUTER_API_KEY');
+      const response = await retryingFetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+          'HTTP-Referer': 'http://localhost:5173',
+          'X-Title': 'DraftHarbour Studio (dev)',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: prompt }],
+          max_tokens: 4096,
+          temperature: 0.7,
+        }),
+      });
+      await mustOk('OpenRouter', response);
+      const data = await response.json() as {
+        choices?: Array<{ message?: { content?: string } }>;
+        usage?: { prompt_tokens?: number; completion_tokens?: number };
+      };
+      return {
+        text: data.choices?.[0]?.message?.content || '',
+        model,
+        provider: 'openrouter',
+        usage: { promptTokens: data.usage?.prompt_tokens, completionTokens: data.usage?.completion_tokens },
+      };
+    }
+
+    case 'gemini': {
+      const apiKey = resolveKey('BROKER_GEMINI_API_KEY');
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const response = await retryingFetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
+        }),
+      });
+      await mustOk('Gemini', response);
+      const data = await response.json() as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+        usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+      };
+      return {
+        text: data.candidates?.[0]?.content?.parts?.[0]?.text || '',
+        model,
+        provider: 'gemini',
+        usage: { promptTokens: data.usageMetadata?.promptTokenCount, completionTokens: data.usageMetadata?.candidatesTokenCount },
+      };
+    }
+
+    default:
+      throw new BrokerError(`Unknown server proxy provider: ${provider}`, 400);
+  }
+}
+
 export async function handleBrokerRequest(request: BrokerRequest): Promise<BrokerResponse | null> {
   if (request.method !== 'POST') return null;
   try {
@@ -116,6 +233,7 @@ export async function handleBrokerRequest(request: BrokerRequest): Promise<Broke
       throw new BrokerError(`Unsupported provider: ${provider}`, 404, 'NOT_FOUND');
     }
     if (request.path === '/api/ai/generate') return { status: 200, body: await generateAI(body) };
+    if (request.path === '/api/chat') return { status: 200, body: await generateServerProxy(body) };
     return null;
   } catch (error) {
     if (error instanceof BrokerError) return { status: error.status, body: { message: error.message, code: error.code } };

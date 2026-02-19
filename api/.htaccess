@@ -1,0 +1,12 @@
+# DraftHarbour Studio — API proxy .htaccess
+# Protects internal files and routes all requests through index.php.
+
+# Block direct access to files starting with underscore
+<FilesMatch "^_">
+    Require all denied
+</FilesMatch>
+
+# Route all non-file requests to index.php
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^(.*)$ index.php [QSA,L]

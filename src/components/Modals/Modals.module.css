@@ -1781,6 +1781,23 @@
   font-size: 0.875rem;
 }
 
+.aiSelect {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.875rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.aiSelect:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
 /* ===== Advanced Analytics Modal ===== */
 
 /* Overview row */
