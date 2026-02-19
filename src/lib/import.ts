@@ -26,6 +26,7 @@ export interface ImportResult {
 const CHAPTER_RE = /^(?:chapter|chap\.?)\s*(\d+|[ivxlcdm]+)[\s:.-]*/i;
 const PART_RE = /^(?:part)\s*(\d+|[ivxlcdm]+)[\s:.-]*/i;
 const FRONT_RE = /^(?:prologue|epilogue|introduction|preface|foreword|afterword)[\s:.-]*/i;
+const NAMED_SECTION_RE = /^(?:interlude|intermission|author'?s?\s*note|coda|postscript|addendum|appendix|digest|entr'?acte)[\s:.-]*/i;
 const ALL_CAPS_RE = /^[A-Z\s\d]+$/;
 
 /**
@@ -52,6 +53,7 @@ function isChapterHeading(text: string): boolean {
   if (CHAPTER_RE.test(trimmed)) return true;
   if (PART_RE.test(trimmed)) return true;
   if (FRONT_RE.test(trimmed)) return true;
+  if (NAMED_SECTION_RE.test(trimmed)) return true;
 
   // All caps short text
   if (ALL_CAPS_RE.test(trimmed) && trimmed.length < 40 && trimmed.length > 2) {
@@ -62,15 +64,64 @@ function isChapterHeading(text: string): boolean {
 }
 
 /**
- * Split text into chapters
+ * Check if a line looks like a standalone chapter title based on surrounding
+ * context. Only used when the document already has recognised numbered chapters,
+ * so that short standalone lines between chapters (e.g. "The Evidence") are
+ * treated as chapter breaks rather than being merged into the preceding chapter.
  */
-function splitIntoChapters(lines: string[]): ParsedChapter[] {
+function isContextualHeading(lines: string[], index: number): boolean {
+  const trimmed = lines[index].trim();
+
+  // Must have text, be short, and not be overly brief (single char)
+  if (!trimmed || trimmed.length > 60 || trimmed.length < 2) return false;
+
+  // Must start with an uppercase letter
+  if (!/^[A-Z]/.test(trimmed)) return false;
+
+  // Must NOT end with sentence-ending punctuation
+  if (/[.!?,;:]$/.test(trimmed)) return false;
+
+  // Must NOT look like dialogue (contains quotation marks)
+  if (/["'\u201C\u201D\u2018\u2019]/.test(trimmed)) return false;
+
+  // Should be title-length — at most 6 words
+  if (trimmed.split(/\s+/).length > 6) return false;
+
+  // Must be preceded by a blank line (or be at the start of the document)
+  if (index > 0 && lines[index - 1].trim() !== '') return false;
+
+  // Must be followed by a blank line (or be at the end of the document)
+  if (index < lines.length - 1 && lines[index + 1].trim() !== '') return false;
+
+  return true;
+}
+
+/**
+ * Split text into chapters.
+ *
+ * @param lines        The lines of text to split.
+ * @param forceHeadingAt  Optional set of line indices that are known to be
+ *                        headings from the source format (e.g. DOCX heading
+ *                        styles). These are always treated as chapter breaks.
+ */
+function splitIntoChapters(lines: string[], forceHeadingAt?: Set<number>): ParsedChapter[] {
+  // Pre-scan: does the document contain any recognised numbered chapter headings?
+  // If so, enable contextual heading detection for non-standard titles.
+  const hasNumberedChapters = lines.some(line => CHAPTER_RE.test(line.trim()));
+
   const chapters: ParsedChapter[] = [];
   let currentTitle = 'Chapter 1';
   let currentParagraphs: string[] = [];
+  let currentStartedByHeading = false;
 
-  for (const line of lines) {
-    if (isChapterHeading(line)) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const isForced = forceHeadingAt?.has(i) && line.trim().length > 0;
+    const isHeading = isForced
+      || isChapterHeading(line)
+      || (hasNumberedChapters && isContextualHeading(lines, i));
+
+    if (isHeading) {
       // Save current chapter if it has content
       if (currentParagraphs.some(p => p.trim())) {
         chapters.push({
@@ -81,13 +132,15 @@ function splitIntoChapters(lines: string[]): ParsedChapter[] {
       // Start new chapter
       currentTitle = line.trim();
       currentParagraphs = [];
+      currentStartedByHeading = true;
     } else {
       currentParagraphs.push(line);
     }
   }
 
-  // Don't forget the last chapter
-  if (currentParagraphs.some(p => p.trim())) {
+  // Don't forget the last chapter — also push headings that had no body content
+  // (e.g. "The End" at the very end of a document)
+  if (currentParagraphs.some(p => p.trim()) || currentStartedByHeading) {
     chapters.push({
       title: currentTitle,
       content: paragraphsToDoc(currentParagraphs)
@@ -272,6 +325,7 @@ export async function importDocx(file: File): Promise<ParsedChapter[]> {
   const doc = parser.parseFromString(docXml, 'application/xml');
 
   const paragraphs: string[] = [];
+  const headingIndices = new Set<number>();
   const pElements = doc.getElementsByTagName('w:p');
 
   for (let i = 0; i < pElements.length; i++) {
@@ -284,10 +338,22 @@ export async function importDocx(file: File): Promise<ParsedChapter[]> {
       texts.push(textElements[j].textContent || '');
     }
 
+    // Detect heading styles (Heading1, Heading2, Title, etc.)
+    const pPr = p.getElementsByTagName('w:pPr')[0];
+    if (pPr) {
+      const pStyle = pPr.getElementsByTagName('w:pStyle')[0];
+      if (pStyle) {
+        const styleVal = pStyle.getAttribute('w:val') || '';
+        if (/^(?:heading|title)/i.test(styleVal)) {
+          headingIndices.add(paragraphs.length);
+        }
+      }
+    }
+
     paragraphs.push(texts.join(''));
   }
 
-  return splitIntoChapters(paragraphs).map(section => ({
+  return splitIntoChapters(paragraphs, headingIndices.size > 0 ? headingIndices : undefined).map(section => ({
     ...section,
     metadata: { sourceFormat: 'docx', originalTitle: section.title }
   }));
