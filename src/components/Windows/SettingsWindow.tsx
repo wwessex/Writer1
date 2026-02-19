@@ -5,6 +5,8 @@ import { HelpTooltip } from '@/components/UI/Tooltip';
 import { Select } from '@/components/UI/Select';
 import { clearAllData } from '@/lib/storage';
 import { isTelemetryOptedIn, setTelemetryOptIn, clearTelemetryData } from '@/lib/telemetry';
+import { loadAIConfig, saveAIConfig } from '@/lib/ai';
+import type { AIProviderConfig } from '@/lib/ai';
 import { useWindowResize } from '@/hooks/useResizable';
 import styles from './Windows.module.css';
 
@@ -75,6 +77,16 @@ const SETTINGS_SECTIONS = [
     ]
   },
   {
+    id: 'ai',
+    title: 'AI Provider',
+    keywords: ['ai', 'openai', 'api key', 'llm', 'model', 'endpoint', 'gpt', 'claude'],
+    fields: [
+      { id: 'aiEndpoint', label: 'API Endpoint', keywords: ['url', 'server', 'openai'] },
+      { id: 'aiApiKey', label: 'API Key', keywords: ['token', 'secret', 'key', 'session'] },
+      { id: 'aiModel', label: 'Model', keywords: ['gpt', 'claude', 'llm', 'gpt-4o'] }
+    ]
+  },
+  {
     id: 'assist',
     title: 'Writing Assistance',
     keywords: ['grammar', 'spelling', 'language tool'],
@@ -132,6 +144,7 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   });
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     typography: false,
+    ai: false,
     sync: true,
     assist: true,
     privacy: true,
@@ -139,6 +152,20 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
     data: true
   });
   const [telemetryEnabled, setTelemetryEnabled] = useState(isTelemetryOptedIn());
+  const [aiConfig, setAIConfig] = useState<AIProviderConfig>(loadAIConfig);
+
+  const updateAIConfig = useCallback((updates: Partial<AIProviderConfig>) => {
+    setAIConfig(prev => {
+      const next = { ...prev, ...updates };
+      // Auto-switch to openai-compatible when both endpoint and key are provided
+      if (next.endpoint?.trim() && next.sessionToken?.trim() && next.provider !== 'server-proxy') {
+        next.provider = 'openai-compatible';
+      }
+      saveAIConfig(next);
+      return next;
+    });
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -396,6 +423,78 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                     />
                   </div>}
                 </div>}
+              </div>
+            )}
+          </section>
+          )}
+
+          {/* AI Provider Section */}
+          {isSectionVisible('ai') && (
+          <section className={styles.section} ref={el => { sectionRefs.current.ai = el; }}>
+            <button className={styles.sectionToggle} onClick={() => toggleSection('ai')}>
+              <h4>
+                <span className="material-symbols-rounded">smart_toy</span>
+                {highlightMatch('AI Provider')}
+              </h4>
+              <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
+                {isSectionCollapsed('ai') ? 'expand_more' : 'expand_less'}
+              </span>
+            </button>
+            {!isSectionCollapsed('ai') && (
+              <div className={styles.sectionContent}>
+                <div className={styles.privacyNotice}>
+                  <span className="material-symbols-rounded">info</span>
+                  <div>
+                    <p className={styles.privacyNotice__text}>
+                      Enter your OpenAI-compatible API endpoint and key to enable AI writing tools.
+                      Your key is stored locally in your browser and only sent to the endpoint you specify.
+                    </p>
+                  </div>
+                </div>
+                {isFieldVisible('ai', 'aiEndpoint') && <div className={styles.field}>
+                  <label>
+                    {highlightMatch('API Endpoint')}
+                    <HelpTooltip text="OpenAI-compatible chat completions endpoint (e.g. https://api.openai.com/v1/chat/completions)" />
+                  </label>
+                  <Input
+                    placeholder="https://api.openai.com/v1/chat/completions"
+                    value={aiConfig.endpoint || ''}
+                    onChange={e => updateAIConfig({ endpoint: e.target.value })}
+                  />
+                </div>}
+                {isFieldVisible('ai', 'aiApiKey') && <div className={styles.field}>
+                  <label>
+                    {highlightMatch('API Key')}
+                    <HelpTooltip text="Your API key from OpenAI or any compatible provider" />
+                  </label>
+                  <Input
+                    type="password"
+                    placeholder="sk-..."
+                    value={aiConfig.sessionToken || ''}
+                    onChange={e => updateAIConfig({ sessionToken: e.target.value })}
+                  />
+                </div>}
+                {isFieldVisible('ai', 'aiModel') && <div className={styles.field}>
+                  <label>
+                    {highlightMatch('Model')}
+                    <HelpTooltip text="Model identifier sent with requests (e.g. gpt-4o, gpt-4o-mini, gpt-3.5-turbo)" />
+                  </label>
+                  <Input
+                    placeholder="gpt-4o"
+                    value={aiConfig.model || ''}
+                    onChange={e => updateAIConfig({ model: e.target.value })}
+                  />
+                </div>}
+                {aiConfig.endpoint?.trim() && aiConfig.sessionToken?.trim() && (
+                  <div className={styles.privacyNotice}>
+                    <span className="material-symbols-rounded" style={{ color: 'var(--success, #22c55e)' }}>check_circle</span>
+                    <div>
+                      <p className={styles.privacyNotice__text}>
+                        AI provider configured. Open <strong>AI Writing Tools</strong> from the menu to start using AI assistance.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </section>

@@ -180,6 +180,10 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   const updateConfig = useCallback((updates: Partial<AIProviderConfig>) => {
     setConfig(prev => {
       const next = { ...prev, ...updates };
+      // Auto-switch to openai-compatible when both endpoint and key are provided
+      if (next.endpoint?.trim() && next.sessionToken?.trim() && next.provider !== 'server-proxy') {
+        next.provider = 'openai-compatible';
+      }
       saveAIConfig(next);
       return next;
     });
@@ -218,17 +222,16 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   // Reset transient state when the modal opens/closes
   useEffect(() => {
     if (open) {
+      // Reload config from localStorage (may have been updated in Settings)
+      const freshConfig = loadAIConfig();
+      setConfig(freshConfig);
       setResponse('');
       setError(null);
       setPrompt('');
       setLoading(false);
-      if (config.provider === 'openai-compatible' && !isConfigured) {
-        setShowSettings(true);
-      }
     } else {
       abortRef.current?.abort();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
 
@@ -616,12 +619,20 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
                 />
               </label>
               <label className={styles.aiLabel}>
-                Session Token / API Key
+                API Key
                 <Input
                   type="password"
                   placeholder="sk-..."
                   value={config.sessionToken || ''}
                   onChange={e => updateConfig({ sessionToken: e.target.value })}
+                />
+              </label>
+              <label className={styles.aiLabel}>
+                Model
+                <Input
+                  placeholder="gpt-4o"
+                  value={config.model || ''}
+                  onChange={e => updateConfig({ model: e.target.value })}
                 />
               </label>
             </div>
@@ -634,13 +645,6 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
               >
                 <span className="material-symbols-rounded">wifi_tethering</span>
                 {testingConnection ? 'Testing...' : 'Test Connection'}
-              </Button>
-              <Button
-                variant="ghost"
-                size="small"
-                onClick={() => updateConfig({ provider: 'openai-compatible' })}
-              >
-                Use Custom Provider
               </Button>
               <Button
                 variant="ghost"
@@ -663,25 +667,13 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         <div className={styles.aiNotice}>
           <span className="material-symbols-rounded">info</span>
           <div>
-            {config.provider === 'openai-compatible' ? (
-              <>
-                <strong>Custom provider needs setup.</strong> Open{' '}
-                <button className={styles.aiNoticeLink} onClick={() => setShowSettings(true)}>
-                  Settings
-                </button>{' '}
-                and expand <em>Custom provider (advanced)</em> to enter your API endpoint and key.
-                You can get an API key from providers like OpenAI (platform.openai.com) or any OpenAI-compatible service.
-              </>
-            ) : (
-              <>
-                <strong>AI is not configured yet.</strong> Open{' '}
-                <button className={styles.aiNoticeLink} onClick={() => setShowSettings(true)}>
-                  Settings
-                </button>{' '}
-                and expand <em>Custom provider (advanced)</em> to connect your own OpenAI-compatible API.
-                {!isChromeBrowser() && ' Alternatively, use Google Chrome for free on-device AI.'}
-              </>
-            )}
+            <strong>AI is not configured yet.</strong> Click{' '}
+            <button className={styles.aiNoticeLink} onClick={() => setShowSettings(true)}>
+              Settings
+            </button>{' '}
+            below to enter your API endpoint and key, or configure them in the{' '}
+            <strong>AI Provider</strong> section of the main Settings window.
+            {!isChromeBrowser() && ' Alternatively, use Google Chrome for free on-device AI.'}
           </div>
         </div>
       )}
