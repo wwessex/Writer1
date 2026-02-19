@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { generateId } from '@/lib/utils';
 import { ToastContext, type ToastVariant } from './useToast';
 
@@ -35,11 +35,22 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 }
 
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }) {
+  const [exiting, setExiting] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const dismiss = useCallback(() => {
+    setExiting(true);
+    timerRef.current = setTimeout(() => onRemove(toast.id), 250);
+  }, [toast.id, onRemove]);
+
   useEffect(() => {
     if (toast.persistent) return;
-    const timer = setTimeout(() => onRemove(toast.id), 3000);
-    return () => clearTimeout(timer);
-  }, [toast.id, toast.persistent, onRemove]);
+    const autoTimer = setTimeout(dismiss, 3000);
+    return () => {
+      clearTimeout(autoTimer);
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [toast.id, toast.persistent, dismiss]);
 
   const iconMap: Record<ToastVariant, string> = {
     success: 'check_circle',
@@ -49,7 +60,11 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
   };
 
   return (
-    <div className={`toast toast--${toast.variant}`} role="status" aria-live={toast.persistent ? 'assertive' : 'polite'}>
+    <div
+      className={`toast toast--${toast.variant}${exiting ? ' toast--exiting' : ''}`}
+      role="status"
+      aria-live={toast.persistent ? 'assertive' : 'polite'}
+    >
       <span className="material-symbols-rounded" style={{ fontSize: '1.125rem' }}>
         {toast.icon || iconMap[toast.variant]}
       </span>
@@ -57,7 +72,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
       {toast.persistent && (
         <button
           className="toast__dismiss"
-          onClick={() => onRemove(toast.id)}
+          onClick={dismiss}
           aria-label="Dismiss"
         >
           <span className="material-symbols-rounded" style={{ fontSize: '1rem' }}>close</span>

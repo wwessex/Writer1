@@ -16,17 +16,17 @@
   line-height: 1.4;
   white-space: nowrap;
   pointer-events: none;
-  animation: tooltipFadeIn 0.15s ease-out;
+  animation: tooltipFadeIn 0.2s var(--ease-out-back, cubic-bezier(0.34, 1.3, 0.64, 1));
 }
 
 @keyframes tooltipFadeIn {
   from {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.92) translateY(2px);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: scale(1) translateY(0);
   }
 }
 
@@ -34,24 +34,48 @@
   bottom: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
+  animation: tooltipEnterTop 0.2s var(--ease-out-back, cubic-bezier(0.34, 1.3, 0.64, 1));
+}
+
+@keyframes tooltipEnterTop {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.95); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
 
 .tooltip--bottom {
   top: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
+  animation: tooltipEnterBottom 0.2s var(--ease-out-back, cubic-bezier(0.34, 1.3, 0.64, 1));
+}
+
+@keyframes tooltipEnterBottom {
+  from { opacity: 0; transform: translateX(-50%) translateY(-4px) scale(0.95); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
 
 .tooltip--left {
   right: calc(100% + 6px);
   top: 50%;
   transform: translateY(-50%);
+  animation: tooltipEnterLeft 0.2s var(--ease-out-back, cubic-bezier(0.34, 1.3, 0.64, 1));
+}
+
+@keyframes tooltipEnterLeft {
+  from { opacity: 0; transform: translateY(-50%) translateX(4px) scale(0.95); }
+  to { opacity: 1; transform: translateY(-50%) translateX(0) scale(1); }
 }
 
 .tooltip--right {
   left: calc(100% + 6px);
   top: 50%;
   transform: translateY(-50%);
+  animation: tooltipEnterRight 0.2s var(--ease-out-back, cubic-bezier(0.34, 1.3, 0.64, 1));
+}
+
+@keyframes tooltipEnterRight {
+  from { opacity: 0; transform: translateY(-50%) translateX(-4px) scale(0.95); }
+  to { opacity: 1; transform: translateY(-50%) translateX(0) scale(1); }
 }
 
 .helpIcon {
@@ -61,11 +85,12 @@
   cursor: help;
   color: var(--text-muted);
   opacity: 0.6;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.15s ease, transform 0.2s var(--ease-spring, ease);
 }
 
 .helpIcon:hover {
   opacity: 1;
+  transform: scale(1.1);
 }
 
 .helpIcon .material-symbols-rounded {
