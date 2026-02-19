@@ -116,6 +116,77 @@ const SCREENPLAY_PRESET_PROMPTS: PresetPrompt[] = [
   }
 ];
 
+/* ------------------------------------------------------------------ */
+/*  Well-known OpenAI-compatible endpoint presets                       */
+/* ------------------------------------------------------------------ */
+
+interface EndpointPreset {
+  id: string;
+  label: string;
+  endpoint: string;
+  defaultModel: string;
+  keyPlaceholder: string;
+  signupUrl: string;
+}
+
+const ENDPOINT_PRESETS: EndpointPreset[] = [
+  {
+    id: 'openai',
+    label: 'OpenAI',
+    endpoint: 'https://api.openai.com/v1/chat/completions',
+    defaultModel: 'gpt-4o',
+    keyPlaceholder: 'sk-...',
+    signupUrl: 'platform.openai.com',
+  },
+  {
+    id: 'groq',
+    label: 'Groq',
+    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+    defaultModel: 'llama-3.3-70b-versatile',
+    keyPlaceholder: 'gsk_...',
+    signupUrl: 'console.groq.com',
+  },
+  {
+    id: 'openrouter',
+    label: 'OpenRouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    defaultModel: 'google/gemini-2.0-flash-exp:free',
+    keyPlaceholder: 'sk-or-...',
+    signupUrl: 'openrouter.ai',
+  },
+  {
+    id: 'mistral',
+    label: 'Mistral',
+    endpoint: 'https://api.mistral.ai/v1/chat/completions',
+    defaultModel: 'mistral-large-latest',
+    keyPlaceholder: 'api key',
+    signupUrl: 'console.mistral.ai',
+  },
+  {
+    id: 'deepseek',
+    label: 'DeepSeek',
+    endpoint: 'https://api.deepseek.com/v1/chat/completions',
+    defaultModel: 'deepseek-chat',
+    keyPlaceholder: 'sk-...',
+    signupUrl: 'platform.deepseek.com',
+  },
+  {
+    id: 'together',
+    label: 'Together AI',
+    endpoint: 'https://api.together.xyz/v1/chat/completions',
+    defaultModel: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+    keyPlaceholder: 'api key',
+    signupUrl: 'api.together.ai',
+  },
+];
+
+/** Match a config endpoint to a known preset (or return empty string). */
+function matchPresetId(endpoint?: string): string {
+  if (!endpoint?.trim()) return '';
+  const normalized = endpoint.trim().replace(/\/$/, '');
+  return ENDPOINT_PRESETS.find(p => p.endpoint === normalized)?.id ?? '';
+}
+
 const BOOK_CHAPTER_TEMPLATE = `# Chapter Title
 
 ## Scene Goal
@@ -266,7 +337,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       if (!promptText.trim()) return;
 
       if (!isConfigured) {
-        setError('Custom provider is not configured yet. Open Settings → Custom provider to set endpoint and session token.');
+        setError('AI is not configured yet. Open Settings below, pick a provider, and paste your API key.');
         return;
       }
 
@@ -658,15 +729,31 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
             <div className={styles.aiSetupGuide}>
               <span className="material-symbols-rounded">help_outline</span>
               <div>
-                <strong>How to set up a custom AI provider:</strong>
-                <ol className={styles.aiSetupSteps}>
-                  <li>Sign up for an API key at your chosen provider (e.g. <strong>OpenAI</strong> at platform.openai.com, or any OpenAI-compatible service).</li>
-                  <li>Copy the <strong>API endpoint</strong> (e.g. <code className={styles.aiCode}>https://api.openai.com/v1/chat/completions</code>).</li>
-                  <li>Paste your <strong>API key</strong> into the Session Token field below.</li>
-                  <li>Click <strong>Test Connection</strong> to verify everything works.</li>
-                </ol>
+                <strong>Quick setup:</strong> Pick a provider below, paste your API key, and you&apos;re ready to go.
                 <p className={styles.aiSetupNote}>Your API key is stored locally in your browser and is never sent anywhere except the endpoint you specify.</p>
               </div>
+            </div>
+
+            {/* Endpoint presets */}
+            <div className={styles.aiEndpointPresets}>
+              {ENDPOINT_PRESETS.map(preset => {
+                const isActive = matchPresetId(config.endpoint) === preset.id;
+                return (
+                  <button
+                    key={preset.id}
+                    className={`${styles.aiEndpointPreset} ${isActive ? styles['aiEndpointPreset--active'] : ''}`}
+                    onClick={() => {
+                      updateConfig({
+                        endpoint: preset.endpoint,
+                        model: config.model?.trim() ? config.model : preset.defaultModel,
+                      });
+                    }}
+                  >
+                    <strong>{preset.label}</strong>
+                    <small>{preset.signupUrl}</small>
+                  </button>
+                );
+              })}
             </div>
 
             <div className={styles.aiSettingsFields}>
@@ -682,7 +769,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
                 API Key
                 <Input
                   type="password"
-                  placeholder="sk-..."
+                  placeholder={ENDPOINT_PRESETS.find(p => p.id === matchPresetId(config.endpoint))?.keyPlaceholder ?? 'sk-...'}
                   value={config.sessionToken || ''}
                   onChange={e => updateConfig({ sessionToken: e.target.value })}
                 />
@@ -690,7 +777,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
               <label className={styles.aiLabel}>
                 Model
                 <Input
-                  placeholder="gpt-4o"
+                  placeholder={ENDPOINT_PRESETS.find(p => p.id === matchPresetId(config.endpoint))?.defaultModel ?? 'gpt-4o'}
                   value={config.model || ''}
                   onChange={e => updateConfig({ model: e.target.value })}
                 />
@@ -728,11 +815,10 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
           <span className="material-symbols-rounded">info</span>
           <div>
             <strong>AI is not configured yet.</strong> Click{' '}
-            <button className={styles.aiNoticeLink} onClick={() => setShowSettings(true)}>
+            <button className={styles.aiNoticeLink} onClick={() => { setShowSettings(true); setShowCustomProvider(true); }}>
               Settings
             </button>{' '}
-            below to enter your API endpoint and key, or configure them in the{' '}
-            <strong>AI Provider</strong> section of the main Settings window.
+            below, pick a provider (e.g. OpenAI, Groq, OpenRouter), and paste your API key.
             {!isChromeBrowser() && ' Alternatively, use Google Chrome for free on-device AI.'}
           </div>
         </div>
