@@ -133,6 +133,86 @@ For local/server runtime (Node), set these environment variables as needed:
 
 See `.env.example` for a complete list of frontend and broker/server environment variables.
 
+## AI runtime modes
+
+The app supports two backend runtime paths for AI, depending on how you host and configure it.
+
+### 1) Dev mode: Vite middleware + Node broker
+
+In local dev, Vite can hand off AI requests to the broker handler in `src/server/integrationBroker.ts`:
+
+- `POST /api/ai/generate` → handled by `generateAI(...)` (OpenAI-compatible path using `BROKER_OPENAI_API_KEY` / `OPENAI_API_KEY`)
+- `POST /api/chat` → handled by `generateServerProxy(...)` (Groq / OpenRouter / Gemini proxy path)
+
+The route dispatch happens in `handleBrokerRequest(...)`, which matches those exact paths.
+
+### 2) Hosted mode: PHP API
+
+In hosted deployments, the frontend calls into `api/index.php`, which routes `POST /api/chat` to `api/_chatHandler.php`.
+
+- `api/index.php` performs CORS + rate-limit checks, then routes `/api/chat`
+- `api/_chatHandler.php` validates payload fields (`provider`, `prompt`, `model`), enforces limits, resolves API keys (server key or BYOK), and forwards to the selected provider
+
+## Frontend → backend wiring (`VITE_BROKER_BASE_URL`)
+
+`src/lib/featureFlags.ts` exposes:
+
+```ts
+export function getBrokerBaseUrl(): string {
+  return import.meta.env.VITE_BROKER_BASE_URL || '';
+}
+```
+
+Frontend providers build API URLs from this value:
+
+- Cloud/OpenAI path: `${getBrokerBaseUrl()}/api/ai/generate`
+- Server-proxy path: `${getBrokerBaseUrl()}/api/chat`
+
+Example `.env` values:
+
+```bash
+# Local Vite+broker runtime
+VITE_BROKER_BASE_URL=http://localhost:5173
+
+# Hosted PHP API on same origin (optional; empty uses relative URLs)
+VITE_BROKER_BASE_URL=
+
+# Hosted API on another origin
+VITE_BROKER_BASE_URL=https://your-domain.example
+```
+
+## What happens when no broker URL is configured
+
+Because `getBrokerBaseUrl()` falls back to `''`, requests become relative paths:
+
+- `/api/ai/generate`
+- `/api/chat`
+
+So behavior depends on your host:
+
+- If your server exposes those endpoints on the same origin, calls still work.
+- If not, requests return 404/network errors.
+- In managed-cloud mode, the OpenAI provider explicitly throws a user-facing error when no broker URL is available, prompting users to configure a custom provider or supported on-device option.
+
+## Verify endpoint readiness before enabling AI features
+
+Run these checks first (replace base URL as needed):
+
+```bash
+# 1) Basic route check (expect JSON 404 on GET from PHP router, which proves routing is alive)
+curl -i https://your-domain.example/api/chat
+
+# 2) CORS/preflight check for browser POSTs
+curl -i -X OPTIONS https://your-domain.example/api/chat
+
+# 3) Functional POST check (expect 200 or a structured JSON error, not HTML)
+curl -i -X POST https://your-domain.example/api/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"provider":"groq","model":"llama-3.3-70b-versatile","prompt":"ping"}'
+```
+
+For dev broker mode, run the same checks against your local Vite URL (for example `http://localhost:5173/api/chat` and `http://localhost:5173/api/ai/generate`). Do this before turning on AI in user-facing environments so failures surface early.
+
 ## External Integrations
 
 Integration availability is staged and may depend on your project type.
