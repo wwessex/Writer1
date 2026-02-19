@@ -158,7 +158,9 @@ export function AISuggestionsPanel({ open, onClose }: AISuggestionsPanelProps) {
           <p>
             {config.provider === 'chrome-ai'
               ? 'Chrome AI is not available in this browser. Use Chrome 137+ on a supported platform, or configure an OpenAI-compatible API in AI Writing Tools.'
-              : 'AI is not configured. Open AI Writing Tools → Settings → Custom provider (advanced) to connect your own OpenAI-compatible API endpoint and key.'
+              : config.provider === 'server-proxy'
+                ? 'Enter your API key in AI Writing Tools → Settings to connect directly to the selected provider.'
+                : 'AI is not configured. Open AI Writing Tools → Settings → Custom provider (advanced) to connect your own OpenAI-compatible API endpoint and key.'
             }
           </p>
         </div>

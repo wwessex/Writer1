@@ -11,6 +11,7 @@ import {
   checkChromeAIAvailability,
   detectBestProvider,
   isChromeBrowser,
+  SERVER_PROXY_ENDPOINTS,
   SERVER_PROXY_MODELS,
   SERVER_PROXY_LABELS,
 } from '@/lib/ai';
@@ -212,7 +213,8 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
 
   const isConfigured =
     config.provider === 'server-proxy'
-      ? !!(config.serverProxy?.serverProvider && config.serverProxy?.model)
+      ? !!(config.serverProxy?.serverProvider && config.serverProxy?.model &&
+           (config.serverProxy.userApiKey?.trim() || getBrokerBaseUrl()))
       : config.provider === 'openai-compatible'
         ? !!(config.endpoint?.trim() && config.sessionToken?.trim())
         : config.provider === 'chrome-ai'
@@ -370,30 +372,86 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   };
 
   const handleTestServerProxy = async () => {
-    if (!config.serverProxy?.model) {
+    if (!config.serverProxy?.model || !config.serverProxy?.serverProvider) {
       showToast('Select a provider and model first', 'warning');
       return;
     }
     setTestingConnection(true);
+
+    const { serverProvider, model, userApiKey } = config.serverProxy;
+    const hasUserKey = !!userApiKey?.trim();
+    const hasBroker = !!getBrokerBaseUrl();
+
+    const abortSignal = (() => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 15000);
+      return controller.signal;
+    })();
+
     try {
+      // Direct API call when user provides their own key
+      if (hasUserKey) {
+        let res: Response;
+
+        if (serverProvider === 'gemini') {
+          const endpoint = `${SERVER_PROXY_ENDPOINTS.gemini}/${model}:generateContent?key=${encodeURIComponent(userApiKey!)}`;
+          res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: 'Say "Connection successful" in exactly two words.' }] }],
+              generationConfig: { maxOutputTokens: 10 },
+            }),
+            signal: abortSignal,
+          });
+        } else {
+          const endpoint = SERVER_PROXY_ENDPOINTS[serverProvider];
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${userApiKey}`,
+          };
+          if (serverProvider === 'openrouter') {
+            headers['HTTP-Referer'] = window.location.origin;
+            headers['X-Title'] = 'DraftHarbour Studio';
+          }
+          res = await fetch(endpoint, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              model,
+              messages: [{ role: 'user', content: 'Say "Connection successful" in exactly two words.' }],
+              max_tokens: 10,
+            }),
+            signal: abortSignal,
+          });
+        }
+
+        if (res.ok) {
+          showToast(`Direct connection to ${SERVER_PROXY_LABELS[serverProvider]} successful`, 'success', 'check_circle');
+        } else {
+          const body = await res.text().catch(() => '');
+          showToast(`Connection failed (${res.status}): ${(body || res.statusText).slice(0, 100)}`, 'error');
+        }
+        return;
+      }
+
+      // Fall back to broker proxy
+      if (!hasBroker) {
+        showToast('Enter your API key to connect directly, or configure a broker URL.', 'warning');
+        return;
+      }
+
       const body: Record<string, unknown> = {
-        provider: config.serverProxy.serverProvider,
-        model: config.serverProxy.model,
+        provider: serverProvider,
+        model,
         prompt: 'Say "Connection successful" in exactly two words.',
         projectType: 'book',
       };
-      if (config.serverProxy.userApiKey?.trim()) {
-        body.userApiKey = config.serverProxy.userApiKey;
-      }
       const res = await fetch(getBrokerEndpoint('/api/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(body),
-        signal: (() => {
-          const controller = new AbortController();
-          setTimeout(() => controller.abort(), 15000);
-          return controller.signal;
-        })(),
+        signal: abortSignal,
       });
       if (res.ok) {
         showToast('Connection successful', 'success', 'check_circle');
@@ -401,7 +459,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         const errBody = await res.json().catch(() => ({})) as { message?: string; error?: string };
         const detail = errBody.message || errBody.error || res.statusText;
         if (res.status === 404) {
-          showToast('Proxy endpoint not found (404). Set VITE_AI_BROKER_BASE_URL to a host serving /api/chat, or deploy the api/ PHP proxy.', 'error');
+          showToast('Proxy not found (404). Enter your own API key above to connect directly.', 'error');
           return;
         }
         showToast(`Connection failed (${res.status}): ${detail.slice(0, 100)}`, 'error');
@@ -485,7 +543,9 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
               {config.provider === 'chrome-ai'
                 ? 'Using local AI. Chrome built-in models run directly on your device when available.'
                 : config.provider === 'server-proxy'
-                  ? `Using ${SERVER_PROXY_LABELS[config.serverProxy?.serverProvider ?? 'groq']}. Requests are routed through the DraftHarbour server proxy. API keys stay server-side.`
+                  ? config.serverProxy?.userApiKey?.trim()
+                    ? `Using ${SERVER_PROXY_LABELS[config.serverProxy?.serverProvider ?? 'groq']}. Requests are sent directly to the provider API with your key.`
+                    : `Using ${SERVER_PROXY_LABELS[config.serverProxy?.serverProvider ?? 'groq']}. Requests are routed through the DraftHarbour server proxy.`
                   : config.provider === 'openai-compatible'
                     ? 'Using a custom OpenAI-compatible provider. Requests are sent directly to your configured API endpoint.'
                     : 'Using cloud AI. Requests are routed through the managed DraftHarbour cloud endpoint.'}
@@ -507,7 +567,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
           <div className={styles.aiProviderSelector}>
             <h5>Server AI Providers</h5>
             <p className={styles.aiSettingsHint}>
-              API keys are managed server-side. Optionally bring your own key below.
+              Enter your API key to connect directly, or leave blank to use the server proxy if available.
             </p>
             <div className={styles.aiProviderOptions}>
               {(['groq', 'openrouter', 'gemini'] as const).map(sp => (
@@ -557,10 +617,10 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
                   </select>
                 </label>
                 <label className={styles.aiLabel}>
-                  Your API Key (optional — leave blank to use server key)
+                  Your API Key
                   <Input
                     type="password"
-                    placeholder="Enter your own API key..."
+                    placeholder="Enter your API key to connect directly..."
                     value={config.serverProxy.userApiKey || ''}
                     onChange={e => updateConfig({
                       serverProxy: { ...config.serverProxy!, userApiKey: e.target.value },
