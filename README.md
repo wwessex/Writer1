@@ -89,6 +89,50 @@ Settings → Online Sync:
 
 If no server is configured, the app works fully offline.
 
+## AI Setup (Server Proxy + Local Broker)
+
+The AI features can run through either:
+- `api/` (PHP server proxy for production-style deployments), or
+- the local dev broker in `src/server/integrationBroker.ts`.
+
+### 1) Configure `api/_config.php` provider keys
+
+Edit `api/_config.php` and set the provider keys you plan to use:
+
+- `groq.api_key`
+- `openrouter.api_key`
+- `gemini.api_key`
+
+Each provider also has an `enabled` flag. If `enabled` is `false`, requests for that provider are rejected.
+
+### 2) Understand `allow_byok`
+
+`allow_byok` controls whether the client can submit `userApiKey` in the `/api/chat` request body:
+
+- `true`: request-level key override is allowed (Bring Your Own Key)
+- `false`: only server-side keys from `api/_config.php` are accepted
+
+For shared/public deployments, `false` is generally safer.
+
+### 3) Deploy `api/` behind PHP for `/api/chat`
+
+`/api/chat` is a server endpoint, not a static file route. To use the PHP proxy path, deploy the `api/` directory behind a PHP-enabled web server (Apache, Nginx+PHP-FPM, etc.) so requests to `/api/chat` are executed server-side.
+
+If you only serve static frontend files, `/api/chat` will not work.
+
+### 4) Local dev broker env vars (`src/server/integrationBroker.ts`)
+
+For local/server runtime (Node), set these environment variables as needed:
+
+- `BROKER_GROQ_API_KEY`
+- `BROKER_OPENROUTER_API_KEY`
+- `BROKER_GEMINI_API_KEY`
+- `BROKER_OPENAI_API_KEY`
+
+`BROKER_OPENAI_API_KEY` is used by `/api/ai/generate` in the broker implementation.
+
+See `.env.example` for a complete list of frontend and broker/server environment variables.
+
 ## External Integrations
 
 Integration availability is staged and may depend on your project type.
