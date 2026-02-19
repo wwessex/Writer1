@@ -11,7 +11,19 @@
 /*  Provider & config                                                  */
 /* ------------------------------------------------------------------ */
 
-export type AIProviderType = 'chrome-ai' | 'managed-cloud' | 'openai-compatible';
+export type AIProviderType = 'chrome-ai' | 'managed-cloud' | 'openai-compatible' | 'server-proxy';
+
+/** LLM provider routed through the server-side proxy */
+export type ServerProxyProviderType = 'groq' | 'openrouter' | 'gemini';
+
+export interface ServerProxyConfig {
+  /** Which LLM provider to route through the server */
+  serverProvider: ServerProxyProviderType;
+  /** Model identifier for the selected provider */
+  model: string;
+  /** User's own API key for BYOK (optional, sent to server per-request) */
+  userApiKey?: string;
+}
 
 export interface AIProviderConfig {
   provider: AIProviderType;
@@ -21,6 +33,8 @@ export interface AIProviderConfig {
   sessionToken?: string;
   /** Model identifier (only for openai-compatible, defaults to gpt-4o) */
   model?: string;
+  /** Server proxy sub-config (only when provider === 'server-proxy') */
+  serverProxy?: ServerProxyConfig;
 }
 
 /* ------------------------------------------------------------------ */
@@ -47,6 +61,11 @@ export interface AIResponse {
   provider: AIProviderType;
   /** Round-trip latency in milliseconds */
   latencyMs: number;
+  /** Token usage info (available from server-proxy providers) */
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+  };
 }
 
 /* ------------------------------------------------------------------ */

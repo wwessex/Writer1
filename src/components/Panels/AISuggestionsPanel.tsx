@@ -142,7 +142,7 @@ export function AISuggestionsPanel({ open, onClose }: AISuggestionsPanelProps) {
           {isConfigured && (
             <span className={styles.aiPanel__providerBadge}>
               <span className="material-symbols-rounded">
-                {config.provider === 'chrome-ai' ? 'memory' : 'cloud'}
+                {config.provider === 'chrome-ai' ? 'memory' : config.provider === 'server-proxy' ? 'dns' : 'cloud'}
               </span>
             </span>
           )}
