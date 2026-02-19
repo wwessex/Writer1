@@ -238,6 +238,26 @@ export interface DhprojData {
   worldEntries?: WorldEntry[];
 }
 
+
+export interface CharacterVoiceProfile {
+  characterId: string;
+  sampleCount: number;
+  fingerprint: {
+    speaker: string;
+    utteranceCount: number;
+    combinedText: string;
+    features: {
+      sampleTokens: number;
+      sentenceCount: number;
+      avgSentenceLength: number;
+      uniqueTokenRatio: number;
+      repeatedPhrases: Record<string, number>;
+      punctuationPattern: Record<string, number>;
+    };
+  };
+  updatedAt: number;
+}
+
 // Character and World Bible types
 export interface CharacterEntity {
   id: string;
@@ -251,6 +271,7 @@ export interface CharacterEntity {
   relationships: { targetId: string; type: string }[];
   createdAt: number;
   updatedAt: number;
+  voiceProfile?: CharacterVoiceProfile;
 }
 
 export interface WorldEntry {

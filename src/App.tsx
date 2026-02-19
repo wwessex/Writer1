@@ -26,6 +26,8 @@ import { ToastProvider, useToast } from '@/components/UI';
 import { Tooltip } from '@/components/UI/Tooltip';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { PanelErrorBoundary } from '@/components/PanelErrorBoundary';
+import { buildCharacterVoiceProfiles, getDialogueSimilarityAlerts, DEFAULT_VOICE_SIMILARITY_CONFIG, type VoiceSimilarityAlert } from '@/lib/voiceFingerprint';
+import type { CharacterEntity } from '@/types';
 import { useModalState } from '@/hooks/useModalState';
 import { useProjectFileActions } from '@/hooks/useProjectFileActions';
 import { useCommentActions } from '@/hooks/useCommentActions';
@@ -63,7 +65,24 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
   const [hasTextSelection, setHasTextSelection] = useState(false);
+  const [voiceAlerts, setVoiceAlerts] = useState<VoiceSimilarityAlert[]>([]);
+  const voiceAlertSignatureRef = useRef<string>('');
   const findReplace = useFindReplace(editor);
+
+  const characters = useMemo<CharacterEntity[]>(() => {
+    try {
+      const raw = localStorage.getItem('draftharbour_characters');
+      const parsed = raw ? (JSON.parse(raw) as CharacterEntity[]) : [];
+      return parsed.filter(character => character.novelId === '' || character.novelId === state.novelId);
+    } catch {
+      return [];
+    }
+  }, [state.novelId]);
+
+  const baselineProfiles = useMemo(() => {
+    const baselineChapters = state.chapters.filter(chapter => chapter.id !== activeChapter?.id);
+    return buildCharacterVoiceProfiles(baselineChapters, characters);
+  }, [state.chapters, characters, activeChapter?.id]);
 
   const {
     fileInputRef,
@@ -121,6 +140,27 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
       editor.off('blur', handleEditorBlur);
     };
   }, [editor]);
+
+  useEffect(() => {
+    if (!activeChapter) {
+      setVoiceAlerts([]);
+      return;
+    }
+
+    const alerts = getDialogueSimilarityAlerts(activeChapter.content, baselineProfiles, DEFAULT_VOICE_SIMILARITY_CONFIG);
+    setVoiceAlerts(alerts);
+
+    const nextSignature = alerts.slice(0, 3).map(alert => `${alert.activeSpeaker}:${alert.comparedSpeaker}:${alert.similarity.toFixed(3)}`).join('|');
+    if (nextSignature && nextSignature !== voiceAlertSignatureRef.current) {
+      const topAlert = alerts[0];
+      showToast(`Voice overlap warning: ${topAlert.activeSpeaker} is ${(topAlert.similarity * 100).toFixed(0)}% similar to ${topAlert.comparedSpeaker}.`, 'warning');
+      voiceAlertSignatureRef.current = nextSignature;
+    }
+
+    if (!nextSignature) {
+      voiceAlertSignatureRef.current = '';
+    }
+  }, [activeChapter, baselineProfiles, showToast]);
 
   const handleOnboardingClose = useCallback(() => {
     closeModal('onboarding');
@@ -239,7 +279,7 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
           </Tooltip>
         )}
         <PanelErrorBoundary panel="inspector">
-          <Inspector open={inspectorOpen} onClose={() => setInspectorOpen(false)} />
+          <Inspector open={inspectorOpen} onClose={() => setInspectorOpen(false)} voiceAlerts={voiceAlerts} />
         </PanelErrorBoundary>
         <AISuggestionsPanel open={modals.aiPanel} onClose={() => closeModal('aiPanel')} />
       </main>
