@@ -337,7 +337,14 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       if (!promptText.trim()) return;
 
       if (!isConfigured) {
-        setError('AI is not configured yet. Open Settings below, pick a provider, and paste your API key.');
+        if (config.provider === 'server-proxy') {
+          const providerName = SERVER_PROXY_LABELS[config.serverProxy?.serverProvider ?? 'groq'];
+          setError(`${providerName} is not configured yet. Open Settings below, select ${providerName}, and paste your API key.`);
+        } else if (config.provider === 'openai-compatible' && config.endpoint?.trim() && !config.sessionToken?.trim()) {
+          setError('API key is missing. Open Settings below and paste your API key in the Custom provider section.');
+        } else {
+          setError('AI is not configured yet. Open Settings below, pick a provider, and paste your API key.');
+        }
         return;
       }
 
@@ -412,7 +419,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${config.sessionToken}`
+          Authorization: `Bearer ${config.sessionToken!.trim()}`
         },
         body: JSON.stringify({
           model: config.model || 'gpt-4o',
@@ -465,7 +472,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         let res: Response;
 
         if (serverProvider === 'gemini') {
-          const endpoint = `${SERVER_PROXY_ENDPOINTS.gemini}/${model}:generateContent?key=${encodeURIComponent(userApiKey!)}`;
+          const endpoint = `${SERVER_PROXY_ENDPOINTS.gemini}/${model}:generateContent?key=${encodeURIComponent(userApiKey!.trim())}`;
           res = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -479,7 +486,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
           const endpoint = SERVER_PROXY_ENDPOINTS[serverProvider];
           const headers: Record<string, string> = {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${userApiKey}`,
+            Authorization: `Bearer ${userApiKey!.trim()}`,
           };
           if (serverProvider === 'openrouter') {
             headers['HTTP-Referer'] = window.location.origin;

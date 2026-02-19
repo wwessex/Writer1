@@ -112,9 +112,10 @@ export class ServerProxyProvider implements AIProvider {
 
     // Groq and OpenRouter use OpenAI-compatible format
     const endpoint = SERVER_PROXY_ENDPOINTS[serverProvider];
+    const trimmedKey = apiKey.trim();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${trimmedKey}`,
     };
 
     // OpenRouter recommends identifying the app
@@ -164,7 +165,7 @@ export class ServerProxyProvider implements AIProvider {
     signal: AbortSignal | undefined,
     start: number,
   ): Promise<AIResponse> {
-    const endpoint = `${SERVER_PROXY_ENDPOINTS.gemini}/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const endpoint = `${SERVER_PROXY_ENDPOINTS.gemini}/${model}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
 
     const res = await fetch(endpoint, {
       method: 'POST',

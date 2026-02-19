@@ -43,12 +43,23 @@ export function loadAIConfig(): AIProviderConfig {
     }
 
     const safeConfig = parsed as AIProviderConfig & { apiKey?: string };
+    // Migrate legacy `apiKey` → `sessionToken` and persist the cleaned config
     if ('apiKey' in safeConfig) {
+      const migratedToken = safeConfig.sessionToken || safeConfig.apiKey;
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         provider: safeConfig.provider,
         endpoint: safeConfig.endpoint,
         model: safeConfig.model,
+        sessionToken: migratedToken,
+        serverProxy: safeConfig.serverProxy,
       }));
+      return {
+        provider: safeConfig.provider,
+        endpoint: safeConfig.endpoint,
+        model: safeConfig.model,
+        sessionToken: migratedToken,
+        serverProxy: safeConfig.serverProxy,
+      };
     }
 
     return {
