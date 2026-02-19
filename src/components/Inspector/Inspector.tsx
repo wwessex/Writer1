@@ -8,6 +8,7 @@ import { buildNarrativeWeather } from '@/lib/narrativeWeather';
 import { useResizable } from '@/hooks/useResizable';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 import type { ChapterStatus, Scene } from '@/types';
+import type { VoiceSimilarityAlert } from '@/lib/voiceFingerprint';
 import styles from './Inspector.module.css';
 
 const STATUS_OPTIONS = [
@@ -20,9 +21,10 @@ const STATUS_OPTIONS = [
 interface InspectorProps {
   open: boolean;
   onClose: () => void;
+  voiceAlerts?: VoiceSimilarityAlert[];
 }
 
-export function Inspector({ open, onClose }: InspectorProps) {
+export function Inspector({ open, onClose, voiceAlerts = [] }: InspectorProps) {
   const { state, activeChapter, setActiveChapter, updateChapterImmediate, addScene, updateScene, deleteScene } = useApp();
   const [activeTab, setActiveTab] = useState<'details' | 'scenes' | 'notes' | 'weather'>('details');
 
@@ -196,6 +198,21 @@ export function Inspector({ open, onClose }: InspectorProps) {
                   {activeChapter.wordGoal > 0 && (
                     <div className={styles.progressBar}>
                       <div className={styles.progressFill} style={{ width: `${wordGoalProgress}%` }} />
+                    </div>
+                  )}
+
+                  {voiceAlerts.length > 0 && (
+                    <div className={styles.statsCard} role="status" aria-live="polite">
+                      <div className={styles.stat}>
+                        <span className="material-symbols-rounded" style={{ color: 'var(--warning)' }}>warning</span>
+                        <span className={styles.statLabel}>Voice overlap risk</span>
+                      </div>
+                      {voiceAlerts.slice(0, 2).map(alert => (
+                        <div key={`${alert.activeSpeaker}-${alert.comparedSpeaker}`} className={styles.stat}>
+                          <span className={styles.statValue}>{(alert.similarity * 100).toFixed(0)}%</span>
+                          <span className={styles.statLabel}>{alert.activeSpeaker} ↔ {alert.comparedSpeaker}</span>
+                        </div>
+                      ))}
                     </div>
                   )}
 
