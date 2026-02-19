@@ -258,7 +258,12 @@ export async function exportToDocx(
   includeHeadings: boolean = true,
   manuscriptOptions?: ManuscriptExportOptions,
 ): Promise<void> {
-  const docx = await import('docx');
+  let docx;
+  try {
+    docx = await import('docx');
+  } catch (cause) {
+    throw new Error('Failed to load the DOCX export library. Check your connection and try again.', { cause });
+  }
   const {
     Document,
     Packer,
@@ -732,7 +737,13 @@ export async function exportToPdf(
   manuscriptOptions?: ManuscriptExportOptions,
 ): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pdfMake = (await import('pdfmake/build/pdfmake.min.js')) as any;
+  let pdfMake: any;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    pdfMake = (await import('pdfmake/build/pdfmake.min.js')) as any;
+  } catch (cause) {
+    throw new Error('Failed to load the PDF export library. Check your connection and try again.', { cause });
+  }
   const pdfMakeModule = pdfMake.default || pdfMake;
 
   pdfMakeModule.fonts = SCREENPLAY_PDF_FONTS;
@@ -889,7 +900,13 @@ export async function exportToScreenplayPdf(
   title: string,
 ): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pdfMake = (await import('pdfmake/build/pdfmake.min.js')) as any;
+  let pdfMake: any;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    pdfMake = (await import('pdfmake/build/pdfmake.min.js')) as any;
+  } catch (cause) {
+    throw new Error('Failed to load the PDF export library. Check your connection and try again.', { cause });
+  }
   const pdfMakeModule = pdfMake.default || pdfMake;
 
   pdfMakeModule.fonts = SCREENPLAY_PDF_FONTS;

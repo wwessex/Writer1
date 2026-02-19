@@ -84,10 +84,13 @@ export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
       setSelectedSnapshot(null);
       setCompareSnapshot(null);
       setShowDiff(false);
+    } catch (err) {
+      console.error('Failed to load snapshots:', err);
+      showToast('Failed to load snapshots', 'error');
     } finally {
       setLoading(false);
     }
-  }, [activeChapter]);
+  }, [activeChapter, showToast]);
 
   useEffect(() => {
     if (open && activeChapter) {
@@ -120,8 +123,13 @@ export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
 
   const handleDeleteSnapshot = async (snapshot: Snapshot) => {
     if (!confirm('Delete this snapshot?')) return;
-    await deleteSnapshot(snapshot.id);
-    await loadSnapshots();
+    try {
+      await deleteSnapshot(snapshot.id);
+      await loadSnapshots();
+    } catch (err) {
+      console.error('Failed to delete snapshot:', err);
+      showToast('Failed to delete snapshot', 'error');
+    }
   };
 
   const handleCompare = () => {

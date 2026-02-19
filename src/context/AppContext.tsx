@@ -14,6 +14,8 @@ import { debounce, generateId } from '@/lib/utils';
 import { loadSettingsFromStorage, createSettingsEnvelope } from '@/lib/settingsMigration';
 import { SETTINGS_STORAGE_KEY } from '@/lib/storageKeys';
 import { createDefaultSettings, mergeSettings, normalizeSidebarPanels, type SettingsUpdate } from './appSettings';
+import { storageErrorFrom } from '@/lib/errors';
+import { useToast } from '@/components/UI';
 
 // Check if mobile viewport (matches the CSS breakpoint)
 const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches;
@@ -203,6 +205,7 @@ const AppContext = createContext<AppContextType | null>(null);
 // Provider component
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
+  const { showErrorToast } = useToast();
 
   // Undo/redo stack for chapter reordering
   const reorderUndoStack = useRef<string[][]>([]);
@@ -220,6 +223,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const getChapterById = useCallback((chapterId: string) => {
     return state.chapters.find(chapter => chapter.id === chapterId);
   }, [state.chapters]);
+
+  /** Report a storage error: log + toast. */
+  const reportStorageError = useCallback((context: string, cause: unknown) => {
+    console.error(`[storage] ${context}:`, cause);
+    showErrorToast(storageErrorFrom(cause));
+  }, [showErrorToast]);
 
   // Load settings from localStorage
   useEffect(() => {
@@ -317,18 +326,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Delete the current novel and switch to another
   const deleteCurrentNovel = useCallback(async () => {
     const currentId = state.novelId;
-    await storage.deleteNovel(currentId);
+    try {
+      await storage.deleteNovel(currentId);
+    } catch (cause) {
+      reportStorageError(`deleteNovel(${currentId})`, cause);
+      return;
+    }
 
     // Load next available novel or create a new one
     await loadNovel();
-  }, [state.novelId, loadNovel]);
+  }, [state.novelId, loadNovel, reportStorageError]);
 
-  // Debounced save for content updates
+  // Debounced save for content updates — errors are caught and reported via toast
   const debouncedSave = useMemo(() => debounce(async (id: string, updates: Partial<Chapter>) => {
-    await runWithSavingState(async () => {
-      await storage.updateChapter(id, updates);
-    });
-  }, state.settings.autosaveMs), [state.settings.autosaveMs, runWithSavingState]);
+    try {
+      await runWithSavingState(async () => {
+        await storage.updateChapter(id, updates);
+      });
+    } catch (cause) {
+      reportStorageError(`autosave chapter(${id})`, cause);
+    }
+  }, state.settings.autosaveMs), [state.settings.autosaveMs, runWithSavingState, reportStorageError]);
 
   // Create chapter
   const createChapter = useCallback(async () => {
@@ -339,15 +357,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       undefined,
       state.projectType
     );
-    await storage.addChapter(chapter);
-    dispatch({ type: 'ADD_CHAPTER', payload: chapter });
-  }, [state.novelId, state.chapters.length, state.projectType]);
+    try {
+      await storage.addChapter(chapter);
+      dispatch({ type: 'ADD_CHAPTER', payload: chapter });
+    } catch (cause) {
+      reportStorageError('createChapter', cause);
+    }
+  }, [state.novelId, state.chapters.length, state.projectType, reportStorageError]);
 
   // Delete chapter
   const deleteChapter = useCallback(async (id: string) => {
-    await storage.deleteChapter(id);
-    dispatch({ type: 'DELETE_CHAPTER', payload: id });
-  }, []);
+    try {
+      await storage.deleteChapter(id);
+      dispatch({ type: 'DELETE_CHAPTER', payload: id });
+    } catch (cause) {
+      reportStorageError(`deleteChapter(${id})`, cause);
+    }
+  }, [reportStorageError]);
 
   // Update chapter (debounced for content)
   const updateChapter = useCallback((id: string, updates: Partial<Chapter>) => {
@@ -358,10 +384,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Update chapter immediately (for title, metadata)
   const updateChapterImmediate = useCallback(async (id: string, updates: Partial<Chapter>) => {
     dispatch({ type: 'UPDATE_CHAPTER', payload: { id, updates } });
-    await runWithSavingState(async () => {
-      await storage.updateChapter(id, updates);
-    });
-  }, [runWithSavingState]);
+    try {
+      await runWithSavingState(async () => {
+        await storage.updateChapter(id, updates);
+      });
+    } catch (cause) {
+      reportStorageError(`updateChapterImmediate(${id})`, cause);
+    }
+  }, [runWithSavingState, reportStorageError]);
 
   // Set active chapter
   const setActiveChapter = useCallback((id: string) => {
@@ -380,8 +410,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     reorderRedoStack.current = [];
 
     dispatch({ type: 'REORDER_CHAPTERS', payload: ids });
-    await storage.reorderChapters(state.novelId, ids);
-  }, [state.novelId, state.chapters]);
+    try {
+      await storage.reorderChapters(state.novelId, ids);
+    } catch (cause) {
+      reportStorageError('reorderChapters', cause);
+    }
+  }, [state.novelId, state.chapters, reportStorageError]);
 
   // Undo chapter reorder
   const undoReorder = useCallback(async () => {
@@ -393,8 +427,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     reorderRedoStack.current.push(currentOrder);
 
     dispatch({ type: 'REORDER_CHAPTERS', payload: previousOrder });
-    await storage.reorderChapters(state.novelId, previousOrder);
-  }, [state.novelId, state.chapters]);
+    try {
+      await storage.reorderChapters(state.novelId, previousOrder);
+    } catch (cause) {
+      reportStorageError('undoReorder', cause);
+    }
+  }, [state.novelId, state.chapters, reportStorageError]);
 
   // Redo chapter reorder
   const redoReorder = useCallback(async () => {
@@ -406,14 +444,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     reorderUndoStack.current.push(currentOrder);
 
     dispatch({ type: 'REORDER_CHAPTERS', payload: nextOrder });
-    await storage.reorderChapters(state.novelId, nextOrder);
-  }, [state.novelId, state.chapters]);
+    try {
+      await storage.reorderChapters(state.novelId, nextOrder);
+    } catch (cause) {
+      reportStorageError('redoReorder', cause);
+    }
+  }, [state.novelId, state.chapters, reportStorageError]);
 
   // Update novel title
   const updateNovelTitle = useCallback((title: string) => {
     dispatch({ type: 'SET_NOVEL_TITLE', payload: title });
-    storage.updateNovel(state.novelId, { title });
-  }, [state.novelId]);
+    storage.updateNovel(state.novelId, { title }).catch((cause) => {
+      reportStorageError('updateNovelTitle', cause);
+    });
+  }, [state.novelId, reportStorageError]);
 
   // Update settings
   const updateSettings = useCallback((settings: SettingsUpdate) => {
@@ -456,9 +500,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const updates = { scenes: [...existingScenes, newScene] };
     dispatch({ type: 'UPDATE_CHAPTER', payload: { id: chapterId, updates } });
-    storage.updateChapter(chapterId, updates);
+    storage.updateChapter(chapterId, updates).catch((cause) => {
+      reportStorageError('addScene', cause);
+    });
     return newScene.id;
-  }, [getChapterById, state.projectType]);
+  }, [getChapterById, state.projectType, reportStorageError]);
 
   // Update scene
   const updateScene = useCallback((chapterId: string, sceneId: string, updates: Partial<Scene>) => {
@@ -470,8 +516,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
 
     dispatch({ type: 'UPDATE_CHAPTER', payload: { id: chapterId, updates: { scenes } } });
-    storage.updateChapter(chapterId, { scenes });
-  }, [getChapterById]);
+    storage.updateChapter(chapterId, { scenes }).catch((cause) => {
+      reportStorageError('updateScene', cause);
+    });
+  }, [getChapterById, reportStorageError]);
 
   // Delete scene
   const deleteScene = useCallback((chapterId: string, sceneId: string) => {
@@ -480,8 +528,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const scenes = (chapter.scenes || []).filter(scene => scene.id !== sceneId);
     dispatch({ type: 'UPDATE_CHAPTER', payload: { id: chapterId, updates: { scenes } } });
-    storage.updateChapter(chapterId, { scenes });
-  }, [getChapterById]);
+    storage.updateChapter(chapterId, { scenes }).catch((cause) => {
+      reportStorageError('deleteScene', cause);
+    });
+  }, [getChapterById, reportStorageError]);
 
   // Reorder scenes within a chapter
   const reorderScenes = useCallback((chapterId: string, sceneIds: string[]) => {
@@ -493,8 +543,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .filter((s): s is Scene => s !== null && s !== undefined);
 
     dispatch({ type: 'UPDATE_CHAPTER', payload: { id: chapterId, updates: { scenes } } });
-    storage.updateChapter(chapterId, { scenes });
-  }, [getChapterById]);
+    storage.updateChapter(chapterId, { scenes }).catch((cause) => {
+      reportStorageError('reorderScenes', cause);
+    });
+  }, [getChapterById, reportStorageError]);
 
   // Get active chapter
   const activeChapter = state.chapters.find(ch => ch.id === state.activeChapterId) || null;
@@ -529,6 +581,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 }
 
 // Hook to use the context
+// eslint-disable-next-line react-refresh/only-export-components
 export function useApp() {
   const context = useContext(AppContext);
   if (!context) {

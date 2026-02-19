@@ -25,6 +25,7 @@ import { SettingsWindow, AboutWindow } from '@/components/Windows';
 import { ToastProvider, useToast } from '@/components/UI';
 import { Tooltip } from '@/components/UI/Tooltip';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { PanelErrorBoundary } from '@/components/PanelErrorBoundary';
 import { useModalState } from '@/hooks/useModalState';
 import { useProjectFileActions } from '@/hooks/useProjectFileActions';
 import { useCommentActions } from '@/hooks/useCommentActions';
@@ -216,11 +217,15 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
             </button>
           </Tooltip>
         )}
-        <Sidebar
-          onExportBackup={handleExportBackup}
-          onImportBackup={() => fileInputRef.current?.click()}
-        />
-        <Editor screenplayMode={screenplayMode} onToggleScreenplayMode={onToggleScreenplayMode} />
+        <PanelErrorBoundary panel="sidebar">
+          <Sidebar
+            onExportBackup={handleExportBackup}
+            onImportBackup={() => fileInputRef.current?.click()}
+          />
+        </PanelErrorBoundary>
+        <PanelErrorBoundary panel="editor">
+          <Editor screenplayMode={screenplayMode} onToggleScreenplayMode={onToggleScreenplayMode} />
+        </PanelErrorBoundary>
         {!inspectorOpen && (
           <Tooltip content="Expand inspector (Ctrl+Shift+I)" position="left">
             <button
@@ -233,7 +238,9 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
             </button>
           </Tooltip>
         )}
-        <Inspector open={inspectorOpen} onClose={() => setInspectorOpen(false)} />
+        <PanelErrorBoundary panel="inspector">
+          <Inspector open={inspectorOpen} onClose={() => setInspectorOpen(false)} />
+        </PanelErrorBoundary>
         <AISuggestionsPanel open={modals.aiPanel} onClose={() => closeModal('aiPanel')} />
       </main>
 
@@ -378,11 +385,11 @@ function AppShell() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <AppProvider>
-        <ToastProvider>
+      <ToastProvider>
+        <AppProvider>
           <AppShell />
-        </ToastProvider>
-      </AppProvider>
+        </AppProvider>
+      </ToastProvider>
     </ErrorBoundary>
   );
 }

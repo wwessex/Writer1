@@ -240,6 +240,24 @@ a:hover { text-decoration: underline; }
 .toast--warning { border-left: 3px solid var(--warning); }
 .toast--error { border-left: 3px solid var(--danger); }
 
+.toast__dismiss {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  margin-left: auto;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--transition-fast);
+}
+
+.toast__dismiss:hover {
+  color: var(--text);
+}
+
 /* ============================================================
    Focus mode
    ============================================================ */
