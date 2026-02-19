@@ -84,8 +84,9 @@ export class ServerProxyProvider implements AIProvider {
     });
 
     if (!res.ok) {
-      const errBody = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
-      throw new Error(`Server proxy error (${res.status}): ${errBody.error || res.statusText}`);
+      const errBody = await res.json().catch(() => ({})) as { message?: string; error?: string };
+      const detail = errBody.message || errBody.error || res.statusText;
+      throw new Error(`Server proxy error (${res.status}): ${detail}`);
     }
 
     const data = await res.json() as {
