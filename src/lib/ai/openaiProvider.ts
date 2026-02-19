@@ -30,7 +30,15 @@ export class OpenAIProvider implements AIProvider {
 
   async execute(request: AIRequest): Promise<AIResponse> {
     if (!this.isAvailable()) {
-      throw new Error('Custom provider is not configured. Set an API endpoint and session token.');
+      const hasEndpoint = !!this.config.endpoint?.trim();
+      const hasKey = !!this.config.sessionToken?.trim();
+      if (hasEndpoint && !hasKey) {
+        throw new Error('API key is missing. Open Settings → Custom provider and paste your API key.');
+      }
+      if (!hasEndpoint && hasKey) {
+        throw new Error('API endpoint is missing. Open Settings → Custom provider and select a provider (e.g. Groq, OpenAI).');
+      }
+      throw new Error('Custom provider is not configured. Open Settings → Custom provider, select a provider, and paste your API key.');
     }
 
     const start = Date.now();
@@ -90,7 +98,7 @@ export class OpenAIProvider implements AIProvider {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.config.sessionToken}`,
+        Authorization: `Bearer ${this.config.sessionToken!.trim()}`,
       },
       body: JSON.stringify({
         model: this.config.model || 'gpt-4o',
