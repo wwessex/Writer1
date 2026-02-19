@@ -85,6 +85,11 @@ export class ServerProxyProvider implements AIProvider {
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({})) as { message?: string; error?: string };
       const detail = errBody.message || errBody.error || res.statusText;
+      if (res.status === 404) {
+        throw new Error(
+          'Server proxy endpoint not found (404). Configure a broker URL that serves /api/chat, or deploy the api/ PHP proxy on your host.',
+        );
+      }
       throw new Error(`Server proxy error (${res.status}): ${detail}`);
     }
 
