@@ -1444,6 +1444,32 @@
   margin-top: 0.5rem;
 }
 
+.aiConnectionResult {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: var(--radius-sm, 4px);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.aiConnectionResult--success {
+  background: color-mix(in srgb, var(--success, #22c55e) 12%, transparent);
+  color: var(--success, #22c55e);
+}
+
+.aiConnectionResult--error {
+  background: color-mix(in srgb, var(--danger, #ef4444) 12%, transparent);
+  color: var(--danger, #ef4444);
+}
+
+.aiConnectionResult--warning {
+  background: color-mix(in srgb, var(--warning, #f59e0b) 12%, transparent);
+  color: var(--warning, #f59e0b);
+}
+
 .aiSettingsHint {
   margin: 0.75rem 0 0;
   font-size: 0.75rem;
