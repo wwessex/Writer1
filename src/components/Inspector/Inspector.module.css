@@ -423,3 +423,60 @@
   height: 100%;
   background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 65%, #f59e0b));
 }
+
+.timelineSummary {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-1);
+  background: var(--btn-bg);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+}
+
+.timelineEmpty {
+  padding: var(--space-2);
+  border: 1px dashed var(--border-subtle, var(--border));
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.timelineFinding {
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  text-align: left;
+  padding: var(--space-1);
+  display: grid;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.timelineFinding--error {
+  border-color: color-mix(in srgb, #ef4444 55%, var(--border));
+}
+
+.timelineFinding--warning {
+  border-color: color-mix(in srgb, #f59e0b 55%, var(--border));
+}
+
+.timelineFinding--info {
+  border-color: color-mix(in srgb, #3b82f6 55%, var(--border));
+}
+
+.timelineFindingHeader {
+  display: flex;
+  gap: 8px;
+  text-transform: capitalize;
+  font-size: 0.75rem;
+}
+
+.timelineFindingSeverity {
+  font-weight: 700;
+}
+
+.timelineFindingMeta {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
