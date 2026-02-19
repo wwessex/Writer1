@@ -62,13 +62,20 @@ export class OpenAIProvider implements AIProvider {
       });
 
       if (!brokerRes.ok) {
-        const body = await brokerRes.text().catch(() => '');
+        let detail = brokerRes.statusText;
+        try {
+          const errBody = await brokerRes.json() as { message?: string; error?: string };
+          detail = errBody.message || errBody.error || detail;
+        } catch {
+          const text = await brokerRes.text().catch(() => '');
+          if (text) detail = text;
+        }
         if (brokerRes.status === 404) {
           throw new Error(
             'Cloud AI endpoint not found (404). Please switch to a custom OpenAI-compatible provider in Settings → Custom provider (advanced) and supply your own API endpoint and key.',
           );
         }
-        throw new Error(`Broker AI request failed (${brokerRes.status}): ${body || brokerRes.statusText}`);
+        throw new Error(`Broker AI request failed (${brokerRes.status}): ${detail}`);
       }
 
       const brokerData = await brokerRes.json() as { text: string };

@@ -396,8 +396,9 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       if (res.ok) {
         showToast('Connection successful', 'success', 'check_circle');
       } else {
-        const errBody = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
-        showToast(`Connection failed (${res.status}): ${(errBody.error || res.statusText).slice(0, 100)}`, 'error');
+        const errBody = await res.json().catch(() => ({})) as { message?: string; error?: string };
+        const detail = errBody.message || errBody.error || res.statusText;
+        showToast(`Connection failed (${res.status}): ${detail.slice(0, 100)}`, 'error');
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
