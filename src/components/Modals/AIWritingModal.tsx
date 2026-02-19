@@ -232,6 +232,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   const [config, setConfig] = useState<AIProviderConfig>(loadAIConfig);
   const [showSettings, setShowSettings] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionResult, setConnectionResult] = useState<{ type: 'success' | 'error' | 'warning'; message: string } | null>(null);
   const [showCustomProvider, setShowCustomProvider] = useState(false);
 
   // Chrome AI availability
@@ -259,6 +260,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       saveAIConfig(next);
       return next;
     });
+    setConnectionResult(null);
   }, []);
 
   // Detect Chrome AI availability on mount
@@ -410,10 +412,11 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
 
   const handleTestConnection = async () => {
     if (!config.endpoint?.trim() || !config.sessionToken?.trim()) {
-      showToast('Enter both an API endpoint and session token first', 'warning');
+      setConnectionResult({ type: 'warning', message: 'Enter both an API endpoint and API key first' });
       return;
     }
     setTestingConnection(true);
+    setConnectionResult(null);
     try {
       const res = await fetch(config.endpoint!, {
         method: 'POST',
@@ -436,14 +439,14 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       });
 
       if (res.ok) {
-        showToast('Connection successful', 'success', 'check_circle');
+        setConnectionResult({ type: 'success', message: 'Connection successful' });
       } else {
         const body = await res.text().catch(() => '');
-        showToast(`Connection failed (${res.status}): ${body.slice(0, 100) || res.statusText}`, 'error');
+        setConnectionResult({ type: 'error', message: `Connection failed (${res.status}): ${body.slice(0, 100) || res.statusText}` });
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      showToast(`Connection failed: ${message}`, 'error');
+      setConnectionResult({ type: 'error', message: `Connection failed: ${message}` });
     } finally {
       setTestingConnection(false);
     }
@@ -451,10 +454,11 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
 
   const handleTestServerProxy = async () => {
     if (!config.serverProxy?.model || !config.serverProxy?.serverProvider) {
-      showToast('Select a provider and model first', 'warning');
+      setConnectionResult({ type: 'warning', message: 'Select a provider and model first' });
       return;
     }
     setTestingConnection(true);
+    setConnectionResult(null);
 
     const { serverProvider, model, userApiKey } = config.serverProxy;
     const hasUserKey = !!userApiKey?.trim();
@@ -505,17 +509,17 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         }
 
         if (res.ok) {
-          showToast(`Direct connection to ${SERVER_PROXY_LABELS[serverProvider]} successful`, 'success', 'check_circle');
+          setConnectionResult({ type: 'success', message: `Direct connection to ${SERVER_PROXY_LABELS[serverProvider]} successful` });
         } else {
           const body = await res.text().catch(() => '');
-          showToast(`Connection failed (${res.status}): ${(body || res.statusText).slice(0, 100)}`, 'error');
+          setConnectionResult({ type: 'error', message: `Connection failed (${res.status}): ${(body || res.statusText).slice(0, 100)}` });
         }
         return;
       }
 
       // Fall back to broker proxy
       if (!hasBroker) {
-        showToast('Enter your API key to connect directly, or configure a broker URL.', 'warning');
+        setConnectionResult({ type: 'warning', message: 'Enter your API key to connect directly, or configure a broker URL.' });
         return;
       }
 
@@ -532,19 +536,19 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         signal: abortSignal,
       });
       if (res.ok) {
-        showToast('Connection successful', 'success', 'check_circle');
+        setConnectionResult({ type: 'success', message: 'Connection successful' });
       } else {
         const errBody = await res.json().catch(() => ({})) as { message?: string; error?: string };
         const detail = errBody.message || errBody.error || res.statusText;
         if (res.status === 404) {
-          showToast('Proxy not found (404). Enter your own API key above to connect directly.', 'error');
+          setConnectionResult({ type: 'error', message: 'Proxy not found (404). Enter your own API key above to connect directly.' });
           return;
         }
-        showToast(`Connection failed (${res.status}): ${detail.slice(0, 100)}`, 'error');
+        setConnectionResult({ type: 'error', message: `Connection failed (${res.status}): ${detail.slice(0, 100)}` });
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      showToast(`Connection failed: ${message}`, 'error');
+      setConnectionResult({ type: 'error', message: `Connection failed: ${message}` });
     } finally {
       setTestingConnection(false);
     }
@@ -709,24 +713,34 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
             )}
 
             {config.provider === 'server-proxy' && (
-              <div className={styles.aiSettingsActions}>
-                <Button
-                  variant="default"
-                  size="small"
-                  onClick={() => handleTestServerProxy()}
-                  disabled={testingConnection || !config.serverProxy?.model}
-                >
-                  <span className="material-symbols-rounded">wifi_tethering</span>
-                  {testingConnection ? 'Testing...' : 'Test Connection'}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="small"
-                  onClick={() => updateConfig({ provider: chromeAIAvailable ? 'chrome-ai' : 'managed-cloud' })}
-                >
-                  Use Automatic Mode
-                </Button>
-              </div>
+              <>
+                <div className={styles.aiSettingsActions}>
+                  <Button
+                    variant="default"
+                    size="small"
+                    onClick={() => handleTestServerProxy()}
+                    disabled={testingConnection || !config.serverProxy?.model}
+                  >
+                    <span className="material-symbols-rounded">wifi_tethering</span>
+                    {testingConnection ? 'Testing...' : 'Test Connection'}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="small"
+                    onClick={() => updateConfig({ provider: chromeAIAvailable ? 'chrome-ai' : 'managed-cloud' })}
+                  >
+                    Use Automatic Mode
+                  </Button>
+                </div>
+                {connectionResult && (
+                  <div className={`${styles.aiConnectionResult} ${styles[`aiConnectionResult--${connectionResult.type}`]}`}>
+                    <span className="material-symbols-rounded" style={{ fontSize: '1rem' }}>
+                      {connectionResult.type === 'success' ? 'check_circle' : connectionResult.type === 'error' ? 'error' : 'warning'}
+                    </span>
+                    {connectionResult.message}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -808,6 +822,14 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
                 Use Automatic Mode
               </Button>
             </div>
+            {connectionResult && (
+              <div className={`${styles.aiConnectionResult} ${styles[`aiConnectionResult--${connectionResult.type}`]}`}>
+                <span className="material-symbols-rounded" style={{ fontSize: '1rem' }}>
+                  {connectionResult.type === 'success' ? 'check_circle' : connectionResult.type === 'error' ? 'error' : 'warning'}
+                </span>
+                {connectionResult.message}
+              </div>
+            )}
           </details>
 
           <p className={styles.aiSettingsHint}>
