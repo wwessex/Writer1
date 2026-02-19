@@ -14,7 +14,7 @@ import {
   SERVER_PROXY_MODELS,
   SERVER_PROXY_LABELS,
 } from '@/lib/ai';
-import { getBrokerBaseUrl } from '@/lib/featureFlags';
+import { getBrokerBaseUrl, getBrokerEndpoint } from '@/lib/featureFlags';
 import type { AIProviderConfig, AvailabilityStatus } from '@/lib/ai';
 import type { ProjectType } from '@/types';
 import styles from './Modals.module.css';
@@ -373,7 +373,6 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
     }
     setTestingConnection(true);
     try {
-      const base = getBrokerBaseUrl();
       const body: Record<string, unknown> = {
         provider: config.serverProxy.serverProvider,
         model: config.serverProxy.model,
@@ -383,7 +382,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       if (config.serverProxy.userApiKey?.trim()) {
         body.userApiKey = config.serverProxy.userApiKey;
       }
-      const res = await fetch(`${base}/api/chat`, {
+      const res = await fetch(getBrokerEndpoint('/api/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(body),
