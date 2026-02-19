@@ -397,6 +397,10 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       } else {
         const errBody = await res.json().catch(() => ({})) as { message?: string; error?: string };
         const detail = errBody.message || errBody.error || res.statusText;
+        if (res.status === 404) {
+          showToast('Proxy endpoint not found (404). Set VITE_AI_BROKER_BASE_URL to a host serving /api/chat, or deploy the api/ PHP proxy.', 'error');
+          return;
+        }
         showToast(`Connection failed (${res.status}): ${detail.slice(0, 100)}`, 'error');
       }
     } catch (err) {

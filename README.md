@@ -213,6 +213,11 @@ curl -i -X POST https://your-domain.example/api/chat \
 
 For dev broker mode, run the same checks against your local Vite URL (for example `http://localhost:5173/api/chat` and `http://localhost:5173/api/ai/generate`). Do this before turning on AI in user-facing environments so failures surface early.
 
+If AI settings report **"Proxy endpoint not found (404)"**, you typically need one manual step:
+
+- Set `VITE_BROKER_BASE_URL` to the host that actually serves your AI routes (`/api/chat`, and optionally `/api/ai/generate`) and redeploy/restart the frontend.
+- Or, if using the PHP proxy path, deploy the `api/` folder behind PHP so `/api/chat` is routed through `api/index.php` instead of static hosting.
+
 ## External Integrations
 
 Integration availability is staged and may depend on your project type.
