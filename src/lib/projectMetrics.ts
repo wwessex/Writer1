@@ -76,3 +76,49 @@ export function summarizeProjectMetrics(chapterMetrics: ChapterMetric[]): Projec
 export function getProjectMetrics(chapters: Chapter[]): ProjectMetrics {
   return summarizeProjectMetrics(buildChapterMetrics(chapters));
 }
+
+
+export interface SceneSimulationMetricsDelta {
+  baseline: {
+    tension: number;
+    readability: number;
+    thematicAlignment: number;
+  };
+  simulated: {
+    tension: number;
+    readability: number;
+    thematicAlignment: number;
+  };
+  delta: {
+    tension: number;
+    readability: number;
+    thematicAlignment: number;
+  };
+}
+
+function roundMetric(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+export function calculateSceneSimulationMetrics(
+  baseline: { tension: number; readability: number; thematicAlignment: number },
+  simulated: { tension: number; readability: number; thematicAlignment: number },
+): SceneSimulationMetricsDelta {
+  return {
+    baseline: {
+      tension: roundMetric(baseline.tension),
+      readability: roundMetric(baseline.readability),
+      thematicAlignment: roundMetric(baseline.thematicAlignment),
+    },
+    simulated: {
+      tension: roundMetric(simulated.tension),
+      readability: roundMetric(simulated.readability),
+      thematicAlignment: roundMetric(simulated.thematicAlignment),
+    },
+    delta: {
+      tension: roundMetric(simulated.tension - baseline.tension),
+      readability: roundMetric(simulated.readability - baseline.readability),
+      thematicAlignment: roundMetric(simulated.thematicAlignment - baseline.thematicAlignment),
+    },
+  };
+}
