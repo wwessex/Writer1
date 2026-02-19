@@ -24,7 +24,7 @@
   height: 100%;
   cursor: col-resize;
   z-index: 10;
-  transition: background 0.15s ease;
+  transition: background 0.2s ease, opacity 0.2s ease;
 }
 
 .resizeHandle:hover,
@@ -73,18 +73,29 @@
   font-size: 0.75rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all var(--transition-fast), transform 200ms var(--ease-spring, ease);
   white-space: nowrap;
   flex-shrink: 0;
+  position: relative;
 }
 
 .tab .material-symbols-rounded {
   font-size: 1rem;
+  transition: transform 200ms var(--ease-spring, ease);
 }
 
 .tab:hover {
   background: var(--btn-bg);
   color: var(--text-secondary, var(--text-muted));
+}
+
+.tab:hover .material-symbols-rounded {
+  transform: scale(1.1);
+}
+
+.tab:active {
+  transform: scale(0.96);
+  transition-duration: 80ms;
 }
 
 .tab--active {
@@ -112,11 +123,18 @@
   padding: var(--space-4) var(--space-2);
   text-align: center;
   color: var(--text-muted);
+  animation: inspectorEmptyFade 0.4s ease-out;
+}
+
+@keyframes inspectorEmptyFade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .empty .material-symbols-rounded {
   font-size: 2.5rem;
   opacity: 0.25;
+  animation: gentleBounce 3s ease-in-out infinite;
 }
 
 .empty p {
@@ -127,9 +145,15 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  animation: sectionFadeIn 0.25s ease-out;
 }
 
-/* Stats card — bento style */
+@keyframes sectionFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Stats card — bento style with subtle entry */
 .statsCard {
   display: flex;
   flex-wrap: wrap;
@@ -138,6 +162,11 @@
   background: var(--btn-bg);
   border-radius: var(--radius-card);
   border: 1px solid var(--border-subtle, var(--border));
+  transition: box-shadow 200ms ease;
+}
+
+.statsCard:hover {
+  box-shadow: var(--shadow-subtle, 0 1px 3px rgba(0,0,0,0.08));
 }
 
 .stat {
@@ -152,6 +181,7 @@
   font-size: 1.125rem;
   font-weight: 600;
   color: var(--text);
+  transition: color 200ms ease;
 }
 
 .statLabel {
@@ -173,7 +203,7 @@
   height: 100%;
   background: var(--accent);
   border-radius: 2px;
-  transition: width 0.3s ease;
+  transition: width 0.5s var(--ease-smooth, cubic-bezier(0.4, 0, 0.2, 1));
 }
 
 /* Form fields */
@@ -196,7 +226,7 @@
   gap: var(--space-1);
 }
 
-/* Scene cards — bento style */
+/* Scene cards — bento style with hover lift */
 .sceneCard {
   padding: var(--space-2);
   background: var(--btn-bg);
@@ -205,6 +235,12 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  transition: box-shadow 200ms ease, transform 250ms var(--ease-spring, ease);
+}
+
+.sceneCard:hover {
+  box-shadow: var(--shadow-subtle, 0 1px 3px rgba(0,0,0,0.08));
+  transform: translateY(-1px);
 }
 
 .sceneCardHeader {
@@ -221,6 +257,11 @@
 
 .addBtn .material-symbols-rounded {
   font-size: 1.125rem;
+  transition: transform 200ms var(--ease-spring, ease);
+}
+
+.addBtn:hover .material-symbols-rounded {
+  transform: rotate(90deg);
 }
 
 /* Notes hint */
@@ -234,6 +275,12 @@
   font-size: 0.75rem;
   line-height: 1.5;
   color: var(--text-secondary, var(--text-muted));
+  animation: hintSlideIn 0.3s var(--ease-out-back, cubic-bezier(0.34, 1.3, 0.64, 1));
+}
+
+@keyframes hintSlideIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .notesHint .material-symbols-rounded {
@@ -282,12 +329,12 @@
     border-top: 1px solid var(--border);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     box-shadow: var(--shadow-overlay);
-    animation: slideUpSheet 0.25s ease-out;
+    animation: slideUpSheet 0.3s var(--ease-out-back, cubic-bezier(0.34, 1.3, 0.64, 1));
   }
 
   @keyframes slideUpSheet {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
+    from { transform: translateY(100%); opacity: 0.5; }
+    to { transform: translateY(0); opacity: 1; }
   }
 }
 

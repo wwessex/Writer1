@@ -1,4 +1,4 @@
-/* Soft UI inputs — rounded, subtle borders */
+/* Soft UI inputs — rounded, subtle borders, gentle focus transitions */
 .input {
   width: 100%;
   padding: var(--space-1, 8px) 12px;
@@ -8,7 +8,15 @@
   color: var(--text);
   font-size: 0.875rem;
   font-family: inherit;
-  transition: border-color var(--transition-fast, 120ms ease), box-shadow var(--transition-fast, 120ms ease);
+  transition:
+    border-color 180ms ease,
+    box-shadow 200ms var(--ease-smooth, ease),
+    background-color var(--transition-fast, 120ms ease);
+}
+
+.input:hover:not(:focus):not(:disabled) {
+  border-color: var(--text-muted);
+  background: color-mix(in srgb, var(--input-bg) 85%, var(--btn-hover));
 }
 
 .input:focus {
@@ -19,6 +27,16 @@
 
 .input::placeholder {
   color: var(--text-muted);
+  transition: opacity var(--transition-fast, 120ms ease);
+}
+
+.input:focus::placeholder {
+  opacity: 0.6;
+}
+
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .input--title {
@@ -30,6 +48,11 @@
   font-weight: 600;
 }
 
+.input--title:hover:not(:focus) {
+  background: transparent;
+  border-color: transparent;
+}
+
 .input--title:focus {
   box-shadow: none;
 }
@@ -38,4 +61,15 @@
   min-height: 100px;
   resize: vertical;
   line-height: 1.5;
+}
+
+/* Error state */
+.input--error {
+  border-color: var(--danger);
+  animation: softShake 0.4s ease;
+}
+
+.input--error:focus {
+  box-shadow: 0 0 0 3px rgba(194, 65, 12, 0.15);
+  border-color: var(--danger);
 }

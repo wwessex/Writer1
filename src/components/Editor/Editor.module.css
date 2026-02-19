@@ -66,7 +66,17 @@
   font-size: 0.75rem;
   letter-spacing: 0.03em;
   cursor: pointer;
-  transition: all var(--transition-fast, 120ms ease);
+  transition: all var(--transition-fast, 120ms ease), transform 200ms var(--ease-spring, ease);
+}
+
+.modeToggle:hover {
+  border-color: var(--text-muted);
+  transform: translateY(-0.5px);
+}
+
+.modeToggle:active {
+  transform: scale(0.96);
+  transition-duration: 80ms;
 }
 
 .modeToggle--active {
@@ -92,12 +102,18 @@
   padding: 5px 10px;
   font-size: 0.75rem;
   cursor: pointer;
-  transition: all var(--transition-fast, 120ms ease);
+  transition: all var(--transition-fast, 120ms ease), transform 200ms var(--ease-spring, ease);
 }
 
 .screenplayButton:hover {
   color: var(--text);
   border-color: var(--accent);
+  transform: translateY(-0.5px);
+}
+
+.screenplayButton:active {
+  transform: scale(0.96);
+  transition-duration: 80ms;
 }
 
 .editorPane--pageView .editorHeader {
@@ -288,11 +304,18 @@
   justify-content: center;
   gap: 1rem;
   color: var(--text-muted);
+  animation: editorEmptyFade 0.5s ease-out;
+}
+
+@keyframes editorEmptyFade {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .editorEmpty .material-symbols-rounded {
   font-size: 3rem;
   opacity: 0.25;
+  animation: gentleBounce 3s ease-in-out infinite;
 }
 
 .editorEmpty p {
@@ -304,14 +327,15 @@
   position: fixed;
   bottom: var(--space-3, 24px);
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(8px);
   z-index: 501;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s ease, transform 0.3s var(--ease-smooth, ease);
 }
 
 .editorPane--focusMode:hover .focusModeBar {
   opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 .focusModeExit {
@@ -325,13 +349,19 @@
   color: var(--text-muted);
   font-size: 0.8125rem;
   cursor: pointer;
-  transition: all var(--transition-fast, 120ms ease);
+  transition: all var(--transition-fast, 120ms ease), transform 200ms var(--ease-spring, ease);
   box-shadow: var(--shadow-float, 0 8px 24px rgba(0,0,0,0.2));
 }
 
 .focusModeExit:hover {
   color: var(--text);
   background: var(--btn-hover);
+  transform: scale(1.03);
+}
+
+.focusModeExit:active {
+  transform: scale(0.97);
+  transition-duration: 80ms;
 }
 
 .focusModeExit .material-symbols-rounded {
@@ -387,7 +417,13 @@
 .editorWrapper :global(.find-replace-current) {
   background: rgba(79, 124, 255, 0.35);
   border-radius: 2px;
-  box-shadow: 0 0 0 1px var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+  animation: matchPulse 0.4s ease-out;
+}
+
+@keyframes matchPulse {
+  0% { box-shadow: 0 0 0 4px rgba(79, 124, 255, 0.4); }
+  100% { box-shadow: 0 0 0 2px var(--accent); }
 }
 
 /* Typewriter mode: extra bottom padding keeps the cursor vertically centered */
