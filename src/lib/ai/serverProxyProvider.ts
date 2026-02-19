@@ -6,7 +6,7 @@
  * server-side — never embedded in the browser JS bundle.
  */
 
-import { getBrokerBaseUrl } from '@/lib/featureFlags';
+import { getBrokerEndpoint } from '@/lib/featureFlags';
 import type { AIProvider, AIProviderConfig, AIRequest, AIResponse, ServerProxyProviderType } from './types';
 
 /* ------------------------------------------------------------------ */
@@ -58,7 +58,6 @@ export class ServerProxyProvider implements AIProvider {
     }
 
     const start = Date.now();
-    const base = getBrokerBaseUrl();
     const { serverProvider, model, userApiKey } = this.config.serverProxy!;
 
     const fullPrompt = request.context
@@ -76,7 +75,7 @@ export class ServerProxyProvider implements AIProvider {
       body.userApiKey = userApiKey;
     }
 
-    const res = await fetch(`${base}/api/chat`, {
+    const res = await fetch(getBrokerEndpoint('/api/chat'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(body),
