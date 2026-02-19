@@ -461,6 +461,47 @@
   color: var(--accent);
 }
 
+/* AI endpoint presets */
+.aiEndpointPresets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.aiEndpointPreset {
+  display: flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+  padding: 0.375rem 0.625rem;
+  background: var(--panel);
+  border: 2px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.aiEndpointPreset:hover {
+  background: var(--btn-bg);
+}
+
+.aiEndpointPreset--active {
+  border-color: var(--accent);
+  background: var(--accent-alpha);
+}
+
+.aiEndpointPreset strong {
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.aiEndpointPreset small {
+  font-size: 0.5625rem;
+  color: var(--text-muted);
+}
+
 .privacyToggle {
   display: flex;
   align-items: center;
