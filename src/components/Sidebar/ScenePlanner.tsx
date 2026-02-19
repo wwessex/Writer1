@@ -3,7 +3,8 @@ import { useApp } from '@/context/AppContext';
 import { IconButton, Button, Input, Textarea } from '@/components/UI';
 import { Tooltip } from '@/components/UI/Tooltip';
 import { Select } from '@/components/UI/Select';
-import type { Scene } from '@/types';
+import type { Scene, SceneConflictType, SceneSimulationSwapCandidate } from '@/types';
+import { simulateChapterSceneChemistry } from '@/lib/sceneChemistry';
 import styles from './ScenePlanner.module.css';
 
 const STATUS_OPTIONS = [
@@ -29,6 +30,9 @@ export function ScenePlanner() {
     dropTargetId: null
   });
   const [justMovedId, setJustMovedId] = useState<string | null>(null);
+  const [simulatorOpen, setSimulatorOpen] = useState(false);
+  const [simulatedSceneId, setSimulatedSceneId] = useState<string>('');
+  const [swapCandidate, setSwapCandidate] = useState<SceneSimulationSwapCandidate>({});
   const animRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const isScreenplay = state.projectType === 'screenplay';
@@ -39,6 +43,11 @@ export function ScenePlanner() {
     scenes.forEach(scene => (scene.productionTags || []).forEach(tag => tags.add(tag)));
     return Array.from(tags).sort();
   }, [scenes]);
+
+  const simulationResult = useMemo(() => {
+    if (!simulatorOpen || !activeChapter || !simulatedSceneId) return null;
+    return simulateChapterSceneChemistry(activeChapter.scenes || [], simulatedSceneId, swapCandidate);
+  }, [simulatorOpen, activeChapter, simulatedSceneId, swapCandidate]);
 
   const filteredScenes = useMemo(() => {
     return scenes.filter(scene => {
@@ -106,6 +115,15 @@ export function ScenePlanner() {
     addScene(activeChapter.id);
   };
 
+  const conflictOptions: { value: SceneConflictType; label: string }[] = [
+    { value: 'interpersonal', label: 'Interpersonal' },
+    { value: 'internal', label: 'Internal' },
+    { value: 'environmental', label: 'Environmental' },
+    { value: 'societal', label: 'Societal' },
+    { value: 'mystery', label: 'Mystery' },
+    { value: 'survival', label: 'Survival' },
+  ];
+
   if (!activeChapter) {
     return (
       <section className={styles.scenePlanner}>
@@ -124,10 +142,107 @@ export function ScenePlanner() {
           {isScreenplay ? 'Scene Planner' : 'Scenes'}
           {filteredScenes.length > 0 && <span className={styles.scenePlanner__count}>{filteredScenes.length}</span>}
         </h3>
-        <Tooltip content="Add a new scene" position="bottom">
-          <IconButton icon="add" label="Add Scene" variant="ghost" onClick={handleAddScene} />
-        </Tooltip>
+        <div className={styles.scenePlanner__headerActions}>
+          <Tooltip content="Simulate impact from scene variable swaps" position="bottom">
+            <IconButton
+              icon="model_training"
+              label="Scene Chemistry Simulator"
+              variant="ghost"
+              onClick={() => {
+                setSimulatorOpen(prev => !prev);
+                if (!simulatedSceneId && scenes.length > 0) setSimulatedSceneId(scenes[0].id);
+              }}
+            />
+          </Tooltip>
+          <Tooltip content="Add a new scene" position="bottom">
+            <IconButton icon="add" label="Add Scene" variant="ghost" onClick={handleAddScene} />
+          </Tooltip>
+        </div>
       </div>
+
+      {simulatorOpen && (
+        <div className={styles.simulatorPanel}>
+          <div className={styles.simulatorPanel__header}>
+            <h4>Scene Chemistry Simulation</h4>
+            <p>Pick a scene and test swaps for POV, location, conflict type, and stakes to preview projected impact.</p>
+          </div>
+          <div className={styles.simulatorPanel__grid}>
+            <div>
+              <label>Scene</label>
+              <Select
+                options={scenes.map(scene => ({ value: scene.id, label: scene.title || 'Untitled scene' }))}
+                value={simulatedSceneId || (scenes[0]?.id || '')}
+                onChange={e => setSimulatedSceneId(e.target.value)}
+              />
+            </div>
+            <div>
+              <label>Swap POV</label>
+              <Input
+                value={swapCandidate.pov || ''}
+                onChange={e => setSwapCandidate(prev => ({ ...prev, pov: e.target.value || undefined }))}
+                placeholder="e.g. Antagonist"
+              />
+            </div>
+            <div>
+              <label>Swap Location</label>
+              <Input
+                value={swapCandidate.location || ''}
+                onChange={e => setSwapCandidate(prev => ({ ...prev, location: e.target.value || undefined }))}
+                placeholder="e.g. Flooded subway"
+              />
+            </div>
+            <div>
+              <label>Swap Conflict Type</label>
+              <Select
+                options={[{ value: '', label: 'No swap' }, ...conflictOptions]}
+                value={swapCandidate.conflictType || ''}
+                onChange={e => setSwapCandidate(prev => ({ ...prev, conflictType: (e.target.value || undefined) as SceneConflictType | undefined }))}
+              />
+            </div>
+            <div className={styles.simulatorPanel__full}>
+              <label>Swap Stakes</label>
+              <Textarea
+                value={swapCandidate.stakes || ''}
+                onChange={e => setSwapCandidate(prev => ({ ...prev, stakes: e.target.value || undefined }))}
+                rows={2}
+                placeholder="What is at risk if the scene fails?"
+              />
+            </div>
+          </div>
+
+          {simulationResult && (
+            <div className={styles.simulatorPanel__results}>
+              <div className={styles.simulatorMetrics}>
+                <div>
+                  <strong>Tension</strong>
+                  <span>{simulationResult.metrics.simulated.tension} ({simulationResult.metrics.delta.tension >= 0 ? '+' : ''}{simulationResult.metrics.delta.tension})</span>
+                </div>
+                <div>
+                  <strong>Readability</strong>
+                  <span>{simulationResult.metrics.simulated.readability} ({simulationResult.metrics.delta.readability >= 0 ? '+' : ''}{simulationResult.metrics.delta.readability})</span>
+                </div>
+                <div>
+                  <strong>Thematic alignment</strong>
+                  <span>{simulationResult.metrics.simulated.thematicAlignment} ({simulationResult.metrics.delta.thematicAlignment >= 0 ? '+' : ''}{simulationResult.metrics.delta.thematicAlignment})</span>
+                </div>
+              </div>
+              <p className={styles.simulatorPanel__rationale}>{simulationResult.rationale}</p>
+              <p className={styles.simulatorPanel__direction}><strong>Recommended rewrite direction:</strong> {simulationResult.recommendedRewriteDirection}</p>
+              <p className={styles.simulatorPanel__confidence}>
+                Confidence: <strong>{simulationResult.confidence}%</strong>
+              </p>
+              {simulationResult.lowConfidence && (
+                <div className={styles.simulatorPanel__guardrail}>
+                  <strong>Low-confidence projection.</strong> Add more scene summary detail, explicit stakes, and POV metadata before relying on these deltas.
+                  <ul>
+                    {simulationResult.confidenceRationale.map(reason => <li key={reason}>{reason}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className={styles.scenePlanner__items}>
         <Select
