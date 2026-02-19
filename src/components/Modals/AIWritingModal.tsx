@@ -413,7 +413,9 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
     config.provider === 'chrome-ai' ? 'Using local AI'
     : config.provider === 'server-proxy'
       ? `Using ${SERVER_PROXY_LABELS[config.serverProxy?.serverProvider ?? 'groq']}`
-    : 'Using cloud AI';
+      : config.provider === 'openai-compatible'
+        ? 'Using custom provider'
+        : 'Using cloud AI';
   const providerLabel = `AI ready · ${providerModeLabel}`;
   const providerIcon =
     config.provider === 'chrome-ai' ? 'memory'
@@ -477,7 +479,9 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
                 ? 'Using local AI. Chrome built-in models run directly on your device when available.'
                 : config.provider === 'server-proxy'
                   ? `Using ${SERVER_PROXY_LABELS[config.serverProxy?.serverProvider ?? 'groq']}. Requests are routed through the DraftHarbour server proxy. API keys stay server-side.`
-                  : 'Using cloud AI. Requests are routed through the managed DraftHarbour cloud endpoint.'}
+                  : config.provider === 'openai-compatible'
+                    ? 'Using a custom OpenAI-compatible provider. Requests are sent directly to your configured API endpoint.'
+                    : 'Using cloud AI. Requests are routed through the managed DraftHarbour cloud endpoint.'}
             </span>
           </div>
 

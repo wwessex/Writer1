@@ -13,14 +13,19 @@ export class OpenAIProvider implements AIProvider {
   }
 
   isAvailable(): boolean {
+    const hasCustomEndpoint = !!(this.config.endpoint?.trim() && this.config.sessionToken?.trim());
+
     if (this.config.provider === 'managed-cloud') {
       // managed-cloud requires a broker URL to function
       return !!getBrokerBaseUrl();
     }
+    if (this.config.provider === 'openai-compatible' && hasCustomEndpoint) {
+      return true;
+    }
     if (!isAIDeveloperModeEnabled()) {
       return !!getBrokerBaseUrl();
     }
-    return !!(this.config.endpoint?.trim() && this.config.sessionToken?.trim());
+    return hasCustomEndpoint;
   }
 
   async execute(request: AIRequest): Promise<AIResponse> {
@@ -33,7 +38,9 @@ export class OpenAIProvider implements AIProvider {
       ? `Here is the current ${request.projectType === 'screenplay' ? 'scene' : 'chapter'} text for context:\n\n---\n${request.context}\n---\n\n${request.prompt}`
       : request.prompt;
 
-    const useManagedBroker = this.config.provider === 'managed-cloud' || !isAIDeveloperModeEnabled();
+    const hasCustomEndpoint = !!(this.config.endpoint?.trim() && this.config.sessionToken?.trim());
+    const useCustomEndpoint = this.config.provider === 'openai-compatible' && hasCustomEndpoint;
+    const useManagedBroker = this.config.provider === 'managed-cloud' || (!useCustomEndpoint && !isAIDeveloperModeEnabled());
 
     if (useManagedBroker) {
       const brokerBase = getBrokerBaseUrl();
