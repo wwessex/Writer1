@@ -318,6 +318,21 @@ export interface AdvancedAnalytics {
   sentimentByParagraph: SentimentResult[];
 }
 
+export interface NarrativeWeatherPoint {
+  chapterId: string;
+  chapterOrder: number;
+  chapterTitle: string;
+  sentimentProxy: number;
+  pacingIntensity: number;
+  dialogueDensity: number;
+}
+
+export interface NarrativeClimateBand {
+  id: 'sentiment' | 'pacing' | 'dialogue';
+  average: number;
+  label: 'low' | 'moderate' | 'high';
+}
+
 // Plugin API types
 export interface PluginManifest {
   id: string;

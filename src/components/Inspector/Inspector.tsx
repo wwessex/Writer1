@@ -4,6 +4,7 @@ import { Input, Textarea, Button, IconButton } from '@/components/UI';
 import { Tooltip } from '@/components/UI/Tooltip';
 import { Select } from '@/components/UI/Select';
 import { countWords, countSentences, countParagraphs, countCharacters, editorToPlainText } from '@/lib/utils';
+import { buildNarrativeWeather } from '@/lib/narrativeWeather';
 import { useResizable } from '@/hooks/useResizable';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 import type { ChapterStatus, Scene } from '@/types';
@@ -22,8 +23,8 @@ interface InspectorProps {
 }
 
 export function Inspector({ open, onClose }: InspectorProps) {
-  const { state, activeChapter, updateChapterImmediate, addScene, updateScene, deleteScene } = useApp();
-  const [activeTab, setActiveTab] = useState<'details' | 'scenes' | 'notes'>('details');
+  const { state, activeChapter, setActiveChapter, updateChapterImmediate, addScene, updateScene, deleteScene } = useApp();
+  const [activeTab, setActiveTab] = useState<'details' | 'scenes' | 'notes' | 'weather'>('details');
 
   const inspectorRef = useRef<HTMLElement | null>(null);
 
@@ -56,6 +57,16 @@ export function Inspector({ open, onClose }: InspectorProps) {
   const chapterParagraphs = useMemo(() => countParagraphs(chapterText), [chapterText]);
   const chapterCharacters = useMemo(() => countCharacters(chapterText), [chapterText]);
 
+
+  const narrativeWeather = useMemo(() => buildNarrativeWeather(state.chapters), [state.chapters]);
+  const [hoveredWeatherChapterId, setHoveredWeatherChapterId] = useState<string | null>(null);
+
+  const weatherFocusPoint = useMemo(() => {
+    if (!narrativeWeather.points.length) return null;
+    const selectedChapterId = hoveredWeatherChapterId || activeChapter?.id;
+    return narrativeWeather.points.find(point => point.chapterId === selectedChapterId) || narrativeWeather.points[0];
+  }, [narrativeWeather.points, hoveredWeatherChapterId, activeChapter?.id]);
+
   const wordGoalProgress = useMemo(() => {
     if (!activeChapter?.wordGoal || activeChapter.wordGoal <= 0) return 0;
     return Math.min(100, Math.round((chapterWords / activeChapter.wordGoal) * 100));
@@ -86,11 +97,13 @@ export function Inspector({ open, onClose }: InspectorProps) {
         { key: 'details' as const, label: 'Scene', icon: 'movie' },
         { key: 'scenes' as const, label: 'Breakdown', icon: 'stacks' },
         { key: 'notes' as const, label: 'Notes', icon: 'sticky_note_2' },
+        { key: 'weather' as const, label: 'Weather', icon: 'timeline' },
       ]
     : [
         { key: 'details' as const, label: 'Chapter', icon: 'description' },
         { key: 'scenes' as const, label: 'Scenes', icon: 'stacks' },
         { key: 'notes' as const, label: 'Notes', icon: 'sticky_note_2' },
+        { key: 'weather' as const, label: 'Weather', icon: 'timeline' },
       ];
 
   return (
@@ -363,6 +376,7 @@ export function Inspector({ open, onClose }: InspectorProps) {
               )}
 
               {/* NOTES TAB — rich notes + synopsis */}
+
               {activeTab === 'notes' && (
                 <div
                   className={styles.section}
@@ -382,6 +396,60 @@ export function Inspector({ open, onClose }: InspectorProps) {
                   <div className={styles.notesHint}>
                     <span className="material-symbols-rounded">lightbulb</span>
                     <span>Use the synopsis to capture the essence of this {isScreenplay ? 'scene group' : 'chapter'}. What is the core conflict? What changes by the end?</span>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'weather' && (
+                <div
+                  className={styles.section}
+                  role="tabpanel"
+                  id="inspector-panel-weather"
+                  aria-labelledby="inspector-tab-weather"
+                >
+                  <div className={styles.weatherBandGrid}>
+                    {narrativeWeather.climateBands.map(band => (
+                      <div key={band.id} className={styles.weatherBand}>
+                        <span className={styles.weatherBand__label}>{band.id}</span>
+                        <strong>{band.average}</strong>
+                        <span>{band.label}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {weatherFocusPoint && (
+                    <div className={styles.weatherDetails}>
+                      <strong>{weatherFocusPoint.chapterTitle}</strong>
+                      <span>Sentiment: {weatherFocusPoint.sentimentProxy}</span>
+                      <span>Pacing: {weatherFocusPoint.pacingIntensity}</span>
+                      <span>Dialogue: {weatherFocusPoint.dialogueDensity}%</span>
+                    </div>
+                  )}
+
+                  <div className={styles.weatherTimeline}>
+                    {narrativeWeather.points.map((point) => {
+                      const isActivePoint = point.chapterId === activeChapter?.id;
+                      const weatherScore = Math.round((Math.abs(point.sentimentProxy) + point.pacingIntensity + point.dialogueDensity) / 3);
+                      return (
+                        <button
+                          key={point.chapterId}
+                          type="button"
+                          className={`${styles.weatherPoint} ${isActivePoint ? styles['weatherPoint--active'] : ''}`}
+                          onMouseEnter={() => setHoveredWeatherChapterId(point.chapterId)}
+                          onMouseLeave={() => setHoveredWeatherChapterId(null)}
+                          onFocus={() => setHoveredWeatherChapterId(point.chapterId)}
+                          onBlur={() => setHoveredWeatherChapterId(null)}
+                          onClick={() => setActiveChapter(point.chapterId)}
+                          title={`${point.chapterTitle}
+Sentiment ${point.sentimentProxy} | Pacing ${point.pacingIntensity} | Dialogue ${point.dialogueDensity}%`}
+                        >
+                          <span className={styles.weatherPoint__label}>{point.chapterOrder + 1}. {point.chapterTitle}</span>
+                          <div className={styles.weatherPoint__track}>
+                            <div className={styles.weatherPoint__fill} style={{ width: `${weatherScore}%` }} />
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}

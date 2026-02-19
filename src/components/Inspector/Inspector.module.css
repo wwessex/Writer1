@@ -351,3 +351,75 @@
     max-height: calc(var(--mobile-viewport-height) - 72px - var(--mobile-safe-top));
   }
 }
+
+.weatherBandGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.weatherBand {
+  background: var(--btn-bg);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-md);
+  padding: var(--space-1);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.75rem;
+}
+
+.weatherBand__label {
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.weatherDetails {
+  display: grid;
+  gap: 4px;
+  padding: var(--space-1);
+  background: var(--accent-subtle, var(--accent-alpha));
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+}
+
+.weatherTimeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.weatherPoint {
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  text-align: left;
+  padding: var(--space-1);
+  display: grid;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.weatherPoint--active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.weatherPoint__label {
+  font-size: 0.75rem;
+  color: var(--text-secondary, var(--text));
+}
+
+.weatherPoint__track {
+  width: 100%;
+  height: 6px;
+  background: var(--btn-bg);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.weatherPoint__fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 65%, #f59e0b));
+}
