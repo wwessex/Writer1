@@ -181,6 +181,25 @@ export interface ManuscriptExportOptions {
 
 export type ValidationSeverity = 'error' | 'warning' | 'info';
 
+export type TimelineParadoxSeverity = ValidationSeverity;
+
+export type TimelineParadoxType =
+  | 'prerequisite_order_violation'
+  | 'overlap_conflict'
+  | 'travel_time_violation'
+  | 'age_regression'
+  | 'state_transition_conflict'
+  | 'missing_prerequisite';
+
+export interface TimelineParadoxFinding {
+  id: string;
+  severity: TimelineParadoxSeverity;
+  type: TimelineParadoxType;
+  involvedChapterIds: string[];
+  involvedSceneIds: string[];
+  explanation: string;
+}
+
 export interface ExportValidationRule {
   id: string;
   severity: ValidationSeverity;

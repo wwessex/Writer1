@@ -5,6 +5,7 @@ import { Tooltip } from '@/components/UI/Tooltip';
 import { Select } from '@/components/UI/Select';
 import { countWords, countSentences, countParagraphs, countCharacters, editorToPlainText } from '@/lib/utils';
 import { buildNarrativeWeather } from '@/lib/narrativeWeather';
+import { analyzeTimelineConsistency } from '@/lib/timelineConsistency';
 import { useResizable } from '@/hooks/useResizable';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 import type { ChapterStatus, Scene } from '@/types';
@@ -18,6 +19,8 @@ const STATUS_OPTIONS = [
   { value: 'final', label: 'Final' }
 ];
 
+const SEVERITY_ORDER = { error: 0, warning: 1, info: 2 } as const;
+
 interface InspectorProps {
   open: boolean;
   onClose: () => void;
@@ -26,7 +29,7 @@ interface InspectorProps {
 
 export function Inspector({ open, onClose, voiceAlerts = [] }: InspectorProps) {
   const { state, activeChapter, setActiveChapter, updateChapterImmediate, addScene, updateScene, deleteScene } = useApp();
-  const [activeTab, setActiveTab] = useState<'details' | 'scenes' | 'notes' | 'weather'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'scenes' | 'notes' | 'weather' | 'timeline'>('details');
 
   const inspectorRef = useRef<HTMLElement | null>(null);
 
@@ -61,6 +64,7 @@ export function Inspector({ open, onClose, voiceAlerts = [] }: InspectorProps) {
 
 
   const narrativeWeather = useMemo(() => buildNarrativeWeather(state.chapters), [state.chapters]);
+  const timelineConsistency = useMemo(() => analyzeTimelineConsistency(state.chapters), [state.chapters]);
   const [hoveredWeatherChapterId, setHoveredWeatherChapterId] = useState<string | null>(null);
 
   const weatherFocusPoint = useMemo(() => {
@@ -68,6 +72,8 @@ export function Inspector({ open, onClose, voiceAlerts = [] }: InspectorProps) {
     const selectedChapterId = hoveredWeatherChapterId || activeChapter?.id;
     return narrativeWeather.points.find(point => point.chapterId === selectedChapterId) || narrativeWeather.points[0];
   }, [narrativeWeather.points, hoveredWeatherChapterId, activeChapter?.id]);
+
+  const timelineFindings = useMemo(() => timelineConsistency.findings.slice().sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]), [timelineConsistency.findings]);
 
   const wordGoalProgress = useMemo(() => {
     if (!activeChapter?.wordGoal || activeChapter.wordGoal <= 0) return 0;
@@ -100,12 +106,14 @@ export function Inspector({ open, onClose, voiceAlerts = [] }: InspectorProps) {
         { key: 'scenes' as const, label: 'Breakdown', icon: 'stacks' },
         { key: 'notes' as const, label: 'Notes', icon: 'sticky_note_2' },
         { key: 'weather' as const, label: 'Weather', icon: 'timeline' },
+        { key: 'timeline' as const, label: 'Timeline', icon: 'schedule' },
       ]
     : [
         { key: 'details' as const, label: 'Chapter', icon: 'description' },
         { key: 'scenes' as const, label: 'Scenes', icon: 'stacks' },
         { key: 'notes' as const, label: 'Notes', icon: 'sticky_note_2' },
         { key: 'weather' as const, label: 'Weather', icon: 'timeline' },
+        { key: 'timeline' as const, label: 'Timeline', icon: 'schedule' },
       ];
 
   return (
@@ -414,6 +422,45 @@ export function Inspector({ open, onClose, voiceAlerts = [] }: InspectorProps) {
                     <span className="material-symbols-rounded">lightbulb</span>
                     <span>Use the synopsis to capture the essence of this {isScreenplay ? 'scene group' : 'chapter'}. What is the core conflict? What changes by the end?</span>
                   </div>
+                </div>
+              )}
+
+
+              {activeTab === 'timeline' && (
+                <div
+                  className={styles.section}
+                  role="tabpanel"
+                  id="inspector-panel-timeline"
+                  aria-labelledby="inspector-tab-timeline"
+                >
+                  <div className={styles.timelineSummary}>
+                    <strong>{timelineFindings.length} potential paradox{timelineFindings.length === 1 ? '' : 'es'}</strong>
+                    <span>{timelineConsistency.extractedTimelineCount} scenes analyzed</span>
+                  </div>
+                  {timelineFindings.length === 0 && (
+                    <div className={styles.timelineEmpty}>No timeline contradictions detected.</div>
+                  )}
+                  {timelineFindings.map(finding => (
+                    <button
+                      type="button"
+                      key={finding.id}
+                      className={`${styles.timelineFinding} ${styles[`timelineFinding--${finding.severity}`]}`}
+                      onClick={() => {
+                        const chapterId = finding.involvedChapterIds[0];
+                        if (chapterId) setActiveChapter(chapterId);
+                        setActiveTab('scenes');
+                      }}
+                    >
+                      <div className={styles.timelineFindingHeader}>
+                        <span className={styles.timelineFindingSeverity}>{finding.severity}</span>
+                        <span>{finding.type.replaceAll('_', ' ')}</span>
+                      </div>
+                      <p>{finding.explanation}</p>
+                      <span className={styles.timelineFindingMeta}>
+                        Chapters: {finding.involvedChapterIds.length} · Scenes: {finding.involvedSceneIds.length}
+                      </span>
+                    </button>
+                  ))}
                 </div>
               )}
 
