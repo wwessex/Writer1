@@ -92,6 +92,7 @@ export const APP_MENUS: AppMenuConfig[] = [
       { divider: true },
       { label: 'AI Writing Tools...', action: COMMAND_IDS.AI_WRITING },
       { label: 'AI Suggestions Panel', action: COMMAND_IDS.AI_PANEL },
+      { label: 'Translate...', action: COMMAND_IDS.TRANSLATION },
       { label: 'Add Comment', action: COMMAND_IDS.ADD_COMMENT, shortcut: 'Ctrl+Shift+M' },
       { label: 'Comments...', action: COMMAND_IDS.COMMENTS },
       { divider: true },

@@ -21,7 +21,8 @@ export type ModalKey =
   | 'projects'
   | 'sceneTemplates'
   | 'exportHistory'
-  | 'aiPanel';
+  | 'aiPanel'
+  | 'translation';
 
 type ModalState = Record<ModalKey, boolean>;
 
@@ -48,6 +49,7 @@ const initialState: ModalState = {
   sceneTemplates: false,
   exportHistory: false,
   aiPanel: false,
+  translation: false,
 };
 
 function modalReducer(state: ModalState, action: ModalAction): ModalState {

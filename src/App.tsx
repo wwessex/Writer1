@@ -18,7 +18,7 @@ import { FindReplace, useFindReplace } from '@/components/FindReplace';
 import {
   ExportModal, SnapshotModal, AnalysisModal, WordCountModal, DashboardModal, OnboardingModal,
   AIWritingModal, CharacterBibleModal, CommentModal, AdvancedAnalyticsModal, IntegrationsModal,
-  ProjectsModal, SceneTemplatesModal, ExportHistoryModal
+  ProjectsModal, SceneTemplatesModal, ExportHistoryModal, TranslationModal
 } from '@/components/Modals';
 import { AISuggestionsPanel } from '@/components/Panels';
 import { SettingsWindow, AboutWindow } from '@/components/Windows';
@@ -306,6 +306,7 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
       <ProjectsModal open={modals.projects} onClose={() => closeModal('projects')} />
       <SceneTemplatesModal open={modals.sceneTemplates} onClose={() => closeModal('sceneTemplates')} />
       <ExportHistoryModal open={modals.exportHistory} onClose={() => closeModal('exportHistory')} />
+      <TranslationModal open={modals.translation} onClose={() => closeModal('translation')} />
 
       {/* Windows */}
       <SettingsWindow open={modals.settings} onClose={() => closeModal('settings')} />
