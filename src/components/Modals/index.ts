@@ -13,3 +13,4 @@ export { ConflictResolutionModal } from './ConflictResolutionModal';
 export { ProjectsModal } from './ProjectsModal';
 export { SceneTemplatesModal } from './SceneTemplatesModal';
 export { ExportHistoryModal } from './ExportHistoryModal';
+export { TranslationModal } from './TranslationModal';
