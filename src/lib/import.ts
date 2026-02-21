@@ -314,40 +314,32 @@ function parseFountain(text: string): ImportResult {
 export async function importDocx(file: File): Promise<ParsedChapter[]> {
   const JSZip = (await import('jszip')).default;
 
-  const zip = await JSZip.loadAsync(file);
-  const docXml = await zip.file('word/document.xml')?.async('string');
+  const zip = await JSZip.loadAsync(await file.arrayBuffer());
+  const documentFile = zip.file('word/document.xml') ?? zip.file(/^word\/document\d*\.xml$/i)?.[0];
+  const docXml = await documentFile?.async('string');
 
   if (!docXml) {
     throw new Error('Invalid DOCX file');
   }
 
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(docXml, 'application/xml');
-
   const paragraphs: string[] = [];
   const headingIndices = new Set<number>();
-  const pElements = doc.getElementsByTagName('w:p');
 
-  for (let i = 0; i < pElements.length; i++) {
-    const p = pElements[i];
-    const texts: string[] = [];
+  const paragraphMatches = docXml.match(/<w:p\b[\s\S]*?<\/w:p>/g) || [];
+  for (const paragraphXml of paragraphMatches) {
+    const texts = Array.from(paragraphXml.matchAll(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g), match =>
+      match[1]
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'")
+    );
 
-    // Get all text elements
-    const textElements = p.getElementsByTagName('w:t');
-    for (let j = 0; j < textElements.length; j++) {
-      texts.push(textElements[j].textContent || '');
-    }
-
-    // Detect heading styles (Heading1, Heading2, Title, etc.)
-    const pPr = p.getElementsByTagName('w:pPr')[0];
-    if (pPr) {
-      const pStyle = pPr.getElementsByTagName('w:pStyle')[0];
-      if (pStyle) {
-        const styleVal = pStyle.getAttribute('w:val') || '';
-        if (/^(?:heading|title)/i.test(styleVal)) {
-          headingIndices.add(paragraphs.length);
-        }
-      }
+    const styleMatch = paragraphXml.match(/<w:pStyle\b[^>]*w:val=(?:"([^"]+)"|'([^']+)')/i);
+    const styleVal = styleMatch?.[1] || styleMatch?.[2] || '';
+    if (/^(?:heading|title)/i.test(styleVal)) {
+      headingIndices.add(paragraphs.length);
     }
 
     paragraphs.push(texts.join(''));
@@ -459,7 +451,8 @@ export function mapImportedContentToProjectType(content: JSONContent, projectTyp
  * Import file based on extension
  */
 export async function importFile(file: File): Promise<ImportResult> {
-  const ext = file.name.split('.').pop()?.toLowerCase();
+  const ext = file.name.split('.').pop()?.trim().toLowerCase();
+  const mime = file.type.toLowerCase();
 
   switch (ext) {
     case 'docx':
@@ -472,6 +465,15 @@ export async function importFile(file: File): Promise<ImportResult> {
     case 'spmd':
       return importFountain(file);
     default:
+      if (mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        return { sections: await importDocx(file), notices: [] };
+      }
+      if (mime === 'application/rtf' || mime === 'text/rtf') {
+        return { sections: await importRtf(file), notices: [] };
+      }
+      if (mime.startsWith('text/')) {
+        return { sections: await importText(file), notices: [] };
+      }
       throw new Error(`Unsupported file type: ${ext}`);
   }
 }

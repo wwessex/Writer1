@@ -5,6 +5,31 @@ function makeTextFile(content: string, name = 'test.txt'): File {
   return new File([content], name, { type: 'text/plain' });
 }
 
+async function makeDocxFile(name: string, type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'): Promise<File> {
+  const { default: JSZip } = await import('jszip');
+  const zip = new JSZip();
+  zip.file(
+    'word/document.xml',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Chapter 1</w:t></w:r></w:p><w:p><w:r><w:t>Hello from DOCX</w:t></w:r></w:p></w:body></w:document>'
+  );
+  const blob = await zip.generateAsync({ type: 'blob' });
+  return new File([blob], name, { type });
+}
+
+describe('docx import', () => {
+  it('imports DOCX when filename extension has trailing spaces and uppercase', async () => {
+    const result = await importFile(await makeDocxFile('manuscript.DOCX   '));
+    expect(result.sections).toHaveLength(1);
+    expect(result.sections[0].title).toBe('Chapter 1');
+  });
+
+  it('imports DOCX based on MIME type even without .docx extension', async () => {
+    const result = await importFile(await makeDocxFile('manuscript.upload'));
+    expect(result.sections).toHaveLength(1);
+    expect(result.sections[0].title).toBe('Chapter 1');
+  });
+});
+
 describe('chapter heading detection', () => {
   describe('named section patterns', () => {
     it('recognises "Interlude" as a chapter heading', async () => {
