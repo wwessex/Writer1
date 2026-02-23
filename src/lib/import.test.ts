@@ -258,6 +258,27 @@ describe('chapter heading detection', () => {
       expect(result.sections).toHaveLength(1);
     });
 
+
+    it('keeps a non-standard heading in original order when body starts immediately', async () => {
+      const text = [
+        'Chapter 5',
+        'Content for chapter five.',
+        '',
+        'The Evidence',
+        'Evidence content starts right away.',
+        '',
+        'Chapter 6',
+        'Content for chapter six.',
+      ].join('\n');
+
+      const result = await importFile(makeTextFile(text));
+      expect(result.sections.map(s => s.title)).toEqual([
+        'Chapter 5',
+        'The Evidence',
+        'Chapter 6',
+      ]);
+    });
+
     it('does NOT treat a line without preceding blank line as a title', async () => {
       const text = [
         'Chapter 1',
