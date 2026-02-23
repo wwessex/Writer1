@@ -14,12 +14,32 @@
  *   maxOutputTokens int     Capped by server config (optional)
  *   userApiKey     string   BYOK key (optional, only used when allow_byok is true)
  *
- * Response body (200):
- *   text           string   Generated text
- *   model          string   Model that was used
- *   provider       string   Provider that was used
- *   usage          object   { promptTokens?, completionTokens? }
+ * Success envelope (200):
+ *   { ok: true, data: { text, model, provider, usage? } }
+ *
+ * Error envelope (!200):
+ *   { ok: false, error: { code, message, status, retryable, userMessage } }
  */
+
+
+function chatErrorEnvelope(int $status, string $message, string $code = 'UNKNOWN', bool $retryable = false, ?string $userMessage = null): array
+{
+    return [
+        'ok' => false,
+        'error' => [
+            'code' => $code,
+            'message' => $message,
+            'status' => $status,
+            'retryable' => $retryable,
+            'userMessage' => $userMessage ?? $message,
+        ],
+    ];
+}
+
+function chatSuccessEnvelope(array $data): array
+{
+    return ['ok' => true, 'data' => $data];
+}
 
 function handleChat(array $config): void
 {
@@ -28,7 +48,7 @@ function handleChat(array $config): void
 
     if (!$body || empty($body['provider']) || empty($body['prompt']) || empty($body['model'])) {
         http_response_code(400);
-        echo json_encode(['error' => 'Missing required fields: provider, prompt, model.']);
+        echo json_encode(chatErrorEnvelope(400, 'Missing required fields: provider, prompt, model.', 'UNKNOWN', false, 'Review request input and try again.'));
         return;
     }
 
@@ -46,7 +66,7 @@ function handleChat(array $config): void
     $maxInput = (int) $config['max_input_chars'];
     if (mb_strlen($prompt) > $maxInput) {
         http_response_code(400);
-        echo json_encode(['error' => "Input exceeds maximum length of {$maxInput} characters."]);
+        echo json_encode(chatErrorEnvelope(400, "Input exceeds maximum length of {$maxInput} characters.", 'UNKNOWN', false, 'Shorten the input and retry.'));
         return;
     }
 
@@ -54,13 +74,13 @@ function handleChat(array $config): void
     $validProviders = ['groq', 'openrouter', 'gemini'];
     if (!in_array($provider, $validProviders, true)) {
         http_response_code(400);
-        echo json_encode(['error' => "Unknown provider: {$provider}."]);
+        echo json_encode(chatErrorEnvelope(400, "Unknown provider: {$provider}.", 'NOT_FOUND', false, 'Choose a supported provider and retry.'));
         return;
     }
 
     if (empty($config[$provider]) || empty($config[$provider]['enabled'])) {
         http_response_code(400);
-        echo json_encode(['error' => "Provider '{$provider}' is not enabled on this server."]);
+        echo json_encode(chatErrorEnvelope(503, "Provider '{$provider}' is not enabled on this server.", 'PROVIDER_UNAVAILABLE', true, 'Enable the provider or choose another one.'));
         return;
     }
 
@@ -74,10 +94,7 @@ function handleChat(array $config): void
 
     if (!$apiKey) {
         http_response_code(500);
-        echo json_encode([
-            'error' => "No API key available for provider '{$provider}'. "
-                     . 'Contact the administrator or provide your own key.',
-        ]);
+        echo json_encode(chatErrorEnvelope(503, "No API key available for provider '{$provider}'. Contact the administrator or provide your own key.", 'PROVIDER_UNAVAILABLE', true, 'Configure an API key and retry.'));
         return;
     }
 
@@ -104,9 +121,9 @@ function handleChat(array $config): void
 
     if (isset($result['error'])) {
         http_response_code($result['status'] ?? 502);
-        echo json_encode(['error' => $result['error']]);
+        echo json_encode(chatErrorEnvelope((int) ($result['status'] ?? 502), (string) $result['error'], ((int) ($result['status'] ?? 502)) === 429 ? 'RATE_LIMITED' : (((int) ($result['status'] ?? 502)) >= 500 ? 'PROVIDER_UNAVAILABLE' : 'UNKNOWN'), ((int) ($result['status'] ?? 502)) === 429 || ((int) ($result['status'] ?? 502)) >= 500, ((int) ($result['status'] ?? 502)) === 429 ? 'Rate limit reached. Wait and retry.' : 'Provider is temporarily unavailable. Retry shortly.'));
         return;
     }
 
-    echo json_encode($result);
+    echo json_encode(chatSuccessEnvelope($result));
 }

@@ -1,6 +1,7 @@
 import type { Chapter, IntegrationConfig, IntegrationType } from '@/types';
 import { getBrokerBaseUrl } from '@/lib/featureFlags';
 import { IntegrationApiError } from './api';
+import { fetchEnvelope } from './providerClient';
 import type { IntegrationOperationResult, NormalizedPullResult, ProviderPayload } from './types';
 
 function toBrokerUrl(path: string): string {
@@ -8,16 +9,8 @@ function toBrokerUrl(path: string): string {
   return `${base}${path}`;
 }
 
-async function parseJsonSafe(response: Response): Promise<unknown> {
-  try {
-    return await response.json();
-  } catch {
-    return null;
-  }
-}
-
 async function callBroker<T>(path: string, body: Record<string, unknown>): Promise<T> {
-  const response = await fetch(toBrokerUrl(path), {
+  const envelope = await fetchEnvelope<T>(toBrokerUrl(path), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -26,17 +19,14 @@ async function callBroker<T>(path: string, body: Record<string, unknown>): Promi
     body: JSON.stringify(body),
   });
 
-  const payload = await parseJsonSafe(response);
-
-  if (!response.ok) {
-    const details = payload as { message?: string; error?: string; code?: string } | null;
-    throw new IntegrationApiError(details?.message || details?.error || 'Broker request failed.', {
-      code: (details?.code as IntegrationApiError['code']) || 'UNKNOWN',
-      status: response.status,
+  if (!envelope.ok) {
+    throw new IntegrationApiError(envelope.error.message, {
+      code: envelope.error.code,
+      status: envelope.error.status,
     });
   }
 
-  return payload as T;
+  return envelope.data;
 }
 
 export async function brokerConnect(

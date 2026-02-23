@@ -7,6 +7,7 @@
  */
 
 import { getBrokerBaseUrl, getBrokerEndpoint } from '@/lib/featureFlags';
+import { fetchEnvelope, fetchWithPolicy } from '@/lib/integrations/providerClient';
 import type { AIProvider, AIProviderConfig, AIRequest, AIResponse, ServerProxyProviderType } from './types';
 
 /* ------------------------------------------------------------------ */
@@ -124,7 +125,7 @@ export class ServerProxyProvider implements AIProvider {
       headers['X-Title'] = 'DraftHarbour Studio';
     }
 
-    const res = await fetch(endpoint, {
+    const res = await fetchWithPolicy(endpoint, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -167,7 +168,7 @@ export class ServerProxyProvider implements AIProvider {
   ): Promise<AIResponse> {
     const endpoint = `${SERVER_PROXY_ENDPOINTS.gemini}/${model}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
 
-    const res = await fetch(endpoint, {
+    const res = await fetchWithPolicy(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -223,30 +224,28 @@ export class ServerProxyProvider implements AIProvider {
       body.userApiKey = userApiKey;
     }
 
-    const res = await fetch(getBrokerEndpoint('/api/chat'), {
+    const envelope = await fetchEnvelope<{
+      text: string;
+      model: string;
+      provider: string;
+      usage?: { promptTokens?: number; completionTokens?: number };
+    }>(getBrokerEndpoint('/api/chat'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(body),
       signal: request.signal,
     });
 
-    if (!res.ok) {
-      const errBody = await res.json().catch(() => ({})) as { message?: string; error?: string };
-      const detail = errBody.message || errBody.error || res.statusText;
-      if (res.status === 404) {
+    if (!envelope.ok) {
+      if (envelope.error.status === 404) {
         throw new Error(
           'Server proxy endpoint not found (404). Enter your own API key in AI Settings to connect directly to the provider.',
         );
       }
-      throw new Error(`Server proxy error (${res.status}): ${detail}`);
+      throw new Error(`${envelope.error.userMessage} (${envelope.error.status}: ${envelope.error.message})`);
     }
 
-    const data = await res.json() as {
-      text: string;
-      model: string;
-      provider: string;
-      usage?: { promptTokens?: number; completionTokens?: number };
-    };
+    const data = envelope.data;
 
     return {
       text: data.text,

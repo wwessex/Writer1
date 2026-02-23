@@ -43,3 +43,47 @@ export interface IntegrationAdapter {
 export interface IntegrationRunContext {
   appState: Pick<AppState, 'novelId' | 'projectType' | 'chapters'>;
 }
+
+/**
+ * Shared request contract used by integration and AI proxy APIs.
+ */
+export interface ProviderRequestEnvelope<TPayload> {
+  payload: TPayload;
+}
+
+/**
+ * Shared response envelope for successful provider calls.
+ */
+export interface ProviderSuccessEnvelope<TData> {
+  ok: true;
+  data: TData;
+}
+
+export type ProviderErrorCode =
+  | 'UNAUTHORIZED'
+  | 'NOT_FOUND'
+  | 'CONFLICT'
+  | 'RATE_LIMITED'
+  | 'PROVIDER_UNAVAILABLE'
+  | 'TIMEOUT'
+  | 'UNKNOWN';
+
+export interface ProviderErrorPayload {
+  code: ProviderErrorCode;
+  message: string;
+  status: number;
+  retryable: boolean;
+  userMessage: string;
+}
+
+/**
+ * Shared response envelope for failed provider calls.
+ */
+export interface ProviderErrorEnvelope {
+  ok: false;
+  error: ProviderErrorPayload;
+}
+
+export type ProviderResponseEnvelope<TData> =
+  | ProviderSuccessEnvelope<TData>
+  | ProviderErrorEnvelope;
