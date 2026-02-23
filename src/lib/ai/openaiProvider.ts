@@ -3,6 +3,7 @@
  */
 
 import { getBrokerBaseUrl, isAIDeveloperModeEnabled } from '@/lib/featureFlags';
+import { fetchEnvelope, fetchWithPolicy } from '@/lib/integrations/providerClient';
 import type { AIProvider, AIProviderConfig, AIRequest, AIResponse } from './types';
 
 export class OpenAIProvider implements AIProvider {
@@ -58,7 +59,7 @@ export class OpenAIProvider implements AIProvider {
         );
       }
 
-      const brokerRes = await fetch(`${brokerBase}/api/ai/generate`, {
+      const envelope = await fetchEnvelope<{ text: string }>(`${brokerBase}/api/ai/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
@@ -69,24 +70,16 @@ export class OpenAIProvider implements AIProvider {
         signal: request.signal,
       });
 
-      if (!brokerRes.ok) {
-        let detail = brokerRes.statusText;
-        try {
-          const errBody = await brokerRes.json() as { message?: string; error?: string };
-          detail = errBody.message || errBody.error || detail;
-        } catch {
-          const text = await brokerRes.text().catch(() => '');
-          if (text) detail = text;
-        }
-        if (brokerRes.status === 404) {
+      if (!envelope.ok) {
+        if (envelope.error.status === 404) {
           throw new Error(
             'Cloud AI endpoint not found (404). Please switch to a custom OpenAI-compatible provider in Settings → Custom provider (advanced) and supply your own API endpoint and key.',
           );
         }
-        throw new Error(`Broker AI request failed (${brokerRes.status}): ${detail}`);
+        throw new Error(`${envelope.error.userMessage} (${envelope.error.status}: ${envelope.error.message})`);
       }
 
-      const brokerData = await brokerRes.json() as { text: string };
+      const brokerData = envelope.data;
       return {
         text: brokerData.text,
         provider: this.config.provider,
@@ -94,7 +87,7 @@ export class OpenAIProvider implements AIProvider {
       };
     }
 
-    const res = await fetch(this.config.endpoint!, {
+    const res = await fetchWithPolicy(this.config.endpoint!, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -5,6 +5,7 @@
 
 import type { IntegrationType } from '@/types';
 import { openOAuthPopup } from './oauth';
+import { fetchEnvelope } from './providerClient';
 
 export type ProviderConnectionStatus = 'disconnected' | 'pending' | 'connected' | 'error';
 
@@ -44,6 +45,8 @@ export type IntegrationApiErrorCode =
   | 'NOT_FOUND'
   | 'CONFLICT'
   | 'RATE_LIMITED'
+  | 'PROVIDER_UNAVAILABLE'
+  | 'TIMEOUT'
   | 'POPUP_BLOCKED'
   | 'UNKNOWN';
 
@@ -68,38 +71,16 @@ function ensureOAuthProvider(provider: IntegrationType): asserts provider is 'go
   }
 }
 
-async function parseJsonSafe(response: Response): Promise<unknown> {
-  try {
-    return await response.json();
-  } catch {
-    return null;
-  }
-}
-
-function extractErrorCode(status: number): IntegrationApiErrorCode {
-  if (status === 401 || status === 403) return 'UNAUTHORIZED';
-  if (status === 404) return 'NOT_FOUND';
-  if (status === 409) return 'CONFLICT';
-  if (status === 429) return 'RATE_LIMITED';
-  return 'UNKNOWN';
-}
-
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
-  const payload = await parseJsonSafe(response);
-
-  if (!response.ok) {
-    const message =
-      (payload as { message?: string; error?: string } | null)?.message ||
-      (payload as { message?: string; error?: string } | null)?.error ||
-      `Request failed (${response.status}).`;
-    throw new IntegrationApiError(message, {
-      code: extractErrorCode(response.status),
-      status: response.status,
+  const envelope = await fetchEnvelope<T>(url, init);
+  if (!envelope.ok) {
+    throw new IntegrationApiError(envelope.error.message, {
+      code: envelope.error.code,
+      status: envelope.error.status,
     });
   }
 
-  return payload as T;
+  return envelope.data;
 }
 
 
