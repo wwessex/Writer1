@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
 import { EditorContext, useCurrentEditor, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -14,8 +14,8 @@ import { QuickSwitcher } from '@/components/QuickSwitcher';
 import { FindReplace, useFindReplace } from '@/components/FindReplace';
 import {
   ExportModal, SnapshotModal, AnalysisModal, WordCountModal, DashboardModal, OnboardingModal,
-  AIWritingModal, CharacterBibleModal, CommentModal, AdvancedAnalyticsModal, IntegrationsModal,
-  ProjectsModal, SceneTemplatesModal, ExportHistoryModal, TranslationModal
+  CharacterBibleModal, CommentModal,
+  ProjectsModal, SceneTemplatesModal
 } from '@/components/Modals';
 import { SettingsWindow, AboutWindow } from '@/components/Windows';
 import { ToastProvider, useToast } from '@/components/UI';
@@ -53,6 +53,12 @@ const createExtensions = (screenplayMode: boolean) => [
   CommentAnchorMark,
   FindReplaceExtension,
 ];
+
+const AIWritingModal = lazy(() => import('@/components/Modals/AIWritingModal').then((module) => ({ default: module.AIWritingModal })));
+const AdvancedAnalyticsModal = lazy(() => import('@/components/Modals/AdvancedAnalyticsModal').then((module) => ({ default: module.AdvancedAnalyticsModal })));
+const IntegrationsModal = lazy(() => import('@/components/Modals/IntegrationsModal').then((module) => ({ default: module.IntegrationsModal })));
+const ExportHistoryModal = lazy(() => import('@/components/Modals/ExportHistoryModal').then((module) => ({ default: module.ExportHistoryModal })));
+const TranslationModal = lazy(() => import('@/components/Modals/TranslationModal').then((module) => ({ default: module.TranslationModal })));
 
 function AppScene({ screenplayMode, onToggleScreenplayMode }: { screenplayMode: boolean; onToggleScreenplayMode: () => void }) {
   const { state, activeChapter, loadNovel, createChapter: createNewChapter, dispatch, updateSettings } = useApp();
@@ -210,14 +216,24 @@ function AppScene({ screenplayMode, onToggleScreenplayMode }: { screenplayMode: 
       <DashboardModal open={modals.dashboard} onClose={() => closeModal('dashboard')} onAction={handleMenuAction} />
       <OnboardingModal open={modals.onboarding} onClose={handleOnboardingClose} />
       <CharacterBibleModal open={modals.characterBible} onClose={() => closeModal('characterBible')} />
-      <AIWritingModal open={modals.aiWriting} onClose={() => closeModal('aiWriting')} />
+      <Suspense fallback={null}>
+        <AIWritingModal open={modals.aiWriting} onClose={() => closeModal('aiWriting')} />
+      </Suspense>
       <CommentModal open={modals.comments} onClose={() => closeModal('comments')} />
-      <AdvancedAnalyticsModal open={modals.advancedAnalytics} onClose={() => closeModal('advancedAnalytics')} />
-      <IntegrationsModal open={modals.integrations} onClose={() => closeModal('integrations')} />
+      <Suspense fallback={null}>
+        <AdvancedAnalyticsModal open={modals.advancedAnalytics} onClose={() => closeModal('advancedAnalytics')} />
+      </Suspense>
+      <Suspense fallback={null}>
+        <IntegrationsModal open={modals.integrations} onClose={() => closeModal('integrations')} />
+      </Suspense>
       <ProjectsModal open={modals.projects} onClose={() => closeModal('projects')} />
       <SceneTemplatesModal open={modals.sceneTemplates} onClose={() => closeModal('sceneTemplates')} />
-      <ExportHistoryModal open={modals.exportHistory} onClose={() => closeModal('exportHistory')} />
-      <TranslationModal open={modals.translation} onClose={() => closeModal('translation')} />
+      <Suspense fallback={null}>
+        <ExportHistoryModal open={modals.exportHistory} onClose={() => closeModal('exportHistory')} />
+      </Suspense>
+      <Suspense fallback={null}>
+        <TranslationModal open={modals.translation} onClose={() => closeModal('translation')} />
+      </Suspense>
 
       <SettingsWindow open={modals.settings} onClose={() => closeModal('settings')} />
       <AboutWindow open={modals.about} onClose={() => closeModal('about')} />

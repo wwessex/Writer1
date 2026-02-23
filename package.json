@@ -14,7 +14,9 @@
     "cap:sync": "npx cap sync",
     "cap:open:ios": "npx cap open ios",
     "cap:doctor": "npx cap doctor",
-    "prepare": "husky"
+    "prepare": "husky",
+    "bundle:analyze": "npm run build && node scripts/check-bundle-size.mjs",
+    "bundle:check": "node scripts/check-bundle-size.mjs --ci"
   },
   "dependencies": {
     "@capacitor/cli": "^8.1.0",
