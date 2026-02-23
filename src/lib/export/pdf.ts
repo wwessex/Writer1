@@ -2,6 +2,8 @@ import type { Chapter, ManuscriptExportOptions } from '@/types';
 import { editorToPlainText } from '@/lib/utils';
 import { SCREENPLAY_PDF_FONTS, isSceneBreakLine } from './shared';
 import { screenplayChapterToPdfContent } from './screenplay';
+import { loadPdfMake } from './boundary/pdfmake';
+import type { PdfAlignment, PdfContentNode, PdfDocumentDefinition, PdfMakeApi } from './types';
 
 export async function exportToPdf(
   chapters: Chapter[],
@@ -9,15 +11,12 @@ export async function exportToPdf(
   includeHeadings: boolean = true,
   manuscriptOptions?: ManuscriptExportOptions,
 ): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let pdfMake: any;
+  let pdfMakeModule: PdfMakeApi;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    pdfMake = (await import('pdfmake/build/pdfmake.min.js')) as any;
+    pdfMakeModule = await loadPdfMake();
   } catch (cause) {
     throw new Error('Failed to load the PDF export library. Check your connection and try again.', { cause });
   }
-  const pdfMakeModule = pdfMake.default || pdfMake;
 
   pdfMakeModule.fonts = SCREENPLAY_PDF_FONTS;
 
@@ -29,11 +28,10 @@ export async function exportToPdf(
   const sceneBreakMarker = opts?.sceneBreakMarker ?? '#';
   const firstLineIndent = opts ? opts.firstLineIndentIn * 72 : 0;
   const marginPt = opts ? opts.marginIn * 72 : 72;
-  const pdfAlignment = opts?.alignment === 'justified' ? 'justify' : (opts?.alignment ?? 'left');
+  const pdfAlignment: PdfAlignment = opts?.alignment === 'justified' ? 'justify' : (opts?.alignment ?? 'left');
   const pageSize = opts?.pageSize ?? 'LETTER';
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const content: any[] = [];
+  const content: PdfContentNode[] = [];
 
   if (opts?.includeTitlePage) {
     content.push({ text: '', margin: [0, 180, 0, 0] });
@@ -78,7 +76,7 @@ export async function exportToPdf(
   const shortTitle = opts?.headerContent?.shortTitle ?? '';
   const headerText = [headerSurname, shortTitle].filter(Boolean).join(' / ');
 
-  const docDefinition = {
+  const docDefinition: PdfDocumentDefinition = {
     pageSize,
     pageMargins: [marginPt, marginPt, marginPt, marginPt],
     content,
@@ -103,25 +101,22 @@ export async function exportToPdf(
 }
 
 export async function exportToScreenplayPdf(chapters: Chapter[], title: string): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let pdfMake: any;
+  let pdfMakeModule: PdfMakeApi;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    pdfMake = (await import('pdfmake/build/pdfmake.min.js')) as any;
+    pdfMakeModule = await loadPdfMake();
   } catch (cause) {
     throw new Error('Failed to load the PDF export library. Check your connection and try again.', { cause });
   }
-  const pdfMakeModule = pdfMake.default || pdfMake;
 
   pdfMakeModule.fonts = SCREENPLAY_PDF_FONTS;
 
-  const content: Array<Record<string, unknown>> = [{ text: title.toUpperCase(), style: 'title', margin: [0, 0, 0, 20] }];
+  const content: PdfContentNode[] = [{ text: title.toUpperCase(), style: 'title', margin: [0, 0, 0, 20] }];
   for (const chapter of chapters) {
     if (chapter.title) content.push({ text: chapter.title.toUpperCase(), style: 'section', margin: [0, 18, 0, 8] });
     content.push(...screenplayChapterToPdfContent(chapter));
   }
 
-  const docDefinition = {
+  const docDefinition: PdfDocumentDefinition = {
     pageSize: 'LETTER',
     pageMargins: [72, 72, 72, 72],
     content,

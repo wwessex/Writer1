@@ -1,5 +1,6 @@
 import type { JSONContent } from '@tiptap/core';
 import type { Chapter, ScreenplayBlockType } from '@/types';
+import type { PdfContentNode } from './types';
 import { extractTextFromNode } from './shared';
 
 export interface ScreenplayBlock {
@@ -91,7 +92,7 @@ export function screenplayChapterToFountain(chapter: Chapter, options: Screenpla
   return chunks.join('\n').replace(/^\n+/, '').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-export function screenplayChapterToPdfContent(chapter: Chapter): Array<Record<string, unknown>> {
+export function screenplayChapterToPdfContent(chapter: Chapter): PdfContentNode[] {
   return screenplayJsonToBlocks(chapter.content).map(block => {
     const normalized = normalizeScreenplayText(block);
 

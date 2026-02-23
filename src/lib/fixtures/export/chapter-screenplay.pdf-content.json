@@ -1,0 +1,8 @@
+[
+  { "text": "INT. HOUSE - NIGHT", "style": "sceneHeading", "margin": [0, 12, 0, 6] },
+  { "text": "Rain pounds the windows.", "style": "action", "margin": [0, 0, 0, 8] },
+  { "text": "SAM", "style": "character", "margin": [170, 10, 0, 0] },
+  { "text": "(whispering)", "style": "parenthetical", "margin": [140, 0, 120, 0] },
+  { "text": "We need to leave. Now.", "style": "dialogue", "margin": [110, 0, 110, 4] },
+  { "text": "CUT TO:", "style": "transition", "margin": [0, 10, 0, 6], "alignment": "right" }
+]

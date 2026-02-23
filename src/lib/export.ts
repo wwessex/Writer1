@@ -1,6 +1,9 @@
 import type { JSONContent } from '@tiptap/core';
 import type { Chapter, ScreenplayBlockType, ManuscriptExportOptions } from '@/types';
 import { editorToPlainText, downloadFile } from './utils';
+import { loadPdfMake } from './export/boundary/pdfmake';
+import { cloneDocxTextRun } from './export/boundary/docxCompat';
+import type { PdfAlignment, PdfContentNode, PdfDocumentDefinition, DocxAlignment, DocxSection, DocxClasses, PdfMakeApi } from './export/types';
 
 export interface ScreenplayBlock {
   type: ScreenplayBlockType;
@@ -165,7 +168,7 @@ export function screenplayChapterToFountain(chapter: Chapter, options: Screenpla
 /**
  * Build pdfmake content blocks for screenplay formatting.
  */
-export function screenplayChapterToPdfContent(chapter: Chapter): Array<Record<string, unknown>> {
+export function screenplayChapterToPdfContent(chapter: Chapter): PdfContentNode[] {
   return screenplayJsonToBlocks(chapter.content).map(block => {
     const normalized = normalizeScreenplayText(block);
 
@@ -339,12 +342,11 @@ export async function exportToDocx(
 
   // Build sections: one section per chapter when chapterStartsNewPage is true
   // Otherwise one big section
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sections: any[] = [];
+  const sections: DocxSection[] = [];
 
   // Title page section (if requested)
   if (includeTitlePage && opts) {
-    const titlePageChildren: InstanceType<typeof Paragraph>[] = [];
+    const titlePageChildren: unknown[] = [];
 
     // Approximately 1/3 down the page: title
     titlePageChildren.push(new Paragraph({ spacing: { before: 4800 } }));
@@ -427,7 +429,7 @@ export async function exportToDocx(
     // One section per chapter
     for (let i = 0; i < chapters.length; i++) {
       const chapter = chapters[i];
-      const children: InstanceType<typeof Paragraph>[] = [];
+      const children: unknown[] = [];
 
       if (doIncludeHeadings) {
         // Chapter heading: centred, bold, with space before/after
@@ -454,8 +456,7 @@ export async function exportToDocx(
       );
       children.push(...contentChildren);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const sectionProps: any = {
+          const sectionProps: Record<string, unknown> = {
         page: {
           size: pageDims,
           margin: {
@@ -477,12 +478,7 @@ export async function exportToDocx(
               alignment: AlignmentType.RIGHT,
               children: headerChildren.map(run => {
                 // Clone TextRuns for each section to avoid shared references
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const props = (run as any).root?.[1] || {};
-                if (props.children) {
-                  return new TextRun({ ...props });
-                }
-                return new TextRun({ ...props });
+                              return cloneDocxTextRun(run, TextRun) as InstanceType<typeof TextRun>;
               }),
             })],
           }),
@@ -508,7 +504,7 @@ export async function exportToDocx(
     }
   } else {
     // All chapters in a single section
-    const children: InstanceType<typeof Paragraph>[] = [];
+    const children: unknown[] = [];
 
     if (!includeTitlePage) {
       // Simple title at top
@@ -542,8 +538,7 @@ export async function exportToDocx(
       children.push(...contentChildren);
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sectionProps: any = {
+      const sectionProps: Record<string, unknown> = {
       page: {
         size: pageDims,
         margin: {
@@ -584,7 +579,7 @@ export async function exportToDocx(
     sections.push({ properties: sectionProps, children });
   }
 
-  const doc = new Document({ sections });
+  const doc = new Document({ sections: sections as never });
   const blob = await Packer.toBlob(doc);
   downloadFile(blob, `${title}.docx`);
 }
@@ -601,16 +596,12 @@ function buildDocxChapterContent(
   firstLineIndent: number,
   spacingBefore: number,
   spacingAfter: number,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  alignment: any,
+  alignment: DocxAlignment,
   sceneBreakMarker: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  docxClasses: { Paragraph: any; TextRun: any; AlignmentType: any },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): any[] {
+  docxClasses: DocxClasses,
+): unknown[] {
   const { Paragraph, TextRun, AlignmentType } = docxClasses;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const children: any[] = [];
+  const children: unknown[] = [];
 
   if (!chapter.content?.content) {
     return children;
@@ -736,15 +727,12 @@ export async function exportToPdf(
   includeHeadings: boolean = true,
   manuscriptOptions?: ManuscriptExportOptions,
 ): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let pdfMake: any;
+  let pdfMakeModule: PdfMakeApi;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    pdfMake = (await import('pdfmake/build/pdfmake.min.js')) as any;
+    pdfMakeModule = await loadPdfMake();
   } catch (cause) {
     throw new Error('Failed to load the PDF export library. Check your connection and try again.', { cause });
   }
-  const pdfMakeModule = pdfMake.default || pdfMake;
 
   pdfMakeModule.fonts = SCREENPLAY_PDF_FONTS;
 
@@ -756,11 +744,10 @@ export async function exportToPdf(
   const sceneBreakMarker = opts?.sceneBreakMarker ?? '#';
   const firstLineIndent = opts ? opts.firstLineIndentIn * 72 : 0;
   const marginPt = opts ? opts.marginIn * 72 : 72;
-  const pdfAlignment = opts?.alignment === 'justified' ? 'justify' : (opts?.alignment ?? 'left');
+  const pdfAlignment: PdfAlignment = opts?.alignment === 'justified' ? 'justify' : (opts?.alignment ?? 'left');
   const pageSize = opts?.pageSize ?? 'LETTER';
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const content: any[] = [];
+  const content: PdfContentNode[] = [];
 
   // Title page
   if (opts?.includeTitlePage) {
@@ -851,7 +838,7 @@ export async function exportToPdf(
   const shortTitle = opts?.headerContent?.shortTitle ?? '';
   const headerText = [headerSurname, shortTitle].filter(Boolean).join(' / ');
 
-  const docDefinition = {
+  const docDefinition: PdfDocumentDefinition = {
     pageSize,
     pageMargins: [marginPt, marginPt, marginPt, marginPt],
     content,
@@ -899,19 +886,16 @@ export async function exportToScreenplayPdf(
   chapters: Chapter[],
   title: string,
 ): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let pdfMake: any;
+  let pdfMakeModule: PdfMakeApi;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    pdfMake = (await import('pdfmake/build/pdfmake.min.js')) as any;
+    pdfMakeModule = await loadPdfMake();
   } catch (cause) {
     throw new Error('Failed to load the PDF export library. Check your connection and try again.', { cause });
   }
-  const pdfMakeModule = pdfMake.default || pdfMake;
 
   pdfMakeModule.fonts = SCREENPLAY_PDF_FONTS;
 
-  const content: Array<Record<string, unknown>> = [{
+  const content: PdfContentNode[] = [{
     text: title.toUpperCase(),
     style: 'title',
     margin: [0, 0, 0, 20],
@@ -924,7 +908,7 @@ export async function exportToScreenplayPdf(
     content.push(...screenplayChapterToPdfContent(chapter));
   }
 
-  const docDefinition = {
+  const docDefinition: PdfDocumentDefinition = {
     pageSize: 'LETTER',
     pageMargins: [72, 72, 72, 72],
     content,
@@ -1256,4 +1240,3 @@ export async function exportToPlainText(
   const output = parts.join('\n').trim();
   downloadFile(output, `${title}.txt`, 'text/plain;charset=utf-8');
 }
-

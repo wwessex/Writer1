@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { Chapter } from '@/types';
 import { screenplayJsonToBlocks, screenplayChapterToFountain, screenplayChapterToPdfContent, exportToFountain } from './export';
 
@@ -14,30 +16,18 @@ vi.mock('./utils', async () => {
   };
 });
 
-const screenplayFixture: Chapter = {
-  id: 'chapter-1',
-  novelId: 'novel-1',
-  order: 1,
-  title: 'Opening',
-  updatedAt: Date.now(),
-  summary: '',
-  pov: '',
-  status: 'draft',
-  tags: [],
-  wordGoal: 0,
-  scenes: [],
-  content: {
-    type: 'doc',
-    content: [
-      { type: 'paragraph', attrs: { screenplayType: 'scene-heading' }, content: [{ type: 'text', text: 'Int. House - Night' }] },
-      { type: 'paragraph', attrs: { screenplayType: 'action' }, content: [{ type: 'text', text: 'Rain pounds the windows.' }] },
-      { type: 'paragraph', attrs: { screenplayType: 'character' }, content: [{ type: 'text', text: 'Sam' }] },
-      { type: 'paragraph', attrs: { screenplayType: 'parenthetical' }, content: [{ type: 'text', text: '(whispering)' }] },
-      { type: 'paragraph', attrs: { screenplayType: 'dialogue' }, content: [{ type: 'text', text: 'We need to leave. Now.' }] },
-      { type: 'paragraph', attrs: { screenplayType: 'transition' }, content: [{ type: 'text', text: 'Cut to:' }] },
-    ],
-  },
-};
+function readFixture(name: string): string {
+  return readFileSync(resolve(process.cwd(), 'src/lib/fixtures/export', name), 'utf8');
+}
+
+function readJsonFixture<T>(name: string): T {
+  return JSON.parse(readFixture(name)) as T;
+}
+
+const screenplayFixture = readJsonFixture<Chapter>('chapter-screenplay.json');
+const expectedFountain = readFixture('chapter-screenplay.fountain.txt').trim();
+const expectedPdfContent = readJsonFixture<ReturnType<typeof screenplayChapterToPdfContent>>('chapter-screenplay.pdf-content.json');
+
 
 function createChapter(id: string, title: string, paragraphs: Array<{ screenplayType?: string; text: string }>): Chapter {
   return {
@@ -72,16 +62,7 @@ describe('screenplay export helpers', () => {
   });
 
   it('renders Fountain output with screenplay spacing conventions', () => {
-    expect(screenplayChapterToFountain(screenplayFixture)).toBe(
-`INT. HOUSE - NIGHT
-
-Rain pounds the windows.
-SAM
-(whispering)
-We need to leave. Now.
-
-CUT TO:`
-    );
+    expect(screenplayChapterToFountain(screenplayFixture)).toBe(expectedFountain);
   });
 
   it('keeps character and dialogue grouped, spaces transitions, and marks non-standard scene headings', () => {
@@ -113,14 +94,7 @@ A bus rounds the corner.`
   });
 
   it('renders PDF content with screenplay-specific styles and indents', () => {
-    expect(screenplayChapterToPdfContent(screenplayFixture)).toEqual([
-      { text: 'INT. HOUSE - NIGHT', style: 'sceneHeading', margin: [0, 12, 0, 6] },
-      { text: 'Rain pounds the windows.', style: 'action', margin: [0, 0, 0, 8] },
-      { text: 'SAM', style: 'character', margin: [170, 10, 0, 0] },
-      { text: '(whispering)', style: 'parenthetical', margin: [140, 0, 120, 0] },
-      { text: 'We need to leave. Now.', style: 'dialogue', margin: [110, 0, 110, 4] },
-      { text: 'CUT TO:', style: 'transition', margin: [0, 10, 0, 6], alignment: 'right' },
-    ]);
+    expect(screenplayChapterToPdfContent(screenplayFixture)).toEqual(expectedPdfContent);
   });
 
   it('exports multi-chapter Fountain output with metadata and section titles', async () => {
