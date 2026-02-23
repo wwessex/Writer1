@@ -90,8 +90,21 @@ function isContextualHeading(lines: string[], index: number): boolean {
   // Must be preceded by a blank line (or be at the start of the document)
   if (index > 0 && lines[index - 1].trim() !== '') return false;
 
-  // Must be followed by a blank line (or be at the end of the document)
-  if (index < lines.length - 1 && lines[index + 1].trim() !== '') return false;
+  // Prefer standalone title lines, but allow body text to start immediately
+  // after the heading. This covers documents where headings are separated only
+  // above (e.g. "\nThe Evidence\nThe room was silent...").
+  if (index < lines.length - 1 && lines[index + 1].trim() !== '') {
+    const next = lines[index + 1].trim();
+
+    // If the next line itself looks like another heading, this line is likely
+    // a paragraph and should not force a split.
+    if (isChapterHeading(next)) return false;
+
+    // If the next line is title-like as well, avoid splitting on both.
+    if (/^[A-Z]/.test(next) && !/[.!?,;:]$/.test(next) && next.split(/\s+/).length <= 6) {
+      return false;
+    }
+  }
 
   return true;
 }
