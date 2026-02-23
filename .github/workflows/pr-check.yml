@@ -28,6 +28,9 @@ jobs:
       - name: ESLint
         run: npm run lint
 
+      - name: Asset duplicate hash check
+        run: npm run assets:check
+
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
