@@ -139,6 +139,36 @@ export default defineConfig({
   },
   build: {
     target: ['es2020', 'safari14'],
-    sourcemap: true
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (
+            id.includes('/src/lib/export/')
+            || id.includes('/src/components/Modals/ExportModal')
+            || id.includes('/src/components/Modals/ExportHistoryModal')
+          ) {
+            return 'export';
+          }
+
+          if (
+            id.includes('/src/lib/ai/')
+            || id.includes('/src/components/Modals/AIWritingModal')
+            || id.includes('/src/components/Modals/TranslationModal')
+          ) {
+            return 'ai';
+          }
+
+          if (
+            id.includes('/src/lib/integrations/')
+            || id.includes('/src/components/Modals/IntegrationsModal')
+          ) {
+            return 'integrations';
+          }
+
+          return undefined;
+        }
+      }
+    }
   }
 });
