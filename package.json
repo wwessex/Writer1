@@ -16,7 +16,8 @@
     "cap:doctor": "npx cap doctor",
     "prepare": "husky",
     "bundle:analyze": "npm run build && node scripts/check-bundle-size.mjs",
-    "bundle:check": "node scripts/check-bundle-size.mjs --ci"
+    "bundle:check": "node scripts/check-bundle-size.mjs --ci",
+    "assets:check": "node scripts/check-asset-duplicates.mjs"
   },
   "dependencies": {
     "@capacitor/cli": "^8.1.0",
