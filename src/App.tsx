@@ -9,10 +9,7 @@ import FontFamily from '@tiptap/extension-font-family';
 import { ScreenplayParagraph, CommentAnchorMark } from '@/components/Editor/screenplayExtension';
 import { FindReplaceExtension } from '@/lib/findReplaceExtension';
 import { useApp, AppProvider } from '@/context/AppContext';
-import { Header } from '@/components/Header';
-import { Sidebar } from '@/components/Sidebar';
-import { Editor } from '@/components/Editor';
-import { Inspector } from '@/components/Inspector';
+import { AppShell } from '@/components/AppShell/AppShell';
 import { QuickSwitcher } from '@/components/QuickSwitcher';
 import { FindReplace, useFindReplace } from '@/components/FindReplace';
 import {
@@ -20,18 +17,20 @@ import {
   AIWritingModal, CharacterBibleModal, CommentModal, AdvancedAnalyticsModal, IntegrationsModal,
   ProjectsModal, SceneTemplatesModal, ExportHistoryModal, TranslationModal
 } from '@/components/Modals';
-import { AISuggestionsPanel } from '@/components/Panels';
 import { SettingsWindow, AboutWindow } from '@/components/Windows';
 import { ToastProvider, useToast } from '@/components/UI';
-import { Tooltip } from '@/components/UI/Tooltip';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { PanelErrorBoundary } from '@/components/PanelErrorBoundary';
-import { buildCharacterVoiceProfiles, getDialogueSimilarityAlerts, DEFAULT_VOICE_SIMILARITY_CONFIG, type VoiceSimilarityAlert } from '@/lib/voiceFingerprint';
+import { buildCharacterVoiceProfiles } from '@/lib/voiceFingerprint';
 import type { CharacterEntity } from '@/types';
 import { useModalState } from '@/hooks/useModalState';
 import { useProjectFileActions } from '@/hooks/useProjectFileActions';
 import { useCommentActions } from '@/hooks/useCommentActions';
 import { useAppKeyboardShortcuts } from '@/hooks/useAppKeyboardShortcuts';
+import { useLoadNovel } from '@/hooks/useLoadNovel';
+import { useOnboardingTrigger } from '@/hooks/useOnboardingTrigger';
+import { useFocusModeClass } from '@/hooks/useFocusModeClass';
+import { useEditorSelectionTracking } from '@/hooks/useEditorSelectionTracking';
+import { useVoiceAlerts } from '@/hooks/useVoiceAlerts';
 import './styles/index.css';
 import styles from './App.module.css';
 
@@ -55,7 +54,7 @@ const createExtensions = (screenplayMode: boolean) => [
   FindReplaceExtension,
 ];
 
-function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode: boolean; onToggleScreenplayMode: () => void }) {
+function AppScene({ screenplayMode, onToggleScreenplayMode }: { screenplayMode: boolean; onToggleScreenplayMode: () => void }) {
   const { state, activeChapter, loadNovel, createChapter: createNewChapter, dispatch, updateSettings } = useApp();
   const { editor } = useCurrentEditor();
   const { showToast } = useToast();
@@ -64,9 +63,7 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
   const [error, setError] = useState<string | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
-  const [hasTextSelection, setHasTextSelection] = useState(false);
-  const [voiceAlerts, setVoiceAlerts] = useState<VoiceSimilarityAlert[]>([]);
-  const voiceAlertSignatureRef = useRef<string>('');
+  const hasTextSelection = useEditorSelectionTracking(editor);
   const findReplace = useFindReplace(editor);
 
   const characters = useMemo<CharacterEntity[]>(() => {
@@ -84,6 +81,8 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
     return buildCharacterVoiceProfiles(baselineChapters, characters);
   }, [state.chapters, characters, activeChapter?.id]);
 
+  const voiceAlerts = useVoiceAlerts({ activeChapter, baselineProfiles, showToast });
+
   const {
     fileInputRef,
     importInputRef,
@@ -95,72 +94,23 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
     handleImportDocument,
   } = useProjectFileActions({ state, loadNovel, showToast });
 
-  // Load novel on mount
-  useEffect(() => {
-    loadNovel()
-      .then(() => setIsLoading(false))
-      .catch((err) => {
-        console.error('Failed to load novel:', err);
-        setError(`Failed to load: ${err.message || 'Unknown error'}`);
-        setIsLoading(false);
-      });
-  }, [loadNovel]);
+  useLoadNovel({
+    loadNovel,
+    onLoaded: () => setIsLoading(false),
+    onError: (err) => {
+      console.error('Failed to load novel:', err);
+      setError(`Failed to load: ${err.message || 'Unknown error'}`);
+      setIsLoading(false);
+    },
+  });
 
-  // Show onboarding on first visit
-  useEffect(() => {
-    if (!isLoading && !state.settings.onboardingComplete) {
-      openModal('onboarding');
-    }
-  }, [isLoading, state.settings.onboardingComplete, openModal]);
+  useOnboardingTrigger({
+    isLoading,
+    onboardingComplete: state.settings.onboardingComplete,
+    openOnboarding: () => openModal('onboarding'),
+  });
 
-  // Apply focus mode body class
-  useEffect(() => {
-    document.body.classList.toggle('focus-mode', state.settings.focusMode);
-    return () => document.body.classList.remove('focus-mode');
-  }, [state.settings.focusMode]);
-
-  // Track whether the editor has a non-empty selection for contextual mobile actions
-  useEffect(() => {
-    if (!editor) {
-      setHasTextSelection(false);
-      return;
-    }
-
-    const updateSelectionState = () => {
-      setHasTextSelection(!editor.state.selection.empty);
-    };
-    const handleEditorBlur = () => setHasTextSelection(false);
-
-    updateSelectionState();
-    editor.on('selectionUpdate', updateSelectionState);
-    editor.on('blur', handleEditorBlur);
-
-    return () => {
-      editor.off('selectionUpdate', updateSelectionState);
-      editor.off('blur', handleEditorBlur);
-    };
-  }, [editor]);
-
-  useEffect(() => {
-    if (!activeChapter) {
-      setVoiceAlerts([]);
-      return;
-    }
-
-    const alerts = getDialogueSimilarityAlerts(activeChapter.content, baselineProfiles, DEFAULT_VOICE_SIMILARITY_CONFIG);
-    setVoiceAlerts(alerts);
-
-    const nextSignature = alerts.slice(0, 3).map(alert => `${alert.activeSpeaker}:${alert.comparedSpeaker}:${alert.similarity.toFixed(3)}`).join('|');
-    if (nextSignature && nextSignature !== voiceAlertSignatureRef.current) {
-      const topAlert = alerts[0];
-      showToast(`Voice overlap warning: ${topAlert.activeSpeaker} is ${(topAlert.similarity * 100).toFixed(0)}% similar to ${topAlert.comparedSpeaker}.`, 'warning');
-      voiceAlertSignatureRef.current = nextSignature;
-    }
-
-    if (!nextSignature) {
-      voiceAlertSignatureRef.current = '';
-    }
-  }, [activeChapter, baselineProfiles, showToast]);
+  useFocusModeClass(state.settings.focusMode);
 
   const handleOnboardingClose = useCallback(() => {
     closeModal('onboarding');
@@ -194,7 +144,6 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
     setQuickSwitcherOpen,
   });
 
-  // Show error state
   if (error) {
     return (
       <div className={styles.loading}>
@@ -216,7 +165,6 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
     );
   }
 
-  // Show loading state
   if (isLoading) {
     const loadingProjectLabel = state.projectType === 'screenplay' ? 'screenplay project' : 'book project';
     return (
@@ -227,71 +175,34 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
     );
   }
 
-  const layoutClass = [
-    styles.layout,
-    state.settings.sidebarHidden ? styles['layout--sidebarHidden'] : '',
-    inspectorOpen ? styles['layout--inspectorOpen'] : '',
-  ].filter(Boolean).join(' ');
-
   const appLabel = `DraftHarbour Studio ${state.projectType === 'screenplay' ? 'Screenplay Project Workspace' : 'Book Project Workspace'}`;
 
   return (
     <div className={styles.app} role="application" aria-label={appLabel}>
-      <Header
-        onAction={handleMenuAction}
-        onToggleInspector={() => setInspectorOpen(prev => !prev)}
-        inspectorOpen={inspectorOpen}
-        hasTextSelection={hasTextSelection}
-      />
       <FindReplace controls={findReplace} />
-      <main className={layoutClass} role="main">
-        {state.settings.sidebarHidden && (
-          <Tooltip content="Expand sidebar (Ctrl+Shift+B)" position="right">
-            <button
-              className={styles.expandTab}
-              onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
-              aria-label="Expand sidebar (Ctrl+Shift+B)"
-              title="Expand sidebar"
-            >
-              <span className="material-symbols-rounded">chevron_right</span>
-            </button>
-          </Tooltip>
-        )}
-        <PanelErrorBoundary panel="sidebar">
-          <Sidebar
-            onExportBackup={handleExportBackup}
-            onImportBackup={() => fileInputRef.current?.click()}
-          />
-        </PanelErrorBoundary>
-        <PanelErrorBoundary panel="editor">
-          <Editor screenplayMode={screenplayMode} onToggleScreenplayMode={onToggleScreenplayMode} />
-        </PanelErrorBoundary>
-        {!inspectorOpen && (
-          <Tooltip content="Expand inspector (Ctrl+Shift+I)" position="left">
-            <button
-              className={`${styles.expandTab} ${styles['expandTab--right']}`}
-              onClick={() => setInspectorOpen(true)}
-              aria-label="Expand inspector (Ctrl+Shift+I)"
-              title="Expand inspector"
-            >
-              <span className="material-symbols-rounded">chevron_left</span>
-            </button>
-          </Tooltip>
-        )}
-        <PanelErrorBoundary panel="inspector">
-          <Inspector open={inspectorOpen} onClose={() => setInspectorOpen(false)} voiceAlerts={voiceAlerts} />
-        </PanelErrorBoundary>
-        <AISuggestionsPanel open={modals.aiPanel} onClose={() => closeModal('aiPanel')} />
-      </main>
+      <AppShell
+        appLabel={appLabel}
+        state={state}
+        screenplayMode={screenplayMode}
+        onToggleScreenplayMode={onToggleScreenplayMode}
+        onAction={handleMenuAction}
+        hasTextSelection={hasTextSelection}
+        inspectorOpen={inspectorOpen}
+        setInspectorOpen={setInspectorOpen}
+        voiceAlerts={voiceAlerts}
+        sidebarImportBackup={() => fileInputRef.current?.click()}
+        onExportBackup={handleExportBackup}
+        onToggleSidebar={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
+        aiPanelOpen={modals.aiPanel}
+        closeAiPanel={() => closeModal('aiPanel')}
+      />
 
-      {/* Quick Switcher */}
       <QuickSwitcher
         open={quickSwitcherOpen}
         onClose={() => setQuickSwitcherOpen(false)}
         onAction={handleMenuAction}
       />
 
-      {/* Modals */}
       <ExportModal open={modals.export} onClose={() => closeModal('export')} />
       <SnapshotModal open={modals.snapshot} onClose={() => closeModal('snapshot')} />
       <AnalysisModal open={modals.analysis} onClose={() => closeModal('analysis')} />
@@ -308,45 +219,9 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
       <ExportHistoryModal open={modals.exportHistory} onClose={() => closeModal('exportHistory')} />
       <TranslationModal open={modals.translation} onClose={() => closeModal('translation')} />
 
-      {/* Windows */}
       <SettingsWindow open={modals.settings} onClose={() => closeModal('settings')} />
       <AboutWindow open={modals.about} onClose={() => closeModal('about')} />
 
-      {/* Mobile bottom navigation: Outline | Write | Inspector */}
-      <nav className={styles.mobileNav} aria-label="Mobile navigation">
-        <button
-          className={`${styles.mobileNav__tab} ${!state.settings.sidebarHidden ? styles['mobileNav__tab--active'] : ''}`}
-          onClick={() => {
-            if (state.settings.sidebarHidden) dispatch({ type: 'TOGGLE_SIDEBAR' });
-            setInspectorOpen(false);
-          }}
-        >
-          <span className="material-symbols-rounded">list</span>
-          <span>Outline</span>
-        </button>
-        <button
-          className={`${styles.mobileNav__tab} ${state.settings.sidebarHidden && !inspectorOpen ? styles['mobileNav__tab--active'] : ''}`}
-          onClick={() => {
-            if (!state.settings.sidebarHidden) dispatch({ type: 'TOGGLE_SIDEBAR' });
-            setInspectorOpen(false);
-          }}
-        >
-          <span className="material-symbols-rounded">edit</span>
-          <span>Write</span>
-        </button>
-        <button
-          className={`${styles.mobileNav__tab} ${inspectorOpen ? styles['mobileNav__tab--active'] : ''}`}
-          onClick={() => {
-            if (!state.settings.sidebarHidden) dispatch({ type: 'TOGGLE_SIDEBAR' });
-            setInspectorOpen(prev => !prev);
-          }}
-        >
-          <span className="material-symbols-rounded">info</span>
-          <span>Inspector</span>
-        </button>
-      </nav>
-
-      {/* Hidden file inputs */}
       <input
         ref={fileInputRef}
         type="file"
@@ -375,11 +250,10 @@ function AppContent({ screenplayMode, onToggleScreenplayMode }: { screenplayMode
   );
 }
 
-function AppShell() {
+function AppEditorProvider() {
   const { activeChapter, updateChapter, state } = useApp();
   const [screenplayMode, setScreenplayMode] = useState(state.projectType === 'screenplay');
 
-  // Use refs to avoid stale closures in editor onUpdate callback
   const activeChapterRef = useRef(activeChapter);
   activeChapterRef.current = activeChapter;
   const updateChapterRef = useRef(updateChapter);
@@ -402,9 +276,6 @@ function AppShell() {
     },
   });
 
-  // Keep the ScreenplayParagraph extension's screenplayMode option in sync
-  // with the React state. useEditor does not recreate the editor when the
-  // extensions array reference changes, so we patch the live option directly.
   useEffect(() => {
     if (!editor) return;
     const ext = editor.extensionManager.extensions.find(e => e.name === 'paragraph');
@@ -415,7 +286,7 @@ function AppShell() {
 
   return (
     <EditorContext.Provider value={{ editor }}>
-      <AppContent
+      <AppScene
         screenplayMode={screenplayMode}
         onToggleScreenplayMode={() => setScreenplayMode(mode => !mode)}
       />
@@ -428,7 +299,7 @@ export default function App() {
     <ErrorBoundary>
       <ToastProvider>
         <AppProvider>
-          <AppShell />
+          <AppEditorProvider />
         </AppProvider>
       </ToastProvider>
     </ErrorBoundary>
