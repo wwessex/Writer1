@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { initializeSafeModeSession, installGlobalErrorHandlers } from '@/lib/errors';
 
 // Clean up stale caches from the old vanilla service worker (pre-Vite migration).
 // The old SW used cache names like "draftharbour-v22" which Workbox won't remove.
@@ -14,10 +15,8 @@ if ('caches' in window) {
   });
 }
 
-// Safety net: log unhandled promise rejections so they don't vanish silently.
-window.addEventListener('unhandledrejection', (event) => {
-  console.error('[unhandled rejection]', event.reason);
-});
+initializeSafeModeSession();
+installGlobalErrorHandlers();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -6,6 +6,7 @@
 
 import type { PluginManifest } from '@/types';
 import { generateId } from '@/lib/utils';
+import { isSafeModeEnabledForSession } from '@/lib/errors';
 
 type EventHandler = (...args: unknown[]) => void;
 type FilterHandler = (value: unknown) => unknown;
@@ -122,6 +123,7 @@ class PluginManager {
 
   /** Emit an event to all registered handlers */
   emit(event: string, ...args: unknown[]): void {
+    if (isSafeModeEnabledForSession()) return;
     const handlers = this.hooks.get(event) || [];
     for (const handler of handlers) {
       const pluginId = (handler as unknown as { __pluginId?: string }).__pluginId;
@@ -147,6 +149,7 @@ class PluginManager {
 
   /** Apply filters to a value */
   applyFilters(name: string, initialValue: unknown): unknown {
+    if (isSafeModeEnabledForSession()) return initialValue;
     const handlers = this.filters.get(name) || [];
     let value = initialValue;
     for (const handler of handlers) {
@@ -175,6 +178,7 @@ class PluginManager {
 
   /** Get UI slots for a specific location */
   getUISlots(location: PluginUISlot['slot']): PluginUISlot[] {
+    if (isSafeModeEnabledForSession()) return [];
     return Array.from(this.uiSlots.values())
       .filter(s => s.slot === location && this.enabled.has(s.pluginId))
       .sort((a, b) => a.priority - b.priority);

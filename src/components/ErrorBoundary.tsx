@@ -1,4 +1,9 @@
 import { Component, type ReactNode } from 'react';
+import {
+  createAppError,
+  enableSafeModeForNextRestart,
+  reportAppError
+} from '@/lib/errors';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -103,6 +108,10 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBound
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('React Error Boundary caught:', error, errorInfo);
+    void reportAppError(
+      createAppError('REACT_BOUNDARY', error.message || 'React render failure', 'application', 'critical', { cause: { error, errorInfo } }),
+      { category: 'react_boundary' }
+    );
   }
 
   private handleExportBackup = async () => {
@@ -163,8 +172,11 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBound
               Export Backup
             </button>
             <button
-              onClick={() => window.location.reload()}
-              style={styles.primaryButton}
+              onClick={() => {
+                enableSafeModeForNextRestart();
+                window.location.reload();
+              }}
+              style={styles.secondaryButton}
               onMouseEnter={e => {
                 e.currentTarget.style.transform = 'translateY(-1px)';
                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(79, 124, 255, 0.4)';
@@ -176,7 +188,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBound
               onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.97)'; }}
               onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-1px)'; }}
             >
-              Reload Page
+              Restart in Safe Mode
             </button>
           </div>
         </div>
