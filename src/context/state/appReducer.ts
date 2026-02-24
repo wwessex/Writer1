@@ -17,7 +17,9 @@ export type AppAction =
   | { type: 'TOGGLE_SIDEBAR' }
   | { type: 'TOGGLE_PAGE_VIEW' }
   | { type: 'SET_THEME'; payload: 'dark' | 'light' | 'high-contrast' }
-  | { type: 'TOGGLE_FOCUS_MODE' };
+  | { type: 'TOGGLE_FOCUS_MODE' }
+  | { type: 'SET_UNDO_STACK_LENGTH'; payload: number }
+  | { type: 'SET_REDO_STACK_LENGTH'; payload: number };
 
 export function createInitialAppState(options?: { isMobile?: boolean; isOnline?: boolean }): AppState {
   const defaultSettings: AppSettings = createDefaultSettings(Boolean(options?.isMobile));
@@ -30,7 +32,9 @@ export function createInitialAppState(options?: { isMobile?: boolean; isOnline?:
     activeChapterId: null,
     isOnline: options?.isOnline ?? true,
     isSaving: false,
-    settings: defaultSettings
+    settings: defaultSettings,
+    reorderUndoStackLength: 0,
+    reorderRedoStackLength: 0
   };
 }
 
@@ -141,6 +145,12 @@ export function appReducer(state: AppState, action: AppAction): AppState {
           focusMode: !state.settings.focusMode
         }
       };
+
+    case 'SET_UNDO_STACK_LENGTH':
+      return { ...state, reorderUndoStackLength: action.payload };
+
+    case 'SET_REDO_STACK_LENGTH':
+      return { ...state, reorderRedoStackLength: action.payload };
 
     default:
       return state;
