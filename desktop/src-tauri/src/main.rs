@@ -1,10 +1,43 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{fs, sync::atomic::{AtomicBool, Ordering}};
+use std::{
+    collections::HashMap,
+    fs,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
-use tauri::{AppHandle, Emitter, Manager, WindowEvent};
+use serde::Deserialize;
+use tauri::{
+    menu::{Menu, MenuBuilder, MenuId, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder},
+    AppHandle, Emitter, Manager, WindowEvent,
+};
 
 static HAS_UNSAVED_EDITS: AtomicBool = AtomicBool::new(false);
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NativeMenuTemplate {
+    label: String,
+    submenu: Vec<NativeMenuItemTemplate>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NativeMenuItemTemplate {
+    id: Option<String>,
+    label: Option<String>,
+    accelerator: Option<String>,
+    role: Option<String>,
+    enabled: Option<bool>,
+    separator: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CommandState {
+    command_id: String,
+    enabled: bool,
+}
 
 #[tauri::command]
 fn set_unsaved_edits(value: bool) {
@@ -19,6 +52,80 @@ fn quit_app(app: AppHandle) {
 #[tauri::command]
 fn read_text_file(path: String) -> Result<String, String> {
     fs::read_to_string(path).map_err(|err| err.to_string())
+}
+
+fn apply_native_role(role: &str) -> Option<PredefinedMenuItem> {
+    match role {
+        "undo" => Some(PredefinedMenuItem::undo(None)),
+        "redo" => Some(PredefinedMenuItem::redo(None)),
+        "cut" => Some(PredefinedMenuItem::cut(None)),
+        "copy" => Some(PredefinedMenuItem::copy(None)),
+        "paste" => Some(PredefinedMenuItem::paste(None)),
+        "selectAll" => Some(PredefinedMenuItem::select_all(None)),
+        _ => None,
+    }
+}
+
+#[tauri::command]
+fn set_native_menu(app: AppHandle, menu: Vec<NativeMenuTemplate>, _platform: String) -> Result<(), String> {
+    let mut menu_builder = MenuBuilder::new(&app);
+
+    for section in menu {
+        let mut submenu_builder = SubmenuBuilder::new(&app, section.label);
+
+        for item in section.submenu {
+            if item.separator.unwrap_or(false) {
+                submenu_builder = submenu_builder.separator();
+                continue;
+            }
+
+            if let Some(role) = item.role.as_deref() {
+                if let Some(predefined) = apply_native_role(role) {
+                    submenu_builder = submenu_builder.item(&predefined);
+                    continue;
+                }
+            }
+
+            if let Some(command_id) = item.id {
+                let item_id = MenuId::new(command_id.clone());
+                let mut item_builder = MenuItemBuilder::with_id(item_id, item.label.unwrap_or(command_id));
+                if let Some(shortcut) = item.accelerator {
+                    item_builder = item_builder.accelerator(shortcut);
+                }
+                if let Some(enabled) = item.enabled {
+                    item_builder = item_builder.enabled(enabled);
+                }
+
+                let menu_item = item_builder.build(&app).map_err(|err| err.to_string())?;
+                submenu_builder = submenu_builder.item(&menu_item);
+            }
+        }
+
+        let submenu = submenu_builder.build().map_err(|err| err.to_string())?;
+        menu_builder = menu_builder.item(&submenu);
+    }
+
+    let built_menu: Menu<_> = menu_builder.build().map_err(|err| err.to_string())?;
+    app.set_menu(built_menu).map_err(|err| err.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn set_native_menu_command_state(app: AppHandle, command_states: Vec<CommandState>) -> Result<(), String> {
+    let command_state_map: HashMap<_, _> = command_states
+        .into_iter()
+        .map(|state| (state.command_id, state.enabled))
+        .collect();
+
+    if let Some(menu) = app.menu() {
+        for (command_id, enabled) in command_state_map {
+            if let Some(item) = menu.get(&command_id) {
+                let _ = item.set_enabled(enabled);
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn emit_launch_payloads(app: &AppHandle, args: &[String]) {
@@ -44,6 +151,9 @@ fn main() {
             }
             emit_launch_payloads(&app, &argv);
         }))
+        .on_menu_event(|app, event| {
+            let _ = app.emit("desktop://menu-command", event.id().0.clone());
+        })
         .setup(|app| {
             let handle = app.handle().clone();
             let args = std::env::args().collect::<Vec<_>>();
@@ -70,7 +180,13 @@ fn main() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![set_unsaved_edits, quit_app, read_text_file])
+        .invoke_handler(tauri::generate_handler![
+            set_unsaved_edits,
+            quit_app,
+            read_text_file,
+            set_native_menu,
+            set_native_menu_command_state
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

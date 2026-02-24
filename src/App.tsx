@@ -71,7 +71,25 @@ function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits }: {
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
   const hasTextSelection = useEditorSelectionTracking(editor);
+  const [editorFocused, setEditorFocused] = useState(false);
   const findReplace = useFindReplace(editor);
+
+  useEffect(() => {
+    if (!editor) {
+      setEditorFocused(false);
+      return;
+    }
+
+    const updateFocus = () => setEditorFocused(editor.isFocused);
+    updateFocus();
+    editor.on('focus', updateFocus);
+    editor.on('blur', updateFocus);
+
+    return () => {
+      editor.off('focus', updateFocus);
+      editor.off('blur', updateFocus);
+    };
+  }, [editor]);
 
   const characters = useMemo<CharacterEntity[]>(() => {
     try {
@@ -89,14 +107,6 @@ function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits }: {
   }, [state.chapters, characters, activeChapter?.id]);
 
   const voiceAlerts = useVoiceAlerts({ activeChapter, baselineProfiles, showToast });
-
-  useDesktopRuntime({
-    hasUnsavedEdits,
-    onDeepLink: (url) => {
-      showToast(`Opened deep link: ${url}`, 'info');
-    },
-    showToast,
-  });
 
   const {
     fileInputRef,
@@ -159,6 +169,17 @@ function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits }: {
     setQuickSwitcherOpen,
   });
 
+
+  useDesktopRuntime({
+    hasUnsavedEdits,
+    onDeepLink: (url) => {
+      showToast(`Opened deep link: ${url}`, 'info');
+    },
+    onMenuAction: handleMenuAction,
+    menuState: { editorFocused, hasSelection: hasTextSelection },
+    showToast,
+  });
+
   if (error) {
     return (
       <div className={styles.loading}>
@@ -202,6 +223,7 @@ function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits }: {
         onToggleScreenplayMode={onToggleScreenplayMode}
         onAction={handleMenuAction}
         hasTextSelection={hasTextSelection}
+        editorFocused={editorFocused}
         inspectorOpen={inspectorOpen}
         setInspectorOpen={setInspectorOpen}
         voiceAlerts={voiceAlerts}

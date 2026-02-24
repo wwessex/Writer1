@@ -40,6 +40,10 @@ export const APP_MENUS: AppMenuConfig[] = [
       { label: 'Undo', action: COMMAND_IDS.UNDO, shortcut: 'Ctrl+Z' },
       { label: 'Redo', action: COMMAND_IDS.REDO, shortcut: 'Ctrl+Y' },
       { divider: true },
+      { label: 'Cut', action: COMMAND_IDS.CUT, shortcut: 'Ctrl+X' },
+      { label: 'Copy', action: COMMAND_IDS.COPY, shortcut: 'Ctrl+C' },
+      { label: 'Paste', action: COMMAND_IDS.PASTE, shortcut: 'Ctrl+V' },
+      { divider: true },
       { label: 'Select All', action: COMMAND_IDS.SELECT_ALL, shortcut: 'Ctrl+A' }
     ]
   },
