@@ -17,7 +17,9 @@
     "prepare": "husky",
     "bundle:analyze": "npm run build && node scripts/check-bundle-size.mjs",
     "bundle:check": "node scripts/check-bundle-size.mjs --ci",
-    "assets:check": "node scripts/check-asset-duplicates.mjs"
+    "assets:check": "node scripts/check-asset-duplicates.mjs",
+    "test:coverage": "vitest run --coverage.enabled",
+    "coverage:changed": "node scripts/check-touched-coverage.mjs"
   },
   "dependencies": {
     "@capacitor/cli": "^8.1.0",
@@ -51,6 +53,7 @@
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^9.17.0",
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.16",

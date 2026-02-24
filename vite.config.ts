@@ -132,6 +132,17 @@ export default defineConfig({
       }
     })
   ],
+
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    coverage: {
+      enabled: false,
+      provider: 'v8',
+      reporter: ['text', 'json-summary'],
+      reportsDirectory: './coverage',
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')

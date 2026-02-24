@@ -1,6 +1,6 @@
-import type { Chapter, IntegrationConfig } from '@/types';
-import type { ProviderErrorCode, ProviderErrorPayload, ProviderPayload, ProviderResponseEnvelope } from '@/lib/integrations/types';
-import { DEFAULT_RETRY_POLICY, fetchWithPolicy, mapStatusToProviderError } from '@/lib/integrations/providerClient';
+import type { Chapter, IntegrationConfig } from '../types';
+import type { ProviderErrorCode, ProviderErrorPayload, ProviderPayload, ProviderResponseEnvelope } from '../lib/integrations/types';
+import { DEFAULT_RETRY_POLICY, fetchWithPolicy, mapStatusToProviderError } from '../lib/integrations/providerClient';
 
 interface BrokerRequest { method: string; path: string; body: unknown; }
 interface BrokerResponse { status: number; body: unknown; }
