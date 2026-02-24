@@ -19,7 +19,8 @@
     "bundle:check": "node scripts/check-bundle-size.mjs --ci",
     "assets:check": "node scripts/check-asset-duplicates.mjs",
     "test:coverage": "vitest run --coverage.enabled",
-    "coverage:changed": "node scripts/check-touched-coverage.mjs"
+    "coverage:changed": "node scripts/check-touched-coverage.mjs",
+    "verify:vite-config": "node scripts/verify-vite-config.mjs"
   },
   "dependencies": {
     "@capacitor/cli": "^8.1.0",
