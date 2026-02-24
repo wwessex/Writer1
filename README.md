@@ -32,6 +32,65 @@ Right-click `index.html` → Open with Live Server.
 In Chrome/Edge/Safari (iOS): use "Add to Home Screen" / "Install App".
 
 
+
+## Desktop App (Tauri)
+
+A native desktop runtime is available under `desktop/`, using Tauri with the existing Vite app as renderer.
+
+### Prerequisites
+- Rust toolchain (`rustup`, `cargo`)
+- Platform build dependencies for Tauri/WebKit2 (Linux) or Xcode (macOS) / Visual Studio Build Tools (Windows)
+
+### Install dependencies
+```bash
+npm install
+npm --prefix desktop install
+```
+
+### Development (desktop shell + Vite renderer)
+```bash
+npm run desktop:dev
+```
+
+This runs the Vite dev server (on `http://localhost:1420`) and launches the native shell.
+
+### Production build
+```bash
+npm run desktop:build
+```
+
+Target-specific examples:
+```bash
+npm run desktop:build:mac
+npm run desktop:build:win
+npm run desktop:build:linux
+```
+
+### Desktop runtime behaviors
+- Single-instance lock: second launches focus the existing window.
+- Window-state restoration: previous bounds are persisted and restored automatically.
+- Close-to-background behavior: closing the window hides it unless unsaved edits exist.
+- Unsaved-edit quit confirmation: app-level confirmation is shown before quitting with dirty content.
+- File/deep-link routing:
+  - Opening `.dhproj` files routes payloads into the running app.
+  - `draftharbour://...` deep links are delivered to the web layer.
+
+### Release signing/notarization configuration
+The packaging config is in `desktop/src-tauri/tauri.conf.json` and is environment-driven:
+
+- macOS signing + notarization:
+  - `APPLE_SIGNING_IDENTITY`
+  - `APPLE_TEAM_ID`
+- Windows code-signing:
+  - `WINDOWS_CERT_THUMBPRINT`
+
+Set these in your CI provider secrets before release jobs.
+
+Suggested CI matrix:
+- macOS: `aarch64-apple-darwin`, `x86_64-apple-darwin` (or universal)
+- Windows: `x86_64-pc-windows-msvc`
+- Linux: `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu` (optional)
+
 ## iOS Native App (Capacitor)
 
 This project now includes Capacitor configuration so the web app can run as a native iOS app.

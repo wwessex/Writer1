@@ -1,0 +1,88 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DraftHarbour Studio",
+  "version": "2.0.0",
+  "identifier": "com.draftharbour.studio",
+  "build": {
+    "beforeDevCommand": "npm --prefix .. run dev -- --host 0.0.0.0 --port 1420",
+    "beforeBuildCommand": "npm --prefix .. run build",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "DraftHarbour Studio",
+        "width": 1440,
+        "height": 900,
+        "resizable": true,
+        "minWidth": 900,
+        "minHeight": 620
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "app",
+      "dmg",
+      "msi",
+      "nsis",
+      "deb",
+      "rpm",
+      "appimage"
+    ],
+    "category": "Productivity",
+    "shortDescription": "Offline-first writing studio",
+    "longDescription": "DraftHarbour Studio desktop runtime built with Tauri.",
+    "createUpdaterArtifacts": true,
+    "macOS": {
+      "entitlements": "entitlements.plist",
+      "hardenedRuntime": true,
+      "minimumSystemVersion": "12.0",
+      "signingIdentity": "${APPLE_SIGNING_IDENTITY}",
+      "providerShortName": "${APPLE_TEAM_ID}"
+    },
+    "windows": {
+      "timestampUrl": "http://timestamp.digicert.com",
+      "digestAlgorithm": "sha256",
+      "certificateThumbprint": "${WINDOWS_CERT_THUMBPRINT}"
+    },
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libappindicator3-1"
+        ]
+      },
+      "rpm": {
+        "depends": [
+          "webkit2gtk4.1",
+          "libappindicator-gtk3"
+        ]
+      },
+      "appimage": {
+        "bundleMediaFramework": true
+      }
+    },
+    "fileAssociations": [
+      {
+        "ext": [
+          "dhproj"
+        ],
+        "name": "DraftHarbour Project",
+        "description": "DraftHarbour Studio project file",
+        "mimeType": "application/x-dhproj"
+      }
+    ]
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "draftharbour"
+        ]
+      }
+    }
+  }
+}
