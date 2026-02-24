@@ -49,6 +49,8 @@ describe('commands', () => {
       createChapter: vi.fn(),
       handleExportBackup: vi.fn(),
       handleSaveProjectFile: vi.fn(),
+      openRecentProjects: vi.fn(),
+      reopenLastProject: vi.fn(),
       openModal: vi.fn(),
       toggleModal: vi.fn(),
       toggleInspector: vi.fn(),

@@ -8,6 +8,8 @@ export const COMMAND_IDS = {
   IMPORT_DOCUMENT: 'importDocument',
   SAVE_PROJECT_FILE: 'saveProjectFile',
   OPEN_PROJECT_FILE: 'openProjectFile',
+  OPEN_RECENT: 'openRecent',
+  REOPEN_LAST_PROJECT: 'reopenLastProject',
   EXPORT_BACKUP: 'exportBackup',
   IMPORT_BACKUP: 'importBackup',
   SETTINGS: 'settings',
@@ -73,6 +75,8 @@ export const COMMAND_METADATA: Record<CommandId, CommandMetadata> = {
   [COMMAND_IDS.IMPORT_DOCUMENT]: { id: COMMAND_IDS.IMPORT_DOCUMENT, label: 'Import Document…', icon: 'upload', group: 'Project', includeInQuickSwitcher: true },
   [COMMAND_IDS.SAVE_PROJECT_FILE]: { id: COMMAND_IDS.SAVE_PROJECT_FILE, label: 'Save Project File (.dhproj)', icon: 'save', shortcut: 'Ctrl+S', group: 'Project', includeInQuickSwitcher: true },
   [COMMAND_IDS.OPEN_PROJECT_FILE]: { id: COMMAND_IDS.OPEN_PROJECT_FILE, label: 'Open Project File (.dhproj)', icon: 'folder_open', shortcut: 'Ctrl+O', group: 'Project', includeInQuickSwitcher: true },
+  [COMMAND_IDS.OPEN_RECENT]: { id: COMMAND_IDS.OPEN_RECENT, label: 'Open Recent…', icon: 'history', group: 'Project', includeInQuickSwitcher: true },
+  [COMMAND_IDS.REOPEN_LAST_PROJECT]: { id: COMMAND_IDS.REOPEN_LAST_PROJECT, label: 'Reopen Last Project', icon: 'restore', group: 'Project', includeInQuickSwitcher: true },
   [COMMAND_IDS.EXPORT_BACKUP]: { id: COMMAND_IDS.EXPORT_BACKUP, label: 'Export Backup', icon: 'archive', group: 'Project', includeInQuickSwitcher: true },
   [COMMAND_IDS.IMPORT_BACKUP]: { id: COMMAND_IDS.IMPORT_BACKUP, label: 'Import Backup', icon: 'unarchive', group: 'Project', includeInQuickSwitcher: true },
   [COMMAND_IDS.SETTINGS]: { id: COMMAND_IDS.SETTINGS, label: 'Settings', icon: 'settings', group: 'Navigation', includeInQuickSwitcher: true },
@@ -126,6 +130,8 @@ export interface CommandContext {
   createChapter: () => void;
   handleExportBackup: () => void;
   handleSaveProjectFile: () => void;
+  openRecentProjects: () => void;
+  reopenLastProject: () => void;
   openModal: (id: ModalKey) => void;
   toggleModal: (id: ModalKey) => void;
   toggleInspector: () => void;
@@ -150,6 +156,8 @@ export const COMMAND_HANDLERS: Record<CommandId, CommandHandler> = {
   [COMMAND_IDS.IMPORT_DOCUMENT]: ({ importInputRef }) => importInputRef.current?.click(),
   [COMMAND_IDS.SAVE_PROJECT_FILE]: ({ handleSaveProjectFile }) => handleSaveProjectFile(),
   [COMMAND_IDS.OPEN_PROJECT_FILE]: ({ projectFileInputRef }) => projectFileInputRef.current?.click(),
+  [COMMAND_IDS.OPEN_RECENT]: ({ openRecentProjects }) => openRecentProjects(),
+  [COMMAND_IDS.REOPEN_LAST_PROJECT]: ({ reopenLastProject }) => reopenLastProject(),
   [COMMAND_IDS.EXPORT_BACKUP]: ({ handleExportBackup }) => handleExportBackup(),
   [COMMAND_IDS.IMPORT_BACKUP]: ({ fileInputRef }) => fileInputRef.current?.click(),
   [COMMAND_IDS.SETTINGS]: ({ openModal }) => openModal('settings'),

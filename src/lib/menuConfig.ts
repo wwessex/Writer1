@@ -23,6 +23,8 @@ export const APP_MENUS: AppMenuConfig[] = [
       { divider: true },
       { label: 'Save Project File (.dhproj)', action: COMMAND_IDS.SAVE_PROJECT_FILE, shortcut: 'Ctrl+S' },
       { label: 'Open Project File (.dhproj)', action: COMMAND_IDS.OPEN_PROJECT_FILE, shortcut: 'Ctrl+O' },
+      { label: 'Open Recent…', action: COMMAND_IDS.OPEN_RECENT },
+      { label: 'Reopen Last Project', action: COMMAND_IDS.REOPEN_LAST_PROJECT },
       { divider: true },
       { label: 'Export...', action: COMMAND_IDS.EXPORT, shortcut: 'Ctrl+Shift+E' },
       { label: 'Import Document...', action: COMMAND_IDS.IMPORT_DOCUMENT },
