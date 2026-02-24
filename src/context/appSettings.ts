@@ -78,6 +78,7 @@ export const createDefaultSettings = (isMobile: boolean): AppSettings => ({
   },
   onboardingComplete: false,
   typewriterMode: false,
+  releaseChannel: 'stable',
   sidebarPanels: {}
 });
 

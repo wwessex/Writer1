@@ -27,7 +27,8 @@
     "desktop:build:debug": "npm --prefix desktop run build:debug",
     "desktop:build:mac": "npm --prefix desktop run build -- --target universal-apple-darwin",
     "desktop:build:win": "npm --prefix desktop run build -- --target x86_64-pc-windows-msvc",
-    "desktop:build:linux": "npm --prefix desktop run build -- --target x86_64-unknown-linux-gnu"
+    "desktop:build:linux": "npm --prefix desktop run build -- --target x86_64-unknown-linux-gnu",
+    "release:verify-artifacts": "node scripts/verify-release-artifacts.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.1.0",
@@ -47,7 +48,10 @@
     "jszip": "^3.10.1",
     "pdfmake": "^0.2.10",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "@tauri-apps/plugin-updater": "^2.0.0",
+    "@tauri-apps/plugin-process": "^2.0.0",
+    "@tauri-apps/plugin-dialog": "^2.0.0"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

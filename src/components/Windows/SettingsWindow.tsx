@@ -9,6 +9,8 @@ import { loadAIConfig, saveAIConfig } from '@/lib/ai';
 import type { AIProviderConfig } from '@/lib/ai';
 import { useWindowResize } from '@/hooks/useResizable';
 import { getManagedPolicy } from '@/lib/policy';
+import { applyUpdateAndRestart, checkForUpdate, deferUpdate, getDeferredUpdateVersion, getLaunchFallbackMessage, getReleaseChannel, setReleaseChannel, type UpdaterSummary } from '@/lib/desktopUpdater';
+import type { ReleaseChannel } from '@/lib/updaterGuardrails';
 import styles from './Windows.module.css';
 
 interface SettingsWindowProps {
@@ -126,6 +128,15 @@ const SETTINGS_SECTIONS = [
     ]
   },
   {
+    id: 'updates',
+    title: 'Updates',
+    keywords: ['release', 'channel', 'stable', 'beta', 'nightly', 'updater'],
+    fields: [
+      { id: 'releaseChannel', label: 'Release Channel', keywords: ['stable', 'beta', 'nightly'] },
+      { id: 'checkUpdates', label: 'Check for Updates', keywords: ['release notes', 'restart'] }
+    ]
+  },
+  {
     id: 'app',
     title: 'Application',
     keywords: ['app', 'behaviour', 'productivity'],
@@ -176,12 +187,16 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
     ai: false,
     sync: true,
     assist: true,
+    updates: false,
     privacy: true,
     app: false,
     data: true
   });
   const [telemetryEnabled, setTelemetryEnabled] = useState(isTelemetryOptedIn());
   const managedPolicy = useMemo(() => getManagedPolicy(), []);
+  const [releaseChannel, setReleaseChannelState] = useState<ReleaseChannel>(() => state.settings.releaseChannel ?? getReleaseChannel());
+  const [updateSummary, setUpdateSummary] = useState<UpdaterSummary | null>(null);
+  const [updateBusy, setUpdateBusy] = useState(false);
   const [aiConfig, setAIConfig] = useState<AIProviderConfig>(loadAIConfig);
 
   const updateAIConfig = useCallback((updates: Partial<AIProviderConfig>) => {
@@ -264,6 +279,53 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   }, [hasSearchQuery, normalizedSearchQuery]);
 
   const visibleSections = SETTINGS_SECTIONS.filter(section => isSectionVisible(section.id));
+
+  useEffect(() => {
+    setReleaseChannel(releaseChannel);
+    updateSettings({ releaseChannel });
+  }, [releaseChannel, updateSettings]);
+
+  useEffect(() => {
+    const fallbackMessage = getLaunchFallbackMessage();
+    if (fallbackMessage) {
+      setUpdateSummary({ available: false, body: fallbackMessage });
+    }
+  }, []);
+
+  const handleCheckUpdates = async () => {
+    setUpdateBusy(true);
+    try {
+      const summary = await checkForUpdate();
+      setUpdateSummary(summary);
+      if (!summary.available) {
+        window.alert('No eligible update found for this channel.');
+      }
+    } catch (error) {
+      console.error('Update check failed', error);
+      window.alert('Update check failed. Guardrails may have switched to fallback mode.');
+    } finally {
+      setUpdateBusy(false);
+    }
+  };
+
+  const handleDeferUpdate = () => {
+    if (!updateSummary?.version) return;
+    deferUpdate(updateSummary.version);
+    window.alert(`Deferred update ${updateSummary.version}.`);
+  };
+
+  const handleApplyUpdate = async () => {
+    setUpdateBusy(true);
+    try {
+      await applyUpdateAndRestart();
+    } catch (error) {
+      console.error('Failed to apply update', error);
+      window.alert('Failed to apply update. Launch fallback remains active.');
+    } finally {
+      setUpdateBusy(false);
+    }
+  };
+
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 820);
@@ -662,6 +724,63 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                     })}
                   />
                 </div>}
+              </div>
+            )}
+          </section>
+          )}
+
+
+          {/* Updates Section */}
+          {isSectionVisible('updates') && (
+          <section className={styles.section} ref={el => { sectionRefs.current.updates = el; }}>
+            <button className={styles.sectionToggle} onClick={() => toggleSection('updates')}>
+              <h4>
+                <span className="material-symbols-rounded">system_update</span>
+                {highlightMatch('Updates')}
+              </h4>
+              <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
+                {isSectionCollapsed('updates') ? 'expand_more' : 'expand_less'}
+              </span>
+            </button>
+            {!isSectionCollapsed('updates') && (
+              <div className={styles.sectionContent}>
+                <div className={styles.field}>
+                  <label>{highlightMatch('Release Channel')}</label>
+                  <Select
+                    value={releaseChannel}
+                    onChange={e => setReleaseChannelState(e.target.value as ReleaseChannel)}
+                    options={[
+                      { value: 'stable', label: 'Stable' },
+                      { value: 'beta', label: 'Beta' },
+                      { value: 'nightly', label: 'Nightly' },
+                    ]}
+                  />
+                </div>
+                <div className={styles.fieldRow}>
+                  <Button onClick={handleCheckUpdates} disabled={updateBusy}>
+                    <span className="material-symbols-rounded">update</span>
+                    Check for Updates
+                  </Button>
+                  {updateSummary?.available && (
+                    <Button variant="ghost" onClick={handleDeferUpdate} disabled={updateBusy}>
+                      <span className="material-symbols-rounded">schedule</span>
+                      Defer Install
+                    </Button>
+                  )}
+                </div>
+                {updateSummary?.version && (
+                  <div className={styles.updateCard}>
+                    <p className={styles.updateMeta}>Version {updateSummary.version}</p>
+                    {updateSummary.body && <pre className={styles.updateNotes}>{updateSummary.body}</pre>}
+                    {getDeferredUpdateVersion() && <p className={styles.updateMeta}>Deferred: {getDeferredUpdateVersion()}</p>}
+                    {updateSummary.available && (
+                      <Button onClick={handleApplyUpdate} disabled={updateBusy}>
+                        <span className="material-symbols-rounded">restart_alt</span>
+                        Restart to Apply
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </section>

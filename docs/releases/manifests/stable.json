@@ -1,0 +1,6 @@
+{
+  "channel": "stable",
+  "branch": "main",
+  "tauriEnv": "RELEASE_CHANNEL=stable",
+  "promotionPolicy": "requires signed artifact verification and checksum match"
+}
