@@ -4,6 +4,7 @@ import { editorToPlainText, downloadFile } from './utils';
 import { loadPdfMake } from './export/boundary/pdfmake';
 import { cloneDocxTextRun } from './export/boundary/docxCompat';
 import type { PdfAlignment, PdfContentNode, PdfDocumentDefinition, DocxAlignment, DocxSection, DocxClasses, PdfMakeApi } from './export/types';
+import { ContentErrors, reportAppError } from '@/lib/errors';
 
 export interface ScreenplayBlock {
   type: ScreenplayBlockType;
@@ -265,6 +266,7 @@ export async function exportToDocx(
   try {
     docx = await import('docx');
   } catch (cause) {
+    void reportAppError(ContentErrors.exportFailed('DOCX', cause), { category: 'export_failure' });
     throw new Error('Failed to load the DOCX export library. Check your connection and try again.', { cause });
   }
   const {
@@ -731,6 +733,7 @@ export async function exportToPdf(
   try {
     pdfMakeModule = await loadPdfMake();
   } catch (cause) {
+    void reportAppError(ContentErrors.exportFailed('PDF', cause), { category: 'export_failure' });
     throw new Error('Failed to load the PDF export library. Check your connection and try again.', { cause });
   }
 
@@ -890,6 +893,7 @@ export async function exportToScreenplayPdf(
   try {
     pdfMakeModule = await loadPdfMake();
   } catch (cause) {
+    void reportAppError(ContentErrors.exportFailed('PDF', cause), { category: 'export_failure' });
     throw new Error('Failed to load the PDF export library. Check your connection and try again.', { cause });
   }
 

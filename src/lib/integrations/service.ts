@@ -1,4 +1,5 @@
 import { pluginManager } from '@/lib/plugins';
+import { isSafeModeEnabledForSession } from '@/lib/errors';
 import type { AppState, IntegrationConfig, IntegrationType } from '@/types';
 import { buildPushSyncMetadata } from './sync';
 import { dropboxAdapter } from './dropbox';
@@ -6,6 +7,13 @@ import { googleDriveAdapter } from './googleDrive';
 import { mapAppStateToProviderPayload } from './orchestration';
 import { scrivenerAdapter } from './scrivener';
 import type { IntegrationAdapter, IntegrationOperationResult, NormalizedPullResult, RemoteRevision } from './types';
+
+
+function assertNotInSafeMode(): void {
+  if (isSafeModeEnabledForSession()) {
+    throw new Error('Integrations are disabled in Safe Mode. Restart normally to re-enable.');
+  }
+}
 
 const adapters: Record<IntegrationType, IntegrationAdapter> = {
   scrivener: scrivenerAdapter,
@@ -21,6 +29,7 @@ export async function connectIntegration(
   type: IntegrationType,
   config: IntegrationConfig
 ): Promise<IntegrationOperationResult> {
+  assertNotInSafeMode();
   return getIntegrationAdapter(type).connect(config);
 }
 
@@ -28,6 +37,7 @@ export async function testIntegrationConnection(
   type: IntegrationType,
   config: IntegrationConfig
 ): Promise<IntegrationOperationResult> {
+  assertNotInSafeMode();
   return getIntegrationAdapter(type).testConnection(config);
 }
 
@@ -36,6 +46,7 @@ export async function pushIntegrationData(
   config: IntegrationConfig,
   appState: Pick<AppState, 'novelId' | 'projectType' | 'chapters'>
 ): Promise<IntegrationOperationResult> {
+  assertNotInSafeMode();
   const payload = mapAppStateToProviderPayload(appState);
 
   pluginManager.emit('export:before', { provider: type, chapterCount: payload.chapters.length, source: 'sync' });
@@ -65,6 +76,7 @@ export async function pullIntegrationData(
   config: IntegrationConfig,
   appState: Pick<AppState, 'novelId' | 'projectType' | 'chapters'>
 ): Promise<NormalizedPullResult> {
+  assertNotInSafeMode();
   const payload = mapAppStateToProviderPayload(appState);
 
   pluginManager.emit('import:before', { provider: type, chapterCount: payload.chapters.length, source: 'sync' });
@@ -87,5 +99,6 @@ export async function listIntegrationRevisions(
   type: IntegrationType,
   config: IntegrationConfig
 ): Promise<RemoteRevision[]> {
+  assertNotInSafeMode();
   return getIntegrationAdapter(type).listRemoteRevisions(config);
 }

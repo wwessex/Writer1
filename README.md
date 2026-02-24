@@ -139,6 +139,14 @@ That error is usually a GitHub client/API issue (not a Capacitor project issue).
 ## Data
 Saved locally in your browser (IndexedDB). Use **Settings → Export Backup** for a JSON backup.
 
+
+## Diagnostics & Privacy Redaction
+- Use **About → Create Diagnostics Report** to export a local JSON diagnostics bundle.
+- Reports include runtime metadata (app version, platform, feature flags, storage estimate), recent structured error events, and a high-level app-state summary.
+- Reports intentionally exclude chapter/editor content.
+- Sensitive values (API keys, auth headers, tokens, secrets, password-like fields) are automatically replaced with `[REDACTED]` before export.
+- Diagnostics are stored locally unless you explicitly configure a remote crash-reporting endpoint in app code.
+
 ## Optional Online Sync
 Settings → Online Sync:
 - Set a `Sync URL` pointing to a simple REST service:

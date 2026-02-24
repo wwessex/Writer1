@@ -1,5 +1,6 @@
 import type { JSONContent } from '@tiptap/core';
 import type { ProjectType, ScreenplayBlockType } from '@/types';
+import { ContentErrors, reportAppError } from '@/lib/errors';
 
 interface ParsedChapter {
   title: string;
@@ -332,7 +333,9 @@ export async function importDocx(file: File): Promise<ParsedChapter[]> {
   const docXml = await documentFile?.async('string');
 
   if (!docXml) {
-    throw new Error('Invalid DOCX file');
+    const error = new Error('Invalid DOCX file');
+    void reportAppError(ContentErrors.importFailed('docx', error), { category: 'import_failure' });
+    throw error;
   }
 
   const paragraphs: string[] = [];
@@ -477,7 +480,7 @@ export async function importFile(file: File): Promise<ImportResult> {
     case 'fountain':
     case 'spmd':
       return importFountain(file);
-    default:
+    default: {
       if (mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
         return { sections: await importDocx(file), notices: [] };
       }
@@ -487,6 +490,9 @@ export async function importFile(file: File): Promise<ImportResult> {
       if (mime.startsWith('text/')) {
         return { sections: await importText(file), notices: [] };
       }
-      throw new Error(`Unsupported file type: ${ext}`);
+      const error = new Error(`Unsupported file type: ${ext}`);
+      void reportAppError(ContentErrors.importFailed(ext || mime || 'unknown', error), { category: 'import_failure' });
+      throw error;
+    }
   }
 }

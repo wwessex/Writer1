@@ -13,7 +13,7 @@ import type { Chapter, Novel, Scene, ProjectType, AppSettings, AppState } from '
 import * as storage from '@/lib/storage';
 import { debounce, generateId } from '@/lib/utils';
 import { createDefaultSettings, normalizeSidebarPanels, type SettingsUpdate } from './appSettings';
-import { storageErrorFrom } from '@/lib/errors';
+import { reportAppError, storageErrorFrom } from '@/lib/errors';
 import { useToast } from '@/components/UI';
 import { appReducer, createInitialAppState, type AppAction } from './state/appReducer';
 import {
@@ -73,7 +73,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const reportStorageError = useCallback((context: string, cause: unknown) => {
     console.error(`[storage] ${context}:`, cause);
-    showErrorToast(storageErrorFrom(cause));
+    const error = storageErrorFrom(cause);
+    showErrorToast(error);
+    void reportAppError(error, { category: 'storage_failure', context });
   }, [showErrorToast]);
 
   const runWithSavingState = useCallback(async (operation: () => Promise<void>) => {

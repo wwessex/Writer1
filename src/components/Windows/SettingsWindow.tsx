@@ -754,7 +754,8 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                     <p className={styles.privacyNotice__text}>
                       <strong>Your writing stays private by default.</strong> DraftHarbour Studio stores everything in
                       your browser's local storage (IndexedDB). No data leaves your device unless you
-                      explicitly enable cloud sync below.
+                      explicitly enable cloud sync below. Diagnostics reports include only metadata and
+                      app-state summaries, and automatically redact auth tokens, secrets, and passwords.
                     </p>
                   </div>
                 </div>

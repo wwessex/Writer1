@@ -1,5 +1,256 @@
-import type { AppErrorInfo, ErrorDomain, ErrorSeverity } from '@/types';
+import type { AppErrorInfo, AppState, ErrorDomain, ErrorSeverity } from '@/types';
+import {
+  getBrokerBaseUrl,
+  isAIDeveloperModeEnabled,
+  isIntegrationDeveloperModeEnabled
+} from '@/lib/featureFlags';
 import { recordTelemetryEvent } from '@/lib/telemetry';
+
+const MAX_LOCAL_ERROR_LOGS = 200;
+const SAFE_MODE_RESTART_KEY = 'draftharbour_safe_mode_next_boot';
+
+export type ErrorEventCategory =
+  | 'storage_failure'
+  | 'sync_conflict'
+  | 'integration_auth_failure'
+  | 'export_failure'
+  | 'import_failure'
+  | 'unhandled_rejection'
+  | 'global_error'
+  | 'react_boundary'
+  | 'application';
+
+export interface ErrorEnvironmentMetadata {
+  appVersion: string;
+  userAgent: string;
+  platform: string;
+  online: boolean;
+  language: string;
+  timestamp: number;
+  brokerConfigured: boolean;
+  featureFlags: {
+    integrationsDeveloperMode: boolean;
+    aiDeveloperMode: boolean;
+  };
+  storage: {
+    quotaBytes: number | null;
+    usedBytes: number | null;
+    usageRatio: number | null;
+  };
+}
+
+export interface ErrorReportEntry {
+  id: string;
+  category: ErrorEventCategory;
+  error: AppErrorInfo;
+  metadata: ErrorEnvironmentMetadata;
+  context?: string;
+}
+
+type RemoteCrashReporter = (entry: ErrorReportEntry) => Promise<void> | void;
+
+let remoteCrashReporter: RemoteCrashReporter | null = null;
+const localErrorLogs: ErrorReportEntry[] = [];
+
+function generateErrorId(): string {
+  return `err_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function sanitizeString(raw: string): string {
+  return raw
+    .replace(/(bearer\s+)[a-z0-9._-]+/gi, '$1[REDACTED]')
+    .replace(/(api[_-]?key["'=: ]+)[^\s"']+/gi, '$1[REDACTED]')
+    .replace(/(token["'=: ]+)[^\s"']+/gi, '$1[REDACTED]');
+}
+
+function sanitizeUnknown(value: unknown): unknown {
+  if (typeof value === 'string') return sanitizeString(value);
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: sanitizeString(value.message),
+      stack: value.stack ? sanitizeString(value.stack) : undefined,
+    };
+  }
+
+  if (Array.isArray(value)) return value.map(sanitizeUnknown);
+
+  if (value && typeof value === 'object') {
+    const next: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      const lower = key.toLowerCase();
+      if (lower.includes('token') || lower.includes('secret') || lower.includes('password') || lower.includes('auth')) {
+        next[key] = '[REDACTED]';
+      } else {
+        next[key] = sanitizeUnknown(val);
+      }
+    }
+    return next;
+  }
+
+  return value;
+}
+
+async function getStorageMetadata(): Promise<ErrorEnvironmentMetadata['storage']> {
+  if (!navigator.storage?.estimate) {
+    return { quotaBytes: null, usedBytes: null, usageRatio: null };
+  }
+
+  try {
+    const estimate = await navigator.storage.estimate();
+    const quotaBytes = typeof estimate.quota === 'number' ? estimate.quota : null;
+    const usedBytes = typeof estimate.usage === 'number' ? estimate.usage : null;
+    const usageRatio = quotaBytes && usedBytes ? Number((usedBytes / quotaBytes).toFixed(4)) : null;
+    return { quotaBytes, usedBytes, usageRatio };
+  } catch {
+    return { quotaBytes: null, usedBytes: null, usageRatio: null };
+  }
+}
+
+export async function collectEnvironmentMetadata(): Promise<ErrorEnvironmentMetadata> {
+  return {
+    appVersion: import.meta.env.VITE_APP_VERSION || '2.0.0',
+    userAgent: navigator.userAgent,
+    platform: navigator.platform || 'unknown',
+    online: navigator.onLine,
+    language: navigator.language,
+    timestamp: Date.now(),
+    brokerConfigured: Boolean(getBrokerBaseUrl()),
+    featureFlags: {
+      integrationsDeveloperMode: isIntegrationDeveloperModeEnabled(),
+      aiDeveloperMode: isAIDeveloperModeEnabled(),
+    },
+    storage: await getStorageMetadata(),
+  };
+}
+
+export function setRemoteCrashReporter(reporter: RemoteCrashReporter | null): void {
+  remoteCrashReporter = reporter;
+}
+
+export async function reportAppError(
+  error: AppErrorInfo,
+  options?: {
+    category?: ErrorEventCategory;
+    context?: string;
+  }
+): Promise<void> {
+  const category = options?.category || 'application';
+  const metadata = await collectEnvironmentMetadata();
+
+  const entry: ErrorReportEntry = {
+    id: generateErrorId(),
+    category,
+    error: {
+      ...error,
+      message: sanitizeString(error.message),
+      cause: sanitizeUnknown(error.cause),
+    },
+    metadata,
+    context: options?.context ? sanitizeString(options.context) : undefined,
+  };
+
+  localErrorLogs.unshift(entry);
+  if (localErrorLogs.length > MAX_LOCAL_ERROR_LOGS) {
+    localErrorLogs.length = MAX_LOCAL_ERROR_LOGS;
+  }
+
+  recordTelemetryEvent({
+    action: `error.${category}.${error.code.toLowerCase()}`,
+    contextLengthChars: options?.context?.length || 0,
+    promptLengthChars: 0,
+    responseLengthChars: 0,
+    success: false,
+    errorType: error.code,
+  });
+
+  if (remoteCrashReporter) {
+    try {
+      await remoteCrashReporter(entry);
+    } catch (remoteError) {
+      console.error('[errors] remote crash reporter failed', remoteError);
+    }
+  }
+}
+
+export function getErrorLogs(): ErrorReportEntry[] {
+  return [...localErrorLogs];
+}
+
+export function clearErrorLogs(): void {
+  localErrorLogs.length = 0;
+}
+
+export async function createDiagnosticsReport(state: AppState): Promise<string> {
+  const metadata = await collectEnvironmentMetadata();
+
+  const report = {
+    generatedAt: new Date().toISOString(),
+    metadata,
+    appStateSummary: {
+      projectType: state.projectType,
+      novelId: state.novelId,
+      novelTitle: sanitizeString(state.novelTitle),
+      chapterCount: state.chapters.length,
+      activeChapterId: state.activeChapterId,
+      totalScenes: state.chapters.reduce((sum, chapter) => sum + (chapter.scenes?.length || 0), 0),
+      isOnline: state.isOnline,
+      isSaving: state.isSaving,
+      settings: {
+        theme: state.settings.theme,
+        autosaveMs: state.settings.autosaveMs,
+        focusMode: state.settings.focusMode,
+        typewriterMode: state.settings.typewriterMode,
+        languageToolEnabled: state.settings.assist.languageToolEnabled,
+        syncEnabled: Boolean(state.settings.sync.url),
+      },
+    },
+    recentErrors: getErrorLogs(),
+    redaction: [
+      'Tokens, secrets, auth headers, and password-like fields are replaced with [REDACTED].',
+      'Diagnostics include metadata and aggregate state only; chapter/editor content is excluded.',
+    ],
+  };
+
+  return JSON.stringify(report, null, 2);
+}
+
+export function enableSafeModeForNextRestart(): void {
+  localStorage.setItem(SAFE_MODE_RESTART_KEY, 'true');
+}
+
+export function consumeSafeModeFlag(): boolean {
+  const enabled = localStorage.getItem(SAFE_MODE_RESTART_KEY) === 'true';
+  if (enabled) localStorage.removeItem(SAFE_MODE_RESTART_KEY);
+  return enabled;
+}
+
+export function isSafeModeEnabledForSession(): boolean {
+  return document.documentElement.dataset.safeMode === 'true';
+}
+
+export function initializeSafeModeSession(): boolean {
+  const shouldEnable = consumeSafeModeFlag();
+  document.documentElement.dataset.safeMode = shouldEnable ? 'true' : 'false';
+  return shouldEnable;
+}
+
+export function installGlobalErrorHandlers(): void {
+  window.addEventListener('unhandledrejection', event => {
+    const reason = event.reason;
+    void reportAppError(
+      createAppError('UNHANDLED_REJECTION', 'Unhandled promise rejection', 'application', 'high', { cause: reason }),
+      { category: 'unhandled_rejection' }
+    );
+  });
+
+  window.addEventListener('error', event => {
+    void reportAppError(
+      createAppError('GLOBAL_ERROR', event.message || 'Unexpected global error', 'application', 'high', { cause: event.error }),
+      { category: 'global_error' }
+    );
+  });
+}
 
 export function createAppError(
   code: string,
@@ -24,8 +275,6 @@ export function createAppError(
   };
 }
 
-// ── Storage errors ──
-
 export const StorageErrors = {
   writeFailed: (cause?: unknown) => createAppError(
     'STORAGE_WRITE_FAILED',
@@ -47,8 +296,6 @@ export const StorageErrors = {
   ),
 };
 
-// ── Network / integration errors ──
-
 export const NetworkErrors = {
   offline: () => createAppError(
     'NETWORK_OFFLINE',
@@ -63,8 +310,6 @@ export const NetworkErrors = {
     { retryable: false, userAction: 'Reconnect in Integrations settings.' }
   ),
 };
-
-// ── Content / export / import errors ──
 
 export const ContentErrors = {
   importFailed: (format: string, cause?: unknown) => createAppError(
@@ -87,7 +332,6 @@ export const ContentErrors = {
   ),
 };
 
-/** Check if a caught error is an IndexedDB quota exceeded error. */
 export function isQuotaError(err: unknown): boolean {
   return err instanceof DOMException && (
     err.name === 'QuotaExceededError' ||
@@ -95,21 +339,12 @@ export function isQuotaError(err: unknown): boolean {
   );
 }
 
-/** Build the appropriate storage AppErrorInfo for a caught error. */
 export function storageErrorFrom(cause: unknown): AppErrorInfo {
   return isQuotaError(cause)
     ? StorageErrors.quotaExceeded(cause)
     : StorageErrors.writeFailed(cause);
 }
 
-/** Record an AppErrorInfo to the telemetry system. */
 export function recordAppError(error: AppErrorInfo): void {
-  recordTelemetryEvent({
-    action: `error.${error.domain}.${error.code.toLowerCase()}`,
-    contextLengthChars: 0,
-    promptLengthChars: 0,
-    responseLengthChars: 0,
-    success: false,
-    errorType: error.code,
-  });
+  void reportAppError(error);
 }

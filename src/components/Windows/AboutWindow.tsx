@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '@/context/AppContext';
 import { useWindowResize } from '@/hooks/useResizable';
+import { createDiagnosticsReport } from '@/lib/errors';
 import styles from './Windows.module.css';
 
 interface AboutWindowProps {
@@ -88,6 +89,18 @@ export function AboutWindow({ open, onClose }: AboutWindowProps) {
     };
   }, [isDragging, dragOffset]);
 
+
+  const handleCreateDiagnosticsReport = useCallback(async () => {
+    const report = await createDiagnosticsReport(state);
+    const blob = new Blob([report], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `draftharbour-diagnostics-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [state]);
+
   if (!open) return null;
 
   return (
@@ -163,6 +176,12 @@ export function AboutWindow({ open, onClose }: AboutWindowProps) {
           <p className={styles.aboutCredits}>
             Built with React, TypeScript, and Tiptap.
           </p>
+
+          <button className={styles.diagnosticsButton} onClick={() => { void handleCreateDiagnosticsReport(); }}>
+            <span className="material-symbols-rounded">description</span>
+            Create Diagnostics Report
+          </button>
+          <p className={styles.aboutCredits}>Sensitive keys and auth data are redacted.</p>
         </div>
         {!isMobile && (
           <>

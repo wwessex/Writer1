@@ -21,6 +21,7 @@ import {
 } from '@/lib/integrations/api';
 import type { AppState, Chapter, ConflictInfo, ConflictResolutionOption, IntegrationConfig, IntegrationType, PersistedIntegrationConfig } from '@/types';
 import { recordTelemetryEvent } from '@/lib/telemetry';
+import { createAppError, reportAppError } from '@/lib/errors';
 import styles from './Modals.module.css';
 
 interface IntegrationsModalProps {
@@ -265,6 +266,10 @@ export function IntegrationsModal({ open, onClose }: IntegrationsModalProps) {
         success: false,
         errorType: conflict.remoteRevisionId || 'revision_conflict',
       });
+      void reportAppError(
+        createAppError('SYNC_CONFLICT', 'Integration sync conflict detected.', 'network', 'medium', { cause: conflict }),
+        { category: 'sync_conflict', context: `provider=${conflict.provider}` }
+      );
     }
     setActiveConflict(conflict);
   }, [dispatch]);
@@ -326,6 +331,10 @@ export function IntegrationsModal({ open, onClose }: IntegrationsModalProps) {
           if (!result.active) {
             updateConfig(provider, { sessionToken: undefined, status: 'error' });
             recordTelemetryEvent({ action: 'integrations.token_refresh_failed', contextLengthChars: 0, promptLengthChars: 0, responseLengthChars: 0, provider, success: false, errorType: 'session_inactive' });
+            void reportAppError(
+              createAppError('INTEGRATION_AUTH_FAILED', `${provider} session is inactive.`, 'network', 'medium', { cause: result }),
+              { category: 'integration_auth_failure', context: `provider=${provider}` }
+            );
             return;
           }
 
@@ -351,6 +360,10 @@ export function IntegrationsModal({ open, onClose }: IntegrationsModalProps) {
             success: false,
             errorType: error instanceof Error ? error.message : 'unknown_error',
           });
+          void reportAppError(
+            createAppError('INTEGRATION_AUTH_FAILED', `${provider} token refresh failed.`, 'network', 'medium', { cause: error }),
+            { category: 'integration_auth_failure', context: `provider=${provider}` }
+          );
         }
       }));
     };
