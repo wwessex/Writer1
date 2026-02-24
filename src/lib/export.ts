@@ -696,6 +696,8 @@ function buildDocxChapterContent(
             size: ptToHalfPt(fontSizePt),
             bold: run.bold,
             italics: run.italic,
+            underline: run.underline ? { type: 'single' } : undefined,
+            strike: run.strike,
           }));
           children.push(
             new Paragraph({
