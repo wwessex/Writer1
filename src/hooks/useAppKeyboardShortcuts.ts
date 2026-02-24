@@ -27,6 +27,8 @@ interface UseAppKeyboardShortcutsParams {
   createCommentFromSelection: () => void;
   setInspectorOpen: Dispatch<SetStateAction<boolean>>;
   setQuickSwitcherOpen: Dispatch<SetStateAction<boolean>>;
+  openRecentProjects: () => void;
+  reopenLastProject: () => void;
 }
 
 interface KeyboardShortcutContext {
@@ -127,6 +129,8 @@ export function useAppKeyboardShortcuts({
   createCommentFromSelection,
   setInspectorOpen,
   setQuickSwitcherOpen,
+  openRecentProjects,
+  reopenLastProject,
 }: UseAppKeyboardShortcutsParams) {
   const handleMenuAction = useCallback((action: CommandId) => {
     runCommand(action, {
@@ -137,6 +141,8 @@ export function useAppKeyboardShortcuts({
       createChapter,
       handleExportBackup,
       handleSaveProjectFile,
+      openRecentProjects,
+      reopenLastProject,
       openModal,
       toggleModal,
       toggleInspector: () => setInspectorOpen(prev => !prev),
@@ -149,7 +155,7 @@ export function useAppKeyboardShortcuts({
       showToast,
       createCommentFromSelection,
     });
-  }, [createCommentFromSelection, createChapter, dispatch, editor, fileInputRef, handleExportBackup, handleSaveProjectFile, importInputRef, openModal, projectFileInputRef, settings.typewriterMode, setInspectorOpen, setQuickSwitcherOpen, showToast, toggleModal, updateSettings]);
+  }, [createCommentFromSelection, createChapter, dispatch, editor, fileInputRef, handleExportBackup, handleSaveProjectFile, importInputRef, openModal, openRecentProjects, projectFileInputRef, reopenLastProject, settings.typewriterMode, setInspectorOpen, setQuickSwitcherOpen, showToast, toggleModal, updateSettings]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {

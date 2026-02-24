@@ -54,6 +54,22 @@ fn read_text_file(path: String) -> Result<String, String> {
     fs::read_to_string(path).map_err(|err| err.to_string())
 }
 
+#[tauri::command]
+fn open_project_window(app: AppHandle, novel_id: String) -> Result<(), String> {
+    let label = format!("project-{}", novel_id);
+    if app.get_webview_window(&label).is_some() {
+        return Ok(());
+    }
+
+    let url = format!("/?project={}", novel_id);
+    tauri::WebviewWindowBuilder::new(&app, label, tauri::WebviewUrl::App(url.into()))
+        .title("DraftHarbour Studio")
+        .build()
+        .map_err(|err| err.to_string())?;
+
+    Ok(())
+}
+
 fn apply_native_role(role: &str) -> Option<PredefinedMenuItem> {
     match role {
         "undo" => Some(PredefinedMenuItem::undo(None)),
@@ -185,7 +201,8 @@ fn main() {
             quit_app,
             read_text_file,
             set_native_menu,
-            set_native_menu_command_state
+            set_native_menu_command_state,
+            open_project_window
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

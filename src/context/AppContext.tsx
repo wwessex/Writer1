@@ -24,6 +24,7 @@ import {
   readSettingsFromLocalStorage,
   withSavingDispatch
 } from './services/appServices';
+import { getWorkspaceStore, setLastOpenedChapter, trackProjectOpen } from './services/workspaceService';
 
 const MAX_UNDO_STACK = 20;
 const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches;
@@ -145,18 +146,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const actions = useMemo(() => ({
     loadNovel: async () => {
-      const result = await loadDefaultNovelAndChapters();
+      const workspace = getWorkspaceStore();
+      const recentTargetId = workspace.lastProjectId;
+      const result = recentTargetId
+        ? await loadNovelAndChaptersById(recentTargetId) ?? await loadDefaultNovelAndChapters()
+        : await loadDefaultNovelAndChapters();
+      trackProjectOpen(result.novel.id);
       dispatch({ type: 'SET_NOVEL', payload: result });
+      const lastChapterId = workspace.lastOpenedChapterByProject[result.novel.id];
+      if (lastChapterId) {
+        dispatch({ type: 'SET_ACTIVE_CHAPTER', payload: lastChapterId });
+      }
     },
 
     loadNovelById: async (id: string) => {
       const result = await loadNovelAndChaptersById(id);
       if (!result) return;
+      trackProjectOpen(id);
       dispatch({ type: 'SET_NOVEL', payload: result });
+      const workspace = getWorkspaceStore();
+      const lastChapterId = workspace.lastOpenedChapterByProject[id];
+      if (lastChapterId) {
+        dispatch({ type: 'SET_ACTIVE_CHAPTER', payload: lastChapterId });
+      }
     },
 
     createNewNovel: async (title: string, projectType: ProjectType): Promise<Novel> => {
       const result = await createNovelWithFirstChapter(title, projectType);
+      trackProjectOpen(result.novel.id);
       dispatch({ type: 'SET_NOVEL', payload: result });
       return result.novel;
     },
@@ -212,6 +229,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
 
     setActiveChapter: (id: string) => {
+      setLastOpenedChapter(stateRef.current.novelId, id);
       dispatch({ type: 'SET_ACTIVE_CHAPTER', payload: id });
     },
 

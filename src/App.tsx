@@ -32,6 +32,7 @@ import { useFocusModeClass } from '@/hooks/useFocusModeClass';
 import { useEditorSelectionTracking } from '@/hooks/useEditorSelectionTracking';
 import { useVoiceAlerts } from '@/hooks/useVoiceAlerts';
 import { useDesktopRuntime } from '@/hooks/useDesktopRuntime';
+import { clearWindowLocks, getSessionState, getWorkspaceStore, heartbeatProjectLock, persistSessionState } from '@/context/services/workspaceService';
 import './styles/index.css';
 import styles from './App.module.css';
 
@@ -62,7 +63,7 @@ const ExportHistoryModal = lazy(() => import('@/components/Modals/ExportHistoryM
 const TranslationModal = lazy(() => import('@/components/Modals/TranslationModal').then((module) => ({ default: module.TranslationModal })));
 
 function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits }: { screenplayMode: boolean; onToggleScreenplayMode: () => void; hasUnsavedEdits: boolean }) {
-  const { state, activeChapter, loadNovel, createChapter: createNewChapter, dispatch, updateSettings } = useApp();
+  const { state, activeChapter, loadNovel, loadNovelById, createChapter: createNewChapter, dispatch, updateSettings, setActiveChapter } = useApp();
   const { editor } = useCurrentEditor();
   const { showToast } = useToast();
   const { modals, openModal, closeModal, toggleModal } = useModalState();
@@ -137,6 +138,55 @@ function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits }: {
 
   useFocusModeClass(state.settings.focusMode);
 
+  useEffect(() => {
+    const projectFromUrl = new URLSearchParams(window.location.search).get('project');
+    if (projectFromUrl) {
+      void loadNovelById(projectFromUrl);
+    }
+  }, [loadNovelById]);
+
+  useEffect(() => {
+    const restored = getSessionState();
+    if (!restored) return;
+    if (restored.geometry) {
+      window.resizeTo(restored.geometry.width, restored.geometry.height);
+      window.moveTo(restored.geometry.x, restored.geometry.y);
+    }
+    if (typeof restored.panelLayout === 'object' && restored.panelLayout) {
+      updateSettings({ sidebarPanels: restored.panelLayout as typeof state.settings.sidebarPanels });
+    }
+    if (restored.projectId && restored.projectId !== state.novelId) {
+      void loadNovelById(restored.projectId);
+    }
+    if (restored.chapterId) {
+      setActiveChapter(restored.chapterId);
+    }
+    setInspectorOpen(Boolean((restored as { inspectorOpen?: boolean }).inspectorOpen));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    persistSessionState({
+      projectId: state.novelId,
+      chapterId: state.activeChapterId,
+      panelLayout: state.settings.sidebarPanels,
+      geometry: { width: window.outerWidth, height: window.outerHeight, x: window.screenX, y: window.screenY },
+      inspectorOpen,
+    });
+  }, [state.novelId, state.activeChapterId, state.settings.sidebarPanels, inspectorOpen]);
+
+  useEffect(() => {
+    heartbeatProjectLock(state.novelId);
+    const interval = window.setInterval(() => heartbeatProjectLock(state.novelId), 5000);
+    return () => window.clearInterval(interval);
+  }, [state.novelId]);
+
+  useEffect(() => {
+    const handleUnload = () => clearWindowLocks();
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  }, []);
+
   const handleOnboardingClose = useCallback(() => {
     closeModal('onboarding');
     updateSettings({ onboardingComplete: true });
@@ -167,6 +217,13 @@ function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits }: {
     createCommentFromSelection,
     setInspectorOpen,
     setQuickSwitcherOpen,
+    openRecentProjects: () => openModal('projects'),
+    reopenLastProject: () => {
+      const lastProjectId = getWorkspaceStore().lastProjectId;
+      if (lastProjectId) {
+        void loadNovelById(lastProjectId);
+      }
+    },
   });
 
 
