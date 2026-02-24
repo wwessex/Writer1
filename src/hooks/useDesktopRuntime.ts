@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { importDhproj } from '@/lib/storage';
 
 interface UseDesktopRuntimeParams {
@@ -14,7 +16,6 @@ export function useDesktopRuntime({ hasUnsavedEdits, onDeepLink, showToast }: Us
     if (!isDesktopRuntime()) return;
 
     const updateDirtyFlag = async () => {
-      const { invoke } = await import('@tauri-apps/api/core');
       await invoke('set_unsaved_edits', { value: hasUnsavedEdits });
     };
 
@@ -29,11 +30,6 @@ export function useDesktopRuntime({ hasUnsavedEdits, onDeepLink, showToast }: Us
     let unlistenConfirmQuit: (() => void) | undefined;
 
     const setup = async () => {
-      const [{ invoke }, { listen }] = await Promise.all([
-        import('@tauri-apps/api/core'),
-        import('@tauri-apps/api/event')
-      ]);
-
       unlistenProject = await listen<string>('desktop://open-project', async (event) => {
         try {
           const fileContent = await invoke<string>('read_text_file', { path: event.payload });
