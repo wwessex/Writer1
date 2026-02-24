@@ -5,6 +5,7 @@
  */
 
 import { generateId } from '@/lib/utils';
+import { getManagedPolicy } from '@/lib/policy';
 
 const STORAGE_KEY = 'draftharbour_ai_telemetry_v1';
 const OPT_IN_KEY = 'draftharbour_ai_telemetry_optin';
@@ -36,10 +37,16 @@ export interface TelemetrySummary {
 }
 
 export function isTelemetryOptedIn(): boolean {
+  if (getManagedPolicy().disableTelemetry) return false;
   return localStorage.getItem(OPT_IN_KEY) === 'true';
 }
 
 export function setTelemetryOptIn(enabled: boolean): void {
+  if (getManagedPolicy().disableTelemetry) {
+    localStorage.setItem(OPT_IN_KEY, 'false');
+    localStorage.removeItem(STORAGE_KEY);
+    return;
+  }
   localStorage.setItem(OPT_IN_KEY, String(enabled));
   if (!enabled) {
     localStorage.removeItem(STORAGE_KEY);

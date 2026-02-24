@@ -12,6 +12,8 @@ use tauri::{
     AppHandle, Emitter, Manager, WindowEvent,
 };
 
+const KEYRING_SERVICE: &str = "DraftHarbourStudio";
+
 static HAS_UNSAVED_EDITS: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug, Deserialize)]
@@ -68,6 +70,31 @@ fn open_project_window(app: AppHandle, novel_id: String) -> Result<(), String> {
         .map_err(|err| err.to_string())?;
 
     Ok(())
+}
+
+#[tauri::command]
+fn set_secure_secret(key: String, value: String) -> Result<(), String> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, &key).map_err(|err| err.to_string())?;
+    entry.set_password(&value).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+fn get_secure_secret(key: String) -> Result<Option<String>, String> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, &key).map_err(|err| err.to_string())?;
+    match entry.get_password() {
+        Ok(value) => Ok(Some(value)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(err) => Err(err.to_string()),
+    }
+}
+
+#[tauri::command]
+fn delete_secure_secret(key: String) -> Result<(), String> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, &key).map_err(|err| err.to_string())?;
+    match entry.delete_credential() {
+        Ok(_) | Err(keyring::Error::NoEntry) => Ok(()),
+        Err(err) => Err(err.to_string()),
+    }
 }
 
 fn apply_native_role(role: &str) -> Option<PredefinedMenuItem> {
@@ -202,7 +229,10 @@ fn main() {
             read_text_file,
             set_native_menu,
             set_native_menu_command_state,
-            open_project_window
+            open_project_window,
+            set_secure_secret,
+            get_secure_secret,
+            delete_secure_secret
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

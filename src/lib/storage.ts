@@ -96,6 +96,11 @@ class DraftHarbourDB extends Dexie {
 
 export const db = new DraftHarbourDB();
 
+export interface DhprojExportOptions {
+  includeSnapshots?: boolean;
+  includeIntegrationArtifacts?: boolean;
+}
+
 function normalizeProjectType(projectType?: ProjectType): ProjectType {
   return projectType === 'screenplay' ? 'screenplay' : 'book';
 }
@@ -643,13 +648,16 @@ function readSafePersistedIntegrationsFromStorage(): DhprojIntegrations | undefi
 }
 
 // Project file (.dhproj) operations
-export async function exportDhproj(novelId: string): Promise<Blob> {
+export async function exportDhproj(novelId: string, options: DhprojExportOptions = {}): Promise<Blob> {
   const novel = await getNovel(novelId);
   if (!novel) throw new Error('Novel not found');
 
   const chapters = await getChapters(novelId);
   const chapterIds = chapters.map(c => c.id);
-  const snapshots = await db.snapshots.where('chapterId').anyOf(chapterIds).toArray();
+  const includeSnapshots = options.includeSnapshots ?? true;
+  const snapshots = includeSnapshots
+    ? await db.snapshots.where('chapterId').anyOf(chapterIds).toArray()
+    : [];
   const commentThreads = getCommentThreadsForChapters(chapterIds);
 
   // Read settings from localStorage
@@ -680,13 +688,18 @@ export async function exportDhproj(novelId: string): Promise<Blob> {
     .filter(isWorldEntry)
     .filter(entry => entry.novelId === novelId);
   // Safe persisted integration data contains connection metadata only (never OAuth/session tokens).
-  const integrations = readSafePersistedIntegrationsFromStorage();
+  const includeIntegrationArtifacts = options.includeIntegrationArtifacts ?? false;
+  const integrations = includeIntegrationArtifacts ? readSafePersistedIntegrationsFromStorage() : undefined;
 
   const manifest: DhprojManifest = {
     format: 'dhproj',
     version: 1,
     appVersion: '1.0.0',
     createdAt: new Date().toISOString(),
+    exportOptions: {
+      includeSnapshots,
+      includeIntegrationArtifacts,
+    }
   };
 
   const data: DhprojData = {
@@ -938,4 +951,8 @@ export async function importDhproj(file: File): Promise<Novel> {
   }
 
   return novel;
+}
+
+export async function secureWipeIntegrationArtifacts(): Promise<void> {
+  localStorage.removeItem(INTEGRATIONS_STORAGE_KEY);
 }

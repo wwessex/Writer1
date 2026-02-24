@@ -31,7 +31,10 @@ export function useProjectFileActions({ state, loadNovel, showToast }: UseProjec
 
   const handleSaveProjectFile = useCallback(async () => {
     try {
-      const blob = await exportDhproj(state.novelId);
+      const blob = await exportDhproj(state.novelId, {
+        includeSnapshots: true,
+        includeIntegrationArtifacts: false,
+      });
       downloadFile(blob, `${state.novelTitle}.dhproj`);
       showToast('Project file saved', 'success', 'save');
     } catch (err) {

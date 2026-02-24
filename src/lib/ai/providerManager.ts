@@ -13,8 +13,11 @@ import { ChromeAIProvider } from './chromeAI';
 import { OpenAIProvider } from './openaiProvider';
 import { ServerProxyProvider } from './serverProxyProvider';
 import { isChromeAIAvailable, isChromeBrowser } from './availability';
+import { deleteSecret, isDesktop, setSecret } from '@/lib/desktopSecrets';
+import { getManagedPolicy } from '@/lib/policy';
 
 const STORAGE_KEY = 'draftharbour_ai_config';
+const AI_TOKEN_SECRET_KEY = 'ai_session_token';
 
 /* ------------------------------------------------------------------ */
 /*  Config persistence                                                 */
@@ -22,6 +25,11 @@ const STORAGE_KEY = 'draftharbour_ai_config';
 
 /** Load AI config from localStorage, migrating legacy format if needed. */
 export function loadAIConfig(): AIProviderConfig {
+  const policy = getManagedPolicy();
+  if (policy.disableAIProviders) {
+    return { provider: 'managed-cloud' };
+  }
+
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
@@ -62,13 +70,19 @@ export function loadAIConfig(): AIProviderConfig {
       };
     }
 
-    return {
+    const loadedConfig: AIProviderConfig = {
       provider: safeConfig.provider,
       endpoint: safeConfig.endpoint,
       model: safeConfig.model,
       sessionToken: safeConfig.sessionToken,
       serverProxy: safeConfig.serverProxy,
     };
+
+    if (policy.disabledAIProviderTypes?.includes(loadedConfig.provider)) {
+      return { provider: 'managed-cloud' };
+    }
+
+    return loadedConfig;
   } catch {
     return { provider: 'managed-cloud' };
   }
@@ -76,11 +90,25 @@ export function loadAIConfig(): AIProviderConfig {
 
 /** Save AI config to localStorage. */
 export function saveAIConfig(config: AIProviderConfig): void {
+  const policy = getManagedPolicy();
+  if (policy.disableAIProviders || policy.disabledAIProviderTypes?.includes(config.provider)) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ provider: 'managed-cloud' }));
+    return;
+  }
+
+  if (isDesktop()) {
+    if (config.sessionToken) {
+      void setSecret(AI_TOKEN_SECRET_KEY, config.sessionToken);
+    } else {
+      void deleteSecret(AI_TOKEN_SECRET_KEY);
+    }
+  }
+
   const safeConfig: AIProviderConfig = {
     provider: config.provider,
     endpoint: config.endpoint,
     model: config.model,
-    sessionToken: config.sessionToken,
+    sessionToken: isDesktop() ? undefined : config.sessionToken,
     serverProxy: config.serverProxy,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(safeConfig));

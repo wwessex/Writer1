@@ -22,6 +22,7 @@ import {
 import type { AppState, Chapter, ConflictInfo, ConflictResolutionOption, IntegrationConfig, IntegrationType, PersistedIntegrationConfig } from '@/types';
 import { recordTelemetryEvent } from '@/lib/telemetry';
 import { createAppError, reportAppError } from '@/lib/errors';
+import { secureCacheDecode, secureCacheEncode } from '@/lib/secureCache';
 import styles from './Modals.module.css';
 
 interface IntegrationsModalProps {
@@ -118,6 +119,19 @@ function loadConfigs(): IntegrationConfigs {
   }
 }
 
+async function loadConfigsEncrypted(): Promise<IntegrationConfigs | null> {
+  try {
+    const encrypted = localStorage.getItem(`${STORAGE_KEY}_enc`);
+    if (!encrypted) return null;
+    const decoded = await secureCacheDecode(encrypted);
+    if (!decoded) return null;
+    localStorage.setItem(STORAGE_KEY, decoded);
+    return loadConfigs();
+  } catch {
+    return null;
+  }
+}
+
 function saveConfigs(configs: IntegrationConfigs) {
   const safeConfigs = {
     scrivener: createSafePersistedConfig(configs.scrivener),
@@ -125,6 +139,9 @@ function saveConfigs(configs: IntegrationConfigs) {
     dropbox: createSafePersistedConfig(configs.dropbox),
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(safeConfigs));
+  void secureCacheEncode(JSON.stringify(safeConfigs)).then(encrypted => {
+    localStorage.setItem(`${STORAGE_KEY}_enc`, encrypted);
+  });
 }
 
 function formatSyncTime(timestamp?: number): string {
@@ -242,6 +259,14 @@ function getProviderHealthLabel(metadata?: ProviderPublicMetadata): string {
 export function IntegrationsModal({ open, onClose }: IntegrationsModalProps) {
   const { state, dispatch } = useApp();
   const [configs, setConfigs] = useState<IntegrationConfigs>(loadConfigs);
+
+  useEffect(() => {
+    void loadConfigsEncrypted().then(loaded => {
+      if (loaded) {
+        setConfigs(loaded);
+      }
+    });
+  }, []);
   const [providerMetadata, setProviderMetadata] = useState<Partial<Record<'google-drive' | 'dropbox', ProviderPublicMetadata>>>({});
   const [activeConflict, setActiveConflict] = useState<ConflictInfo | null>(null);
 
@@ -784,4 +809,3 @@ function DropboxCard({ config, metadata, appState, onToggle, onUpdate, onApplyPu
     </CardShell>
   );
 }
-

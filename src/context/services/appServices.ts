@@ -3,6 +3,10 @@ import type { AppSettings, Chapter, Novel, ProjectType } from '@/types';
 import * as storage from '@/lib/storage';
 import { createSettingsEnvelope, loadSettingsFromStorage } from '@/lib/settingsMigration';
 import { SETTINGS_STORAGE_KEY } from '@/lib/storageKeys';
+import { applyManagedSettingsOverrides } from '@/lib/policy';
+import { getSecret, isDesktop, setSecret } from '@/lib/desktopSecrets';
+
+const SYNC_AUTH_SECRET_KEY = 'sync_auth_header';
 import type { AppAction } from '@/context/state/appReducer';
 
 export async function getNovelWithChapters(novel: Novel): Promise<{ novel: Novel; chapters: Chapter[] }> {
@@ -49,9 +53,34 @@ export async function withSavingDispatch(dispatch: Dispatch<AppAction>, operatio
 }
 
 export function readSettingsFromLocalStorage(fallback: AppSettings): AppSettings {
-  return loadSettingsFromStorage(localStorage.getItem(SETTINGS_STORAGE_KEY), fallback);
+  const userSettings = loadSettingsFromStorage(localStorage.getItem(SETTINGS_STORAGE_KEY), fallback);
+  const policySettings = applyManagedSettingsOverrides(userSettings);
+
+  if (!isDesktop()) {
+    return policySettings;
+  }
+
+  void getSecret(SYNC_AUTH_SECRET_KEY).then(secret => {
+    if (!secret) return;
+    const current = loadSettingsFromStorage(localStorage.getItem(SETTINGS_STORAGE_KEY), fallback);
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(createSettingsEnvelope({
+      ...current,
+      sync: { ...current.sync, auth: secret }
+    })));
+  });
+
+  return policySettings;
 }
 
 export function persistSettingsToLocalStorage(settings: AppSettings): void {
-  localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(createSettingsEnvelope(settings)));
+  const policyAppliedSettings = applyManagedSettingsOverrides(settings);
+  if (isDesktop() && policyAppliedSettings.sync.auth) {
+    void setSecret(SYNC_AUTH_SECRET_KEY, policyAppliedSettings.sync.auth);
+  }
+
+  const persistableSettings = isDesktop()
+    ? { ...policyAppliedSettings, sync: { ...policyAppliedSettings.sync, auth: '' } }
+    : policyAppliedSettings;
+
+  localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(createSettingsEnvelope(persistableSettings)));
 }
