@@ -132,7 +132,9 @@ export function VirtualChapterList() {
 
       if (draggedIndex !== -1 && targetIndex !== -1) {
         const [dragged] = chapters.splice(draggedIndex, 1);
-        chapters.splice(targetIndex, 0, dragged);
+        const adjustedTargetIndex = draggedIndex < targetIndex ? targetIndex - 1 : targetIndex;
+        const insertIndex = dragState.dropPosition === 'below' ? adjustedTargetIndex + 1 : adjustedTargetIndex;
+        chapters.splice(insertIndex, 0, dragged);
         reorderChapters(chapters.map(ch => ch.id));
 
         setJustMovedId(draggedId);
@@ -142,7 +144,7 @@ export function VirtualChapterList() {
     }
 
     setDragState({ dragging: false, draggedId: null, dropTargetId: null, dropPosition: null });
-  }, [state.chapters, reorderChapters]);
+  }, [state.chapters, reorderChapters, dragState.dropPosition]);
 
   const renderChapterItem = (chapter: typeof state.chapters[0], index: number) => {
     const wordCount = countWords(editorToPlainText(chapter.content));
