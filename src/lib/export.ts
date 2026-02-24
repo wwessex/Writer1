@@ -695,7 +695,7 @@ function buildDocxChapterContent(
             font: fontFamily,
             size: ptToHalfPt(fontSizePt),
             bold: run.bold,
-            italics: run.italic || true,
+            italics: run.italic,
           }));
           children.push(
             new Paragraph({

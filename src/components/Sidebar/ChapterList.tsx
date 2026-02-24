@@ -60,7 +60,8 @@ export function ChapterList() {
 
       if (draggedIndex !== -1 && targetIndex !== -1) {
         const [dragged] = chapters.splice(draggedIndex, 1);
-        const insertIndex = dragState.dropPosition === 'below' ? targetIndex : targetIndex;
+        const adjustedTargetIndex = draggedIndex < targetIndex ? targetIndex - 1 : targetIndex;
+        const insertIndex = dragState.dropPosition === 'below' ? adjustedTargetIndex + 1 : adjustedTargetIndex;
         chapters.splice(insertIndex, 0, dragged);
         reorderChapters(chapters.map(ch => ch.id));
 
