@@ -8,6 +8,7 @@
 
 import { getBrokerBaseUrl, getBrokerEndpoint } from '@/lib/featureFlags';
 import { fetchEnvelope, fetchWithPolicy } from '@/lib/integrations/providerClient';
+import { getManagedPolicy } from '@/lib/policy';
 import type { AIProvider, AIProviderConfig, AIRequest, AIResponse, ServerProxyProviderType } from './types';
 
 /* ------------------------------------------------------------------ */
@@ -68,6 +69,11 @@ export class ServerProxyProvider implements AIProvider {
   }
 
   async execute(request: AIRequest): Promise<AIResponse> {
+    const policy = getManagedPolicy();
+    if (policy.forceLocalOnly || policy.disableAIProviders || policy.disabledAIProviderTypes?.includes('server-proxy')) {
+      throw new Error('Server proxy AI is disabled by managed policy.');
+    }
+
     if (!this.config.serverProxy?.serverProvider || !this.config.serverProxy?.model) {
       throw new Error('Server proxy is not configured. Select a provider and model in AI Settings.');
     }

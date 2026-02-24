@@ -139,6 +139,48 @@ That error is usually a GitHub client/API issue (not a Capacitor project issue).
 ## Data
 Saved locally in your browser (IndexedDB). Use **Settings → Export Backup** for a JSON backup.
 
+## Security Appendix
+
+### Storage boundaries by runtime
+
+- **Web/PWA runtime:**
+  - Project content is stored in IndexedDB (`DraftHarbourDB`).
+  - User settings and safe integration metadata are stored in `localStorage`.
+  - Sensitive provider/session credentials are best-effort and browser-bound (no OS vault APIs are available in standard web runtimes).
+- **Desktop (Tauri) runtime:**
+  - Project content remains in IndexedDB for renderer compatibility.
+  - Sensitive credentials (AI session token, sync authorization header) are moved to the OS credential vault through native keyring APIs (Keychain/Credential Manager/libsecret).
+  - The renderer persists only non-sensitive config metadata.
+
+### Config layering and policy precedence
+
+Runtime configuration resolves with this precedence:
+
+1. **App defaults**
+2. **User settings**
+3. **Managed policy overrides** (highest precedence, read-only)
+
+Managed policy can enforce controls such as:
+
+- disable telemetry,
+- disable AI providers,
+- force local-only mode (clears remote sync URL/auth and blocks cloud AI paths),
+- provider-specific AI disable lists.
+
+### Backup/export inclusion semantics
+
+- `.dhproj` export now tracks explicit export options in the manifest:
+  - `includeSnapshots`
+  - `includeIntegrationArtifacts`
+- Integration artifacts are excluded by default from project-file export and require explicit inclusion.
+- A secure wipe path exists for clearing stored integration artifacts before export or deprovisioning.
+
+### Threat assumptions
+
+- This app primarily protects against **accidental disclosure** (e.g., exported files, diagnostics, shared devices).
+- It does **not** claim protection against a fully compromised OS/user session.
+- On desktop, OS vault integration improves credential-at-rest posture compared with browser storage, but does not replace endpoint hardening.
+
 
 ## Diagnostics & Privacy Redaction
 - Use **About → Create Diagnostics Report** to export a local JSON diagnostics bundle.

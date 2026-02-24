@@ -283,6 +283,10 @@ export interface DhprojManifest {
   version: 1;
   appVersion: string;
   createdAt: string;
+  exportOptions?: {
+    includeSnapshots?: boolean;
+    includeIntegrationArtifacts?: boolean;
+  };
 }
 
 export interface DhprojData {

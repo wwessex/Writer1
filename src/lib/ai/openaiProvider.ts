@@ -4,7 +4,11 @@
 
 import { getBrokerBaseUrl, isAIDeveloperModeEnabled } from '@/lib/featureFlags';
 import { fetchEnvelope, fetchWithPolicy } from '@/lib/integrations/providerClient';
+import { getSecret } from '@/lib/desktopSecrets';
+import { getManagedPolicy } from '@/lib/policy';
 import type { AIProvider, AIProviderConfig, AIRequest, AIResponse } from './types';
+
+const AI_TOKEN_SECRET_KEY = 'ai_session_token';
 
 export class OpenAIProvider implements AIProvider {
   readonly type: AIProviderConfig['provider'];
@@ -14,7 +18,7 @@ export class OpenAIProvider implements AIProvider {
   }
 
   isAvailable(): boolean {
-    const hasCustomEndpoint = !!(this.config.endpoint?.trim() && this.config.sessionToken?.trim());
+    const hasCustomEndpoint = !!this.config.endpoint?.trim();
 
     if (this.config.provider === 'managed-cloud') {
       // managed-cloud requires a broker URL to function
@@ -30,9 +34,16 @@ export class OpenAIProvider implements AIProvider {
   }
 
   async execute(request: AIRequest): Promise<AIResponse> {
+    const policy = getManagedPolicy();
+    if (policy.forceLocalOnly || policy.disableAIProviders) {
+      throw new Error('AI is disabled by managed policy.');
+    }
+
+    const resolvedToken = this.config.sessionToken ?? await getSecret(AI_TOKEN_SECRET_KEY) ?? undefined;
+
     if (!this.isAvailable()) {
       const hasEndpoint = !!this.config.endpoint?.trim();
-      const hasKey = !!this.config.sessionToken?.trim();
+      const hasKey = !!resolvedToken?.trim();
       if (hasEndpoint && !hasKey) {
         throw new Error('API key is missing. Open Settings → Custom provider and paste your API key.');
       }
@@ -47,7 +58,7 @@ export class OpenAIProvider implements AIProvider {
       ? `Here is the current ${request.projectType === 'screenplay' ? 'scene' : 'chapter'} text for context:\n\n---\n${request.context}\n---\n\n${request.prompt}`
       : request.prompt;
 
-    const hasCustomEndpoint = !!(this.config.endpoint?.trim() && this.config.sessionToken?.trim());
+    const hasCustomEndpoint = !!(this.config.endpoint?.trim() && resolvedToken?.trim());
     const useCustomEndpoint = this.config.provider === 'openai-compatible' && hasCustomEndpoint;
     const useManagedBroker = this.config.provider === 'managed-cloud' || (!useCustomEndpoint && !isAIDeveloperModeEnabled());
 
@@ -91,7 +102,7 @@ export class OpenAIProvider implements AIProvider {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.config.sessionToken!.trim()}`,
+        ...(resolvedToken ? { Authorization: `Bearer ${resolvedToken.trim()}` } : {}),
       },
       body: JSON.stringify({
         model: this.config.model || 'gpt-4o',

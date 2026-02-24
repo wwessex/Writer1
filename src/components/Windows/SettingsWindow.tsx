@@ -8,6 +8,7 @@ import { isTelemetryOptedIn, setTelemetryOptIn, clearTelemetryData } from '@/lib
 import { loadAIConfig, saveAIConfig } from '@/lib/ai';
 import type { AIProviderConfig } from '@/lib/ai';
 import { useWindowResize } from '@/hooks/useResizable';
+import { getManagedPolicy } from '@/lib/policy';
 import styles from './Windows.module.css';
 
 interface SettingsWindowProps {
@@ -180,6 +181,7 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
     data: true
   });
   const [telemetryEnabled, setTelemetryEnabled] = useState(isTelemetryOptedIn());
+  const managedPolicy = useMemo(() => getManagedPolicy(), []);
   const [aiConfig, setAIConfig] = useState<AIProviderConfig>(loadAIConfig);
 
   const updateAIConfig = useCallback((updates: Partial<AIProviderConfig>) => {
@@ -772,6 +774,7 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                     <input
                       type="checkbox"
                       checked={state.settings.sync.url.trim() !== ''}
+                      disabled={managedPolicy.forceLocalOnly}
                       onChange={e => {
                         if (!e.target.checked) {
                           updateSettings({ sync: { ...state.settings.sync, url: '', auth: '' } });
@@ -794,6 +797,7 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                     <input
                       type="checkbox"
                       checked={telemetryEnabled}
+                      disabled={managedPolicy.disableTelemetry}
                       onChange={e => {
                         setTelemetryEnabled(e.target.checked);
                         setTelemetryOptIn(e.target.checked);
