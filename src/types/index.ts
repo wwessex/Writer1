@@ -161,6 +161,8 @@ export interface AppState {
   isOnline: boolean;
   isSaving: boolean;
   settings: AppSettings;
+  reorderUndoStackLength: number;
+  reorderRedoStackLength: number;
 }
 
 export interface LanguageToolMatch {
