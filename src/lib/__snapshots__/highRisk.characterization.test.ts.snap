@@ -1,0 +1,240 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`high-risk module characterization snapshots > keeps fountain import parsing structure stable for partial-support fixture 1`] = `
+{
+  "notices": [
+    {
+      "line": 1,
+      "message": "Section headings are not fully supported and were imported as action text.",
+    },
+    {
+      "line": 2,
+      "message": "Synopses are imported as action text.",
+    },
+    {
+      "line": 4,
+      "message": "Inline notes are imported as action text.",
+    },
+  ],
+  "sections": [
+    {
+      "content": {
+        "content": [
+          {
+            "attrs": {
+              "screenplayType": "action",
+            },
+            "content": [
+              {
+                "text": "Act One",
+                "type": "text",
+              },
+            ],
+            "type": "paragraph",
+          },
+          {
+            "attrs": {
+              "screenplayType": "action",
+            },
+            "content": [
+              {
+                "text": "Setup beat",
+                "type": "text",
+              },
+            ],
+            "type": "paragraph",
+          },
+        ],
+        "type": "doc",
+      },
+      "metadata": {
+        "originalTitle": "Scene 1",
+        "sourceFormat": "fountain",
+        "sourceLineEnd": 2,
+        "sourceLineStart": 1,
+      },
+      "title": "Scene 1",
+    },
+    {
+      "content": {
+        "content": [
+          {
+            "attrs": {
+              "screenplayType": "scene-heading",
+            },
+            "content": [
+              {
+                "text": "INT. OFFICE - DAY",
+                "type": "text",
+              },
+            ],
+            "type": "paragraph",
+          },
+          {
+            "attrs": {
+              "screenplayType": "action",
+            },
+            "content": [
+              {
+                "text": "NOTE: Remember to add prop business",
+                "type": "text",
+              },
+            ],
+            "type": "paragraph",
+          },
+          {
+            "attrs": {
+              "screenplayType": "character",
+            },
+            "content": [
+              {
+                "text": "JUNE",
+                "type": "text",
+              },
+            ],
+            "type": "paragraph",
+          },
+          {
+            "attrs": {
+              "screenplayType": "parenthetical",
+            },
+            "content": [
+              {
+                "text": "(quietly)",
+                "type": "text",
+              },
+            ],
+            "type": "paragraph",
+          },
+          {
+            "attrs": {
+              "screenplayType": "dialogue",
+            },
+            "content": [
+              {
+                "text": "We only get one shot.",
+                "type": "text",
+              },
+            ],
+            "type": "paragraph",
+          },
+          {
+            "attrs": {
+              "screenplayType": "transition",
+            },
+            "content": [
+              {
+                "text": "CUT TO:",
+                "type": "text",
+              },
+            ],
+            "type": "paragraph",
+          },
+        ],
+        "type": "doc",
+      },
+      "metadata": {
+        "originalTitle": "INT. OFFICE - DAY",
+        "sourceFormat": "fountain",
+        "sourceLineEnd": 11,
+        "sourceLineStart": 3,
+      },
+      "title": "INT. OFFICE - DAY",
+    },
+  ],
+}
+`;
+
+exports[`high-risk module characterization snapshots > keeps screenplay fountain formatting stable for reference fixture 1`] = `
+"INT. HOUSE - NIGHT
+
+Rain pounds the windows.
+SAM
+(whispering)
+We need to leave. Now.
+
+CUT TO:"
+`;
+
+exports[`high-risk module characterization snapshots > keeps sync conflict payload shape stable when local and remote diverge 1`] = `
+{
+  "baseContent": {
+    "content": [
+      {
+        "content": [
+          {
+            "text": "Base",
+            "type": "text",
+          },
+        ],
+        "type": "paragraph",
+      },
+    ],
+    "type": "doc",
+  },
+  "chapterId": "chapter-1",
+  "localContent": {
+    "content": [
+      {
+        "content": [
+          {
+            "text": "Local",
+            "type": "text",
+          },
+        ],
+        "type": "paragraph",
+      },
+    ],
+    "type": "doc",
+  },
+  "localRevisionId": "rev-1",
+  "localUpdatedAt": 10,
+  "localVersion": 10,
+  "mergedContent": {
+    "content": [
+      {
+        "content": [
+          {
+            "text": "Local",
+            "type": "text",
+          },
+        ],
+        "type": "paragraph",
+      },
+      {
+        "content": [
+          {
+            "text": "Remote",
+            "type": "text",
+          },
+        ],
+        "type": "paragraph",
+      },
+    ],
+    "type": "doc",
+  },
+  "provider": "dropbox",
+  "remoteContent": {
+    "content": [
+      {
+        "content": [
+          {
+            "text": "Remote",
+            "type": "text",
+          },
+        ],
+        "type": "paragraph",
+      },
+    ],
+    "type": "doc",
+  },
+  "remoteRevisionId": "rev-2",
+  "remoteUpdatedAt": 20,
+  "remoteVersion": 20,
+  "resolutionOptions": [
+    "local",
+    "remote",
+    "merge",
+  ],
+}
+`;
