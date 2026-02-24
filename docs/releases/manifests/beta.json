@@ -1,0 +1,6 @@
+{
+  "channel": "beta",
+  "branch": "release/beta",
+  "tauriEnv": "RELEASE_CHANNEL=beta",
+  "promotionPolicy": "requires stable candidate verification and QA signoff"
+}

@@ -83,6 +83,14 @@
           "draftharbour"
         ]
       }
+    },
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://releases.draftharbour.com/{{target}}/{{arch}}/{{current_version}}?channel={{env.RELEASE_CHANNEL}}"
+      ],
+      "dialog": false,
+      "pubkey": "${TAURI_UPDATER_PUBKEY}"
     }
   }
 }

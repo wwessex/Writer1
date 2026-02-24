@@ -1,0 +1,6 @@
+{
+  "channel": "nightly",
+  "branch": "develop",
+  "tauriEnv": "RELEASE_CHANNEL=nightly",
+  "promotionPolicy": "auto-publish after CI verification"
+}

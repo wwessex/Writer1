@@ -149,6 +149,7 @@ export interface AppSettings {
   typography: TypographySettings;
   onboardingComplete: boolean;
   typewriterMode: boolean;
+  releaseChannel: 'stable' | 'beta' | 'nightly';
   sidebarPanels: SidebarPanelsSettings;
 }
 
