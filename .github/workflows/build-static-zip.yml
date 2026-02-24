@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify Vite config loads
+        run: npm run verify:vite-config
+
       - name: Build static site
         run: npm run build
 
