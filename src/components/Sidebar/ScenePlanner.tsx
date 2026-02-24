@@ -85,7 +85,8 @@ export function ScenePlanner() {
 
       if (dragIdx !== -1 && targetIdx !== -1) {
         const [dragged] = scenesCopy.splice(dragIdx, 1);
-        scenesCopy.splice(targetIdx, 0, dragged);
+        const adjustedTargetIdx = dragIdx < targetIdx ? targetIdx - 1 : targetIdx;
+        scenesCopy.splice(adjustedTargetIdx, 0, dragged);
         reorderScenes(activeChapter.id, scenesCopy.map(s => s.id));
 
         setJustMovedId(draggedId);
