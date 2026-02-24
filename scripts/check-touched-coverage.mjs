@@ -24,7 +24,19 @@ function resolveDiffRange() {
 const summary = JSON.parse(readFileSync('coverage/coverage-summary.json', 'utf8'));
 const diffRange = resolveDiffRange();
 const changed = sh(`git diff --name-only ${diffRange}`).split('\n').filter(Boolean);
-const touchedSources = changed.filter((file) => file.startsWith('src/') && /\.(ts|tsx)$/.test(file) && !file.endsWith('.test.ts') && !file.endsWith('.test.tsx'));
+
+function isCoveredSourceFile(file) {
+  return (
+    file.startsWith('src/') &&
+    /\.(ts|tsx)$/.test(file) &&
+    !file.endsWith('.d.ts') &&
+    !file.includes('/test/') &&
+    !file.endsWith('.test.ts') &&
+    !file.endsWith('.test.tsx')
+  );
+}
+
+const touchedSources = changed.filter(isCoveredSourceFile);
 
 const missing = [];
 const low = [];
