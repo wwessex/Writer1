@@ -21,7 +21,13 @@
     "test:coverage": "vitest run --coverage.enabled",
     "coverage:changed": "node scripts/check-touched-coverage.mjs",
     "verify:vite-config": "node scripts/verify-vite-config.mjs",
-    "ci": "npm run lint && npm run typecheck && npm run verify:vite-config && npm run test:coverage && npm run build && npm run bundle:check && npm run assets:check"
+    "ci": "npm run lint && npm run typecheck && npm run verify:vite-config && npm run test:coverage && npm run build && npm run bundle:check && npm run assets:check",
+    "desktop:dev": "npm --prefix desktop run dev",
+    "desktop:build": "npm --prefix desktop run build",
+    "desktop:build:debug": "npm --prefix desktop run build:debug",
+    "desktop:build:mac": "npm --prefix desktop run build -- --target universal-apple-darwin",
+    "desktop:build:win": "npm --prefix desktop run build -- --target x86_64-pc-windows-msvc",
+    "desktop:build:linux": "npm --prefix desktop run build -- --target x86_64-unknown-linux-gnu"
   },
   "dependencies": {
     "@capacitor/core": "^8.1.0",
@@ -69,6 +75,7 @@
     "vite": "^6.0.5",
     "vite-plugin-pwa": "^0.21.1",
     "vitest": "^4.0.18",
-    "workbox-window": "^7.3.0"
+    "workbox-window": "^7.3.0",
+    "@tauri-apps/api": "^2.2.0"
   }
 }

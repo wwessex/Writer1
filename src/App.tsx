@@ -31,6 +31,7 @@ import { useOnboardingTrigger } from '@/hooks/useOnboardingTrigger';
 import { useFocusModeClass } from '@/hooks/useFocusModeClass';
 import { useEditorSelectionTracking } from '@/hooks/useEditorSelectionTracking';
 import { useVoiceAlerts } from '@/hooks/useVoiceAlerts';
+import { useDesktopRuntime } from '@/hooks/useDesktopRuntime';
 import './styles/index.css';
 import styles from './App.module.css';
 
@@ -60,7 +61,7 @@ const IntegrationsModal = lazy(() => import('@/components/Modals/IntegrationsMod
 const ExportHistoryModal = lazy(() => import('@/components/Modals/ExportHistoryModal').then((module) => ({ default: module.ExportHistoryModal })));
 const TranslationModal = lazy(() => import('@/components/Modals/TranslationModal').then((module) => ({ default: module.TranslationModal })));
 
-function AppScene({ screenplayMode, onToggleScreenplayMode }: { screenplayMode: boolean; onToggleScreenplayMode: () => void }) {
+function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits }: { screenplayMode: boolean; onToggleScreenplayMode: () => void; hasUnsavedEdits: boolean }) {
   const { state, activeChapter, loadNovel, createChapter: createNewChapter, dispatch, updateSettings } = useApp();
   const { editor } = useCurrentEditor();
   const { showToast } = useToast();
@@ -88,6 +89,14 @@ function AppScene({ screenplayMode, onToggleScreenplayMode }: { screenplayMode: 
   }, [state.chapters, characters, activeChapter?.id]);
 
   const voiceAlerts = useVoiceAlerts({ activeChapter, baselineProfiles, showToast });
+
+  useDesktopRuntime({
+    hasUnsavedEdits,
+    onDeepLink: (url) => {
+      showToast(`Opened deep link: ${url}`, 'info');
+    },
+    showToast,
+  });
 
   const {
     fileInputRef,
@@ -269,6 +278,8 @@ function AppScene({ screenplayMode, onToggleScreenplayMode }: { screenplayMode: 
 function AppEditorProvider() {
   const { activeChapter, updateChapter, state } = useApp();
   const [screenplayMode, setScreenplayMode] = useState(state.projectType === 'screenplay');
+  const [hasUnsavedEdits, setHasUnsavedEdits] = useState(false);
+  const unsavedTimerRef = useRef<number | null>(null);
 
   const activeChapterRef = useRef(activeChapter);
   activeChapterRef.current = activeChapter;
@@ -288,9 +299,26 @@ function AppEditorProvider() {
       const chapter = activeChapterRef.current;
       if (chapter) {
         updateChapterRef.current(chapter.id, { content: ed.getJSON() });
+        setHasUnsavedEdits(true);
       }
     },
   });
+
+  useEffect(() => {
+    if (state.isSaving) return;
+    if (unsavedTimerRef.current) {
+      window.clearTimeout(unsavedTimerRef.current);
+    }
+    unsavedTimerRef.current = window.setTimeout(() => {
+      setHasUnsavedEdits(false);
+    }, 1200);
+
+    return () => {
+      if (unsavedTimerRef.current) {
+        window.clearTimeout(unsavedTimerRef.current);
+      }
+    };
+  }, [state.isSaving]);
 
   useEffect(() => {
     if (!editor) return;
@@ -305,6 +333,7 @@ function AppEditorProvider() {
       <AppScene
         screenplayMode={screenplayMode}
         onToggleScreenplayMode={() => setScreenplayMode(mode => !mode)}
+        hasUnsavedEdits={hasUnsavedEdits || state.isSaving}
       />
     </EditorContext.Provider>
   );
