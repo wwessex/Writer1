@@ -9,13 +9,13 @@ const invokeMock = vi.fn();
 const listenMock = vi.fn();
 const importDhprojMock = vi.fn();
 
-vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
-vi.mock('@tauri-apps/api/event', () => ({ listen: listenMock }));
 vi.mock('@/lib/storage', () => ({ importDhproj: importDhprojMock }));
 
 async function mountHook(props: {
   hasUnsavedEdits: boolean;
   onDeepLink: (url: string) => void;
+  onMenuAction: (action: string) => void;
+  menuState: { editorFocused: boolean; hasSelection: boolean };
   showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning', icon?: string) => void;
 }) {
   const { useDesktopRuntime } = await import('./useDesktopRuntime');
@@ -38,21 +38,18 @@ async function mountHook(props: {
         root.render(<Test {...next} />);
       });
     },
-    unmount() {
-      act(() => root.unmount());
-    },
   };
 }
 
 describe('useDesktopRuntime', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+    delete (window as Window & { __TAURI__?: unknown }).__TAURI__;
     window.confirm = vi.fn(() => true);
   });
 
   it('is a no-op outside desktop runtime', async () => {
-    await mountHook({ hasUnsavedEdits: true, onDeepLink: vi.fn(), showToast: vi.fn() });
+    await mountHook({ hasUnsavedEdits: true, onDeepLink: vi.fn(), onMenuAction: vi.fn(), menuState: { editorFocused: false, hasSelection: false }, showToast: vi.fn() });
     await act(async () => Promise.resolve());
 
     expect(invokeMock).not.toHaveBeenCalled();
@@ -60,8 +57,6 @@ describe('useDesktopRuntime', () => {
   });
 
   it('wires desktop listeners and handles events', async () => {
-    (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = { stub: true };
-
     const listeners = new Map<string, (event: { payload: string }) => void | Promise<void>>();
     listenMock.mockImplementation(async (name: string, handler: (event: { payload: string }) => void | Promise<void>) => {
       listeners.set(name, handler);
@@ -73,11 +68,13 @@ describe('useDesktopRuntime', () => {
       }
       return undefined;
     });
+    (window as Window & { __TAURI__?: unknown }).__TAURI__ = { invoke: invokeMock, event: { listen: listenMock } };
 
     const onDeepLink = vi.fn();
+    const onMenuAction = vi.fn();
     const showToast = vi.fn();
 
-    await mountHook({ hasUnsavedEdits: true, onDeepLink, showToast });
+    await mountHook({ hasUnsavedEdits: true, onDeepLink, onMenuAction, menuState: { editorFocused: true, hasSelection: true }, showToast });
     await act(async () => Promise.resolve());
 
     expect(invokeMock).toHaveBeenCalledWith('set_unsaved_edits', { value: true });
@@ -86,22 +83,24 @@ describe('useDesktopRuntime', () => {
       await listeners.get('desktop://deep-link')?.({ payload: 'draftharbour://open?id=1' });
       await listeners.get('desktop://confirm-quit')?.({ payload: '' });
       await listeners.get('desktop://open-project')?.({ payload: '/tmp/test.dhproj' });
+      await listeners.get('desktop://menu-command')?.({ payload: 'export' });
     });
 
     expect(onDeepLink).toHaveBeenCalledWith('draftharbour://open?id=1');
+    expect(onMenuAction).toHaveBeenCalledWith('export');
     expect(invokeMock).toHaveBeenCalledWith('quit_app');
     expect(importDhprojMock).toHaveBeenCalledTimes(1);
     expect(showToast).toHaveBeenCalled();
   });
 
   it('updates unsaved state on rerender', async () => {
-    (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = { stub: true };
     listenMock.mockResolvedValue(() => undefined);
+    (window as Window & { __TAURI__?: unknown }).__TAURI__ = { invoke: invokeMock, event: { listen: listenMock } };
 
-    const hook = await mountHook({ hasUnsavedEdits: false, onDeepLink: vi.fn(), showToast: vi.fn() });
+    const hook = await mountHook({ hasUnsavedEdits: false, onDeepLink: vi.fn(), onMenuAction: vi.fn(), menuState: { editorFocused: false, hasSelection: false }, showToast: vi.fn() });
     await act(async () => Promise.resolve());
 
-    hook.rerender({ hasUnsavedEdits: true, onDeepLink: vi.fn(), showToast: vi.fn() });
+    hook.rerender({ hasUnsavedEdits: true, onDeepLink: vi.fn(), onMenuAction: vi.fn(), menuState: { editorFocused: true, hasSelection: true }, showToast: vi.fn() });
     await act(async () => Promise.resolve());
 
     expect(invokeMock.mock.calls.some(([name, payload]) => name === 'set_unsaved_edits' && payload?.value === false)).toBe(true);

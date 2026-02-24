@@ -1,16 +1,20 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '@/context/AppContext';
-import { COMMAND_IDS, LOCAL_MENU_COMMANDS, type CommandId } from '@/lib/commands';
+import { COMMAND_IDS, LOCAL_MENU_COMMANDS, isCommandEnabled, type CommandId } from '@/lib/commands';
 import { APP_MENUS } from '@/lib/menuConfig';
+import { getCurrentPlatform, normalizeShortcut } from '@/lib/nativeMenuAdapter';
 import styles from './Menu.module.css';
 
 interface MenuBarProps {
   onAction?: (action: CommandId) => void;
+  editorFocused?: boolean;
+  hasSelection?: boolean;
 }
 
-export function MenuBar({ onAction }: MenuBarProps) {
+export function MenuBar({ onAction, editorFocused = false, hasSelection = false }: MenuBarProps) {
   const { state } = useApp();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const platform = getCurrentPlatform();
   const menuBarRef = useRef<HTMLDivElement>(null);
 
   const handleMenuClick = (menuLabel: string) => {
@@ -90,12 +94,12 @@ export function MenuBar({ onAction }: MenuBarProps) {
                     key={idx}
                     className={styles.menuItem}
                     onClick={() => item.action && handleItemClick(item.action)}
-                    disabled={item.disabled}
+                    disabled={item.action ? !isCommandEnabled(item.action, { editorFocused, hasSelection }) : item.disabled}
                     role="menuitem"
                   >
                     <span className={styles.menuItem__label}>{item.label}</span>
                     {item.shortcut && (
-                      <span className={styles.menuItem__shortcut}>{item.shortcut}</span>
+                      <span className={styles.menuItem__shortcut}>{normalizeShortcut(item.shortcut, platform)}</span>
                     )}
                   </button>
                 )

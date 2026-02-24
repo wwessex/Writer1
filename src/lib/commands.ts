@@ -38,6 +38,9 @@ export const COMMAND_IDS = {
   THEME_HIGH_CONTRAST: 'themeHighContrast',
   UNDO: 'undo',
   REDO: 'redo',
+  CUT: 'cut',
+  COPY: 'copy',
+  PASTE: 'paste',
   SELECT_ALL: 'selectAll',
   INSERT_HR: 'insertHr',
   INSERT_BLOCKQUOTE: 'insertBlockquote',
@@ -100,6 +103,9 @@ export const COMMAND_METADATA: Record<CommandId, CommandMetadata> = {
   [COMMAND_IDS.THEME_HIGH_CONTRAST]: { id: COMMAND_IDS.THEME_HIGH_CONTRAST, label: 'High Contrast', icon: 'contrast', group: 'Views', includeInQuickSwitcher: true },
   [COMMAND_IDS.UNDO]: { id: COMMAND_IDS.UNDO, label: 'Undo', icon: 'undo', shortcut: 'Ctrl+Z', group: 'Actions' },
   [COMMAND_IDS.REDO]: { id: COMMAND_IDS.REDO, label: 'Redo', icon: 'redo', shortcut: 'Ctrl+Y', group: 'Actions' },
+  [COMMAND_IDS.CUT]: { id: COMMAND_IDS.CUT, label: 'Cut', icon: 'content_cut', shortcut: 'Ctrl+X', group: 'Actions' },
+  [COMMAND_IDS.COPY]: { id: COMMAND_IDS.COPY, label: 'Copy', icon: 'content_copy', shortcut: 'Ctrl+C', group: 'Actions' },
+  [COMMAND_IDS.PASTE]: { id: COMMAND_IDS.PASTE, label: 'Paste', icon: 'content_paste', shortcut: 'Ctrl+V', group: 'Actions' },
   [COMMAND_IDS.SELECT_ALL]: { id: COMMAND_IDS.SELECT_ALL, label: 'Select All', icon: 'select_all', shortcut: 'Ctrl+A', group: 'Actions' },
   [COMMAND_IDS.INSERT_HR]: { id: COMMAND_IDS.INSERT_HR, label: 'Insert Horizontal Rule', icon: 'horizontal_rule', group: 'Actions' },
   [COMMAND_IDS.INSERT_BLOCKQUOTE]: { id: COMMAND_IDS.INSERT_BLOCKQUOTE, label: 'Insert Blockquote', icon: 'format_quote', group: 'Actions' },
@@ -174,6 +180,23 @@ export const COMMAND_HANDLERS: Record<CommandId, CommandHandler> = {
   [COMMAND_IDS.THEME_HIGH_CONTRAST]: ({ setTheme }) => setTheme('high-contrast'),
   [COMMAND_IDS.UNDO]: ({ editor }) => editor?.chain().focus().undo().run(),
   [COMMAND_IDS.REDO]: ({ editor }) => editor?.chain().focus().redo().run(),
+  [COMMAND_IDS.CUT]: ({ editor }) => {
+    if (editor?.isFocused) {
+      editor.commands.deleteSelection();
+      return;
+    }
+    document.execCommand('cut');
+  },
+  [COMMAND_IDS.COPY]: ({ editor }) => {
+    if (editor?.isFocused) {
+      document.execCommand('copy');
+      return;
+    }
+    document.execCommand('copy');
+  },
+  [COMMAND_IDS.PASTE]: () => {
+    document.execCommand('paste');
+  },
   [COMMAND_IDS.SELECT_ALL]: ({ editor }) => editor?.commands.selectAll(),
   [COMMAND_IDS.INSERT_HR]: ({ editor }) => editor?.chain().focus().setHorizontalRule().run(),
   [COMMAND_IDS.INSERT_BLOCKQUOTE]: ({ editor }) => editor?.chain().focus().toggleBlockquote().run(),
@@ -194,6 +217,46 @@ export const LOCAL_MENU_COMMANDS: ReadonlySet<CommandId> = new Set([
   COMMAND_IDS.THEME_LIGHT,
   COMMAND_IDS.THEME_HIGH_CONTRAST,
 ]);
+
+interface CommandStateContext {
+  editorFocused: boolean;
+  hasSelection: boolean;
+}
+
+const REQUIRES_EDITOR_FOCUS = new Set<CommandId>([
+  COMMAND_IDS.UNDO,
+  COMMAND_IDS.REDO,
+  COMMAND_IDS.CUT,
+  COMMAND_IDS.COPY,
+  COMMAND_IDS.PASTE,
+  COMMAND_IDS.SELECT_ALL,
+  COMMAND_IDS.INSERT_HR,
+  COMMAND_IDS.INSERT_BLOCKQUOTE,
+  COMMAND_IDS.FORMAT_BOLD,
+  COMMAND_IDS.FORMAT_ITALIC,
+  COMMAND_IDS.FORMAT_UNDERLINE,
+  COMMAND_IDS.FORMAT_H1,
+  COMMAND_IDS.FORMAT_H2,
+  COMMAND_IDS.FORMAT_P,
+]);
+
+const REQUIRES_SELECTION = new Set<CommandId>([
+  COMMAND_IDS.CUT,
+  COMMAND_IDS.COPY,
+  COMMAND_IDS.ADD_COMMENT,
+]);
+
+export const isCommandEnabled = (commandId: CommandId, context: CommandStateContext) => {
+  if (REQUIRES_EDITOR_FOCUS.has(commandId) && !context.editorFocused) {
+    return false;
+  }
+
+  if (REQUIRES_SELECTION.has(commandId) && !context.hasSelection) {
+    return false;
+  }
+
+  return true;
+};
 
 export const runCommand = (action: CommandId, context: CommandContext) => {
   COMMAND_HANDLERS[action](context);

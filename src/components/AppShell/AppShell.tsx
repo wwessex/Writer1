@@ -18,6 +18,7 @@ interface AppShellProps {
   onToggleScreenplayMode: () => void;
   onAction: (action: CommandId) => void;
   hasTextSelection: boolean;
+  editorFocused: boolean;
   inspectorOpen: boolean;
   setInspectorOpen: Dispatch<SetStateAction<boolean>>;
   voiceAlerts: VoiceSimilarityAlert[];
@@ -35,6 +36,7 @@ export function AppShell({
   onToggleScreenplayMode,
   onAction,
   hasTextSelection,
+  editorFocused,
   inspectorOpen,
   setInspectorOpen,
   voiceAlerts,
@@ -57,6 +59,7 @@ export function AppShell({
         onToggleInspector={() => setInspectorOpen(prev => !prev)}
         inspectorOpen={inspectorOpen}
         hasTextSelection={hasTextSelection}
+        editorFocused={editorFocused}
       />
       <main className={layoutClass} role="main">
         {state.settings.sidebarHidden && (

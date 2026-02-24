@@ -8,7 +8,7 @@ import { Toolbar } from './Toolbar';
 import { getProjectMetrics } from '@/lib/projectMetrics';
 import { getMonthlyHistory } from '@/lib/progressTracker';
 import { createProvider, loadAIConfig } from '@/lib/ai';
-import { COMMAND_IDS, COMMAND_METADATA, type CommandId } from '@/lib/commands';
+import { COMMAND_IDS, COMMAND_METADATA, isCommandEnabled, type CommandId } from '@/lib/commands';
 import { APP_MENUS } from '@/lib/menuConfig';
 import styles from './Header.module.css';
 
@@ -17,6 +17,7 @@ interface HeaderProps {
   onToggleInspector?: () => void;
   inspectorOpen?: boolean;
   hasTextSelection?: boolean;
+  editorFocused?: boolean;
 }
 
 interface MobileMenuSection {
@@ -36,7 +37,7 @@ const MOBILE_SECTION_BY_MENU_LABEL: Record<string, MobileMenuSection['section']>
   Help: 'Tools',
 };
 
-export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSelection = false }: HeaderProps) {
+export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSelection = false, editorFocused = false }: HeaderProps) {
   const { state, updateNovelTitle } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuRootRef = useRef<HTMLDivElement>(null);
@@ -107,6 +108,8 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
     setMobileMenuOpen(false);
     onAction?.(action);
   }, [onAction]);
+
+  const desktopRuntime = '__TAURI_INTERNALS__' in window;
 
   const mobileMenuSections = useMemo(() => {
     const sectionMap = new Map<MobileMenuSection['section'], CommandId[]>(
@@ -315,12 +318,14 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
                   <div className={styles.mobileMenuSectionTitle}>{section}</div>
                   {items.map(commandId => {
                     const command = getCommandPresentation(commandId);
+                    const enabled = isCommandEnabled(commandId, { editorFocused, hasSelection: hasTextSelection });
                     return (
                       <button
                         key={commandId}
                         className={styles.mobileMenuItem}
                         onPointerDown={(e) => e.preventDefault()}
                         onClick={() => dispatchCommand(commandId)}
+                        disabled={!enabled}
                       >
                         <span className="material-symbols-rounded">{command.icon}</span>
                         <span>{command.label}</span>
@@ -341,7 +346,9 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
           </div>
         </div>
       )}
-      <MenuBar onAction={onAction} />
+      {!desktopRuntime && (
+        <MenuBar onAction={onAction} editorFocused={editorFocused} hasSelection={hasTextSelection} />
+      )}
       <Toolbar />
     </header>
   );
