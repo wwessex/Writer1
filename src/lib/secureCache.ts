@@ -2,6 +2,35 @@ import { getSecret, isDesktop, setSecret } from '@/lib/desktopSecrets';
 
 const CACHE_KEY_SECRET = 'local_cache_encryption_key';
 const FALLBACK_KEY_STORAGE = 'draftharbour_cache_key_v1';
+const BYTE_CHUNK_SIZE = 8 * 1024;
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+
+  for (let i = 0; i < bytes.length; i += BYTE_CHUNK_SIZE) {
+    const chunk = bytes.subarray(i, i + BYTE_CHUNK_SIZE);
+    let chunkBinary = '';
+
+    for (let j = 0; j < chunk.length; j++) {
+      chunkBinary += String.fromCharCode(chunk[j]);
+    }
+
+    binary += chunkBinary;
+  }
+
+  return btoa(binary);
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return bytes;
+}
 
 async function getOrCreateKeyMaterial(): Promise<string> {
   if (isDesktop()) {
@@ -32,12 +61,12 @@ export async function secureCacheEncode(value: string): Promise<string> {
   const payload = new Uint8Array(iv.length + encrypted.byteLength);
   payload.set(iv, 0);
   payload.set(new Uint8Array(encrypted), iv.length);
-  return btoa(String.fromCharCode(...payload));
+  return bytesToBase64(payload);
 }
 
 export async function secureCacheDecode(value: string): Promise<string | null> {
   try {
-    const bytes = Uint8Array.from(atob(value), c => c.charCodeAt(0));
+    const bytes = base64ToBytes(value);
     const iv = bytes.slice(0, 12);
     const encrypted = bytes.slice(12);
     const material = await getOrCreateKeyMaterial();
