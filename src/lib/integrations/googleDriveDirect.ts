@@ -319,7 +319,7 @@ export const googleDriveDirectAdapter: IntegrationAdapter = {
       ? `gdrive-${latestFile.id}-${new Date(latestFile.modifiedTime!).getTime()}`
       : `gdrive-${Date.now()}`;
 
-    return await normalizeProviderPullResponse(localChapters, remoteDocs, remoteRevision, 'google-drive');
+    return normalizeProviderPullResponse(localChapters, remoteDocs, remoteRevision, 'google-drive');
   },
 
   async push(config: IntegrationConfig, payload: ProviderPayload) {
