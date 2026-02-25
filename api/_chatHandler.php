@@ -47,8 +47,9 @@ function handleChat(array $config): void
     $body = json_decode($raw, true);
 
     if (!$body || empty($body['provider']) || empty($body['prompt']) || empty($body['model'])) {
-        http_response_code(400);
-        echo json_encode(chatErrorEnvelope(400, 'Missing required fields: provider, prompt, model.', 'UNKNOWN', false, 'Review request input and try again.'));
+        $status = 400;
+        http_response_code($status);
+        echo json_encode(chatErrorEnvelope($status, 'Missing required fields: provider, prompt, model.', 'UNKNOWN', false, 'Review request input and try again.'));
         return;
     }
 
@@ -65,22 +66,25 @@ function handleChat(array $config): void
     // ── Input length safety check ────────────────────────────────────
     $maxInput = (int) $config['max_input_chars'];
     if (mb_strlen($prompt) > $maxInput) {
-        http_response_code(400);
-        echo json_encode(chatErrorEnvelope(400, "Input exceeds maximum length of {$maxInput} characters.", 'UNKNOWN', false, 'Shorten the input and retry.'));
+        $status = 400;
+        http_response_code($status);
+        echo json_encode(chatErrorEnvelope($status, "Input exceeds maximum length of {$maxInput} characters.", 'UNKNOWN', false, 'Shorten the input and retry.'));
         return;
     }
 
     // ── Validate provider is enabled ─────────────────────────────────
     $validProviders = ['groq', 'openrouter', 'gemini'];
     if (!in_array($provider, $validProviders, true)) {
-        http_response_code(400);
-        echo json_encode(chatErrorEnvelope(400, "Unknown provider: {$provider}.", 'NOT_FOUND', false, 'Choose a supported provider and retry.'));
+        $status = 400;
+        http_response_code($status);
+        echo json_encode(chatErrorEnvelope($status, "Unknown provider: {$provider}.", 'NOT_FOUND', false, 'Choose a supported provider and retry.'));
         return;
     }
 
     if (empty($config[$provider]) || empty($config[$provider]['enabled'])) {
-        http_response_code(400);
-        echo json_encode(chatErrorEnvelope(503, "Provider '{$provider}' is not enabled on this server.", 'PROVIDER_UNAVAILABLE', true, 'Enable the provider or choose another one.'));
+        $status = 503;
+        http_response_code($status);
+        echo json_encode(chatErrorEnvelope($status, "Provider '{$provider}' is not enabled on this server.", 'PROVIDER_UNAVAILABLE', true, 'Enable the provider or choose another one.'));
         return;
     }
 
@@ -93,8 +97,9 @@ function handleChat(array $config): void
     }
 
     if (!$apiKey) {
-        http_response_code(500);
-        echo json_encode(chatErrorEnvelope(503, "No API key available for provider '{$provider}'. Contact the administrator or provide your own key.", 'PROVIDER_UNAVAILABLE', true, 'Configure an API key and retry.'));
+        $status = 503;
+        http_response_code($status);
+        echo json_encode(chatErrorEnvelope($status, "No API key available for provider '{$provider}'. Contact the administrator or provide your own key.", 'PROVIDER_UNAVAILABLE', true, 'Configure an API key and retry.'));
         return;
     }
 
@@ -120,8 +125,9 @@ function handleChat(array $config): void
     }
 
     if (isset($result['error'])) {
-        http_response_code($result['status'] ?? 502);
-        echo json_encode(chatErrorEnvelope((int) ($result['status'] ?? 502), (string) $result['error'], ((int) ($result['status'] ?? 502)) === 429 ? 'RATE_LIMITED' : (((int) ($result['status'] ?? 502)) >= 500 ? 'PROVIDER_UNAVAILABLE' : 'UNKNOWN'), ((int) ($result['status'] ?? 502)) === 429 || ((int) ($result['status'] ?? 502)) >= 500, ((int) ($result['status'] ?? 502)) === 429 ? 'Rate limit reached. Wait and retry.' : 'Provider is temporarily unavailable. Retry shortly.'));
+        $status = (int) ($result['status'] ?? 502);
+        http_response_code($status);
+        echo json_encode(chatErrorEnvelope($status, (string) $result['error'], $status === 429 ? 'RATE_LIMITED' : ($status >= 500 ? 'PROVIDER_UNAVAILABLE' : 'UNKNOWN'), $status === 429 || $status >= 500, $status === 429 ? 'Rate limit reached. Wait and retry.' : 'Provider is temporarily unavailable. Retry shortly.'));
         return;
     }
 
