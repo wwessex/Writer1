@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 import { handleBrokerRequest } from './src/server/integrationBroker';
@@ -49,6 +50,7 @@ function integrationBrokerPlugin() {
 export default defineConfig({
   base: './',
   plugins: [
+    tailwindcss(),
     react(),
     integrationBrokerPlugin(),
     VitePWA({
