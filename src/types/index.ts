@@ -7,6 +7,9 @@ export type ScreenplayBlockType = 'scene-heading' | 'action' | 'character' | 'pa
 
 export type ChapterStatus = 'planned' | 'draft' | 'revised' | 'final';
 
+/** Runtime-accessible status values for validation and UI rendering. */
+export const CHAPTER_STATUSES: ChapterStatus[] = ['planned', 'draft', 'revised', 'final'];
+
 export interface Scene {
   id: string;
   title: string;
