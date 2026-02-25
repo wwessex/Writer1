@@ -1,14 +1,16 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { Editor as TiptapEditor } from '@tiptap/react';
+import { Header } from '@/components/Header';
+import { Sidebar } from '@/components/Sidebar';
 import { Editor } from '@/components/Editor';
+import { Inspector } from '@/components/Inspector';
+import { PanelErrorBoundary } from '@/components/PanelErrorBoundary';
 import { AISuggestionsPanel } from '@/components/Panels';
-import { TopBar } from '@/components/layout/TopBar';
-import { StatusBar } from '@/components/layout/StatusBar';
-import { LeftSidebar } from '@/components/layout/sidebar/LeftSidebar';
-import { RightInspector } from '@/components/layout/inspector/RightInspector';
+import { Tooltip } from '@/components/UI/Tooltip';
 import type { VoiceSimilarityAlert } from '@/lib/voiceFingerprint';
 import type { CommandId } from '@/lib/commands';
 import type { AppState } from '@/types';
+import styles from '@/App.module.css';
 
 interface AppShellProps {
   appLabel: string;
@@ -29,53 +31,111 @@ interface AppShellProps {
   editor: TiptapEditor | null;
 }
 
-export function AppShell(props: AppShellProps) {
-  const {
-    state,
-    screenplayMode,
-    onToggleScreenplayMode,
-    onAction,
-    inspectorOpen,
-    setInspectorOpen,
-    onToggleSidebar,
-    aiPanelOpen,
-    closeAiPanel,
-    editor: tiptapEditor,
-  } = props;
+export function AppShell({
+  appLabel,
+  state,
+  screenplayMode,
+  onToggleScreenplayMode,
+  onAction,
+  hasTextSelection,
+  editorFocused,
+  inspectorOpen,
+  setInspectorOpen,
+  voiceAlerts,
+  sidebarImportBackup,
+  onExportBackup,
+  onToggleSidebar,
+  aiPanelOpen,
+  closeAiPanel,
+  editor: tiptapEditor,
+}: AppShellProps) {
+  const layoutClass = [
+    styles.layout,
+    state.settings.sidebarHidden ? styles['layout--sidebarHidden'] : '',
+    inspectorOpen ? styles['layout--inspectorOpen'] : '',
+  ].filter(Boolean).join(' ');
 
   return (
-    <div className="h-[100dvh] min-w-[1100px] bg-[#111315] text-[#ECEFF3] flex flex-col">
-      <TopBar
-        projectTitle={state.novelTitle || 'Writer1 Project'}
-        onFocusMode={onToggleSidebar}
-        onSearch={() => onAction('QUICK_SWITCHER' as CommandId)}
+    <>
+      <Header
+        onAction={onAction}
         onToggleInspector={() => setInspectorOpen(prev => !prev)}
+        inspectorOpen={inspectorOpen}
+        hasTextSelection={hasTextSelection}
+        editorFocused={editorFocused}
       />
-
-      {/* Main 3-panel layout */}
-      <div className="flex-1 min-h-0 flex">
-        <LeftSidebar collapsed={state.settings.sidebarHidden} />
-
-        {/* Editor pane */}
-        <main className="flex-1 min-w-0 min-h-0 bg-[#111315] flex flex-col">
-          <Editor
-            screenplayMode={screenplayMode}
-            onToggleScreenplayMode={onToggleScreenplayMode}
+      <main className={layoutClass} role="main">
+        {state.settings.sidebarHidden && (
+          <Tooltip content="Expand sidebar (Ctrl+Shift+B)" position="right">
+            <button
+              className={styles.expandTab}
+              onClick={onToggleSidebar}
+              aria-label="Expand sidebar (Ctrl+Shift+B)"
+              title="Expand sidebar"
+            >
+              <span className="material-symbols-rounded">chevron_right</span>
+            </button>
+          </Tooltip>
+        )}
+        <PanelErrorBoundary panel="sidebar">
+          <Sidebar
+            onExportBackup={onExportBackup}
+            onImportBackup={sidebarImportBackup}
           />
-        </main>
+        </PanelErrorBoundary>
+        <PanelErrorBoundary panel="editor">
+          <Editor screenplayMode={screenplayMode} onToggleScreenplayMode={onToggleScreenplayMode} />
+        </PanelErrorBoundary>
+        {!inspectorOpen && (
+          <Tooltip content="Expand inspector (Ctrl+Shift+I)" position="left">
+            <button
+              className={`${styles.expandTab} ${styles['expandTab--right']}`}
+              onClick={() => setInspectorOpen(true)}
+              aria-label="Expand inspector (Ctrl+Shift+I)"
+              title="Expand inspector"
+            >
+              <span className="material-symbols-rounded">chevron_left</span>
+            </button>
+          </Tooltip>
+        )}
+        <PanelErrorBoundary panel="inspector">
+          <Inspector open={inspectorOpen} onClose={() => setInspectorOpen(false)} voiceAlerts={voiceAlerts} />
+        </PanelErrorBoundary>
+        <AISuggestionsPanel open={aiPanelOpen} onClose={closeAiPanel} editor={tiptapEditor} />
+      </main>
 
-        <RightInspector collapsed={!inspectorOpen} />
-      </div>
-
-      <StatusBar
-        wordCount={2843}
-        sessionWords={612}
-        goalPercent={61}
-        saved={!state.isSaving}
-        online={state.isOnline}
-      />
-
-      <AISuggestionsPanel open={aiPanelOpen} onClose={closeAiPanel} editor={tiptapEditor} />
-    </div>
+      <nav className={styles.mobileNav} aria-label={`${appLabel} mobile navigation`}>
+        <button
+          className={`${styles.mobileNav__tab} ${!state.settings.sidebarHidden ? styles['mobileNav__tab--active'] : ''}`}
+          onClick={() => {
+            if (state.settings.sidebarHidden) onToggleSidebar();
+            setInspectorOpen(false);
+          }}
+        >
+          <span className="material-symbols-rounded">list</span>
+          <span>Outline</span>
+        </button>
+        <button
+          className={`${styles.mobileNav__tab} ${state.settings.sidebarHidden && !inspectorOpen ? styles['mobileNav__tab--active'] : ''}`}
+          onClick={() => {
+            if (!state.settings.sidebarHidden) onToggleSidebar();
+            setInspectorOpen(false);
+          }}
+        >
+          <span className="material-symbols-rounded">edit</span>
+          <span>Write</span>
+        </button>
+        <button
+          className={`${styles.mobileNav__tab} ${inspectorOpen ? styles['mobileNav__tab--active'] : ''}`}
+          onClick={() => {
+            if (!state.settings.sidebarHidden) onToggleSidebar();
+            setInspectorOpen(prev => !prev);
+          }}
+        >
+          <span className="material-symbols-rounded">info</span>
+          <span>Inspector</span>
+        </button>
+      </nav>
+    </>
   );
 }

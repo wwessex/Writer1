@@ -1,28 +1,25 @@
 /** @vitest-environment jsdom */
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, it, vi } from 'vitest';
 import { AppShell } from './AppShell';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+const headerSpy = vi.fn();
+
+vi.mock('@/components/Header', () => ({
+  Header: (props: unknown) => {
+    headerSpy(props);
+    return <div>Header</div>;
+  },
+}));
+vi.mock('@/components/Sidebar', () => ({ Sidebar: () => <div>Sidebar</div> }));
 vi.mock('@/components/Editor', () => ({ Editor: () => <div>Editor</div> }));
+vi.mock('@/components/Inspector', () => ({ Inspector: () => <div>Inspector</div> }));
+vi.mock('@/components/PanelErrorBoundary', () => ({ PanelErrorBoundary: ({ children }: { children?: ReactNode }) => <>{children}</> }));
 vi.mock('@/components/Panels', () => ({ AISuggestionsPanel: () => <div>AI</div> }));
-vi.mock('@/components/layout/TopBar', () => ({
-  TopBar: (props: { projectTitle?: string; onToggleInspector?: () => void }) => (
-    <div>
-      TopBar:{props.projectTitle}
-      <button aria-label="Toggle inspector" onClick={props.onToggleInspector}>Inspector Toggle</button>
-    </div>
-  ),
-}));
-vi.mock('@/components/layout/StatusBar', () => ({ StatusBar: () => <div>StatusBar</div> }));
-vi.mock('@/components/layout/sidebar/LeftSidebar', () => ({
-  LeftSidebar: (props: { collapsed?: boolean }) => <div>LeftSidebar:{props.collapsed ? 'collapsed' : 'expanded'}</div>,
-}));
-vi.mock('@/components/layout/inspector/RightInspector', () => ({
-  RightInspector: (props: { collapsed?: boolean }) => <div>RightInspector:{props.collapsed ? 'collapsed' : 'expanded'}</div>,
-}));
+vi.mock('@/components/UI/Tooltip', () => ({ Tooltip: ({ children }: { children?: ReactNode }) => <>{children}</> }));
 
 const baseProps = {
   appLabel: 'app',
@@ -30,7 +27,6 @@ const baseProps = {
   onToggleScreenplayMode: vi.fn(),
   onAction: vi.fn(),
   hasTextSelection: false,
-  editorFocused: false,
   voiceAlerts: [],
   sidebarImportBackup: vi.fn(),
   onExportBackup: vi.fn(),
@@ -41,7 +37,7 @@ const baseProps = {
 };
 
 describe('AppShell', () => {
-  it('renders the Tailwind layout shell with all panels', () => {
+  it('forwards editorFocused state to Header', () => {
     const container = document.createElement('div');
     const root = createRoot(container);
 
@@ -49,63 +45,78 @@ describe('AppShell', () => {
       root.render(
         <AppShell
           {...baseProps}
-          state={{ novelTitle: 'Test Novel', settings: { sidebarHidden: false }, isSaving: false, isOnline: true } as never}
-          inspectorOpen
-          setInspectorOpen={vi.fn()}
-        />
-      );
-    });
-
-    expect(container.textContent).toContain('TopBar:Test Novel');
-    expect(container.textContent).toContain('LeftSidebar:expanded');
-    expect(container.textContent).toContain('Editor');
-    expect(container.textContent).toContain('RightInspector:expanded');
-    expect(container.textContent).toContain('StatusBar');
-
-    act(() => root.unmount());
-  });
-
-  it('collapses sidebar when sidebarHidden is true', () => {
-    const container = document.createElement('div');
-    const root = createRoot(container);
-
-    act(() => {
-      root.render(
-        <AppShell
-          {...baseProps}
-          state={{ novelTitle: 'Test', settings: { sidebarHidden: true }, isSaving: false, isOnline: true } as never}
+          state={{ settings: { sidebarHidden: false } } as never}
+          editorFocused
           inspectorOpen={false}
           setInspectorOpen={vi.fn()}
         />
       );
     });
 
-    expect(container.textContent).toContain('LeftSidebar:collapsed');
-    expect(container.textContent).toContain('RightInspector:collapsed');
-
+    expect(headerSpy.mock.calls.at(-1)?.[0]).toMatchObject({ editorFocused: true });
     act(() => root.unmount());
   });
 
-  it('passes setInspectorOpen toggle to TopBar', () => {
+  it('uses expand/collapse controls when sidebar is hidden', () => {
     const container = document.createElement('div');
     const root = createRoot(container);
+    const onToggleSidebar = vi.fn();
     const setInspectorOpen = vi.fn();
 
     act(() => {
       root.render(
         <AppShell
           {...baseProps}
-          state={{ novelTitle: 'Test', settings: { sidebarHidden: false }, isSaving: false, isOnline: true } as never}
+          state={{ settings: { sidebarHidden: true } } as never}
+          editorFocused={false}
           inspectorOpen={false}
           setInspectorOpen={setInspectorOpen}
+          onToggleSidebar={onToggleSidebar}
         />
       );
     });
 
     act(() => {
-      (container.querySelector('button[aria-label="Toggle inspector"]') as HTMLButtonElement).click();
+      (Array.from(container.querySelectorAll('button')).find(btn => btn.getAttribute('aria-label')?.includes('Expand sidebar')) as HTMLButtonElement).click();
     });
 
+    expect(onToggleSidebar).toHaveBeenCalled();
+    expect(container.textContent).toContain('Outline');
+    expect(container.textContent).toContain('Write');
+    expect(container.textContent).toContain('Inspector');
+
+    act(() => root.unmount());
+  });
+
+  it('routes mobile tab actions based on sidebar and inspector state', () => {
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    const onToggleSidebar = vi.fn();
+    const setInspectorOpen = vi.fn();
+
+    act(() => {
+      root.render(
+        <AppShell
+          {...baseProps}
+          state={{ settings: { sidebarHidden: false } } as never}
+          editorFocused={false}
+          inspectorOpen
+          setInspectorOpen={setInspectorOpen}
+          onToggleSidebar={onToggleSidebar}
+        />
+      );
+    });
+
+    const clickByLabel = (label: string) => {
+      act(() => {
+        (Array.from(container.querySelectorAll('button')).find(btn => btn.textContent?.includes(label)) as HTMLButtonElement).click();
+      });
+    };
+
+    clickByLabel('Write');
+    clickByLabel('Inspector');
+
+    expect(onToggleSidebar).toHaveBeenCalled();
     expect(setInspectorOpen).toHaveBeenCalled();
 
     act(() => root.unmount());
