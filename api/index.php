@@ -11,12 +11,42 @@ header('Content-Type: application/json; charset=utf-8');
 // ── Load configuration ───────────────────────────────────────────────
 $config = require __DIR__ . '/_config.php';
 
+$appEnv = strtolower((string) ($config['app_env'] ?? 'production'));
+$isNonDev = !in_array($appEnv, ['dev', 'development', 'local'], true);
+
+// ── Startup security validation ─────────────────────────────────────
+$warnings = [];
+$configuredOrigins = $config['allowed_origins'] ?? ($config['allowed_origin'] ?? []);
+if (!is_array($configuredOrigins)) {
+    $configuredOrigins = [$configuredOrigins];
+}
+$configuredOrigins = array_values(array_filter(array_map('trim', $configuredOrigins), static fn ($origin) => $origin !== ''));
+
+if ($isNonDev) {
+    if (empty($configuredOrigins) || in_array('*', $configuredOrigins, true)) {
+        $warnings[] = 'CORS configuration is insecure for non-dev environments. Set allowed_origins to explicit trusted origin(s).';
+    }
+
+    if (!empty($config['allow_byok'])) {
+        $warnings[] = 'allow_byok is enabled in a non-dev environment. Disable unless explicitly required.';
+    }
+}
+
+foreach ($warnings as $warning) {
+    error_log("[api-security][$appEnv] $warning");
+}
+
 // ── CORS ─────────────────────────────────────────────────────────────
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-$allowedOrigin = $config['allowed_origin'] ?? '';
+$corsOrigin = null;
 
-if ($allowedOrigin === '*' || $origin === $allowedOrigin) {
-    $corsOrigin = $allowedOrigin === '*' ? '*' : $origin;
+if (in_array('*', $configuredOrigins, true)) {
+    $corsOrigin = '*';
+} elseif ($origin !== '' && in_array($origin, $configuredOrigins, true)) {
+    $corsOrigin = $origin;
+}
+
+if ($corsOrigin !== null) {
     header("Access-Control-Allow-Origin: $corsOrigin");
 }
 header('Access-Control-Allow-Methods: POST, OPTIONS');
