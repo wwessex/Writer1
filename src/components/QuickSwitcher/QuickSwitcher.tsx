@@ -16,7 +16,7 @@ interface QuickSwitcherProps {
 }
 
 type ItemType = 'chapter' | 'action' | 'search-result';
-type SearchMode = ItemType;
+type SearchMode = ItemType | 'all';
 
 const ACTION_FILTERS = ['All', 'Actions', 'Navigation', 'Views', 'AI', 'Project'] as const;
 type ActionFilter = typeof ACTION_FILTERS[number];
@@ -39,13 +39,43 @@ const RECENT_ITEMS_STORAGE_KEY = 'writer1.quickSwitcher.recent';
 const SEARCH_DEBOUNCE_MS = 140;
 const MAX_RESULTS = 40;
 
-const MODE_ORDER: SearchMode[] = ['action', 'chapter', 'search-result'];
+const MAX_RESULTS_PER_GROUP = 5;
+
+const MODE_ORDER: SearchMode[] = ['all', 'action', 'chapter', 'search-result'];
 
 const MODE_LABELS: Record<SearchMode, string> = {
+  all: 'All',
   action: 'Actions',
   chapter: 'Chapters',
   'search-result': 'Content',
 };
+
+/** Check if query characters appear in order within text (fuzzy/acronym match). */
+function fuzzyMatch(text: string, query: string): boolean {
+  let qi = 0;
+  for (let ti = 0; ti < text.length && qi < query.length; ti++) {
+    if (text[ti] === query[qi]) qi++;
+  }
+  return qi === query.length;
+}
+
+/** Score a fuzzy match by how tightly the characters cluster. Lower spread = higher score. */
+function fuzzyScore(text: string, query: string): number {
+  let qi = 0;
+  let firstMatch = -1;
+  let lastMatch = -1;
+  for (let ti = 0; ti < text.length && qi < query.length; ti++) {
+    if (text[ti] === query[qi]) {
+      if (firstMatch === -1) firstMatch = ti;
+      lastMatch = ti;
+      qi++;
+    }
+  }
+  if (qi < query.length) return 0;
+  const spread = lastMatch - firstMatch + 1;
+  // Tighter clustering yields a higher score, capped at 10
+  return Math.max(1, Math.round(10 * (query.length / spread)));
+}
 
 function scoreItem(item: SwitcherItem, normalizedQuery: string): number {
   if (!normalizedQuery) return 0;
@@ -66,6 +96,15 @@ function scoreItem(item: SwitcherItem, normalizedQuery: string): number {
   if (subtitle.startsWith(normalizedQuery)) score += 24;
   if (subtitle.includes(normalizedQuery)) score += 16;
   if (group.includes(normalizedQuery)) score += 14;
+
+  // Fuzzy matching: if no exact/substring match was found, try ordered-character matching
+  if (score === 0 && normalizedQuery.length >= 2) {
+    if (fuzzyMatch(title, normalizedQuery)) {
+      score += fuzzyScore(title, normalizedQuery);
+    } else if (fuzzyMatch(subtitle, normalizedQuery)) {
+      score += Math.max(1, fuzzyScore(subtitle, normalizedQuery) - 2);
+    }
+  }
 
   return score;
 }
@@ -185,31 +224,23 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
     }));
   }, [state.chapters, query, chapterLabel, recentOpenedMap, setActiveChapter, onClose]);
 
-  const filteredItems = useMemo(() => {
-    const normalizedQuery = normalizeSearchText(query);
-    const allItems = {
-      chapter: chapterItems,
-      action: actionItems,
-      'search-result': searchResultItems,
-    };
-
-    const typeFilteredItems = allItems[searchMode];
-
+  /** Rank and filter a single type's items by query. */
+  const rankItems = useCallback((items: SwitcherItem[], normalizedQuery: string, mode: ItemType, limit: number): SwitcherItem[] => {
     if (!normalizedQuery) {
-      return [...typeFilteredItems]
+      return [...items]
         .sort((a, b) => {
           const recentDiff = (b.lastOpenedAt ?? 0) - (a.lastOpenedAt ?? 0);
           if (recentDiff !== 0) return recentDiff;
           return a.title.localeCompare(b.title);
         })
-        .slice(0, MAX_RESULTS);
+        .slice(0, limit);
     }
 
-    if (searchMode === 'search-result') {
-      return typeFilteredItems.slice(0, MAX_RESULTS);
+    if (mode === 'search-result') {
+      return items.slice(0, limit);
     }
 
-    return typeFilteredItems
+    return items
       .map(item => ({ item, score: scoreItem(item, normalizedQuery) }))
       .filter(({ score }) => score > 0)
       .sort((a, b) => {
@@ -217,8 +248,56 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
         return (b.item.lastOpenedAt ?? 0) - (a.item.lastOpenedAt ?? 0);
       })
       .map(({ item }) => item)
-      .slice(0, MAX_RESULTS);
-  }, [actionItems, chapterItems, query, searchMode, searchResultItems]);
+      .slice(0, limit);
+  }, []);
+
+  /** Section headers inserted into the flat list for 'all' mode. */
+  interface SectionHeader {
+    kind: 'header';
+    label: string;
+    key: string;
+  }
+
+  type ListEntry = SwitcherItem | SectionHeader;
+
+  const isSectionHeader = (entry: ListEntry): entry is SectionHeader =>
+    'kind' in entry && entry.kind === 'header';
+
+  const { flatEntries, selectableItems } = useMemo(() => {
+    const normalizedQuery = normalizeSearchText(query);
+    const allItemsByType: Record<ItemType, SwitcherItem[]> = {
+      action: actionItems,
+      chapter: chapterItems,
+      'search-result': searchResultItems,
+    };
+
+    if (searchMode === 'all') {
+      const groups: { type: ItemType; label: string }[] = [
+        { type: 'action', label: 'Actions' },
+        { type: 'chapter', label: 'Chapters' },
+        { type: 'search-result', label: 'Content' },
+      ];
+
+      const entries: ListEntry[] = [];
+      const selectable: SwitcherItem[] = [];
+
+      for (const { type, label } of groups) {
+        const ranked = rankItems(allItemsByType[type], normalizedQuery, type, MAX_RESULTS_PER_GROUP);
+        if (ranked.length > 0) {
+          entries.push({ kind: 'header', label, key: `header:${type}` });
+          for (const item of ranked) {
+            entries.push(item);
+            selectable.push(item);
+          }
+        }
+      }
+
+      return { flatEntries: entries, selectableItems: selectable };
+    }
+
+    const ranked = rankItems(allItemsByType[searchMode], normalizedQuery, searchMode, MAX_RESULTS);
+    return { flatEntries: ranked as ListEntry[], selectableItems: ranked };
+  }, [actionItems, chapterItems, query, rankItems, searchMode, searchResultItems]);
 
   const runItemAction = useCallback((item: SwitcherItem) => {
     setRecentOpenedMap(prev => ({
@@ -244,9 +323,11 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
 
   useEffect(() => {
     if (!listRef.current) return;
-    const selected = listRef.current.children[selectedIndex] as HTMLElement;
-    if (selected) {
-      selected.scrollIntoView({ block: 'nearest' });
+    // In 'all' mode, the DOM list contains section headers interspersed with items.
+    // Map from selectable index to the DOM child index by finding the matching data-selectable-index.
+    const el = listRef.current.querySelector(`[data-selectable-index="${selectedIndex}"]`) as HTMLElement | null;
+    if (el) {
+      el.scrollIntoView({ block: 'nearest' });
     }
   }, [selectedIndex]);
 
@@ -258,7 +339,8 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.ctrlKey && !e.shiftKey && !e.altKey) {
-      const modeFromShortcut = e.key === '1' ? 'action' : e.key === '2' ? 'chapter' : e.key === '3' ? 'search-result' : null;
+      const modeMap: Record<string, SearchMode> = { '1': 'all', '2': 'action', '3': 'chapter', '4': 'search-result' };
+      const modeFromShortcut = modeMap[e.key] ?? null;
       if (modeFromShortcut) {
         e.preventDefault();
         updateSettings({ quickSwitcherMode: modeFromShortcut });
@@ -269,7 +351,7 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setSelectedIndex(prev => Math.min(prev + 1, filteredItems.length - 1));
+        setSelectedIndex(prev => Math.min(prev + 1, selectableItems.length - 1));
         break;
       case 'ArrowUp':
         e.preventDefault();
@@ -277,8 +359,8 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
         break;
       case 'Enter':
         e.preventDefault();
-        if (filteredItems[selectedIndex]) {
-          runItemAction(filteredItems[selectedIndex]);
+        if (selectableItems[selectedIndex]) {
+          runItemAction(selectableItems[selectedIndex]);
         }
         break;
       case 'Tab':
@@ -290,13 +372,16 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
         onClose();
         break;
     }
-  }, [filteredItems, selectedIndex, onClose, runItemAction, cycleSearchMode, updateSettings]);
+  }, [selectableItems, selectedIndex, onClose, runItemAction, cycleSearchMode, updateSettings]);
 
   if (!open) return null;
 
+  // Build a mapping from selectable index to the item, for mouse hover in the list
+  let selectableCounter = 0;
+
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.switcher} onClick={e => e.stopPropagation()} role="dialog" aria-label="Quick Switcher">
+      <div className={styles.switcher} onClick={e => e.stopPropagation()} role="dialog" aria-label="Command Palette">
         <div className={styles.inputWrapper}>
           <span className="material-symbols-rounded">search</span>
           <input
@@ -305,14 +390,13 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
             value={rawQuery}
             onChange={e => setRawQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={`Quick switch (${chapterLabel.toLowerCase()}, actions, content)`}
+            placeholder={`Search commands, ${chapterLabel.toLowerCase()}s, content...`}
             autoComplete="off"
             spellCheck={false}
           />
-          <kbd className={styles.kbd}>Tab: {searchMode === 'action' ? 'Commands' : searchMode === 'chapter' ? chapterLabel + 's' : 'Content'}</kbd>
           <kbd className={styles.kbd}>Esc</kbd>
         </div>
-        <div className={styles.modeBar} role="tablist" aria-label="Quick switch mode">
+        <div className={styles.modeBar} role="tablist" aria-label="Search mode">
             {MODE_ORDER.map((mode, idx) => (
               <button
                 key={mode}
@@ -341,33 +425,54 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
           </div>
         )}
         <div className={styles.list} ref={listRef}>
-          {filteredItems.length === 0 ? (
+          {selectableItems.length === 0 ? (
             <div className={styles.empty}>No results found</div>
           ) : (
-            filteredItems.map((item, idx) => (
-              <button
-                key={item.id}
-                className={`${styles.item} ${styles[`item--${item.type}`]} ${idx === selectedIndex ? styles['item--selected'] : ''}`}
-                onClick={() => runItemAction(item)}
-                onMouseEnter={() => setSelectedIndex(idx)}
-              >
-                <span className={`material-symbols-rounded ${styles.itemIcon}`}>{item.icon}</span>
-                <div className={styles.itemContent}>
-                  <span className={styles.itemTitle}>{highlightMatch(item.title, query)}</span>
-                  {item.snippet ? (
-                    <span className={styles.itemSnippet}>{highlightMatch(item.snippet, query)}</span>
-                  ) : item.subtitle ? (
-                    <span className={styles.itemSubtitle}>{item.subtitle}</span>
-                  ) : null}
-                </div>
-                <div className={styles.itemMeta}>
-                  {item.lastOpenedAt && <span className={styles.itemRecent}>Recent</span>}
-                  {item.shortcut && <kbd className={styles.itemShortcut}>{item.shortcut}</kbd>}
-                  <span className={styles.itemType}>{item.type === 'chapter' ? chapterLabel : item.type === 'search-result' ? 'Content' : item.group ?? 'Action'}</span>
-                </div>
-              </button>
-            ))
+            (() => {
+              selectableCounter = 0;
+              return flatEntries.map((entry) => {
+                if (isSectionHeader(entry)) {
+                  return (
+                    <div key={entry.key} className={styles.sectionHeader}>
+                      {entry.label}
+                    </div>
+                  );
+                }
+                const item = entry;
+                const thisIndex = selectableCounter++;
+                return (
+                  <button
+                    key={item.id}
+                    data-selectable-index={thisIndex}
+                    className={`${styles.item} ${styles[`item--${item.type}`]} ${thisIndex === selectedIndex ? styles['item--selected'] : ''}`}
+                    onClick={() => runItemAction(item)}
+                    onMouseEnter={() => setSelectedIndex(thisIndex)}
+                  >
+                    <span className={`material-symbols-rounded ${styles.itemIcon}`}>{item.icon}</span>
+                    <div className={styles.itemContent}>
+                      <span className={styles.itemTitle}>{highlightMatch(item.title, query)}</span>
+                      {item.snippet ? (
+                        <span className={styles.itemSnippet}>{highlightMatch(item.snippet, query)}</span>
+                      ) : item.subtitle ? (
+                        <span className={styles.itemSubtitle}>{item.subtitle}</span>
+                      ) : null}
+                    </div>
+                    <div className={styles.itemMeta}>
+                      {item.lastOpenedAt && <span className={styles.itemRecent}>Recent</span>}
+                      {item.shortcut && <kbd className={styles.itemShortcut}>{item.shortcut}</kbd>}
+                      <span className={styles.itemType}>{item.type === 'chapter' ? chapterLabel : item.type === 'search-result' ? 'Content' : item.group ?? 'Action'}</span>
+                    </div>
+                  </button>
+                );
+              });
+            })()
           )}
+        </div>
+        <div className={styles.footer}>
+          <span className={styles.footerHint}><kbd className={styles.footerKbd}>↑↓</kbd> Navigate</span>
+          <span className={styles.footerHint}><kbd className={styles.footerKbd}>Enter</kbd> Select</span>
+          <span className={styles.footerHint}><kbd className={styles.footerKbd}>Tab</kbd> Switch Mode</span>
+          <span className={styles.footerHint}><kbd className={styles.footerKbd}>Esc</kbd> Close</span>
         </div>
       </div>
     </div>

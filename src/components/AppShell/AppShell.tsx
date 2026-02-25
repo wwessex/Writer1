@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
+import type { Editor as TiptapEditor } from '@tiptap/react';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
 import { Editor } from '@/components/Editor';
@@ -27,6 +28,7 @@ interface AppShellProps {
   onToggleSidebar: () => void;
   aiPanelOpen: boolean;
   closeAiPanel: () => void;
+  editor: TiptapEditor | null;
 }
 
 export function AppShell({
@@ -45,6 +47,7 @@ export function AppShell({
   onToggleSidebar,
   aiPanelOpen,
   closeAiPanel,
+  editor: tiptapEditor,
 }: AppShellProps) {
   const layoutClass = [
     styles.layout,
@@ -98,7 +101,7 @@ export function AppShell({
         <PanelErrorBoundary panel="inspector">
           <Inspector open={inspectorOpen} onClose={() => setInspectorOpen(false)} voiceAlerts={voiceAlerts} />
         </PanelErrorBoundary>
-        <AISuggestionsPanel open={aiPanelOpen} onClose={closeAiPanel} />
+        <AISuggestionsPanel open={aiPanelOpen} onClose={closeAiPanel} editor={tiptapEditor} />
       </main>
 
       <nav className={styles.mobileNav} aria-label={`${appLabel} mobile navigation`}>

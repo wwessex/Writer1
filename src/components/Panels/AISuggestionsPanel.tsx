@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import type { Editor } from '@tiptap/react';
 import { useApp } from '@/context/AppContext';
 import { editorToPlainText, generateId } from '@/lib/utils';
 import { loadAIConfig, createProvider } from '@/lib/ai';
@@ -9,6 +10,7 @@ import styles from './Panels.module.css';
 interface AISuggestionsPanelProps {
   open: boolean;
   onClose: () => void;
+  editor: Editor | null;
 }
 
 interface Suggestion {
@@ -18,6 +20,8 @@ interface Suggestion {
   loading: boolean;
 }
 
+type SectionKey = 'quickActions' | 'rewrite' | 'brainstorm';
+
 const QUICK_ACTIONS = [
   { id: 'continue', label: 'Continue', icon: 'edit_note', type: 'continuation' as const, prompt: 'Continue writing the next 2-3 sentences, matching the tone and style.' },
   { id: 'rephrase', label: 'Rephrase', icon: 'swap_horiz', type: 'alternative' as const, prompt: 'Suggest 2 alternative ways to write the last paragraph.' },
@@ -25,11 +29,38 @@ const QUICK_ACTIONS = [
   { id: 'shorten', label: 'Shorten', icon: 'compress', type: 'style' as const, prompt: 'Tighten the last paragraph to half its length without losing meaning.' },
 ];
 
-export function AISuggestionsPanel({ open, onClose }: AISuggestionsPanelProps) {
+const REWRITE_ACTIONS = [
+  { id: 'rewrite-formal', label: 'Formal', icon: 'school', type: 'alternative' as const,
+    prompt: (text: string) => `Rewrite the following text in a more formal, professional tone. Keep the same meaning:\n\n"${text}"` },
+  { id: 'rewrite-casual', label: 'Casual', icon: 'chat_bubble', type: 'alternative' as const,
+    prompt: (text: string) => `Rewrite the following text in a casual, conversational tone. Keep the same meaning:\n\n"${text}"` },
+  { id: 'rewrite-vivid', label: 'Vivid', icon: 'palette', type: 'style' as const,
+    prompt: (text: string) => `Rewrite the following text with vivid sensory details, strong verbs, and evocative imagery:\n\n"${text}"` },
+  { id: 'rewrite-concise', label: 'Concise', icon: 'compress', type: 'style' as const,
+    prompt: (text: string) => `Rewrite the following text as concisely as possible, keeping only the essential meaning:\n\n"${text}"` },
+];
+
+const BRAINSTORM_ACTIONS = [
+  { id: 'brainstorm-plot', label: 'Plot Ideas', icon: 'auto_stories', type: 'continuation' as const,
+    prompt: 'Based on the story so far, suggest 3 interesting plot developments that could happen next. Be creative and unexpected.' },
+  { id: 'brainstorm-arc', label: 'Character Arc', icon: 'person', type: 'continuation' as const,
+    prompt: 'Based on the current chapter, suggest how the point-of-view character could grow or change. Outline a brief character arc with 3 key emotional beats.' },
+  { id: 'brainstorm-outline', label: 'Scene Outline', icon: 'format_list_numbered', type: 'continuation' as const,
+    prompt: 'Create a detailed beat-by-beat outline for the current scene. Include 5-7 story beats with brief descriptions of what happens in each.' },
+  { id: 'brainstorm-whatif', label: 'What If...', icon: 'help', type: 'continuation' as const,
+    prompt: 'Generate 3 creative "what if" scenarios for this story. Each should be a surprising twist or alternative direction that would change the story in an interesting way.' },
+];
+
+export function AISuggestionsPanel({ open, onClose, editor }: AISuggestionsPanelProps) {
   const { activeChapter, state } = useApp();
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
+  const [expandedSections, setExpandedSections] = useState<Record<SectionKey, boolean>>({
+    quickActions: true,
+    rewrite: true,
+    brainstorm: true,
+  });
   const abortRef = useRef<AbortController | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -37,12 +68,24 @@ export function AISuggestionsPanel({ open, onClose }: AISuggestionsPanelProps) {
   const provider = createProvider(config);
   const isConfigured = provider.isAvailable();
 
+  const selectedText = editor?.state.doc.textBetween(
+    editor.state.selection.from,
+    editor.state.selection.to,
+    ' '
+  ) || '';
+
+  const hasSelection = selectedText.trim().length > 0;
+
   useEffect(() => {
     if (!open) {
       abortRef.current?.abort();
       setLoading(false);
     }
   }, [open]);
+
+  const toggleSection = useCallback((section: SectionKey) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  }, []);
 
   const fetchSuggestion = useCallback(async (prompt: string, type: Suggestion['type'], actionId?: string) => {
     if (!isConfigured || !activeChapter) return;
@@ -131,6 +174,15 @@ export function AISuggestionsPanel({ open, onClose }: AISuggestionsPanelProps) {
     }
   };
 
+  const handleRewriteAction = (action: typeof REWRITE_ACTIONS[number]) => {
+    if (!hasSelection) return;
+    fetchSuggestion(action.prompt(selectedText), action.type, action.id);
+  };
+
+  const handleBrainstormAction = (action: typeof BRAINSTORM_ACTIONS[number]) => {
+    fetchSuggestion(action.prompt, action.type, action.id);
+  };
+
   if (!open) return null;
 
   return (
@@ -165,20 +217,104 @@ export function AISuggestionsPanel({ open, onClose }: AISuggestionsPanelProps) {
           </p>
         </div>
       ) : (
-        <>
-          {/* Quick action buttons */}
-          <div className={styles.aiPanel__actions}>
-            {QUICK_ACTIONS.map(action => (
-              <button
-                key={action.id}
-                className={styles.aiPanel__actionBtn}
-                onClick={() => fetchSuggestion(action.prompt, action.type, action.id)}
-                disabled={loading || !activeChapter}
-              >
-                <span className="material-symbols-rounded">{action.icon}</span>
-                {action.label}
-              </button>
-            ))}
+        <div className={styles.aiPanel__body}>
+          {/* Quick Actions section */}
+          <div className={styles.aiPanel__section}>
+            <button
+              className={styles.aiPanel__sectionHeader}
+              onClick={() => toggleSection('quickActions')}
+              aria-expanded={expandedSections.quickActions}
+            >
+              <span className="material-symbols-rounded">
+                {expandedSections.quickActions ? 'expand_less' : 'expand_more'}
+              </span>
+              Quick Actions
+            </button>
+            {expandedSections.quickActions && (
+              <div className={styles.aiPanel__sectionContent}>
+                <div className={styles.aiPanel__actionGrid}>
+                  {QUICK_ACTIONS.map(action => (
+                    <button
+                      key={action.id}
+                      className={styles.aiPanel__actionBtn}
+                      onClick={() => fetchSuggestion(action.prompt, action.type, action.id)}
+                      disabled={loading || !activeChapter}
+                    >
+                      <span className="material-symbols-rounded">{action.icon}</span>
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Rewrite section */}
+          <div className={styles.aiPanel__section}>
+            <button
+              className={styles.aiPanel__sectionHeader}
+              onClick={() => toggleSection('rewrite')}
+              aria-expanded={expandedSections.rewrite}
+            >
+              <span className="material-symbols-rounded">
+                {expandedSections.rewrite ? 'expand_less' : 'expand_more'}
+              </span>
+              Rewrite Tools
+            </button>
+            {expandedSections.rewrite && (
+              <div className={styles.aiPanel__sectionContent}>
+                {!hasSelection && (
+                  <p className={styles.aiPanel__disabledHint}>
+                    <span className="material-symbols-rounded">info</span>
+                    Select text in the editor to use rewrite tools
+                  </p>
+                )}
+                <div className={styles.aiPanel__actionGrid}>
+                  {REWRITE_ACTIONS.map(action => (
+                    <button
+                      key={action.id}
+                      className={styles.aiPanel__actionBtn}
+                      onClick={() => handleRewriteAction(action)}
+                      disabled={loading || !activeChapter || !hasSelection}
+                    >
+                      <span className="material-symbols-rounded">{action.icon}</span>
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Brainstorm section */}
+          <div className={styles.aiPanel__section}>
+            <button
+              className={styles.aiPanel__sectionHeader}
+              onClick={() => toggleSection('brainstorm')}
+              aria-expanded={expandedSections.brainstorm}
+            >
+              <span className="material-symbols-rounded">
+                {expandedSections.brainstorm ? 'expand_less' : 'expand_more'}
+              </span>
+              Brainstorm
+            </button>
+            {expandedSections.brainstorm && (
+              <div className={styles.aiPanel__sectionContent}>
+                <div className={styles.aiPanel__actionGrid}>
+                  {BRAINSTORM_ACTIONS.map(action => (
+                    <button
+                      key={action.id}
+                      className={styles.aiPanel__actionBtn}
+                      onClick={() => handleBrainstormAction(action)}
+                      disabled={loading || !activeChapter}
+                    >
+                      <span className="material-symbols-rounded">{action.icon}</span>
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Custom prompt */}
@@ -230,7 +366,7 @@ export function AISuggestionsPanel({ open, onClose }: AISuggestionsPanelProps) {
               </p>
             )}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

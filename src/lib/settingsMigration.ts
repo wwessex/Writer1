@@ -103,7 +103,8 @@ const sanitizeSettings = (rawSettings: unknown, defaults: AppSettings): AppSetti
     sidebarHidden: asBoolean(rawSettings.sidebarHidden, defaults.sidebarHidden),
     pageView: asBoolean(rawSettings.pageView, defaults.pageView),
     focusMode: asBoolean(rawSettings.focusMode, defaults.focusMode),
-    quickSwitcherMode: rawSettings.quickSwitcherMode === 'chapter'
+    quickSwitcherMode: rawSettings.quickSwitcherMode === 'all'
+      || rawSettings.quickSwitcherMode === 'chapter'
       || rawSettings.quickSwitcherMode === 'action'
       || rawSettings.quickSwitcherMode === 'search-result'
       ? rawSettings.quickSwitcherMode
