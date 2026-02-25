@@ -16,13 +16,33 @@ vi.mock('@/components/layout/TopBar', () => ({
     </div>
   ),
 }));
-vi.mock('@/components/layout/StatusBar', () => ({ StatusBar: () => <div>StatusBar</div> }));
+vi.mock('@/components/layout/StatusBar', () => ({
+  StatusBar: (props: { wordCount?: number }) => <div>StatusBar:{props.wordCount}</div>,
+}));
 vi.mock('@/components/layout/sidebar/LeftSidebar', () => ({
   LeftSidebar: (props: { collapsed?: boolean }) => <div>LeftSidebar:{props.collapsed ? 'collapsed' : 'expanded'}</div>,
 }));
 vi.mock('@/components/layout/inspector/RightInspector', () => ({
   RightInspector: (props: { collapsed?: boolean }) => <div>RightInspector:{props.collapsed ? 'collapsed' : 'expanded'}</div>,
 }));
+vi.mock('@/lib/projectMetrics', () => ({
+  getProjectMetrics: () => ({ totalWords: 5000, totalChapters: 3, chapters: [] }),
+}));
+vi.mock('@/lib/progressTracker', () => ({
+  getTodayProgress: () => ({ wordsToday: 500, goalMet: false }),
+}));
+
+const makeState = (overrides: Record<string, unknown> = {}) => ({
+  novelTitle: 'Test Novel',
+  novelId: 'n-1',
+  projectType: 'book',
+  chapters: [],
+  activeChapterId: null,
+  isSaving: false,
+  isOnline: true,
+  settings: { sidebarHidden: false, dailyWordGoal: 1000 },
+  ...overrides,
+});
 
 const baseProps = {
   appLabel: 'app',
@@ -49,7 +69,7 @@ describe('AppShell', () => {
       root.render(
         <AppShell
           {...baseProps}
-          state={{ novelTitle: 'Test Novel', settings: { sidebarHidden: false }, isSaving: false, isOnline: true } as never}
+          state={makeState() as never}
           inspectorOpen
           setInspectorOpen={vi.fn()}
         />
@@ -73,7 +93,7 @@ describe('AppShell', () => {
       root.render(
         <AppShell
           {...baseProps}
-          state={{ novelTitle: 'Test', settings: { sidebarHidden: true }, isSaving: false, isOnline: true } as never}
+          state={makeState({ settings: { sidebarHidden: true, dailyWordGoal: 0 } }) as never}
           inspectorOpen={false}
           setInspectorOpen={vi.fn()}
         />
@@ -95,7 +115,7 @@ describe('AppShell', () => {
       root.render(
         <AppShell
           {...baseProps}
-          state={{ novelTitle: 'Test', settings: { sidebarHidden: false }, isSaving: false, isOnline: true } as never}
+          state={makeState() as never}
           inspectorOpen={false}
           setInspectorOpen={setInspectorOpen}
         />

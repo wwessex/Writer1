@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from 'react';
+import { useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { Editor as TiptapEditor } from '@tiptap/react';
 import { Editor } from '@/components/Editor';
 import { AISuggestionsPanel } from '@/components/Panels';
@@ -6,6 +6,8 @@ import { TopBar } from '@/components/layout/TopBar';
 import { StatusBar } from '@/components/layout/StatusBar';
 import { LeftSidebar } from '@/components/layout/sidebar/LeftSidebar';
 import { RightInspector } from '@/components/layout/inspector/RightInspector';
+import { getProjectMetrics } from '@/lib/projectMetrics';
+import { getTodayProgress } from '@/lib/progressTracker';
 import type { VoiceSimilarityAlert } from '@/lib/voiceFingerprint';
 import type { CommandId } from '@/lib/commands';
 import type { AppState } from '@/types';
@@ -38,23 +40,60 @@ export function AppShell(props: AppShellProps) {
     inspectorOpen,
     setInspectorOpen,
     onToggleSidebar,
+    sidebarImportBackup,
     aiPanelOpen,
     closeAiPanel,
     editor: tiptapEditor,
   } = props;
 
+  // Compute project-level metrics for status bar
+  const projectMetrics = useMemo(() => getProjectMetrics(state.chapters), [state.chapters]);
+
+  const { wordsToday } = useMemo(
+    () => getTodayProgress(projectMetrics.totalWords),
+    [projectMetrics.totalWords],
+  );
+
+  // Session word tracking: store baseline on first render
+  const sessionBaselineRef = useRef<number | null>(null);
+  if (sessionBaselineRef.current === null) {
+    sessionBaselineRef.current = projectMetrics.totalWords;
+  }
+  const sessionWords = projectMetrics.totalWords - sessionBaselineRef.current;
+
+  // Daily goal progress
+  const dailyGoal = state.settings.dailyWordGoal;
+  const goalPercent = dailyGoal > 0
+    ? Math.min(100, Math.round((wordsToday / dailyGoal) * 100))
+    : 0;
+
+  // Save status for TopBar
+  const saveStatus = state.isSaving
+    ? 'saving' as const
+    : state.isOnline
+      ? 'saved' as const
+      : 'offline' as const;
+
   return (
     <div className="h-[100dvh] min-w-[1100px] bg-[#111315] text-[#ECEFF3] flex flex-col">
       <TopBar
         projectTitle={state.novelTitle || 'Writer1 Project'}
+        saveStatus={saveStatus}
         onFocusMode={onToggleSidebar}
         onSearch={() => onAction('QUICK_SWITCHER' as CommandId)}
         onToggleInspector={() => setInspectorOpen(prev => !prev)}
+        onNewChapter={() => onAction('NEW_CHAPTER' as CommandId)}
+        onSettings={() => onAction('SETTINGS' as CommandId)}
+        onProjectSelect={() => onAction('PROJECTS' as CommandId)}
       />
 
       {/* Main 3-panel layout */}
       <div className="flex-1 min-h-0 flex">
-        <LeftSidebar collapsed={state.settings.sidebarHidden} />
+        <LeftSidebar
+          collapsed={state.settings.sidebarHidden}
+          onCreateChapter={() => onAction('NEW_CHAPTER' as CommandId)}
+          onImport={sidebarImportBackup}
+        />
 
         {/* Editor pane */}
         <main className="flex-1 min-w-0 min-h-0 bg-[#111315] flex flex-col">
@@ -64,15 +103,19 @@ export function AppShell(props: AppShellProps) {
           />
         </main>
 
-        <RightInspector collapsed={!inspectorOpen} />
+        <RightInspector
+          collapsed={!inspectorOpen}
+          onOpenAiPanel={() => onAction('AI_PANEL' as CommandId)}
+        />
       </div>
 
       <StatusBar
-        wordCount={2843}
-        sessionWords={612}
-        goalPercent={61}
+        wordCount={projectMetrics.totalWords}
+        sessionWords={sessionWords}
+        goalPercent={goalPercent}
         saved={!state.isSaving}
         online={state.isOnline}
+        chapterCount={projectMetrics.totalChapters}
       />
 
       <AISuggestionsPanel open={aiPanelOpen} onClose={closeAiPanel} editor={tiptapEditor} />
