@@ -1,5 +1,5 @@
-import { useMemo, useEffect, useState } from 'react';
-import { Dialog } from '@/components/UI';
+import { useMemo, useEffect, useState, useCallback } from 'react';
+import { Dialog, Button } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
 import { getProjectMetrics } from '@/lib/projectMetrics';
 import {
@@ -22,10 +22,12 @@ interface DashboardModalProps {
 const OVERDUE_DAYS = 14;
 
 export function DashboardModal({ open, onClose, onAction }: DashboardModalProps) {
-  const { state, setActiveChapter } = useApp();
+  const { state, setActiveChapter, updateSettings } = useApp();
   const [progress, setProgress] = useState<ProgressData | null>(null);
   const [weeklyHistory, setWeeklyHistory] = useState<DailyProgress[]>([]);
   const [monthlyHistory, setMonthlyHistory] = useState<DailyProgress[]>([]);
+  const [editingGoal, setEditingGoal] = useState<'daily' | 'novel' | 'deadline' | null>(null);
+  const [goalInputValue, setGoalInputValue] = useState('');
 
   const stats = useMemo(() => getProjectMetrics(state.chapters), [state.chapters]);
 
@@ -102,6 +104,29 @@ export function DashboardModal({ open, onClose, onAction }: DashboardModalProps)
     };
   })();
 
+  // Deadline calculations
+  const deadlineInfo = useMemo(() => {
+    const deadline = state.settings.novelDeadline;
+    if (!deadline) return null;
+
+    const deadlineDate = new Date(deadline + 'T23:59:59');
+    const now = new Date();
+    const diffMs = deadlineDate.getTime() - now.getTime();
+    const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    const wordsRemaining = Math.max(0, (state.settings.novelWordGoal || 0) - stats.totalWords);
+    const dailyNeeded = daysRemaining > 0 ? Math.ceil(wordsRemaining / daysRemaining) : wordsRemaining;
+
+    return {
+      date: deadline,
+      daysRemaining,
+      wordsRemaining,
+      dailyNeeded,
+      isPast: daysRemaining < 0,
+      formattedDate: deadlineDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
+    };
+  }, [state.settings.novelDeadline, state.settings.novelWordGoal, stats.totalWords]);
+
   const chapterLabel = state.projectType === 'screenplay' ? 'Scenes' : 'Chapters';
   const chapterSingleLabel = state.projectType === 'screenplay' ? 'scene' : 'chapter';
 
@@ -111,6 +136,25 @@ export function DashboardModal({ open, onClose, onAction }: DashboardModalProps)
   }, [stats.chapters]);
 
   const maxChapterWords = Math.max(...stats.chapters.map(c => c.words), 1);
+
+  const handleStartEditGoal = useCallback((type: 'daily' | 'novel' | 'deadline') => {
+    setEditingGoal(type);
+    if (type === 'daily') setGoalInputValue(String(state.settings.dailyWordGoal || ''));
+    else if (type === 'novel') setGoalInputValue(String(state.settings.novelWordGoal || ''));
+    else setGoalInputValue(state.settings.novelDeadline || '');
+  }, [state.settings.dailyWordGoal, state.settings.novelWordGoal, state.settings.novelDeadline]);
+
+  const handleSaveGoal = useCallback(() => {
+    if (!editingGoal) return;
+    if (editingGoal === 'daily') {
+      updateSettings({ dailyWordGoal: parseInt(goalInputValue) || 0 });
+    } else if (editingGoal === 'novel') {
+      updateSettings({ novelWordGoal: parseInt(goalInputValue) || 0 });
+    } else {
+      updateSettings({ novelDeadline: goalInputValue });
+    }
+    setEditingGoal(null);
+  }, [editingGoal, goalInputValue, updateSettings]);
 
   return (
     <Dialog open={open} onClose={onClose} title="Project Dashboard" size="large">
@@ -164,27 +208,138 @@ export function DashboardModal({ open, onClose, onAction }: DashboardModalProps)
           </div>
         )}
 
-        {state.settings.dailyWordGoal > 0 && (
-          <div className={styles.dashboardGoal}>
-            <h4><span className="material-symbols-rounded">track_changes</span>Daily Goal Progress</h4>
-            <div className={styles.progressBar}>
-              <div className={styles.progressBar__fill} style={{ width: `${dailyGoalPercent}%`, background: dailyGoalPercent >= 100 ? 'var(--success, #22c55e)' : 'var(--accent)' }} />
-            </div>
-            <span className={styles.progressBar__label}>
-              {todayWords.toLocaleString()} / {state.settings.dailyWordGoal.toLocaleString()} words ({dailyGoalPercent}%)
-              {dailyGoalPercent >= 100 && ' -- Goal met!'}
-            </span>
-            {goalTrend && (
-              <div className={styles.dashboardTrend}>
-                <span>Today: {goalTrend.today.wordsToday.toLocaleString()}</span>
-                <span>Last {goalTrend.previousDays || 1}d avg: {goalTrend.previousAvg.toLocaleString()}</span>
-                <span className={goalTrend.delta >= 0 ? styles.dashboardTrend__positive : styles.dashboardTrend__negative}>
-                  {goalTrend.delta >= 0 ? '+' : ''}{goalTrend.delta.toLocaleString()} vs trend
-                </span>
+        {/* Writing Goals — inline editable */}
+        <div className={styles.dashboardGoal}>
+          <h4><span className="material-symbols-rounded">flag</span>Writing Goals</h4>
+          <div className={styles.goalCards}>
+            <div className={styles.goalCard}>
+              <div className={styles.goalCard__header}>
+                <span className={styles.goalCard__title}>Daily Word Goal</span>
+                <button className={styles.goalCard__editBtn} onClick={() => handleStartEditGoal('daily')}>
+                  <span className="material-symbols-rounded">edit</span>
+                </button>
               </div>
-            )}
+              {editingGoal === 'daily' ? (
+                <div className={styles.goalCard__editRow}>
+                  <input
+                    type="number"
+                    className={styles.goalCard__input}
+                    value={goalInputValue}
+                    onChange={e => setGoalInputValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleSaveGoal(); if (e.key === 'Escape') setEditingGoal(null); }}
+                    placeholder="e.g. 1000"
+                    autoFocus
+                  />
+                  <Button variant="primary" size="small" onClick={handleSaveGoal}>Save</Button>
+                </div>
+              ) : (
+                <>
+                  <span className={styles.goalCard__value}>
+                    {state.settings.dailyWordGoal > 0 ? `${state.settings.dailyWordGoal.toLocaleString()} words/day` : 'Not set'}
+                  </span>
+                  {state.settings.dailyWordGoal > 0 && (
+                    <div className={styles.progressBar}>
+                      <div className={styles.progressBar__fill} style={{ width: `${dailyGoalPercent}%`, background: dailyGoalPercent >= 100 ? 'var(--success, #22c55e)' : 'var(--accent)' }} />
+                    </div>
+                  )}
+                  {state.settings.dailyWordGoal > 0 && (
+                    <span className={styles.goalCard__meta}>
+                      {todayWords.toLocaleString()} / {state.settings.dailyWordGoal.toLocaleString()} ({dailyGoalPercent}%)
+                      {dailyGoalPercent >= 100 && ' — Goal met!'}
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className={styles.goalCard}>
+              <div className={styles.goalCard__header}>
+                <span className={styles.goalCard__title}>Novel Word Goal</span>
+                <button className={styles.goalCard__editBtn} onClick={() => handleStartEditGoal('novel')}>
+                  <span className="material-symbols-rounded">edit</span>
+                </button>
+              </div>
+              {editingGoal === 'novel' ? (
+                <div className={styles.goalCard__editRow}>
+                  <input
+                    type="number"
+                    className={styles.goalCard__input}
+                    value={goalInputValue}
+                    onChange={e => setGoalInputValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleSaveGoal(); if (e.key === 'Escape') setEditingGoal(null); }}
+                    placeholder="e.g. 80000"
+                    autoFocus
+                  />
+                  <Button variant="primary" size="small" onClick={handleSaveGoal}>Save</Button>
+                </div>
+              ) : (
+                <>
+                  <span className={styles.goalCard__value}>
+                    {state.settings.novelWordGoal > 0 ? `${state.settings.novelWordGoal.toLocaleString()} words` : 'Not set'}
+                  </span>
+                  {state.settings.novelWordGoal > 0 && (
+                    <div className={styles.progressBar}>
+                      <div className={styles.progressBar__fill} style={{ width: `${novelGoalPercent}%` }} />
+                    </div>
+                  )}
+                  {state.settings.novelWordGoal > 0 && (
+                    <span className={styles.goalCard__meta}>
+                      {stats.totalWords.toLocaleString()} / {state.settings.novelWordGoal.toLocaleString()} ({novelGoalPercent}%)
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className={styles.goalCard}>
+              <div className={styles.goalCard__header}>
+                <span className={styles.goalCard__title}>Deadline</span>
+                <button className={styles.goalCard__editBtn} onClick={() => handleStartEditGoal('deadline')}>
+                  <span className="material-symbols-rounded">edit</span>
+                </button>
+              </div>
+              {editingGoal === 'deadline' ? (
+                <div className={styles.goalCard__editRow}>
+                  <input
+                    type="date"
+                    className={styles.goalCard__input}
+                    value={goalInputValue}
+                    onChange={e => setGoalInputValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleSaveGoal(); if (e.key === 'Escape') setEditingGoal(null); }}
+                    autoFocus
+                  />
+                  <Button variant="primary" size="small" onClick={handleSaveGoal}>Save</Button>
+                </div>
+              ) : deadlineInfo ? (
+                <>
+                  <span className={styles.goalCard__value}>{deadlineInfo.formattedDate}</span>
+                  <span className={`${styles.goalCard__meta} ${deadlineInfo.isPast ? styles['goalCard__meta--overdue'] : ''}`}>
+                    {deadlineInfo.isPast
+                      ? `${Math.abs(deadlineInfo.daysRemaining)} days overdue`
+                      : `${deadlineInfo.daysRemaining} days remaining`}
+                  </span>
+                  {!deadlineInfo.isPast && deadlineInfo.wordsRemaining > 0 && state.settings.novelWordGoal > 0 && (
+                    <span className={styles.goalCard__meta}>
+                      {deadlineInfo.dailyNeeded.toLocaleString()} words/day needed
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className={styles.goalCard__value}>Not set</span>
+              )}
+            </div>
           </div>
-        )}
+
+          {goalTrend && (
+            <div className={styles.dashboardTrend}>
+              <span>Today: {goalTrend.today.wordsToday.toLocaleString()}</span>
+              <span>Last {goalTrend.previousDays || 1}d avg: {goalTrend.previousAvg.toLocaleString()}</span>
+              <span className={goalTrend.delta >= 0 ? styles.dashboardTrend__positive : styles.dashboardTrend__negative}>
+                {goalTrend.delta >= 0 ? '+' : ''}{goalTrend.delta.toLocaleString()} vs trend
+              </span>
+            </div>
+          )}
+        </div>
 
         <div className={styles.dashboardGoal}>
           <h4><span className="material-symbols-rounded">bolt</span>Quick Actions</h4>
@@ -256,11 +411,30 @@ export function DashboardModal({ open, onClose, onAction }: DashboardModalProps)
           </div>
         )}
 
-        {state.settings.novelWordGoal > 0 && (
+        {monthlyHistory.length > 7 && (
           <div className={styles.dashboardGoal}>
-            <h4><span className="material-symbols-rounded">flag</span>Novel Goal Progress</h4>
-            <div className={styles.progressBar}><div className={styles.progressBar__fill} style={{ width: `${novelGoalPercent}%` }} /></div>
-            <span className={styles.progressBar__label}>{stats.totalWords.toLocaleString()} / {state.settings.novelWordGoal.toLocaleString()} words ({novelGoalPercent}%)</span>
+            <h4><span className="material-symbols-rounded">calendar_month</span>Last 30 Days</h4>
+            <div className={styles.monthlyChart}>
+              {(() => {
+                const days: { date: string; words: number; goalMet: boolean }[] = [];
+                for (let i = 29; i >= 0; i--) {
+                  const d = new Date();
+                  d.setDate(d.getDate() - i);
+                  const dateStr = d.toISOString().slice(0, 10);
+                  const entry = monthlyHistory.find(h => h.date === dateStr);
+                  days.push({ date: dateStr, words: entry?.wordsWritten ?? 0, goalMet: entry?.goalMet ?? false });
+                }
+                const maxWords = Math.max(...days.map(d => d.words), 1);
+                return days.map(day => (
+                  <div
+                    key={day.date}
+                    className={`${styles.monthlyChart__cell} ${day.goalMet ? styles['monthlyChart__cell--goalMet'] : ''}`}
+                    style={{ opacity: day.words > 0 ? 0.3 + (day.words / maxWords) * 0.7 : 0.1 }}
+                    title={`${day.date}: ${day.words.toLocaleString()} words${day.goalMet ? ' (goal met)' : ''}`}
+                  />
+                ));
+              })()}
+            </div>
           </div>
         )}
 

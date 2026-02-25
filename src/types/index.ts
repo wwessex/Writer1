@@ -80,6 +80,7 @@ export interface Chapter {
   tags: string[];
   wordGoal: number;
   scenes: Scene[];
+  part?: string;
   act?: number;
   sequence?: number;
   sync?: ChapterSyncMetadata;
@@ -107,6 +108,7 @@ export interface Snapshot {
   chapterId: string;
   createdAt: number;
   doc: JSONContent;
+  label?: string;
 }
 
 export interface SyncConfig {
@@ -139,6 +141,7 @@ export interface AppSettings {
   autosaveMs: number;
   dailyWordGoal: number;
   novelWordGoal: number;
+  novelDeadline: string;
   sync: SyncConfig;
   assist: AssistConfig;
   theme: 'dark' | 'light' | 'high-contrast';

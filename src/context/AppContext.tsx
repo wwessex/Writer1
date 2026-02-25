@@ -229,7 +229,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
 
     setActiveChapter: (id: string) => {
-      setLastOpenedChapter(stateRef.current.novelId, id);
+      // Auto-snapshot the chapter we're leaving (if it has content)
+      const currentState = stateRef.current;
+      const leavingChapter = currentState.chapters.find(ch => ch.id === currentState.activeChapterId);
+      if (leavingChapter?.content && leavingChapter.id !== id) {
+        storage.createSnapshot(leavingChapter.id, leavingChapter.content, 'Auto').catch(() => {
+          // Non-critical: silently ignore snapshot failures
+        });
+      }
+      setLastOpenedChapter(currentState.novelId, id);
       dispatch({ type: 'SET_ACTIVE_CHAPTER', payload: id });
     },
 

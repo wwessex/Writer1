@@ -3,6 +3,7 @@ import { useApp } from '@/context/AppContext';
 import { IconButton, Button } from '@/components/UI';
 import { Select } from '@/components/UI/Select';
 import { countWords, editorToPlainText, formatRelativeTime } from '@/lib/utils';
+import type { Chapter } from '@/types';
 import styles from './ChapterList.module.css';
 
 const ITEM_HEIGHT = 60;
@@ -15,6 +16,11 @@ interface DragState {
   dropPosition: 'above' | 'below' | null;
 }
 
+interface PartGroup {
+  part: string;
+  chapters: Chapter[];
+}
+
 export function VirtualChapterList() {
   const { state, dispatch, setActiveChapter, createChapter, reorderChapters } = useApp();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -25,6 +31,7 @@ export function VirtualChapterList() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'planned' | 'draft' | 'revised' | 'final'>('all');
   const [productionTagFilter, setProductionTagFilter] = useState('all');
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [collapsedParts, setCollapsedParts] = useState<Set<string>>(new Set());
 
   const isScreenplay = state.projectType === 'screenplay';
   const sectionLabel = isScreenplay ? 'Scenes' : 'Chapters';
@@ -46,16 +53,54 @@ export function VirtualChapterList() {
   });
 
   const filteredChapters = useMemo(() => {
-    if (!isScreenplay) return state.chapters;
+    let chapters = state.chapters;
 
-    return state.chapters.filter(chapter => {
-      const scenes = chapter.scenes || [];
-      const passesStatus = statusFilter === 'all' || scenes.some(scene => scene.status === statusFilter);
-      const passesTag = productionTagFilter === 'all'
-        || scenes.some(scene => (scene.productionTags || []).includes(productionTagFilter));
-      return passesStatus && passesTag;
-    });
+    if (statusFilter !== 'all') {
+      if (isScreenplay) {
+        chapters = chapters.filter(chapter => {
+          const scenes = chapter.scenes || [];
+          return scenes.some(scene => scene.status === statusFilter);
+        });
+      } else {
+        chapters = chapters.filter(chapter => chapter.status === statusFilter);
+      }
+    }
+
+    if (isScreenplay && productionTagFilter !== 'all') {
+      chapters = chapters.filter(chapter => {
+        const scenes = chapter.scenes || [];
+        return scenes.some(scene => (scene.productionTags || []).includes(productionTagFilter));
+      });
+    }
+
+    return chapters;
   }, [state.chapters, isScreenplay, statusFilter, productionTagFilter]);
+
+  // Group chapters by part (books only)
+  const partGroups = useMemo((): PartGroup[] => {
+    if (isScreenplay) return [];
+    const hasParts = filteredChapters.some(ch => ch.part);
+    if (!hasParts) return [];
+
+    const groups = new Map<string, Chapter[]>();
+    for (const ch of filteredChapters) {
+      const part = ch.part || '';
+      if (!groups.has(part)) groups.set(part, []);
+      groups.get(part)!.push(ch);
+    }
+    return Array.from(groups.entries()).map(([part, chapters]) => ({ part, chapters }));
+  }, [filteredChapters, isScreenplay]);
+
+  const hasParts = partGroups.length > 0;
+
+  const togglePartCollapse = useCallback((part: string) => {
+    setCollapsedParts(prev => {
+      const next = new Set(prev);
+      if (next.has(part)) next.delete(part);
+      else next.add(part);
+      return next;
+    });
+  }, []);
 
   const productionTags = useMemo(() => {
     const tags = new Set<string>();
@@ -146,7 +191,7 @@ export function VirtualChapterList() {
     setDragState({ dragging: false, draggedId: null, dropTargetId: null, dropPosition: null });
   }, [state.chapters, reorderChapters, dragState.dropPosition]);
 
-  const renderChapterItem = (chapter: typeof state.chapters[0], index: number) => {
+  const renderChapterItem = (chapter: Chapter, index: number, virtualStyle?: React.CSSProperties) => {
     const wordCount = countWords(editorToPlainText(chapter.content));
     const isActive = chapter.id === state.activeChapterId;
     const isDragging = dragState.draggedId === chapter.id;
@@ -171,13 +216,7 @@ export function VirtualChapterList() {
       <div
         key={chapter.id}
         className={itemClasses}
-        style={shouldVirtualize ? {
-          position: 'absolute',
-          top: `${index * ITEM_HEIGHT}px`,
-          left: 0,
-          right: 0,
-          height: `${ITEM_HEIGHT}px`
-        } : undefined}
+        style={virtualStyle}
         draggable={!isTouchDevice}
         onDragStart={!isTouchDevice ? (e => handleDragStart(e, chapter.id)) : undefined}
         onDragOver={!isTouchDevice ? (e => handleDragOver(e, chapter.id)) : undefined}
@@ -202,9 +241,15 @@ export function VirtualChapterList() {
             ) : (
               <span className={styles.chapterItem__words}>{wordCount.toLocaleString()} words</span>
             )}
-            {chapter.status !== 'planned' && (
-              <span className={`${styles.chapterItem__status} ${styles[`chapterItem__status--${chapter.status}`]}`}>
-                {chapter.status}
+            <span className={`${styles.chapterItem__status} ${styles[`chapterItem__status--${chapter.status}`]}`}>
+              {chapter.status}
+            </span>
+            {chapter.tags.length > 0 && !isScreenplay && (
+              <span className={styles.chapterItem__tags}>
+                {chapter.tags.slice(0, 2).map(tag => (
+                  <span key={tag} className={styles.chapterItem__tag}>{tag}</span>
+                ))}
+                {chapter.tags.length > 2 && <span className={styles.chapterItem__tag}>+{chapter.tags.length - 2}</span>}
               </span>
             )}
             <span className={styles.chapterItem__time}>{formatRelativeTime(chapter.updatedAt)}</span>
@@ -222,6 +267,38 @@ export function VirtualChapterList() {
     );
   };
 
+  const renderPartGroup = (group: PartGroup) => {
+    const isCollapsed = collapsedParts.has(group.part);
+    const partWordCount = group.chapters.reduce((sum, ch) => sum + countWords(editorToPlainText(ch.content)), 0);
+    const partLabel = group.part || 'Ungrouped';
+
+    return (
+      <div key={group.part} className={styles.partGroup}>
+        <button
+          className={styles.partGroup__header}
+          onClick={() => togglePartCollapse(group.part)}
+          aria-expanded={!isCollapsed}
+        >
+          <span className={`material-symbols-rounded ${styles.partGroup__chevron} ${isCollapsed ? styles['partGroup__chevron--collapsed'] : ''}`}>
+            expand_more
+          </span>
+          <span className={styles.partGroup__title}>{partLabel}</span>
+          <span className={styles.partGroup__count}>
+            {group.chapters.length} ch · {partWordCount.toLocaleString()}w
+          </span>
+        </button>
+        {!isCollapsed && (
+          <div className={styles.partGroup__chapters}>
+            {group.chapters.map((chapter, index) => {
+              const globalIndex = filteredChapters.indexOf(chapter);
+              return renderChapterItem(chapter, globalIndex >= 0 ? globalIndex : index);
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <section className={styles.chapterList} role="navigation" aria-label={sectionLabel}>
       <div className={styles.chapterList__header}>
@@ -230,15 +307,13 @@ export function VirtualChapterList() {
           {filteredChapters.length > 0 && ` (${filteredChapters.length})`}
         </h3>
         <div className={styles.chapterList__actions}>
-          {isScreenplay && (
-            <IconButton
-              icon="filter_list"
-              label="Toggle filters"
-              variant="ghost"
-              active={filtersExpanded || hasActiveFilters}
-              onClick={() => setFiltersExpanded(prev => !prev)}
-            />
-          )}
+          <IconButton
+            icon="filter_list"
+            label="Toggle filters"
+            variant="ghost"
+            active={filtersExpanded || hasActiveFilters}
+            onClick={() => setFiltersExpanded(prev => !prev)}
+          />
           <IconButton
             icon="add"
             label={`New ${singularLabel}`}
@@ -248,7 +323,7 @@ export function VirtualChapterList() {
         </div>
       </div>
 
-      {isScreenplay && filtersExpanded && (
+      {filtersExpanded && (
         <div className={styles.chapterList__filters}>
           <Select
             options={[
@@ -261,14 +336,16 @@ export function VirtualChapterList() {
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
           />
-          <Select
-            options={[
-              { value: 'all', label: 'All production tags' },
-              ...productionTags.map(tag => ({ value: tag, label: tag }))
-            ]}
-            value={productionTagFilter}
-            onChange={e => setProductionTagFilter(e.target.value)}
-          />
+          {isScreenplay && (
+            <Select
+              options={[
+                { value: 'all', label: 'All production tags' },
+                ...productionTags.map(tag => ({ value: tag, label: tag }))
+              ]}
+              value={productionTagFilter}
+              onChange={e => setProductionTagFilter(e.target.value)}
+            />
+          )}
           {hasActiveFilters && (
             <button
               className={styles.chapterList__clearFilters}
@@ -280,7 +357,11 @@ export function VirtualChapterList() {
         </div>
       )}
 
-      {shouldVirtualize ? (
+      {hasParts ? (
+        <div className={styles.chapterList__items} role="listbox" aria-label={`${sectionLabel} list`}>
+          {partGroups.map(group => renderPartGroup(group))}
+        </div>
+      ) : shouldVirtualize ? (
         <div
           ref={containerRef}
           className={styles.chapterList__items}
@@ -291,7 +372,13 @@ export function VirtualChapterList() {
         >
           <div style={{ height: `${totalHeight}px`, position: 'relative' }}>
             {visibleChapters.map((chapter, i) =>
-              renderChapterItem(chapter, startIndex + i)
+              renderChapterItem(chapter, startIndex + i, {
+                position: 'absolute',
+                top: `${(startIndex + i) * ITEM_HEIGHT}px`,
+                left: 0,
+                right: 0,
+                height: `${ITEM_HEIGHT}px`
+              })
             )}
           </div>
         </div>

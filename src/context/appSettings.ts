@@ -56,6 +56,7 @@ export const createDefaultSettings = (isMobile: boolean): AppSettings => ({
   autosaveMs: 800,
   dailyWordGoal: 0,
   novelWordGoal: 0,
+  novelDeadline: '',
   sync: {
     novelId: '',
     url: '',
