@@ -190,8 +190,32 @@ exports[`high-risk module characterization snapshots > keeps sync conflict paylo
   "localRevisionId": "rev-1",
   "localUpdatedAt": 10,
   "localVersion": 10,
+  "mergeConflictBlocks": [
+    {
+      "baseEnd": 1,
+      "baseStart": 0,
+      "id": "conflict-1",
+      "localLines": [
+        "Local",
+      ],
+      "mergedEnd": 5,
+      "mergedStart": 0,
+      "remoteLines": [
+        "Remote",
+      ],
+    },
+  ],
   "mergedContent": {
     "content": [
+      {
+        "content": [
+          {
+            "text": "<<<<<<< LOCAL",
+            "type": "text",
+          },
+        ],
+        "type": "paragraph",
+      },
       {
         "content": [
           {
@@ -204,7 +228,25 @@ exports[`high-risk module characterization snapshots > keeps sync conflict paylo
       {
         "content": [
           {
+            "text": "=======",
+            "type": "text",
+          },
+        ],
+        "type": "paragraph",
+      },
+      {
+        "content": [
+          {
             "text": "Remote",
+            "type": "text",
+          },
+        ],
+        "type": "paragraph",
+      },
+      {
+        "content": [
+          {
+            "text": ">>>>>>> REMOTE",
             "type": "text",
           },
         ],
