@@ -15,7 +15,7 @@ import { FindReplace, useFindReplace } from '@/components/FindReplace';
 import {
   ExportModal, SnapshotModal, AnalysisModal, WordCountModal, DashboardModal, OnboardingModal,
   CharacterBibleModal, CommentModal,
-  ProjectsModal, SceneTemplatesModal
+  ProjectsModal, SceneTemplatesModal, CorkboardModal, StoryCardsModal
 } from '@/components/Modals';
 import { SettingsWindow, AboutWindow } from '@/components/Windows';
 import { ToastProvider, useToast } from '@/components/UI';
@@ -299,6 +299,7 @@ function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits }: {
         onToggleSidebar={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
         aiPanelOpen={modals.aiPanel}
         closeAiPanel={() => closeModal('aiPanel')}
+        editor={editor ?? null}
       />
 
       <QuickSwitcher
@@ -332,6 +333,8 @@ function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits }: {
       <Suspense fallback={null}>
         <TranslationModal open={modals.translation} onClose={() => closeModal('translation')} />
       </Suspense>
+      <CorkboardModal open={modals.corkboard} onClose={() => closeModal('corkboard')} />
+      <StoryCardsModal open={modals.storyCards} onClose={() => closeModal('storyCards')} />
 
       <SettingsWindow open={modals.settings} onClose={() => closeModal('settings')} />
       <AboutWindow open={modals.about} onClose={() => closeModal('about')} />

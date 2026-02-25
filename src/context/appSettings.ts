@@ -71,7 +71,7 @@ export const createDefaultSettings = (isMobile: boolean): AppSettings => ({
   sidebarHidden: isMobile,
   pageView: true,
   focusMode: false,
-  quickSwitcherMode: 'chapter',
+  quickSwitcherMode: 'all',
   typography: {
     fontFamily: 'system',
     fontSize: 16,

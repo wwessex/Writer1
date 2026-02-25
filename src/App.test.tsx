@@ -71,6 +71,8 @@ vi.mock('@/components/Modals', () => ({
   CommentModal: () => null,
   ProjectsModal: () => null,
   SceneTemplatesModal: () => null,
+  CorkboardModal: () => null,
+  StoryCardsModal: () => null,
 }));
 vi.mock('@/components/Windows', () => ({ SettingsWindow: () => null, AboutWindow: () => null }));
 vi.mock('@/components/UI', () => ({
@@ -100,6 +102,8 @@ vi.mock('@/hooks/useModalState', () => ({
       settings: false,
       about: false,
       aiPanel: false,
+      corkboard: false,
+      storyCards: false,
     },
     openModal: vi.fn(),
     closeModal: vi.fn(),

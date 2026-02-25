@@ -33,6 +33,7 @@ const baseProps = {
   onToggleSidebar: vi.fn(),
   aiPanelOpen: false,
   closeAiPanel: vi.fn(),
+  editor: null,
 };
 
 describe('AppShell', () => {

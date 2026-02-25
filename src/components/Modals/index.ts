@@ -14,3 +14,5 @@ export { ProjectsModal } from './ProjectsModal';
 export { SceneTemplatesModal } from './SceneTemplatesModal';
 export { ExportHistoryModal } from './ExportHistoryModal';
 export { TranslationModal } from './TranslationModal';
+export { CorkboardModal } from './CorkboardModal';
+export { StoryCardsModal } from './StoryCardsModal';

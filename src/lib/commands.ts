@@ -30,6 +30,7 @@ export const COMMAND_IDS = {
   EXPORT_HISTORY: 'exportHistory',
   AI_PANEL: 'aiPanel',
   TRANSLATION: 'translation',
+  CORKBOARD: 'corkboard',
   INSPECTOR: 'inspector',
   QUICK_SWITCHER: 'quickSwitcher',
   TOGGLE_SIDEBAR: 'toggleSidebar',
@@ -53,6 +54,7 @@ export const COMMAND_IDS = {
   FORMAT_H2: 'formatH2',
   FORMAT_P: 'formatP',
   TOGGLE_TYPEWRITER_MODE: 'toggleTypewriterMode',
+  STORY_CARDS: 'storyCards',
 } as const;
 
 export type CommandId = typeof COMMAND_IDS[keyof typeof COMMAND_IDS];
@@ -97,6 +99,7 @@ export const COMMAND_METADATA: Record<CommandId, CommandMetadata> = {
   [COMMAND_IDS.EXPORT_HISTORY]: { id: COMMAND_IDS.EXPORT_HISTORY, label: 'Export History', icon: 'schedule', group: 'Project', includeInQuickSwitcher: true },
   [COMMAND_IDS.AI_PANEL]: { id: COMMAND_IDS.AI_PANEL, label: 'AI Suggestions Panel', icon: 'assistant', group: 'AI', includeInQuickSwitcher: true },
   [COMMAND_IDS.TRANSLATION]: { id: COMMAND_IDS.TRANSLATION, label: 'Translate...', icon: 'translate', group: 'AI', includeInQuickSwitcher: true },
+  [COMMAND_IDS.CORKBOARD]: { id: COMMAND_IDS.CORKBOARD, label: 'Corkboard View', icon: 'view_module', group: 'Views', includeInQuickSwitcher: true },
   [COMMAND_IDS.INSPECTOR]: { id: COMMAND_IDS.INSPECTOR, label: 'Toggle Inspector', icon: 'info', shortcut: 'Ctrl+Shift+I', group: 'Views', includeInQuickSwitcher: true },
   [COMMAND_IDS.QUICK_SWITCHER]: { id: COMMAND_IDS.QUICK_SWITCHER, label: 'Quick Switcher', icon: 'search', shortcut: 'Ctrl+K', group: 'Navigation' },
   [COMMAND_IDS.TOGGLE_SIDEBAR]: { id: COMMAND_IDS.TOGGLE_SIDEBAR, label: 'Toggle Sidebar', icon: 'side_navigation', shortcut: 'Ctrl+Shift+B', group: 'Views', includeInQuickSwitcher: true },
@@ -120,6 +123,7 @@ export const COMMAND_METADATA: Record<CommandId, CommandMetadata> = {
   [COMMAND_IDS.FORMAT_H2]: { id: COMMAND_IDS.FORMAT_H2, label: 'Heading 2', icon: 'looks_two', group: 'Actions' },
   [COMMAND_IDS.FORMAT_P]: { id: COMMAND_IDS.FORMAT_P, label: 'Paragraph', icon: 'subject', group: 'Actions' },
   [COMMAND_IDS.TOGGLE_TYPEWRITER_MODE]: { id: COMMAND_IDS.TOGGLE_TYPEWRITER_MODE, label: 'Toggle Typewriter Mode', icon: 'keyboard', shortcut: 'Ctrl+Shift+T', group: 'Views', includeInQuickSwitcher: true },
+  [COMMAND_IDS.STORY_CARDS]: { id: COMMAND_IDS.STORY_CARDS, label: 'Story Cards', icon: 'contact_page', group: 'Project', includeInQuickSwitcher: true },
 };
 
 export interface CommandContext {
@@ -178,6 +182,7 @@ export const COMMAND_HANDLERS: Record<CommandId, CommandHandler> = {
   [COMMAND_IDS.EXPORT_HISTORY]: ({ openModal }) => openModal('exportHistory'),
   [COMMAND_IDS.AI_PANEL]: ({ toggleModal }) => toggleModal('aiPanel'),
   [COMMAND_IDS.TRANSLATION]: ({ openModal }) => openModal('translation'),
+  [COMMAND_IDS.CORKBOARD]: ({ openModal }) => openModal('corkboard'),
   [COMMAND_IDS.INSPECTOR]: ({ toggleInspector }) => toggleInspector(),
   [COMMAND_IDS.QUICK_SWITCHER]: ({ openQuickSwitcher }) => openQuickSwitcher(),
   [COMMAND_IDS.TOGGLE_SIDEBAR]: ({ toggleSidebar }) => toggleSidebar(),
@@ -215,6 +220,7 @@ export const COMMAND_HANDLERS: Record<CommandId, CommandHandler> = {
   [COMMAND_IDS.FORMAT_H2]: ({ editor }) => editor?.chain().focus().toggleHeading({ level: 2 }).run(),
   [COMMAND_IDS.FORMAT_P]: ({ editor }) => editor?.chain().focus().setParagraph().run(),
   [COMMAND_IDS.TOGGLE_TYPEWRITER_MODE]: ({ toggleTypewriterMode }) => toggleTypewriterMode(),
+  [COMMAND_IDS.STORY_CARDS]: ({ openModal }) => openModal('storyCards'),
 };
 
 export const LOCAL_MENU_COMMANDS: ReadonlySet<CommandId> = new Set([
