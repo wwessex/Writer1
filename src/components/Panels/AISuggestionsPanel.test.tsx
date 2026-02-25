@@ -25,9 +25,10 @@ vi.mock('@/lib/ai', () => ({
   createProvider: () => ({ execute: executeMock, destroy: destroyMock, isAvailable: () => true }),
 }));
 
+let idCounter = 0;
 vi.mock('@/lib/utils', () => ({
   editorToPlainText: () => 'Some chapter text here.',
-  generateId: () => 'test-id-' + Math.random().toString(36).slice(2),
+  generateId: () => 'test-id-' + String(++idCounter),
 }));
 
 vi.mock('@/lib/telemetry', () => ({
@@ -48,6 +49,7 @@ describe('AISuggestionsPanel', () => {
     onCloseMock.mockClear();
     executeMock.mockClear();
     destroyMock.mockClear();
+    idCounter = 0;
     container = document.createElement('div');
     document.body.appendChild(container);
   });

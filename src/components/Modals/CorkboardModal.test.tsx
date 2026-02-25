@@ -8,22 +8,29 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 const setActiveChapterMock = vi.fn();
 const onCloseMock = vi.fn();
 
+const defaultChapters = [
+  { id: 'c1', order: 0, title: 'Chapter One', status: 'draft', summary: 'A beginning', content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello world' }] }] }, scenes: [], tags: [], wordGoal: 0, pov: '', novelId: 'n1', updatedAt: 0 },
+  { id: 'c2', order: 1, title: 'Chapter Two', status: 'planned', summary: '', content: null, scenes: [], tags: [], wordGoal: 0, pov: '', novelId: 'n1', updatedAt: 0 },
+];
+
+const mockUseApp = vi.fn((): {
+  state: { projectType: string; chapters: typeof defaultChapters };
+  setActiveChapter: typeof setActiveChapterMock;
+} => ({
+  state: {
+    projectType: 'book',
+    chapters: defaultChapters,
+  },
+  setActiveChapter: setActiveChapterMock,
+}));
+
 vi.mock('@/components/UI', () => ({
   Dialog: ({ open, title, children }: { open: boolean; title: string; children?: ReactNode }) =>
     open ? <div data-testid="dialog"><h2>{title}</h2>{children}</div> : null,
 }));
 
 vi.mock('@/context/AppContext', () => ({
-  useApp: () => ({
-    state: {
-      projectType: 'book',
-      chapters: [
-        { id: 'c1', order: 0, title: 'Chapter One', status: 'draft', summary: 'A beginning', content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello world' }] }] }, scenes: [], tags: [], wordGoal: 0, pov: '', novelId: 'n1', updatedAt: 0 },
-        { id: 'c2', order: 1, title: 'Chapter Two', status: 'planned', summary: '', content: null, scenes: [], tags: [], wordGoal: 0, pov: '', novelId: 'n1', updatedAt: 0 },
-      ],
-    },
-    setActiveChapter: setActiveChapterMock,
-  }),
+  useApp: () => mockUseApp(),
 }));
 
 vi.mock('@/lib/utils', () => ({
@@ -43,6 +50,14 @@ describe('CorkboardModal', () => {
   beforeEach(() => {
     setActiveChapterMock.mockClear();
     onCloseMock.mockClear();
+    mockUseApp.mockClear();
+    mockUseApp.mockReturnValue({
+      state: {
+        projectType: 'book' as const,
+        chapters: defaultChapters,
+      },
+      setActiveChapter: setActiveChapterMock,
+    });
     container = document.createElement('div');
     document.body.appendChild(container);
   });
@@ -128,15 +143,12 @@ describe('CorkboardModal', () => {
   });
 
   it('shows empty state when no chapters', async () => {
-    // Temporarily override useApp to return empty chapters
-    const appModule = await import('@/context/AppContext');
-    const original = appModule.useApp;
-    (appModule as { useApp: typeof original }).useApp = () => ({
-      ...original(),
+    mockUseApp.mockReturnValue({
       state: {
-        ...original().state,
+        projectType: 'book' as const,
         chapters: [],
       },
+      setActiveChapter: setActiveChapterMock,
     });
 
     const root = createRoot(container);
@@ -150,9 +162,6 @@ describe('CorkboardModal', () => {
     // No cards rendered
     const cards = container.querySelectorAll('[role="button"]');
     expect(cards.length).toBe(0);
-
-    // Restore original
-    (appModule as { useApp: typeof original }).useApp = original;
 
     await act(async () => {
       root.unmount();
@@ -202,14 +211,12 @@ describe('CorkboardModal', () => {
   });
 
   it('shows correct section label for screenplay', async () => {
-    const appModule = await import('@/context/AppContext');
-    const original = appModule.useApp;
-    (appModule as { useApp: typeof original }).useApp = () => ({
-      ...original(),
+    mockUseApp.mockReturnValue({
       state: {
-        ...original().state,
         projectType: 'screenplay' as const,
+        chapters: defaultChapters,
       },
+      setActiveChapter: setActiveChapterMock,
     });
 
     const root = createRoot(container);
@@ -220,9 +227,6 @@ describe('CorkboardModal', () => {
     const text = container.textContent || '';
     expect(text).toContain('Scenes');
     expect(text).not.toContain('Chapters');
-
-    // Restore original
-    (appModule as { useApp: typeof original }).useApp = original;
 
     await act(async () => {
       root.unmount();

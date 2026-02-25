@@ -121,29 +121,20 @@ describe('StoryCardsModal', () => {
       root.render(<StoryCardsModal open={true} onClose={onCloseMock} />);
     });
     const input = container.querySelector('input')!;
+
+    // Trigger React onChange by setting native value and dispatching input event.
+    // React 19 listens for 'input' events on controlled inputs.
     act(() => {
       const nativeInputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
       nativeInputValueSetter.call(input, 'Alice');
       input.dispatchEvent(new Event('input', { bubbles: true }));
-      // Use the onChange handler directly
     });
-    // The mock Input component uses onChange, so we simulate via the React onChange
-    // We need to fire a change event
+
+    // Also dispatch change event as fallback for React synthetic event handler
     act(() => {
-      const event = new Event('change', { bubbles: true });
-      Object.defineProperty(event, 'target', { value: { value: 'Alice' } });
-      input.dispatchEvent(event);
-    });
-    // Since the mock Input is controlled by the parent, we need to trigger onChange.
-    // Let's re-render with the search happening via the actual React event.
-    // Actually the mock Input renders a real <input>, so we can use the native setter + input event.
-    // But React 19 synthetic events listen for 'input' event.
-    // Let's just verify the input exists and try a simpler approach:
-    // Use Object.getOwnPropertyDescriptor to set value and fire input event
-    act(() => {
-      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
-      nativeInputValueSetter.call(input, 'Alice');
-      input.dispatchEvent(new Event('input', { bubbles: true }));
+      const changeEvent = new Event('change', { bubbles: true });
+      Object.defineProperty(changeEvent, 'target', { value: { value: 'Alice' } });
+      input.dispatchEvent(changeEvent);
     });
 
     // After search for "Alice", Bob and Dark Forest should be filtered out

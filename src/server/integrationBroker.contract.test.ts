@@ -1,8 +1,13 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleBrokerRequest } from './integrationBroker';
 
 describe('integration broker contract envelopes', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });
@@ -42,11 +47,16 @@ describe('integration broker contract envelopes', () => {
   it('returns rate-limit envelope when provider responds 429', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 429 }));
 
-    const response = await handleBrokerRequest({
+    const promise = handleBrokerRequest({
       method: 'POST',
       path: '/api/integrations/dropbox/connect',
       body: { config: { sessionToken: 'token' } },
     });
+
+    // Advance past the retry delays (300ms + 600ms)
+    await vi.advanceTimersByTimeAsync(1000);
+
+    const response = await promise;
 
     expect(response?.status).toBe(429);
     expect(response?.body).toMatchObject({
