@@ -40,19 +40,19 @@ export function mapAppStateToProviderPayload(
   };
 }
 
-export function normalizeProviderPullResponse(
+export async function normalizeProviderPullResponse(
   appChapters: Chapter[],
   remoteDocuments: ProviderDocument[],
   remoteRevision: string,
   provider: 'dropbox' | 'google-drive' | 'scrivener'
-): NormalizedPullResult {
+): Promise<NormalizedPullResult> {
   const appById = new Map(appChapters.map((chapter) => [chapter.id, chapter]));
   const defaultNovelId = appChapters[0]?.novelId || '';
 
   const chapterUpdates: Chapter[] = [];
   const conflicts: NormalizedPullResult['conflicts'] = [];
 
-  remoteDocuments.forEach((document, index) => {
+  for (const [index, document] of remoteDocuments.entries()) {
     const existing = appById.get(document.id);
     const fallback = appChapters[index];
 
@@ -77,11 +77,11 @@ export function normalizeProviderPullResponse(
           lastSyncedContent: null,
         },
       });
-      return;
+      continue;
     }
 
     const baseChapter = (existing || fallback) as Chapter;
-    const mergeResult = mergeChapterFromRemote({
+    const mergeResult = await mergeChapterFromRemote({
       chapter: baseChapter,
       remoteDocument: document,
       context: {
@@ -94,7 +94,7 @@ export function normalizeProviderPullResponse(
     if (mergeResult.conflict) {
       conflicts.push(mergeResult.conflict);
     }
-  });
+  }
 
   pluginManager.emit('sync:pull:normalized', {
     provider,

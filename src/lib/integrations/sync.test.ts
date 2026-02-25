@@ -58,7 +58,7 @@ function makeRemote(body: string, overrides?: Partial<ProviderDocument>): Provid
 }
 
 describe('mergeChapterFromRemote', () => {
-  it('keeps lastSyncedContent at base when only local content changed', () => {
+  it('keeps lastSyncedContent at base when only local content changed', async () => {
     const baseContent = makeDoc('Base text');
     const chapter = makeChapter({
       content: makeDoc('Local draft change'),
@@ -68,7 +68,7 @@ describe('mergeChapterFromRemote', () => {
       },
     });
 
-    const { chapterUpdate, conflict } = mergeChapterFromRemote({
+    const { chapterUpdate, conflict } = await mergeChapterFromRemote({
       chapter,
       remoteDocument: makeRemote('Base text'),
       context: { provider: 'dropbox', remoteRevision: 'rev-2' },
@@ -79,7 +79,7 @@ describe('mergeChapterFromRemote', () => {
     expect(chapterUpdate.sync?.lastSyncedContent).toEqual(baseContent);
   });
 
-  it('updates lastSyncedContent when remote content is accepted', () => {
+  it('updates lastSyncedContent when remote content is accepted', async () => {
     const chapter = makeChapter({
       content: makeDoc('Base text'),
       sync: {
@@ -88,7 +88,7 @@ describe('mergeChapterFromRemote', () => {
       },
     });
 
-    const { chapterUpdate, conflict } = mergeChapterFromRemote({
+    const { chapterUpdate, conflict } = await mergeChapterFromRemote({
       chapter,
       remoteDocument: makeRemote('Remote edit'),
       context: { provider: 'dropbox', remoteRevision: 'rev-2' },
@@ -99,7 +99,7 @@ describe('mergeChapterFromRemote', () => {
     expect(chapterUpdate.sync?.lastSyncedContent).toEqual(makeDoc('Remote edit'));
   });
 
-  it('detects conflict when both local and remote changed', () => {
+  it('detects conflict when both local and remote changed', async () => {
     const baseContent = makeDoc('Base text');
     const chapter = makeChapter({
       content: makeDoc('Local changed text'),
@@ -109,7 +109,7 @@ describe('mergeChapterFromRemote', () => {
       },
     });
 
-    const { chapterUpdate, conflict } = mergeChapterFromRemote({
+    const { chapterUpdate, conflict } = await mergeChapterFromRemote({
       chapter,
       remoteDocument: makeRemote('Remote changed text'),
       context: { provider: 'dropbox', remoteRevision: 'rev-2' },
@@ -128,7 +128,7 @@ describe('mergeChapterFromRemote', () => {
     expect(chapterUpdate.sync?.lastSyncedContent).toEqual(baseContent);
   });
 
-  it('updates title and order from remote when no conflict', () => {
+  it('updates title and order from remote when no conflict', async () => {
     const chapter = makeChapter({
       content: makeDoc('Base text'),
       sync: {
@@ -137,7 +137,7 @@ describe('mergeChapterFromRemote', () => {
       },
     });
 
-    const { chapterUpdate } = mergeChapterFromRemote({
+    const { chapterUpdate } = await mergeChapterFromRemote({
       chapter,
       remoteDocument: makeRemote('Remote edit', { title: 'New Remote Title', order: 5 }),
       context: { provider: 'dropbox', remoteRevision: 'rev-2' },
@@ -147,13 +147,13 @@ describe('mergeChapterFromRemote', () => {
     expect(chapterUpdate.order).toBe(5);
   });
 
-  it('handles chapter with no prior sync metadata', () => {
+  it('handles chapter with no prior sync metadata', async () => {
     const chapter = makeChapter({
       content: makeDoc('Local content'),
       sync: undefined,
     });
 
-    const { chapterUpdate, conflict } = mergeChapterFromRemote({
+    const { chapterUpdate, conflict } = await mergeChapterFromRemote({
       chapter,
       remoteDocument: makeRemote('Remote content'),
       context: { provider: 'google-drive', remoteRevision: 'gdrive-rev-1' },
@@ -164,7 +164,7 @@ describe('mergeChapterFromRemote', () => {
     expect(chapterUpdate.sync?.providerRevisionIds?.['google-drive']).toBe('gdrive-rev-1');
   });
 
-  it('handles empty remote document body', () => {
+  it('handles empty remote document body', async () => {
     const chapter = makeChapter({
       content: makeDoc('Base text'),
       sync: {
@@ -173,7 +173,7 @@ describe('mergeChapterFromRemote', () => {
       },
     });
 
-    const { chapterUpdate, conflict } = mergeChapterFromRemote({
+    const { chapterUpdate, conflict } = await mergeChapterFromRemote({
       chapter,
       remoteDocument: makeRemote(''),
       context: { provider: 'dropbox', remoteRevision: 'rev-2' },
@@ -185,7 +185,7 @@ describe('mergeChapterFromRemote', () => {
     expect(chapterUpdate.sync?.providerRevisionIds?.dropbox).toBe('rev-2');
   });
 
-  it('preserves provider revision IDs from multiple providers', () => {
+  it('preserves provider revision IDs from multiple providers', async () => {
     const chapter = makeChapter({
       content: makeDoc('Base text'),
       sync: {
@@ -194,7 +194,7 @@ describe('mergeChapterFromRemote', () => {
       },
     });
 
-    const { chapterUpdate } = mergeChapterFromRemote({
+    const { chapterUpdate } = await mergeChapterFromRemote({
       chapter,
       remoteDocument: makeRemote('Remote edit'),
       context: { provider: 'dropbox', remoteRevision: 'dropbox-rev-2' },
@@ -204,7 +204,7 @@ describe('mergeChapterFromRemote', () => {
     expect(chapterUpdate.sync?.providerRevisionIds?.['google-drive']).toBe('gdrive-rev-1');
   });
 
-  it('sets lastPulledAt timestamp on merge', () => {
+  it('sets lastPulledAt timestamp on merge', async () => {
     const before = Date.now();
     const chapter = makeChapter({
       content: makeDoc('Base text'),
@@ -214,7 +214,7 @@ describe('mergeChapterFromRemote', () => {
       },
     });
 
-    const { chapterUpdate } = mergeChapterFromRemote({
+    const { chapterUpdate } = await mergeChapterFromRemote({
       chapter,
       remoteDocument: makeRemote('Remote edit'),
       context: { provider: 'dropbox', remoteRevision: 'rev-2' },
@@ -270,10 +270,10 @@ describe('resolveSyncConflict', () => {
 });
 
 describe('buildPushSyncMetadata', () => {
-  it('records lastPushedHash for the current content', () => {
+  it('records lastPushedHash for the current content', async () => {
     const chapter = makeChapter({ content: makeDoc('Push me') });
 
-    const meta = buildPushSyncMetadata(chapter, 'dropbox', 'push-rev-1');
+    const meta = await buildPushSyncMetadata(chapter, 'dropbox', 'push-rev-1');
 
     expect(meta.providerRevisionIds.dropbox).toBe('push-rev-1');
     expect(meta.lastPushedHash).toBeDefined();
@@ -281,7 +281,7 @@ describe('buildPushSyncMetadata', () => {
     expect(meta.lastSyncedContent).toEqual(makeDoc('Push me'));
   });
 
-  it('preserves existing provider revision IDs', () => {
+  it('preserves existing provider revision IDs', async () => {
     const chapter = makeChapter({
       sync: {
         providerRevisionIds: { 'google-drive': 'gdrive-1' },
@@ -289,10 +289,93 @@ describe('buildPushSyncMetadata', () => {
       },
     });
 
-    const meta = buildPushSyncMetadata(chapter, 'dropbox', 'push-rev-1');
+    const meta = await buildPushSyncMetadata(chapter, 'dropbox', 'push-rev-1');
 
     expect(meta.providerRevisionIds.dropbox).toBe('push-rev-1');
     expect(meta.providerRevisionIds['google-drive']).toBe('gdrive-1');
+  });
+
+  it('produces identical SHA-256 hashes for structurally equivalent docs', async () => {
+    const chapterA = makeChapter({
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            attrs: { align: 'left', id: 'p1' },
+            content: [{ text: 'Equivalent', type: 'text' }],
+          },
+        ],
+      },
+    });
+
+    const chapterB = makeChapter({
+      content: {
+        content: [
+          {
+            content: [{ type: 'text', text: 'Equivalent' }],
+            attrs: { id: 'p1', align: 'left' },
+            type: 'paragraph',
+          },
+        ],
+        type: 'doc',
+      },
+    });
+
+    const metaA = await buildPushSyncMetadata(chapterA, 'dropbox', 'push-rev-1');
+    const metaB = await buildPushSyncMetadata(chapterB, 'dropbox', 'push-rev-1');
+
+    expect(metaA.lastPushedHash).toEqual(metaB.lastPushedHash);
+    expect(metaA.lastPushedHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+  });
+});
+
+describe('canonical hash merge behavior', () => {
+  it('treats key-order-only local differences as unchanged relative to base', async () => {
+    const baseContent: JSONContent = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Base text' }] }],
+    };
+    const localEquivalentContent: JSONContent = {
+      content: [{ content: [{ text: 'Base text', type: 'text' }], type: 'paragraph' }],
+      type: 'doc',
+    };
+
+    const chapter = makeChapter({
+      content: localEquivalentContent,
+      sync: {
+        providerRevisionIds: { dropbox: 'rev-1' },
+        lastSyncedContent: baseContent,
+      },
+    });
+
+    const { conflict, chapterUpdate } = await mergeChapterFromRemote({
+      chapter,
+      remoteDocument: makeRemote('Base text'),
+      context: { provider: 'dropbox', remoteRevision: 'rev-2' },
+    });
+
+    expect(conflict).toBeUndefined();
+    expect(chapterUpdate.content).toEqual(baseContent);
+  });
+
+  it('clears legacy non-SHA lastPushedHash when metadata is carried forward', async () => {
+    const chapter = makeChapter({
+      content: makeDoc('Base text'),
+      sync: {
+        providerRevisionIds: { dropbox: 'rev-1' },
+        lastSyncedContent: makeDoc('Base text'),
+        lastPushedHash: 'h12345',
+      },
+    });
+
+    const { chapterUpdate } = await mergeChapterFromRemote({
+      chapter,
+      remoteDocument: makeRemote('Base text'),
+      context: { provider: 'dropbox', remoteRevision: 'rev-2' },
+    });
+
+    expect(chapterUpdate.sync?.lastPushedHash).toBeUndefined();
   });
 });
 
@@ -358,13 +441,13 @@ describe('mapAppStateToProviderPayload', () => {
 });
 
 describe('normalizeProviderPullResponse', () => {
-  it('creates new chapters for unmatched remote documents', () => {
+  it('creates new chapters for unmatched remote documents', async () => {
     const localChapters: Chapter[] = [];
     const remoteDocs: ProviderDocument[] = [
       makeRemote('New chapter text', { id: 'new-1', title: 'New Chapter', order: 0 }),
     ];
 
-    const result = normalizeProviderPullResponse(localChapters, remoteDocs, 'rev-1', 'dropbox');
+    const result = await normalizeProviderPullResponse(localChapters, remoteDocs, 'rev-1', 'dropbox');
 
     expect(result.chapterUpdates).toHaveLength(1);
     expect(result.chapterUpdates[0].id).toBe('new-1');
@@ -374,7 +457,7 @@ describe('normalizeProviderPullResponse', () => {
     expect(result.conflicts).toHaveLength(0);
   });
 
-  it('merges existing chapters with matching remote docs', () => {
+  it('merges existing chapters with matching remote docs', async () => {
     const localChapters: Chapter[] = [
       makeChapter({
         id: 'chapter-1',
@@ -390,14 +473,14 @@ describe('normalizeProviderPullResponse', () => {
       makeRemote('Updated remote', { id: 'chapter-1', title: 'Updated Title' }),
     ];
 
-    const result = normalizeProviderPullResponse(localChapters, remoteDocs, 'rev-2', 'dropbox');
+    const result = await normalizeProviderPullResponse(localChapters, remoteDocs, 'rev-2', 'dropbox');
 
     expect(result.chapterUpdates).toHaveLength(1);
     expect(result.chapterUpdates[0].title).toBe('Updated Title');
     expect(result.conflicts).toHaveLength(0);
   });
 
-  it('collects conflicts for diverged chapters', () => {
+  it('collects conflicts for diverged chapters', async () => {
     const localChapters: Chapter[] = [
       makeChapter({
         id: 'chapter-1',
@@ -413,14 +496,14 @@ describe('normalizeProviderPullResponse', () => {
       makeRemote('Remote edit', { id: 'chapter-1', title: 'Ch 1' }),
     ];
 
-    const result = normalizeProviderPullResponse(localChapters, remoteDocs, 'rev-2', 'dropbox');
+    const result = await normalizeProviderPullResponse(localChapters, remoteDocs, 'rev-2', 'dropbox');
 
     expect(result.chapterUpdates).toHaveLength(1);
     expect(result.conflicts).toHaveLength(1);
     expect(result.conflicts[0].chapterId).toBe('chapter-1');
   });
 
-  it('handles multiple chapters with mixed results', () => {
+  it('handles multiple chapters with mixed results', async () => {
     const localChapters: Chapter[] = [
       makeChapter({
         id: 'ch-1',
@@ -446,7 +529,7 @@ describe('normalizeProviderPullResponse', () => {
       makeRemote('Remote edit ch2', { id: 'ch-2', title: 'Ch 2 Updated', order: 2 }),
     ];
 
-    const result = normalizeProviderPullResponse(localChapters, remoteDocs, 'rev-2', 'dropbox');
+    const result = await normalizeProviderPullResponse(localChapters, remoteDocs, 'rev-2', 'dropbox');
 
     expect(result.chapterUpdates).toHaveLength(2);
     // ch-1: local unchanged, remote changed -> no conflict
