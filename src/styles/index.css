@@ -385,40 +385,142 @@ body.focus-mode:hover .focus-mode-hint { opacity: 1; }
   white-space: pre-wrap;
 }
 
-.writer1-editor .ProseMirror p,
-.writer1-editor p {
+.writer1-editor .ProseMirror p {
   margin: 0 0 0.9em;
 }
 
-.writer1-editor .ProseMirror h1,
-.writer1-editor h1 {
+.writer1-editor .ProseMirror h1 {
   font-size: 30px;
   line-height: 1.2;
   font-weight: 700;
   margin: 1.2em 0 0.5em;
 }
 
-.writer1-editor .ProseMirror h2,
-.writer1-editor h2 {
+.writer1-editor .ProseMirror h2 {
   font-size: 22px;
   line-height: 1.25;
   font-weight: 650;
   margin: 1.1em 0 0.45em;
 }
 
-.writer1-editor .ProseMirror h3,
-.writer1-editor h3 {
+.writer1-editor .ProseMirror h3 {
   font-size: 18px;
   line-height: 1.3;
   font-weight: 600;
   margin: 1em 0 0.4em;
 }
 
-.writer1-editor .ProseMirror ::selection,
-.writer1-editor ::selection {
+.writer1-editor .ProseMirror h4 {
+  font-size: 16px;
+  line-height: 1.35;
+  font-weight: 600;
+  margin: 0.9em 0 0.35em;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.writer1-editor .ProseMirror ul,
+.writer1-editor .ProseMirror ol {
+  margin: 0 0 1em;
+  padding-left: 1.5em;
+}
+
+.writer1-editor .ProseMirror li {
+  margin: 0.25em 0;
+}
+
+.writer1-editor .ProseMirror blockquote {
+  margin: 1em 0;
+  padding-left: 1em;
+  border-left: 3px solid #41ddf2;
+  color: #aab2bd;
+  font-style: italic;
+}
+
+.writer1-editor .ProseMirror hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 2em 0;
+}
+
+.writer1-editor .ProseMirror strong { font-weight: 600; }
+.writer1-editor .ProseMirror em { font-style: italic; }
+.writer1-editor .ProseMirror u { text-decoration: underline; }
+.writer1-editor .ProseMirror s { text-decoration: line-through; }
+
+.writer1-editor .ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 1em 0;
+  display: block;
+}
+
+.writer1-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: 'Start writing\2026';
+  color: #7d8794;
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+.writer1-editor .ProseMirror ::selection {
   background: rgba(65, 221, 242, 0.2);
 }
 
 .writer1-editor .ProseMirror-focused {
   caret-color: #41ddf2;
+}
+
+/* Screenplay formatting in writer1-editor */
+.writer1-editor .ProseMirror p[data-screenplay-type='scene-heading'] {
+  text-transform: uppercase;
+  font-weight: 700;
+  margin: 1.4em 0 0.5em;
+}
+
+.writer1-editor .ProseMirror p[data-screenplay-type='character'] {
+  text-transform: uppercase;
+  margin: 1em 0 0.15em;
+  margin-left: 38%;
+  max-width: 28ch;
+}
+
+.writer1-editor .ProseMirror p[data-screenplay-type='parenthetical'] {
+  margin: 0 0 0.15em;
+  margin-left: 31%;
+  max-width: 30ch;
+}
+
+.writer1-editor .ProseMirror p[data-screenplay-type='dialogue'] {
+  margin: 0 0 0.6em;
+  margin-left: 26%;
+  max-width: 36ch;
+}
+
+.writer1-editor .ProseMirror p[data-screenplay-type='transition'] {
+  text-transform: uppercase;
+  text-align: right;
+  font-weight: 700;
+  margin: 1.2em 0;
+}
+
+/* Comment anchors in writer1-editor */
+.writer1-editor .ProseMirror span[data-comment-thread-id] {
+  border-radius: 4px;
+  padding: 0 1px;
+  background: rgba(250, 204, 21, 0.28);
+  box-shadow: inset 0 -1px 0 rgba(250, 204, 21, 0.6);
+}
+
+/* Find & Replace highlights in writer1-editor */
+.writer1-editor .find-replace-match {
+  background: rgba(250, 204, 21, 0.3);
+  border-radius: 2px;
+}
+
+.writer1-editor .find-replace-current {
+  background: rgba(79, 124, 255, 0.35);
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px #41ddf2;
 }

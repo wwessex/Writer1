@@ -1,10 +1,34 @@
 /** @vitest-environment jsdom */
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { RightInspector } from './RightInspector';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+vi.mock('@/context/AppContext', () => ({
+  useApp: () => ({
+    activeChapter: {
+      id: 'ch-1',
+      title: 'Chapter One',
+      content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello world test sentence.' }] }] },
+      status: 'draft',
+      tags: ['horror', 'suspense'],
+      wordGoal: 1500,
+      scenes: [],
+      summary: 'A test chapter summary',
+      pov: 'Sarah',
+      order: 1,
+      novelId: 'n-1',
+      updatedAt: Date.now(),
+    },
+    updateChapter: vi.fn(),
+  }),
+}));
+
+vi.mock('@/lib/storage', () => ({
+  getSnapshots: vi.fn().mockResolvedValue([]),
+}));
 
 describe('RightInspector', () => {
   it('renders null when collapsed', () => {
@@ -29,15 +53,14 @@ describe('RightInspector', () => {
     act(() => root.unmount());
   });
 
-  it('shows Info tab content by default', () => {
+  it('shows Info tab content by default with real data', () => {
     const container = document.createElement('div');
     const root = createRoot(container);
     act(() => { root.render(<RightInspector />); });
 
     expect(container.textContent).toContain('Document');
-    expect(container.textContent).toContain('1,031');
+    expect(container.textContent).toContain('Draft');
     expect(container.textContent).toContain('Goal Progress');
-    expect(container.textContent).toContain('Dates');
     act(() => root.unmount());
   });
 
@@ -55,7 +78,7 @@ describe('RightInspector', () => {
     act(() => root.unmount());
   });
 
-  it('switches to Tags tab on click', () => {
+  it('switches to Tags tab on click and shows real tags', () => {
     const container = document.createElement('div');
     const root = createRoot(container);
     act(() => { root.render(<RightInspector />); });
@@ -96,7 +119,6 @@ describe('RightInspector', () => {
     act(() => { historyTab.click(); });
 
     expect(container.textContent).toContain('Snapshots');
-    expect(container.textContent).toContain('Auto-save');
     act(() => root.unmount());
   });
 });

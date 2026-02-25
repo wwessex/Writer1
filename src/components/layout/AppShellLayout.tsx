@@ -5,6 +5,10 @@ import { LeftSidebar } from './sidebar/LeftSidebar';
 import { EditorPane } from './editor/EditorPane';
 import { RightInspector } from './inspector/RightInspector';
 
+/**
+ * Standalone layout shell that wraps the Tailwind 3-panel layout.
+ * Requires AppProvider context to be present in the component tree.
+ */
 export function AppShellLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
@@ -23,7 +27,13 @@ export function AppShellLayout() {
         <RightInspector collapsed={inspectorCollapsed} />
       </div>
 
-      <StatusBar />
+      <StatusBar
+        wordCount={0}
+        sessionWords={0}
+        goalPercent={0}
+        saved={true}
+        online={true}
+      />
     </div>
   );
 }

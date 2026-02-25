@@ -7,10 +7,14 @@ import { StatusBar } from './StatusBar';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 describe('StatusBar', () => {
-  it('renders with default values', () => {
+  it('renders with provided values', () => {
     const container = document.createElement('div');
     const root = createRoot(container);
-    act(() => { root.render(<StatusBar />); });
+    act(() => {
+      root.render(
+        <StatusBar wordCount={2843} sessionWords={612} goalPercent={61} saved={true} online={true} />
+      );
+    });
 
     expect(container.textContent).toContain('Words: 2,843');
     expect(container.textContent).toContain('Session: +612');
