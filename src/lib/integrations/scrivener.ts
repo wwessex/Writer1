@@ -311,7 +311,7 @@ export const scrivenerAdapter: IntegrationAdapter = {
     }
 
     const remoteRevision = `scrivener-import-${Date.now()}`;
-    return normalizeProviderPullResponse(localChapters, remoteDocs, remoteRevision, 'scrivener');
+    return await normalizeProviderPullResponse(localChapters, remoteDocs, remoteRevision, 'scrivener');
   },
 
   async push(_config: IntegrationConfig, payload: ProviderPayload) {

@@ -276,7 +276,7 @@ export const dropboxDirectAdapter: IntegrationAdapter = {
       ? `dropbox-rev-${latestEntry.rev}`
       : `dropbox-${Date.now()}`;
 
-    return normalizeProviderPullResponse(localChapters, remoteDocs, remoteRevision, 'dropbox');
+    return await normalizeProviderPullResponse(localChapters, remoteDocs, remoteRevision, 'dropbox');
   },
 
   async push(config: IntegrationConfig, payload: ProviderPayload) {

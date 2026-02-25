@@ -19,6 +19,8 @@ interface ThreeWayMergeResult {
   conflict?: ConflictInfo;
 }
 
+const SHA256_HASH_PATTERN = /^sha256:[a-f0-9]{64}$/;
+
 function ensureDoc(content: JSONContent | null | undefined): JSONContent {
   if (content && content.type === 'doc') {
     return content;
@@ -64,16 +66,68 @@ function docToText(doc: JSONContent | null | undefined): string {
     .trim();
 }
 
-function hashContent(content: JSONContent | null | undefined): string {
-  const data = JSON.stringify(ensureDoc(content));
-  let hash = 0;
-
-  for (let i = 0; i < data.length; i += 1) {
-    hash = (hash << 5) - hash + data.charCodeAt(i);
-    hash |= 0;
+function canonicalizeValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(canonicalizeValue);
   }
 
-  return `h${Math.abs(hash)}`;
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, nested]) => [key, canonicalizeValue(nested)]);
+
+    return Object.fromEntries(entries);
+  }
+
+  return value;
+}
+
+function serializeCanonicalContent(content: JSONContent | null | undefined): string {
+  return JSON.stringify(canonicalizeValue(ensureDoc(content)));
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+type DigestProvider = Pick<SubtleCrypto, 'digest'>;
+
+async function getSubtleCrypto(): Promise<DigestProvider> {
+  if (globalThis.crypto?.subtle) {
+    return globalThis.crypto.subtle;
+  }
+
+  const { webcrypto } = await import('node:crypto');
+  return webcrypto.subtle;
+}
+
+const contentHashMemo = new Map<string, Promise<string>>();
+
+async function hashContent(content: JSONContent | null | undefined): Promise<string> {
+  const serialized = serializeCanonicalContent(content);
+  const memoized = contentHashMemo.get(serialized);
+  if (memoized) {
+    return memoized;
+  }
+
+  const digestPromise = (async () => {
+    const subtle = await getSubtleCrypto();
+    const digest = await subtle.digest('SHA-256', new TextEncoder().encode(serialized));
+    return `sha256:${bytesToHex(new Uint8Array(digest))}`;
+  })();
+
+  contentHashMemo.set(serialized, digestPromise);
+  return digestPromise;
+}
+
+function sanitizeLegacyPushedHash(lastPushedHash: string | undefined): string | undefined {
+  if (!lastPushedHash) {
+    return undefined;
+  }
+
+  return SHA256_HASH_PATTERN.test(lastPushedHash) ? lastPushedHash : undefined;
 }
 
 function mergeDocs(local: JSONContent | null, remote: JSONContent): JSONContent {
@@ -98,31 +152,33 @@ function buildSyncMetadata(
       ...(chapter.sync?.providerRevisionIds || {}),
       [provider]: remoteRevision,
     },
-    lastPushedHash: options?.lastPushedHash ?? chapter.sync?.lastPushedHash,
+    lastPushedHash: options?.lastPushedHash ?? sanitizeLegacyPushedHash(chapter.sync?.lastPushedHash),
     lastPulledAt: options?.lastPulledAt ?? chapter.sync?.lastPulledAt,
     lastSyncedContent: content,
   };
 }
 
-export function buildPushSyncMetadata(
+export async function buildPushSyncMetadata(
   chapter: Chapter,
   provider: IntegrationType,
   remoteRevision: string
-): ChapterSyncMetadata {
+): Promise<ChapterSyncMetadata> {
   return buildSyncMetadata(chapter, provider, remoteRevision, chapter.content, {
-    lastPushedHash: hashContent(chapter.content),
+    lastPushedHash: await hashContent(chapter.content),
   });
 }
 
-export function mergeChapterFromRemote({ chapter, remoteDocument, context }: ThreeWayMergeArgs): ThreeWayMergeResult {
+export async function mergeChapterFromRemote({ chapter, remoteDocument, context }: ThreeWayMergeArgs): Promise<ThreeWayMergeResult> {
   const now = Date.now();
   const localContent = chapter.content;
   const baseContent = chapter.sync?.lastSyncedContent ?? null;
   const remoteContent = textToDoc(remoteDocument.body);
 
-  const localHash = hashContent(localContent);
-  const baseHash = hashContent(baseContent);
-  const remoteHash = hashContent(remoteContent);
+  const [localHash, baseHash, remoteHash] = await Promise.all([
+    hashContent(localContent),
+    hashContent(baseContent),
+    hashContent(remoteContent),
+  ]);
 
   const localChanged = localHash !== baseHash;
   const remoteChanged = remoteHash !== baseHash;
@@ -186,7 +242,9 @@ export function mergeChapterFromRemote({ chapter, remoteDocument, context }: Thr
     summary: docToText(nextContent).slice(0, 200),
     sync: buildSyncMetadata(chapter, context.provider, context.remoteRevision, nextSyncedContent, {
       lastPulledAt: now,
-      lastPushedHash: remoteChanged ? hashContent(nextContent) : chapter.sync?.lastPushedHash,
+      lastPushedHash: remoteChanged
+        ? await hashContent(nextContent)
+        : sanitizeLegacyPushedHash(chapter.sync?.lastPushedHash),
     }),
   };
 

@@ -22,7 +22,7 @@ describe('high-risk module characterization snapshots', () => {
     expect(result).toMatchSnapshot();
   });
 
-  it('keeps sync conflict payload shape stable when local and remote diverge', () => {
+  it('keeps sync conflict payload shape stable when local and remote diverge', async () => {
     const chapter: Chapter = {
       id: 'chapter-1',
       novelId: 'novel-1',
@@ -42,7 +42,7 @@ describe('high-risk module characterization snapshots', () => {
       },
     };
 
-    const output = mergeChapterFromRemote({
+    const output = await mergeChapterFromRemote({
       chapter,
       remoteDocument: { id: 'remote-1', title: 'Remote Chapter', body: 'Remote', order: 4, updatedAt: 20 },
       context: { provider: 'dropbox', remoteRevision: 'rev-2' },

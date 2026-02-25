@@ -55,10 +55,12 @@ export async function pushIntegrationData(
   const result = await getIntegrationAdapter(type).push(config, payload);
 
   const remoteRevision = `push-${type}-${result.syncedAt}`;
-  const syncedChapters = appState.chapters.map((chapter) => ({
-    ...chapter,
-    sync: buildPushSyncMetadata(chapter, type, remoteRevision),
-  }));
+  const syncedChapters = await Promise.all(
+    appState.chapters.map(async (chapter) => ({
+      ...chapter,
+      sync: await buildPushSyncMetadata(chapter, type, remoteRevision),
+    }))
+  );
 
   pluginManager.emit('sync:export:after', {
     provider: type,
