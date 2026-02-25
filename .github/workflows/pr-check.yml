@@ -80,7 +80,6 @@ jobs:
 
       - name: Touched module coverage gate
         env:
-          COVERAGE_DIFF_RANGE: ${{ github.event.pull_request.base.sha }}...${{ github.sha }}
           COVERAGE_MIN: '50'
         run: npm run coverage:changed
 
