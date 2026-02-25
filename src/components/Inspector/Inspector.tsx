@@ -80,6 +80,20 @@ export function Inspector({ open, onClose, voiceAlerts = [] }: InspectorProps) {
     return Math.min(100, Math.round((chapterWords / activeChapter.wordGoal) * 100));
   }, [chapterWords, activeChapter?.wordGoal]);
 
+  // Collect all unique tags across the project for autocomplete
+  const allProjectTags = useMemo(() => {
+    const tags = new Set<string>();
+    state.chapters.forEach(ch => ch.tags.forEach(t => tags.add(t)));
+    return Array.from(tags).sort();
+  }, [state.chapters]);
+
+  // Collect all unique part names across the project for autocomplete
+  const allProjectParts = useMemo(() => {
+    const parts = new Set<string>();
+    state.chapters.forEach(ch => { if (ch.part) parts.add(ch.part); });
+    return Array.from(parts).sort();
+  }, [state.chapters]);
+
   const handleFieldChange = useCallback((field: string, value: string | number | string[]) => {
     if (!activeChapter) return;
     updateChapterImmediate(activeChapter.id, { [field]: value });
@@ -245,6 +259,24 @@ export function Inspector({ open, onClose, voiceAlerts = [] }: InspectorProps) {
                     />
                   </div>
 
+                  {/* Part — book grouping */}
+                  {!isScreenplay && (
+                    <div className={styles.field}>
+                      <label className={styles.fieldLabel}>Part</label>
+                      <Input
+                        value={activeChapter.part || ''}
+                        onChange={e => handleFieldChange('part', e.target.value)}
+                        placeholder="e.g. Part I, Act One"
+                        list="part-suggestions"
+                      />
+                      {allProjectParts.length > 0 && (
+                        <datalist id="part-suggestions">
+                          {allProjectParts.map(p => <option key={p} value={p} />)}
+                        </datalist>
+                      )}
+                    </div>
+                  )}
+
                   {/* POV / Act */}
                   <div className={styles.field}>
                     <label className={styles.fieldLabel}>{isScreenplay ? 'Act' : 'POV Character'}</label>
@@ -277,14 +309,20 @@ export function Inspector({ open, onClose, voiceAlerts = [] }: InspectorProps) {
                     </div>
                   )}
 
-                  {/* Tags */}
+                  {/* Tags with autocomplete */}
                   <div className={styles.field}>
                     <label className={styles.fieldLabel}>Tags</label>
                     <Input
                       value={(activeChapter.tags || []).join(', ')}
                       onChange={e => handleFieldChange('tags', e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
                       placeholder={isScreenplay ? 'setpiece, flashback' : 'action, romance, cliffhanger'}
+                      list="tag-suggestions"
                     />
+                    {allProjectTags.length > 0 && (
+                      <datalist id="tag-suggestions">
+                        {allProjectTags.map(t => <option key={t} value={t} />)}
+                      </datalist>
+                    )}
                   </div>
 
                   {/* Word Goal */}

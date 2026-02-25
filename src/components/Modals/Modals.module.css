@@ -159,6 +159,71 @@
   margin-top: 0.25rem;
 }
 
+.snapshotItem__actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.snapshotItem__label {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: var(--accent-alpha, rgba(99, 102, 241, 0.12));
+  color: var(--accent);
+  vertical-align: middle;
+}
+
+.snapshotItem__label--auto {
+  background: rgba(156, 163, 175, 0.15);
+  color: var(--text-muted);
+}
+
+.snapshotItem__labelEdit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.snapshotItem__labelInput {
+  flex: 1;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.75rem;
+  outline: none;
+}
+
+.snapshotItem__labelInput:focus {
+  border-color: var(--accent);
+}
+
+.snapshotItem__labelSave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: var(--accent);
+  color: white;
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.snapshotItem__labelSave .material-symbols-rounded {
+  font-size: 0.875rem;
+}
+
 .snapshotPreview {
   display: flex;
   flex-direction: column;
@@ -659,6 +724,118 @@
 .dashboardTable h4 .material-symbols-rounded {
   font-size: 1.125rem;
   color: var(--accent);
+}
+
+/* Goal cards — inline editable targets */
+.goalCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.goalCard {
+  padding: 0.75rem;
+  background: var(--panel, var(--bg));
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle, var(--border));
+}
+
+.goalCard__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.goalCard__title {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.goalCard__editBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.goalCard__editBtn:hover {
+  color: var(--accent);
+  background: var(--accent-alpha, rgba(99, 102, 241, 0.08));
+}
+
+.goalCard__editBtn .material-symbols-rounded {
+  font-size: 0.875rem;
+}
+
+.goalCard__value {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.goalCard__meta {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+.goalCard__meta--overdue {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.goalCard__editRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.goalCard__input {
+  flex: 1;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.8125rem;
+  outline: none;
+  min-width: 0;
+}
+
+.goalCard__input:focus {
+  border-color: var(--accent);
+}
+
+/* Monthly chart — heatmap grid */
+.monthlyChart {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.monthlyChart__cell {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  background: var(--accent);
+  cursor: default;
+}
+
+.monthlyChart__cell--goalMet {
+  background: var(--success, #22c55e);
 }
 
 .dashboardStatuses {

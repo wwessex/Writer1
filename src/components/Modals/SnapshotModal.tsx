@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Dialog, Button, IconButton } from '@/components/UI';
 import { useToast } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
-import { getSnapshots, createSnapshot, deleteSnapshot } from '@/lib/storage';
+import { getSnapshots, createSnapshot, deleteSnapshot, updateSnapshotLabel } from '@/lib/storage';
 import { editorToPlainText, formatDateTime, countWords } from '@/lib/utils';
 import type { Snapshot } from '@/types';
 import styles from './Modals.module.css';
@@ -45,7 +45,7 @@ function SnapshotTimeline({
                 key={snapshot.id}
                 className={`${styles.timeline__node} ${isSelected ? styles['timeline__node--selected'] : ''}`}
                 onClick={() => onSelect(snapshot)}
-                title={`${time} - ${words.toLocaleString()} words`}
+                title={`${snapshot.label ? `[${snapshot.label}] ` : ''}${time} - ${words.toLocaleString()} words`}
               >
                 <div className={styles.timeline__dot} />
                 <div className={styles.timeline__bar} style={{ height: `${heightPercent}%` }} />
@@ -74,6 +74,8 @@ export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
   const [compareSnapshot, setCompareSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
+  const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
+  const [editingLabelValue, setEditingLabelValue] = useState('');
 
   const loadSnapshots = useCallback(async () => {
     if (!activeChapter) return;
@@ -141,6 +143,28 @@ export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
     }
   };
 
+  const handleStartEditLabel = (snapshot: Snapshot) => {
+    setEditingLabelId(snapshot.id);
+    setEditingLabelValue(snapshot.label || '');
+  };
+
+  const handleSaveLabel = async () => {
+    if (!editingLabelId) return;
+    try {
+      await updateSnapshotLabel(editingLabelId, editingLabelValue.trim());
+      setSnapshots(prev => prev.map(s =>
+        s.id === editingLabelId ? { ...s, label: editingLabelValue.trim() } : s
+      ));
+      if (selectedSnapshot?.id === editingLabelId) {
+        setSelectedSnapshot(prev => prev ? { ...prev, label: editingLabelValue.trim() } : prev);
+      }
+    } catch (err) {
+      console.error('Failed to update label:', err);
+      showToast('Failed to update label', 'error');
+    }
+    setEditingLabelId(null);
+  };
+
   const diffLines = useMemo(() => {
     if (!showDiff || !selectedSnapshot) return null;
 
@@ -197,7 +221,7 @@ export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
               <span className={`material-symbols-rounded ${styles.snapshotEmptyState__icon}`}>photo_camera</span>
               <p className={styles.emptyMessage}>No snapshots yet</p>
               <p className={styles.snapshotEmptyState__hint}>
-                Save a snapshot to preserve your current {sectionLabel} draft. You can compare versions side-by-side and restore any snapshot later.
+                Save a snapshot to preserve your current {sectionLabel} draft. Snapshots are also created automatically when you switch chapters. You can compare versions side-by-side and restore any snapshot later.
               </p>
               <Button variant="primary" size="small" onClick={handleSaveSnapshot} disabled={loading || !activeChapter?.content}>
                 <span className="material-symbols-rounded">save</span>
@@ -214,26 +238,64 @@ export function SnapshotModal({ open, onClose }: SnapshotModalProps) {
                 onClick={() => { setSelectedSnapshot(snapshot); setShowDiff(false); }}
                 role="button"
                 tabIndex={0}
-                aria-label={`Snapshot from ${formatDateTime(snapshot.createdAt)}`}
+                aria-label={`Snapshot${snapshot.label ? ` "${snapshot.label}"` : ''} from ${formatDateTime(snapshot.createdAt)}`}
                 onKeyDown={e => { if (e.key === 'Enter') { setSelectedSnapshot(snapshot); setShowDiff(false); } }}
               >
                 <div className={styles.snapshotItem__info}>
                   <span className={styles.snapshotItem__date}>
                     {formatDateTime(snapshot.createdAt)}
+                    {snapshot.label && (
+                      <span className={`${styles.snapshotItem__label} ${snapshot.label === 'Auto' ? styles['snapshotItem__label--auto'] : ''}`}>
+                        {snapshot.label}
+                      </span>
+                    )}
                   </span>
-                  <span className={styles.snapshotItem__preview}>
-                    {editorToPlainText(snapshot.doc).slice(0, 100)}...
-                  </span>
+                  {editingLabelId === snapshot.id ? (
+                    <span className={styles.snapshotItem__labelEdit}>
+                      <input
+                        type="text"
+                        value={editingLabelValue}
+                        onChange={e => setEditingLabelValue(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleSaveLabel();
+                          if (e.key === 'Escape') setEditingLabelId(null);
+                          e.stopPropagation();
+                        }}
+                        onClick={e => e.stopPropagation()}
+                        placeholder="Label this snapshot..."
+                        autoFocus
+                        className={styles.snapshotItem__labelInput}
+                      />
+                      <button className={styles.snapshotItem__labelSave} onClick={e => { e.stopPropagation(); handleSaveLabel(); }}>
+                        <span className="material-symbols-rounded">check</span>
+                      </button>
+                    </span>
+                  ) : (
+                    <span className={styles.snapshotItem__preview}>
+                      {editorToPlainText(snapshot.doc).slice(0, 100)}...
+                    </span>
+                  )}
                 </div>
-                <IconButton
-                  icon="delete"
-                  label="Delete snapshot"
-                  variant="ghost"
-                  onClick={e => {
-                    e.stopPropagation();
-                    handleDeleteSnapshot(snapshot);
-                  }}
-                />
+                <div className={styles.snapshotItem__actions}>
+                  <IconButton
+                    icon="label"
+                    label="Edit label"
+                    variant="ghost"
+                    onClick={e => {
+                      e.stopPropagation();
+                      handleStartEditLabel(snapshot);
+                    }}
+                  />
+                  <IconButton
+                    icon="delete"
+                    label="Delete snapshot"
+                    variant="ghost"
+                    onClick={e => {
+                      e.stopPropagation();
+                      handleDeleteSnapshot(snapshot);
+                    }}
+                  />
+                </div>
               </div>
             ))}
           </div>

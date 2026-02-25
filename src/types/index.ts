@@ -7,6 +7,9 @@ export type ScreenplayBlockType = 'scene-heading' | 'action' | 'character' | 'pa
 
 export type ChapterStatus = 'planned' | 'draft' | 'revised' | 'final';
 
+/** Runtime-accessible status values for validation and UI rendering. */
+export const CHAPTER_STATUSES: ChapterStatus[] = ['planned', 'draft', 'revised', 'final'];
+
 export interface Scene {
   id: string;
   title: string;
@@ -80,6 +83,7 @@ export interface Chapter {
   tags: string[];
   wordGoal: number;
   scenes: Scene[];
+  part?: string;
   act?: number;
   sequence?: number;
   sync?: ChapterSyncMetadata;
@@ -107,6 +111,7 @@ export interface Snapshot {
   chapterId: string;
   createdAt: number;
   doc: JSONContent;
+  label?: string;
 }
 
 export interface SyncConfig {
@@ -139,6 +144,7 @@ export interface AppSettings {
   autosaveMs: number;
   dailyWordGoal: number;
   novelWordGoal: number;
+  novelDeadline: string;
   sync: SyncConfig;
   assist: AssistConfig;
   theme: 'dark' | 'light' | 'high-contrast';
