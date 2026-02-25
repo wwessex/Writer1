@@ -23,7 +23,8 @@ function resolveDiffRange() {
 
 const summary = JSON.parse(readFileSync('coverage/coverage-summary.json', 'utf8'));
 const diffRange = resolveDiffRange();
-const changed = sh(`git diff --name-only ${diffRange}`).split('\n').filter(Boolean);
+// Exclude deleted files: coverage cannot be generated for files that no longer exist
+const changed = sh(`git diff --diff-filter=d --name-only ${diffRange}`).split('\n').filter(Boolean);
 
 function isCoveredSourceFile(file) {
   return (
