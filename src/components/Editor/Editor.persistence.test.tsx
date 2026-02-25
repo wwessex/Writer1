@@ -26,11 +26,12 @@ vi.mock('@/components/UI', () => ({
     <input aria-label="Chapter title" value={value} onChange={onChange} />
   ),
   IconButton: ({ onClick }: { onClick?: () => void }) => <button onClick={onClick}>delete</button>,
+  useToast: () => ({ showToast: vi.fn(), showErrorToast: vi.fn() }),
 }));
 
 vi.mock('@/context/AppContext', () => ({
   useApp: () => ({
-    state: { settings: { focusMode: false, pageView: false, typewriterMode: false, typography: { fontFamily: 'system', fontSize: 16, lineHeight: 1.6 } }, projectType: 'book' },
+    state: { settings: { focusMode: false, pageView: false, typewriterMode: false, dailyWordGoal: 0, typography: { fontFamily: 'system', fontSize: 16, lineHeight: 1.6 } }, projectType: 'book', chapters: [] },
     activeChapter: { id: 'chapter-1', title: 'Old', content: { type: 'doc', content: [] } },
     updateChapterImmediate: updateChapterImmediateMock,
     deleteChapter: vi.fn(),

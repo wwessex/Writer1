@@ -5,6 +5,7 @@ import { Tooltip } from '@/components/UI/Tooltip';
 import { Pill, StatusDot } from '@/components/UI/Pill';
 import { MenuBar } from '@/components/Menu/MenuBar';
 import { Toolbar } from './Toolbar';
+import { SaveStatus } from './SaveStatus';
 import { getProjectMetrics } from '@/lib/projectMetrics';
 import { getMonthlyHistory } from '@/lib/progressTracker';
 import { createProvider, loadAIConfig } from '@/lib/ai';
@@ -276,9 +277,7 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
               variant="accent"
             />
           )}
-          {state.isSaving && (
-            <span className={styles.savingStatus}>Saving...</span>
-          )}
+          <SaveStatus isSaving={state.isSaving} />
           <Tooltip content="Toggle inspector (Ctrl+Shift+I)" position="bottom">
             <IconButton
               icon="info"

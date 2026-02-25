@@ -331,11 +331,40 @@
   z-index: 501;
   opacity: 0;
   transition: opacity 0.3s ease, transform 0.3s var(--ease-smooth, ease);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1, 8px);
 }
 
 .editorPane--focusMode:hover .focusModeBar {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+
+.focusModeStats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--space-1, 8px) var(--space-2, 16px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 10px);
+  background: var(--panel);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  box-shadow: var(--shadow-float, 0 8px 24px rgba(0,0,0,0.2));
+  white-space: nowrap;
+}
+
+.focusModeDivider {
+  width: 1px;
+  height: 12px;
+  background: var(--border);
+}
+
+.focusModeHighlight {
+  color: var(--success);
+  font-weight: 600;
 }
 
 .focusModeExit {

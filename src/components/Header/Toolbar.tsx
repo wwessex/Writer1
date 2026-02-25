@@ -299,6 +299,12 @@ export function Toolbar() {
               onChange={e => handleStyleChange(e.target.value)}
               className={styles.styleSelect}
             />
+            <Select
+              options={FONT_FAMILY_OPTIONS}
+              value={fontFamily}
+              onChange={e => handleFontFamilyChange(e.target.value)}
+              className={styles.fontSelect}
+            />
           </div>
 
           <div className={styles.toolbar__divider} />
@@ -343,6 +349,30 @@ export function Toolbar() {
                       <span>{label}</span>
                     </button>
                   ))}
+                  <button
+                    className={styles.moreFormattingItem}
+                    onPointerDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      handleInsertImage();
+                      setMoreFormattingOpen(false);
+                    }}
+                  >
+                    <span className="material-symbols-rounded">image</span>
+                    <span>Insert Image</span>
+                  </button>
+                  <div className={styles.moreFormattingDivider} />
+                  <div className={styles.moreFormattingRow}>
+                    <span className={styles.moreFormattingLabel}>Line Spacing</span>
+                    <Select
+                      options={LINE_SPACING_OPTIONS}
+                      value={lineSpacing}
+                      onChange={e => {
+                        handleLineSpacingChange(e.target.value);
+                        setMoreFormattingOpen(false);
+                      }}
+                      className={styles.moreFormattingSelect}
+                    />
+                  </div>
                 </div>
               )}
             </div>
