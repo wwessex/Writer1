@@ -32,6 +32,7 @@ import { useFocusModeClass } from '@/hooks/useFocusModeClass';
 import { useEditorSelectionTracking } from '@/hooks/useEditorSelectionTracking';
 import { useVoiceAlerts } from '@/hooks/useVoiceAlerts';
 import { useDesktopRuntime } from '@/hooks/useDesktopRuntime';
+import { useCrashRecovery } from '@/hooks/useCrashRecovery';
 import { clearWindowLocks, getSessionState, getWorkspaceStore, heartbeatProjectLock, persistSessionState } from '@/context/services/workspaceService';
 import './styles/index.css';
 import styles from './App.module.css';
@@ -235,6 +236,15 @@ function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits }: {
     onMenuAction: handleMenuAction,
     menuState: { editorFocused, hasSelection: hasTextSelection },
     showToast,
+  });
+
+  useCrashRecovery({
+    hasUnsavedEdits,
+    novelId: state.novelId,
+    activeChapterId: state.activeChapterId,
+    onRecoveryDetected: useCallback(() => {
+      showToast('Your previous session may not have saved cleanly. Check your latest edits.', 'warning', 'history');
+    }, [showToast]),
   });
 
   if (error) {

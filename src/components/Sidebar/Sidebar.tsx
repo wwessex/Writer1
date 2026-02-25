@@ -4,6 +4,7 @@ import type { ProjectType, SidebarPanelId } from '@/types';
 import { VirtualChapterList } from './VirtualChapterList';
 import { OutlinePanel } from './OutlinePanel';
 import { ScenePlanner } from './ScenePlanner';
+import { SidebarSearch } from './SidebarSearch';
 import { Button, IconButton } from '@/components/UI';
 import { Tooltip } from '@/components/UI/Tooltip';
 import { useResizable } from '@/hooks/useResizable';
@@ -156,6 +157,7 @@ export function Sidebar({ onExportBackup, onImportBackup }: SidebarProps) {
             </Tooltip>
           </div>
         )}
+        <SidebarSearch />
         <div className={styles.sidebar__content}>
           {panelOrder.map(panelId => {
             const panel = panelDefinitions.find(def => def.id === panelId);

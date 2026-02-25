@@ -1,0 +1,122 @@
+.searchContainer {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-subtle, var(--border));
+}
+
+.searchToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-sm, 8px);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background var(--transition-fast, 120ms ease), color var(--transition-fast, 120ms ease);
+}
+
+.searchToggle:hover {
+  background: var(--btn-bg);
+  color: var(--text);
+}
+
+.searchToggle--active {
+  color: var(--accent);
+}
+
+.searchToggle .material-symbols-rounded {
+  font-size: 1rem;
+}
+
+.searchToggleLabel {
+  font-weight: 500;
+}
+
+.searchPanel {
+  padding: 4px 0;
+  animation: searchSlideIn 0.15s ease-out;
+}
+
+@keyframes searchSlideIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.searchInput {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 0.8125rem;
+  outline: none;
+  transition: border-color var(--transition-fast, 120ms ease);
+}
+
+.searchInput:focus {
+  border-color: var(--accent);
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted);
+}
+
+.searchResults {
+  max-height: 240px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.searchCount {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  padding: 2px 4px;
+}
+
+.searchEmpty {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 8px 4px;
+  text-align: center;
+}
+
+.searchResult {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast, 120ms ease);
+}
+
+.searchResult:hover {
+  background: var(--btn-bg);
+}
+
+.searchResultTitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.searchResultSnippet {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.4;
+}

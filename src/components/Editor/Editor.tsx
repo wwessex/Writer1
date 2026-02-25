@@ -1,7 +1,9 @@
-import { useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useMemo, useState, useRef } from 'react';
 import { useCurrentEditor, EditorContent } from '@tiptap/react';
 import { useApp } from '@/context/AppContext';
-import { Input, IconButton } from '@/components/UI';
+import { Input, IconButton, useToast } from '@/components/UI';
+import { countWords, editorToPlainText } from '@/lib/utils';
+import { WritingProgress } from './WritingProgress';
 import type { ScreenplayBlockType } from './screenplayExtension';
 import styles from './Editor.module.css';
 
@@ -31,6 +33,7 @@ interface EditorProps {
 export function Editor({ screenplayMode, onToggleScreenplayMode }: EditorProps) {
   const { state, activeChapter, updateChapterImmediate, deleteChapter, dispatch } = useApp();
   const { editor } = useCurrentEditor();
+  const { showToast } = useToast();
 
   // Sync editor content when switching chapters. We intentionally depend on
   // activeChapter.id rather than the full object to avoid re-setting content
@@ -96,6 +99,43 @@ export function Editor({ screenplayMode, onToggleScreenplayMode }: EditorProps) 
     editor.on('selectionUpdate', handleSelectionUpdate);
     return () => { editor.off('selectionUpdate', handleSelectionUpdate); };
   }, [editor, state.settings.typewriterMode]);
+
+  // Focus-mode session tracking
+  const focusStartWordsRef = useRef<number | null>(null);
+  const [focusSessionWords, setFocusSessionWords] = useState(0);
+  const [focusElapsed, setFocusElapsed] = useState(0);
+  const focusTimerRef = useRef<number | null>(null);
+
+  const chapterWordCount = useMemo(() => {
+    if (!activeChapter?.content) return 0;
+    return countWords(editorToPlainText(activeChapter.content));
+  }, [activeChapter?.content]);
+
+  useEffect(() => {
+    if (state.settings.focusMode) {
+      focusStartWordsRef.current = chapterWordCount;
+      setFocusSessionWords(0);
+      setFocusElapsed(0);
+      focusTimerRef.current = window.setInterval(() => {
+        setFocusElapsed(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (focusTimerRef.current) {
+        window.clearInterval(focusTimerRef.current);
+        focusTimerRef.current = null;
+      }
+      focusStartWordsRef.current = null;
+    }
+    return () => {
+      if (focusTimerRef.current) window.clearInterval(focusTimerRef.current);
+    };
+  }, [state.settings.focusMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (focusStartWordsRef.current !== null) {
+      setFocusSessionWords(Math.max(0, chapterWordCount - focusStartWordsRef.current));
+    }
+  }, [chapterWordCount]);
 
   if (!activeChapter) {
     return (
@@ -166,8 +206,20 @@ export function Editor({ screenplayMode, onToggleScreenplayMode }: EditorProps) 
       <div className={styles.editorContent}>
         <EditorContent editor={editor} className={styles.editorWrapper} />
       </div>
+      {!isFocusMode && <WritingProgress showToast={showToast} />}
       {isFocusMode && (
         <div className={styles.focusModeBar}>
+          <div className={styles.focusModeStats} role="status" aria-live="off">
+            <span>{chapterWordCount.toLocaleString()} words</span>
+            <span className={styles.focusModeDivider} />
+            {focusSessionWords > 0 && (
+              <>
+                <span className={styles.focusModeHighlight}>+{focusSessionWords.toLocaleString()}</span>
+                <span className={styles.focusModeDivider} />
+              </>
+            )}
+            <span>{Math.floor(focusElapsed / 60)}:{String(focusElapsed % 60).padStart(2, '0')}</span>
+          </div>
           <button className={styles.focusModeExit} onClick={exitFocusMode} aria-label="Exit focus mode">
             <span className="material-symbols-rounded">fullscreen_exit</span>
             <span>Exit Focus Mode</span>
