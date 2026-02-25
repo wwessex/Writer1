@@ -455,9 +455,20 @@ export interface ConflictInfo {
   remoteContent: JSONContent | null;
   baseContent?: JSONContent | null;
   mergedContent?: JSONContent | null;
+  mergeConflictBlocks?: MergeConflictBlock[];
   localUpdatedAt: number;
   remoteUpdatedAt: number;
   resolutionOptions: ConflictResolutionOption[];
+}
+
+export interface MergeConflictBlock {
+  id: string;
+  baseStart: number;
+  baseEnd: number;
+  mergedStart: number;
+  mergedEnd: number;
+  localLines: string[];
+  remoteLines: string[];
 }
 
 export type ConflictResolutionOption = 'local' | 'remote' | 'merge';

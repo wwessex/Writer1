@@ -6,14 +6,16 @@ import { mapAppStateToProviderPayload, normalizeProviderPullResponse } from './o
 import type { ProviderDocument } from './types';
 
 function makeDoc(text: string): JSONContent {
+  return makeDocFromLines([text]);
+}
+
+function makeDocFromLines(lines: string[]): JSONContent {
   return {
     type: 'doc',
-    content: [
-      {
-        type: 'paragraph',
-        content: [{ type: 'text', text }],
-      },
-    ],
+    content: lines.map((line) => ({
+      type: 'paragraph',
+      content: line.trim() ? [{ type: 'text', text: line }] : [],
+    })),
   };
 }
 
@@ -99,7 +101,28 @@ describe('mergeChapterFromRemote', () => {
     expect(chapterUpdate.sync?.lastSyncedContent).toEqual(makeDoc('Remote edit'));
   });
 
-  it('detects conflict when both local and remote changed', async () => {
+  it('auto-merges non-overlapping local and remote edits', async () => {
+    const baseContent = makeDocFromLines(['Line 1', 'Line 2', 'Line 3']);
+    const chapter = makeChapter({
+      content: makeDocFromLines(['Line 1 - local', 'Line 2', 'Line 3']),
+      sync: {
+        providerRevisionIds: { dropbox: 'rev-1' },
+        lastSyncedContent: baseContent,
+      },
+    });
+
+    const { chapterUpdate, conflict } = await mergeChapterFromRemote({
+      chapter,
+      remoteDocument: makeRemote('Line 1\nLine 2\nLine 3 - remote'),
+      context: { provider: 'dropbox', remoteRevision: 'rev-2' },
+    });
+
+    expect(conflict).toBeUndefined();
+    expect(chapterUpdate.content).toEqual(makeDocFromLines(['Line 1 - local', 'Line 2', 'Line 3 - remote']));
+    expect(chapterUpdate.sync?.lastSyncedContent).toEqual(makeDocFromLines(['Line 1 - local', 'Line 2', 'Line 3 - remote']));
+  });
+
+  it('surfaces conflict markers and block metadata for overlapping edits', async () => {
     const baseContent = makeDoc('Base text');
     const chapter = makeChapter({
       content: makeDoc('Local changed text'),
@@ -123,9 +146,52 @@ describe('mergeChapterFromRemote', () => {
     expect(conflict!.localContent).toEqual(makeDoc('Local changed text'));
     expect(conflict!.remoteContent).toBeDefined();
     expect(conflict!.baseContent).toEqual(baseContent);
-    expect(conflict!.mergedContent).toBeDefined();
+    expect(conflict!.mergedContent).toEqual(makeDocFromLines([
+      '<<<<<<< LOCAL',
+      'Local changed text',
+      '=======',
+      'Remote changed text',
+      '>>>>>>> REMOTE',
+    ]));
+    expect(conflict!.mergeConflictBlocks).toEqual([
+      expect.objectContaining({
+        baseStart: 0,
+        baseEnd: 1,
+        localLines: ['Local changed text'],
+        remoteLines: ['Remote changed text'],
+      }),
+    ]);
     // Chapter update should keep base as sync content during conflict
     expect(chapterUpdate.sync?.lastSyncedContent).toEqual(baseContent);
+  });
+
+  it('does not duplicate paragraphs across repeated sync cycles', async () => {
+    const baseContent = makeDocFromLines(['Intro', 'Body', 'Ending']);
+    const chapter = makeChapter({
+      content: makeDocFromLines(['Intro local', 'Body', 'Ending']),
+      sync: {
+        providerRevisionIds: { dropbox: 'rev-1' },
+        lastSyncedContent: baseContent,
+      },
+    });
+
+    const first = await mergeChapterFromRemote({
+      chapter,
+      remoteDocument: makeRemote('Intro\nBody\nEnding remote'),
+      context: { provider: 'dropbox', remoteRevision: 'rev-2' },
+    });
+
+    expect(first.conflict).toBeUndefined();
+    expect(first.chapterUpdate.content).toEqual(makeDocFromLines(['Intro local', 'Body', 'Ending remote']));
+
+    const second = await mergeChapterFromRemote({
+      chapter: first.chapterUpdate,
+      remoteDocument: makeRemote('Intro\nBody\nEnding remote', { updatedAt: 300 }),
+      context: { provider: 'dropbox', remoteRevision: 'rev-3' },
+    });
+
+    expect(second.conflict).toBeUndefined();
+    expect(second.chapterUpdate.content).toEqual(makeDocFromLines(['Intro', 'Body', 'Ending remote']));
   });
 
   it('updates title and order from remote when no conflict', async () => {
