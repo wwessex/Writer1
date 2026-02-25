@@ -70,7 +70,7 @@ describe('AboutWindow', () => {
 
     const logo = rendered.container.querySelector('img[alt="DraftHarbour Studio"]');
     expect(logo).not.toBeNull();
-    expect(logo?.getAttribute('src')).toContain('brand/logo-light.svg');
+    expect(logo?.getAttribute('src')).toContain('assets/logo-black.svg');
 
     rendered.unmount();
   });
@@ -81,7 +81,7 @@ describe('AboutWindow', () => {
 
     const logo = rendered.container.querySelector('img[alt="DraftHarbour Studio"]');
     expect(logo).not.toBeNull();
-    expect(logo?.getAttribute('src')).toContain('brand/logo.svg');
+    expect(logo?.getAttribute('src')).toContain('assets/logo-blue.svg');
 
     rendered.unmount();
   });
