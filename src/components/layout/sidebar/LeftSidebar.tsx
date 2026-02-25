@@ -65,24 +65,24 @@ export function LeftSidebar({ collapsed = false }: LeftSidebarProps) {
       {/* Tree */}
       <div className="flex-1 min-h-0 overflow-y-auto p-2">
         <SidebarSection title="Pinned">
-          <TreeRow active icon="&#128204;" title="Chapter 4 \u2014 The Corridor" meta="1.8k" />
-          <TreeRow icon="&#128221;" title="Killer Backstory Notes" meta="640" />
+          <TreeRow active icon="📌" title="Chapter 4 — The Corridor" meta="1.8k" />
+          <TreeRow icon="📝" title="Killer Backstory Notes" meta="640" />
         </SidebarSection>
 
         <SidebarSection title="Chapters">
-          <TreeRow icon="&#9656;" title="Chapter 1 \u2014 Prologue" meta="2.1k" />
-          <TreeRow icon="&#9656;" title="Chapter 2 \u2014 The Party" meta="3.4k" />
-          <TreeRow icon="&#9656;" title="Chapter 3 \u2014 The Call" meta="2.9k" />
-          <TreeRow active icon="&#9662;" title="Chapter 4 \u2014 The Corridor" meta="1.8k" />
-          <TreeRow level={1} icon="&#8226;" title="Scene 1 \u2014 Locker Room" meta="812" />
-          <TreeRow level={1} active icon="&#8226;" title="Scene 2 \u2014 The Corridor" meta="1,031" />
-          <TreeRow level={1} icon="&#8226;" title="Scene 3 \u2014 Exit Door" meta="0" />
+          <TreeRow icon="▶" title="Chapter 1 — Prologue" meta="2.1k" />
+          <TreeRow icon="▶" title="Chapter 2 — The Party" meta="3.4k" />
+          <TreeRow icon="▶" title="Chapter 3 — The Call" meta="2.9k" />
+          <TreeRow active icon="▼" title="Chapter 4 — The Corridor" meta="1.8k" />
+          <TreeRow level={1} icon="•" title="Scene 1 — Locker Room" meta="812" />
+          <TreeRow level={1} active icon="•" title="Scene 2 — The Corridor" meta="1,031" />
+          <TreeRow level={1} icon="•" title="Scene 3 — Exit Door" meta="0" />
         </SidebarSection>
 
         <SidebarSection title="Notes">
-          <TreeRow icon="&#128450;" title="Characters" />
-          <TreeRow icon="&#128450;" title="Locations" />
-          <TreeRow icon="&#128450;" title="Timeline" />
+          <TreeRow icon="🟰" title="Characters" />
+          <TreeRow icon="🟰" title="Locations" />
+          <TreeRow icon="🟰" title="Timeline" />
         </SidebarSection>
       </div>
     </aside>
