@@ -204,6 +204,13 @@ The AI features can run through either:
 - `api/` (PHP server proxy for production-style deployments), or
 - the local dev broker in `src/server/integrationBroker.ts`.
 
+### Required security config checklist (production/staging)
+
+- Set `APP_ENV` to a non-dev value (for example: `production` or `staging`).
+- Set `APP_ALLOWED_ORIGINS` to explicit origin(s), comma-separated (for example: `https://app.example.com`).
+- Confirm `allow_byok` is disabled by default in non-dev environments (enable only when intentionally required).
+- Review PHP logs on startup for `[api-security]` warnings and resolve any insecure configuration warnings before go-live.
+
 ### 1) Configure `api/_config.php` provider keys
 
 Edit `api/_config.php` and set the provider keys you plan to use:
