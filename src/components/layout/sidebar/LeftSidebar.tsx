@@ -9,6 +9,9 @@ import type { Chapter } from '@/types';
 
 interface LeftSidebarProps {
   collapsed?: boolean;
+  width?: number;
+  resizeHandleProps?: { onMouseDown: (e: React.MouseEvent) => void; onTouchStart: (e: React.TouchEvent) => void };
+  isResizing?: boolean;
   onCreateChapter?: () => void;
   onImport?: () => void;
 }
@@ -25,7 +28,7 @@ function getChapterWordCount(chapter: Chapter): number {
   return countWords(editorToPlainText(chapter.content));
 }
 
-export function LeftSidebar({ collapsed = false, onCreateChapter, onImport }: LeftSidebarProps) {
+export function LeftSidebar({ collapsed = false, width = 280, resizeHandleProps, isResizing, onCreateChapter, onImport }: LeftSidebarProps) {
   const { state, setActiveChapter, createChapter } = useApp();
   const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
@@ -72,16 +75,16 @@ export function LeftSidebar({ collapsed = false, onCreateChapter, onImport }: Le
 
   if (collapsed) {
     return (
-      <aside className="w-[60px] border-r border-white/10 bg-[#171A1D] min-h-0 flex flex-col items-center py-3 gap-2 transition-all duration-150">
+      <aside className="w-[60px] border-r border-[var(--border)] bg-[var(--panel)] min-h-0 flex flex-col items-center py-3 gap-2 transition-all duration-200 ease-[var(--ease-smooth)]">
         <button
-          className="h-9 w-9 rounded-xl hover:bg-white/5 flex items-center justify-center text-[#AAB2BD]"
+          className="h-9 w-9 rounded-xl hover:bg-[var(--btn-bg)] flex items-center justify-center text-[var(--text-secondary)] transition-colors"
           aria-label="New document"
           onClick={handleCreateChapter}
         >
           <FilePlus size={16} />
         </button>
         <button
-          className="h-9 w-9 rounded-xl hover:bg-white/5 flex items-center justify-center text-[#AAB2BD]"
+          className="h-9 w-9 rounded-xl hover:bg-[var(--btn-bg)] flex items-center justify-center text-[var(--text-secondary)] transition-colors"
           aria-label="Search"
         >
           <Search size={16} />
@@ -91,12 +94,15 @@ export function LeftSidebar({ collapsed = false, onCreateChapter, onImport }: Le
   }
 
   return (
-    <aside className="w-[280px] border-r border-white/10 bg-[#171A1D] min-h-0 flex flex-col transition-all duration-150">
+    <aside
+      className="relative border-r border-[var(--border)] bg-[var(--panel)] min-h-0 flex flex-col transition-[width] duration-200 ease-[var(--ease-smooth)]"
+      style={{ width: `${width}px` }}
+    >
       {/* Header */}
-      <div className="p-3 border-b border-white/10 space-y-3">
-        <button className="w-full h-12 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 px-3 text-left">
+      <div className="p-3 border-b border-[var(--border)] space-y-3">
+        <button className="w-full h-12 rounded-xl border border-[var(--border)] bg-[var(--btn-bg)] hover:bg-[var(--btn-hover)] px-3 text-left transition-colors">
           <div className="text-sm font-medium truncate">{state.novelTitle || 'Untitled Project'}</div>
-          <div className="text-xs text-[#AAB2BD] truncate">
+          <div className="text-xs text-[var(--text-secondary)] truncate">
             {projectMetrics.totalWords.toLocaleString()} words &middot;{' '}
             {projectMetrics.totalChapters} {isBookProject ? 'chapters' : 'scenes'}
           </div>
@@ -104,18 +110,18 @@ export function LeftSidebar({ collapsed = false, onCreateChapter, onImport }: Le
 
         <div className="grid grid-cols-3 gap-2">
           <button
-            className="h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs flex items-center justify-center gap-1.5 text-[#AAB2BD]"
+            className="h-9 rounded-lg bg-[var(--btn-bg)] hover:bg-[var(--btn-hover)] border border-[var(--border)] text-xs flex items-center justify-center gap-1.5 text-[var(--text-secondary)] transition-colors"
             onClick={handleCreateChapter}
           >
             <FilePlus size={13} />
             New
           </button>
-          <button className="h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs flex items-center justify-center gap-1.5 text-[#AAB2BD]">
+          <button className="h-9 rounded-lg bg-[var(--btn-bg)] hover:bg-[var(--btn-hover)] border border-[var(--border)] text-xs flex items-center justify-center gap-1.5 text-[var(--text-secondary)] transition-colors">
             <FolderPlus size={13} />
             Folder
           </button>
           <button
-            className="h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs flex items-center justify-center gap-1.5 text-[#AAB2BD]"
+            className="h-9 rounded-lg bg-[var(--btn-bg)] hover:bg-[var(--btn-hover)] border border-[var(--border)] text-xs flex items-center justify-center gap-1.5 text-[var(--text-secondary)] transition-colors"
             onClick={onImport}
           >
             <FileDown size={13} />
@@ -125,14 +131,14 @@ export function LeftSidebar({ collapsed = false, onCreateChapter, onImport }: Le
 
         <div className="relative">
           <input
-            className="w-full h-9 rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 text-sm text-[#ECEFF3] placeholder:text-[#7D8794] focus:outline-none focus:ring-1 focus:ring-[#41DDF2]/60 focus:border-[#41DDF2]/40"
+            className="w-full h-9 rounded-xl border border-[var(--border)] bg-[var(--input-bg)] pl-9 pr-3 text-sm text-[var(--text)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/60 focus:border-[var(--accent)]/40 transition-shadow"
             placeholder="Search in project"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
           <Search
             size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7D8794]"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
           />
         </div>
       </div>
@@ -177,16 +183,16 @@ export function LeftSidebar({ collapsed = false, onCreateChapter, onImport }: Le
         </SidebarSection>
 
         {filteredChapters.length === 0 && searchQuery && (
-          <div className="px-2 py-4 text-sm text-[#7D8794] text-center">
+          <div className="px-2 py-4 text-sm text-[var(--text-muted)] text-center">
             No results for &ldquo;{searchQuery}&rdquo;
           </div>
         )}
 
         {state.chapters.length === 0 && !searchQuery && (
           <div className="px-2 py-8 text-center">
-            <p className="text-sm text-[#7D8794] mb-3">No chapters yet</p>
+            <p className="text-sm text-[var(--text-muted)] mb-3">No chapters yet</p>
             <button
-              className="h-9 rounded-lg border border-[#41DDF2]/20 bg-[#41DDF2]/10 text-[#BFF6FD] text-sm px-4 hover:bg-[#41DDF2]/20 transition-colors"
+              className="h-9 rounded-lg border border-[var(--accent-subtle)] bg-[var(--accent-alpha)] text-[var(--accent)] text-sm px-4 hover:bg-[var(--accent-subtle)] transition-colors"
               onClick={handleCreateChapter}
             >
               Create first chapter
@@ -194,6 +200,18 @@ export function LeftSidebar({ collapsed = false, onCreateChapter, onImport }: Le
           </div>
         )}
       </div>
+
+      {/* Resize handle */}
+      {resizeHandleProps && (
+        <div
+          className={[
+            'resize-handle resize-handle--right',
+            isResizing ? 'resize-handle--active' : '',
+          ].join(' ')}
+          onMouseDown={resizeHandleProps.onMouseDown}
+          onTouchStart={resizeHandleProps.onTouchStart}
+        />
+      )}
     </aside>
   );
 }
