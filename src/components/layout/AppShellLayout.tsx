@@ -5,6 +5,7 @@ import { LeftSidebar } from './sidebar/LeftSidebar';
 import { EditorPane } from './editor/EditorPane';
 import { RightInspector } from './inspector/RightInspector';
 import { useResizable } from '@/hooks/useResizable';
+import { useResponsivePanels } from '@/hooks/useResponsivePanels';
 import { useApp } from '@/context/AppContext';
 import { countWords, editorToPlainText } from '@/lib/utils';
 
@@ -15,10 +16,11 @@ import { countWords, editorToPlainText } from '@/lib/utils';
 export function AppShellLayout() {
   const { state, activeChapter } = useApp();
   const [focusMode, setFocusMode] = useState(false);
+  const { shouldCollapseSidebar, shouldCollapseInspector } = useResponsivePanels();
   const [sidebarCollapsed] = useState(false);
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
-  const leftPanelCollapsed = focusMode || sidebarCollapsed;
-  const rightPanelCollapsed = focusMode || inspectorCollapsed;
+  const leftPanelCollapsed = focusMode || shouldCollapseSidebar || sidebarCollapsed;
+  const rightPanelCollapsed = focusMode || shouldCollapseInspector || inspectorCollapsed;
 
   const wordCount = useMemo(
     () => countWords(editorToPlainText(activeChapter?.content ?? [])),
@@ -77,7 +79,7 @@ export function AppShellLayout() {
   };
 
   return (
-    <div className="h-[100dvh] min-w-[1100px] bg-[var(--bg)] text-[var(--text)] flex flex-col">
+    <div className="h-[100dvh] min-w-0 bg-[var(--bg)] text-[var(--text)] flex flex-col overflow-x-hidden">
       <TopBar
         focusMode={focusMode}
         onFocusMode={() => setFocusMode((mode) => !mode)}
@@ -85,7 +87,10 @@ export function AppShellLayout() {
         onToggleInspector={() => setInspectorCollapsed((c) => !c)}
       />
 
-      {/* Main 3-panel layout */}
+      {/*
+        Main 3-panel layout.
+        Responsive panel auto-collapse keeps the editor readable on smaller viewports.
+      */}
       <div className="flex-1 min-h-0 flex">
         <LeftSidebar
           collapsed={leftPanelCollapsed}
