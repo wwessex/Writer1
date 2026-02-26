@@ -14,14 +14,42 @@ interface MenuBarProps {
 export function MenuBar({ onAction, editorFocused = false, hasSelection = false }: MenuBarProps) {
   const { state } = useApp();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [closingMenu, setClosingMenu] = useState<string | null>(null);
   const platform = getCurrentPlatform();
   const menuBarRef = useRef<HTMLDivElement>(null);
+  const menuDropdownRef = useRef<HTMLDivElement>(null);
+
+  const closeMenuAnimated = useCallback((callback?: () => void) => {
+    if (!openMenu) { callback?.(); return; }
+    setClosingMenu(openMenu);
+    const dropdown = menuDropdownRef.current;
+    const done = () => {
+      setClosingMenu(null);
+      setOpenMenu(null);
+      callback?.();
+    };
+    if (dropdown) {
+      dropdown.addEventListener('animationend', done, { once: true });
+      setTimeout(done, 160); // fallback
+    } else {
+      done();
+    }
+  }, [openMenu]);
 
   const handleMenuClick = (menuLabel: string) => {
-    setOpenMenu(prev => (prev === menuLabel ? null : menuLabel));
+    if (openMenu === menuLabel) {
+      closeMenuAnimated();
+    } else if (openMenu) {
+      // Switch directly without exit animation for snappiness
+      setClosingMenu(null);
+      setOpenMenu(menuLabel);
+    } else {
+      setOpenMenu(menuLabel);
+    }
   };
 
   const handleItemClick = (action: CommandId) => {
+    setClosingMenu(null);
     setOpenMenu(null);
 
     if (LOCAL_MENU_COMMANDS.has(action)) {
@@ -47,9 +75,9 @@ export function MenuBar({ onAction, editorFocused = false, hasSelection = false 
     // Ignore if this was a scroll gesture, not a tap
     if (touchMovedRef.current) return;
     if (menuBarRef.current && !menuBarRef.current.contains(e.target as Node)) {
-      setOpenMenu(null);
+      closeMenuAnimated();
     }
-  }, []);
+  }, [closeMenuAnimated]);
 
   useEffect(() => {
     if (openMenu) {
@@ -84,8 +112,8 @@ export function MenuBar({ onAction, editorFocused = false, hasSelection = false 
           >
             {menu.label}
           </button>
-          {openMenu === menu.label && (
-            <div className={styles.menu} role="menu">
+          {(openMenu === menu.label || closingMenu === menu.label) && (
+            <div ref={openMenu === menu.label ? menuDropdownRef : undefined} className={`${styles.menu} ${closingMenu === menu.label ? styles['menu--closing'] : ''}`} role="menu">
               {items.map((item, idx) =>
                 item.divider ? (
                   <div key={idx} className={styles.menuDivider} role="separator" />

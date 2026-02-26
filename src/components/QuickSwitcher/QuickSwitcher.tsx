@@ -132,6 +132,8 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [actionFilter, setActionFilter] = useState<ActionFilter>('All');
+  const [isClosing, setIsClosing] = useState(false);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const [recentOpenedMap, setRecentOpenedMap] = useState<Record<string, number>>(() => {
     if (typeof window === 'undefined') return {};
     try {
@@ -311,8 +313,25 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
     setSelectedIndex(0);
   }, [query, searchMode, actionFilter]);
 
+  const handleClose = useCallback(() => {
+    if (isClosing) return;
+    setIsClosing(true);
+    const overlay = overlayRef.current;
+    const done = () => {
+      setIsClosing(false);
+      onClose();
+    };
+    if (overlay) {
+      overlay.addEventListener('animationend', done, { once: true });
+      setTimeout(done, 200); // fallback
+    } else {
+      done();
+    }
+  }, [isClosing, onClose]);
+
   useEffect(() => {
     if (open) {
+      setIsClosing(false);
       setRawQuery('');
       setQuery('');
       setSelectedIndex(0);
@@ -369,19 +388,19 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
         break;
       case 'Escape':
         e.preventDefault();
-        onClose();
+        handleClose();
         break;
     }
-  }, [selectableItems, selectedIndex, onClose, runItemAction, cycleSearchMode, updateSettings]);
+  }, [selectableItems, selectedIndex, handleClose, runItemAction, cycleSearchMode, updateSettings]);
 
-  if (!open) return null;
+  if (!open && !isClosing) return null;
 
   // Build a mapping from selectable index to the item, for mouse hover in the list
   let selectableCounter = 0;
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.switcher} onClick={e => e.stopPropagation()} role="dialog" aria-label="Command Palette">
+    <div ref={overlayRef} className={`${styles.overlay} ${isClosing ? styles['overlay--closing'] : ''}`} onClick={handleClose}>
+      <div className={`${styles.switcher} ${isClosing ? styles['switcher--closing'] : ''}`} onClick={e => e.stopPropagation()} role="dialog" aria-label="Command Palette">
         <div className={styles.inputWrapper}>
           <span className="material-symbols-rounded">search</span>
           <input

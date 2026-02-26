@@ -155,6 +155,7 @@ describe('QuickSwitcher', () => {
   });
 
   it('calls onClose when clicking overlay', () => {
+    vi.useFakeTimers();
     act(() => {
       root.render(
         <QuickSwitcher open={true} onClose={onCloseMock} onAction={onActionMock} />
@@ -165,10 +166,14 @@ describe('QuickSwitcher', () => {
     act(() => {
       overlay!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
+    // Exit animation uses a setTimeout fallback before calling onClose
+    act(() => { vi.advanceTimersByTime(250); });
     expect(onCloseMock).toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it('Escape key calls onClose', () => {
+    vi.useFakeTimers();
     act(() => {
       root.render(
         <QuickSwitcher open={true} onClose={onCloseMock} onAction={onActionMock} />
@@ -181,6 +186,9 @@ describe('QuickSwitcher', () => {
         new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
       );
     });
+    // Exit animation uses a setTimeout fallback before calling onClose
+    act(() => { vi.advanceTimersByTime(250); });
     expect(onCloseMock).toHaveBeenCalled();
+    vi.useRealTimers();
   });
 });
