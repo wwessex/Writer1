@@ -40,7 +40,6 @@ export function AppShell(props: AppShellProps) {
     onAction,
     inspectorOpen,
     setInspectorOpen,
-    onToggleSidebar,
     sidebarImportBackup,
     aiPanelOpen,
     closeAiPanel,
@@ -103,12 +102,19 @@ export function AppShell(props: AppShellProps) {
         projectTitle={state.novelTitle || 'Writer1 Project'}
         saveStatus={saveStatus}
         focusMode={focusMode}
-        onFocusMode={onToggleSidebar}
+        theme={state.settings.theme}
+        onFocusMode={() => onAction('toggleFocusMode' as CommandId)}
         onSearch={() => onAction('QUICK_SWITCHER' as CommandId)}
         onToggleInspector={() => setInspectorOpen(prev => !prev)}
         onNewChapter={() => onAction('NEW_CHAPTER' as CommandId)}
         onSettings={() => onAction('SETTINGS' as CommandId)}
         onProjectSelect={() => onAction('PROJECTS' as CommandId)}
+        onThemeToggle={() => {
+          const themes = ['light', 'dark', 'high-contrast'] as const;
+          const idx = themes.indexOf(state.settings.theme);
+          const next = themes[(idx + 1) % themes.length];
+          onAction(next === 'dark' ? 'themeDark' as CommandId : next === 'light' ? 'themeLight' as CommandId : 'themeHighContrast' as CommandId);
+        }}
       />
 
       {/* Main 3-panel layout */}

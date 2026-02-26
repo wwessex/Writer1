@@ -1,11 +1,13 @@
-import { Search, Moon, Sun, MoreHorizontal, Maximize2, Minimize2, PanelRight, FilePlus } from 'lucide-react';
+import { Search, Moon, Sun, Monitor, MoreHorizontal, Maximize2, Minimize2, PanelRight, FilePlus } from 'lucide-react';
 
 type SaveStatus = 'saved' | 'saving' | 'offline' | 'error';
+type Theme = 'light' | 'dark' | 'high-contrast';
 
 interface TopBarProps {
   projectTitle?: string;
   saveStatus?: SaveStatus;
   focusMode?: boolean;
+  theme?: Theme;
   onFocusMode?: () => void;
   onSearch?: () => void;
   onToggleInspector?: () => void;
@@ -38,12 +40,14 @@ export function TopBar({
   projectTitle = 'Writer1 Project',
   saveStatus = 'saved',
   focusMode = false,
+  theme = 'light',
   onFocusMode,
   onSearch,
   onToggleInspector,
   onNewChapter,
   onSettings,
   onProjectSelect,
+  onThemeToggle,
 }: TopBarProps) {
   const statusStyle = SAVE_STATUS_STYLES[saveStatus];
 
@@ -124,10 +128,10 @@ export function TopBar({
           <>
             <button
               className="h-9 w-9 rounded-xl hover:bg-[var(--btn-bg)] flex items-center justify-center text-[var(--text-secondary)] transition-colors"
-              aria-label="Theme"
+              aria-label={`Theme: ${theme}`}
+              onClick={onThemeToggle}
             >
-              <Moon size={16} className="hidden dark:block" />
-              <Sun size={16} className="block dark:hidden" />
+              {theme === 'dark' ? <Moon size={16} /> : theme === 'high-contrast' ? <Monitor size={16} /> : <Sun size={16} />}
             </button>
 
             <button

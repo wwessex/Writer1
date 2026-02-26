@@ -77,15 +77,17 @@ export function LeftSidebar({ collapsed = false, width = 280, resizeHandleProps,
     return (
       <aside className="w-[60px] border-r border-[var(--border)] bg-[var(--panel)] min-h-0 flex flex-col items-center py-3 gap-2 transition-all duration-200 ease-[var(--ease-smooth)]">
         <button
-          className="h-9 w-9 rounded-xl hover:bg-[var(--btn-bg)] flex items-center justify-center text-[var(--text-secondary)] transition-colors"
+          className="h-9 w-9 rounded-xl hover:bg-[var(--btn-bg)] flex items-center justify-center text-[var(--text-secondary)] transition-colors group relative"
           aria-label="New document"
           onClick={handleCreateChapter}
+          title="New document"
         >
           <FilePlus size={16} />
         </button>
         <button
-          className="h-9 w-9 rounded-xl hover:bg-[var(--btn-bg)] flex items-center justify-center text-[var(--text-secondary)] transition-colors"
+          className="h-9 w-9 rounded-xl hover:bg-[var(--btn-bg)] flex items-center justify-center text-[var(--text-secondary)] transition-colors group relative"
           aria-label="Search"
+          title="Search"
         >
           <Search size={16} />
         </button>
