@@ -144,33 +144,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [state.settings.autosaveMs, runWithSavingState, reportStorageError]
   );
 
+  const loadNovel = useCallback(async () => {
+    const workspace = getWorkspaceStore();
+    const recentTargetId = workspace.lastProjectId;
+    const result = recentTargetId
+      ? await loadNovelAndChaptersById(recentTargetId) ?? await loadDefaultNovelAndChapters()
+      : await loadDefaultNovelAndChapters();
+    trackProjectOpen(result.novel.id);
+    dispatch({ type: 'SET_NOVEL', payload: result });
+    const lastChapterId = workspace.lastOpenedChapterByProject[result.novel.id];
+    if (lastChapterId) {
+      dispatch({ type: 'SET_ACTIVE_CHAPTER', payload: lastChapterId });
+    }
+  }, []);
+
+  const loadNovelById = useCallback(async (id: string) => {
+    const result = await loadNovelAndChaptersById(id);
+    if (!result) return;
+    trackProjectOpen(id);
+    dispatch({ type: 'SET_NOVEL', payload: result });
+    const workspace = getWorkspaceStore();
+    const lastChapterId = workspace.lastOpenedChapterByProject[id];
+    if (lastChapterId) {
+      dispatch({ type: 'SET_ACTIVE_CHAPTER', payload: lastChapterId });
+    }
+  }, []);
+
   const actions = useMemo(() => ({
-    loadNovel: async () => {
-      const workspace = getWorkspaceStore();
-      const recentTargetId = workspace.lastProjectId;
-      const result = recentTargetId
-        ? await loadNovelAndChaptersById(recentTargetId) ?? await loadDefaultNovelAndChapters()
-        : await loadDefaultNovelAndChapters();
-      trackProjectOpen(result.novel.id);
-      dispatch({ type: 'SET_NOVEL', payload: result });
-      const lastChapterId = workspace.lastOpenedChapterByProject[result.novel.id];
-      if (lastChapterId) {
-        dispatch({ type: 'SET_ACTIVE_CHAPTER', payload: lastChapterId });
-      }
-    },
-
-    loadNovelById: async (id: string) => {
-      const result = await loadNovelAndChaptersById(id);
-      if (!result) return;
-      trackProjectOpen(id);
-      dispatch({ type: 'SET_NOVEL', payload: result });
-      const workspace = getWorkspaceStore();
-      const lastChapterId = workspace.lastOpenedChapterByProject[id];
-      if (lastChapterId) {
-        dispatch({ type: 'SET_ACTIVE_CHAPTER', payload: lastChapterId });
-      }
-    },
-
     createNewNovel: async (title: string, projectType: ProjectType): Promise<Novel> => {
       const result = await createNovelWithFirstChapter(title, projectType);
       trackProjectOpen(result.novel.id);
@@ -389,10 +389,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     state,
     dispatch,
     activeChapter,
+    loadNovel,
+    loadNovelById,
     ...actions,
     canUndoReorder: reorderUndoStack.current.length > 0,
     canRedoReorder: reorderRedoStack.current.length > 0
-  }), [state, activeChapter, actions]);
+  }), [state, activeChapter, loadNovel, loadNovelById, actions]);
 
   return (
     <AppContext.Provider value={value}>

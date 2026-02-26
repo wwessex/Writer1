@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface UseLoadNovelOptions {
   loadNovel: () => Promise<void>;
@@ -7,23 +7,33 @@ interface UseLoadNovelOptions {
 }
 
 export function useLoadNovel({ loadNovel, onLoaded, onError }: UseLoadNovelOptions) {
+  const loadNovelRef = useRef(loadNovel);
+  const onLoadedRef = useRef(onLoaded);
+  const onErrorRef = useRef(onError);
+
+  useEffect(() => {
+    loadNovelRef.current = loadNovel;
+    onLoadedRef.current = onLoaded;
+    onErrorRef.current = onError;
+  });
+
   useEffect(() => {
     let mounted = true;
 
-    loadNovel()
+    loadNovelRef.current()
       .then(() => {
         if (mounted) {
-          onLoaded();
+          onLoadedRef.current();
         }
       })
       .catch((error: unknown) => {
         if (mounted) {
-          onError(error instanceof Error ? error : new Error('Unknown error'));
+          onErrorRef.current(error instanceof Error ? error : new Error('Unknown error'));
         }
       });
 
     return () => {
       mounted = false;
     };
-  }, [loadNovel, onLoaded, onError]);
+  }, []);
 }
