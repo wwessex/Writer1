@@ -1,21 +1,51 @@
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { TopBar } from './TopBar';
 import { StatusBar } from './StatusBar';
 import { LeftSidebar } from './sidebar/LeftSidebar';
 import { EditorPane } from './editor/EditorPane';
 import { RightInspector } from './inspector/RightInspector';
 import { useResizable } from '@/hooks/useResizable';
+import { useApp } from '@/context/AppContext';
+import { countWords, editorToPlainText } from '@/lib/utils';
 
 /**
  * Standalone layout shell that wraps the Tailwind 3-panel layout.
  * Requires AppProvider context to be present in the component tree.
  */
 export function AppShellLayout() {
+  const { state, activeChapter } = useApp();
   const [focusMode, setFocusMode] = useState(false);
   const [sidebarCollapsed] = useState(false);
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
   const leftPanelCollapsed = focusMode || sidebarCollapsed;
   const rightPanelCollapsed = focusMode || inspectorCollapsed;
+
+  const wordCount = useMemo(
+    () => countWords(editorToPlainText(activeChapter?.content ?? [])),
+    [activeChapter?.content]
+  );
+
+  const totalWords = useMemo(
+    () => state.chapters.reduce((sum, chapter) => sum + countWords(editorToPlainText(chapter.content)), 0),
+    [state.chapters]
+  );
+
+  const sessionStartWords = useRef<number | null>(null);
+  const previousNovelId = useRef(state.novelId);
+
+  if (previousNovelId.current !== state.novelId) {
+    sessionStartWords.current = totalWords;
+    previousNovelId.current = state.novelId;
+  }
+
+  if (sessionStartWords.current === null) {
+    sessionStartWords.current = totalWords;
+  }
+
+  const sessionWords = Math.max(0, totalWords - (sessionStartWords.current ?? 0));
+  const goalPercent = activeChapter && activeChapter.wordGoal > 0
+    ? Math.min(100, Math.round((wordCount / activeChapter.wordGoal) * 100))
+    : 0;
 
   const sidebarResize = useResizable({
     initialSize: 280,
@@ -61,11 +91,12 @@ export function AppShellLayout() {
       </div>
 
       <StatusBar
-        wordCount={0}
-        sessionWords={0}
-        goalPercent={0}
-        saved={true}
-        online={true}
+        wordCount={wordCount}
+        sessionWords={sessionWords}
+        goalPercent={goalPercent}
+        saved={!state.isSaving}
+        online={state.isOnline}
+        chapterCount={state.chapters.length}
         compact={focusMode}
       />
     </div>
