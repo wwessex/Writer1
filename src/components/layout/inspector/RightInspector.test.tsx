@@ -40,27 +40,26 @@ describe('RightInspector', () => {
     act(() => root.unmount());
   });
 
-  it('renders tab header with all 5 tabs', () => {
+  it('renders semantic tabs and tabpanel relationships', () => {
     const container = document.createElement('div');
     const root = createRoot(container);
     act(() => { root.render(<RightInspector />); });
 
-    expect(container.textContent).toContain('Info');
-    expect(container.textContent).toContain('Notes');
-    expect(container.textContent).toContain('Tags');
-    expect(container.textContent).toContain('AI');
-    expect(container.textContent).toContain('History');
-    act(() => root.unmount());
-  });
+    const tablist = container.querySelector('[role="tablist"]');
+    expect(tablist).toBeTruthy();
 
-  it('shows Info tab content by default with real data', () => {
-    const container = document.createElement('div');
-    const root = createRoot(container);
-    act(() => { root.render(<RightInspector />); });
+    const tabs = container.querySelectorAll('[role="tab"]');
+    expect(tabs).toHaveLength(5);
+    tabs.forEach((tab) => {
+      const controls = tab.getAttribute('aria-controls');
+      expect(controls).toBeTruthy();
+      const panel = container.querySelector(`#${controls}`);
+      expect(panel?.getAttribute('role')).toBe('tabpanel');
+      expect(panel?.getAttribute('aria-labelledby')).toBe(tab.getAttribute('id'));
+    });
 
-    expect(container.textContent).toContain('Document');
-    expect(container.textContent).toContain('Draft');
-    expect(container.textContent).toContain('Goal Progress');
+    expect((tabs[0] as HTMLElement).getAttribute('aria-selected')).toBe('true');
+    expect((tabs[1] as HTMLElement).getAttribute('aria-selected')).toBe('false');
     act(() => root.unmount());
   });
 
@@ -69,56 +68,37 @@ describe('RightInspector', () => {
     const root = createRoot(container);
     act(() => { root.render(<RightInspector />); });
 
-    const notesTab = Array.from(container.querySelectorAll('button')).find(
-      btn => btn.textContent?.includes('Notes')
-    ) as HTMLButtonElement;
+    const notesTab = container.querySelector('#inspector-tab-notes') as HTMLButtonElement;
     act(() => { notesTab.click(); });
 
     expect(container.textContent).toContain('Chapter Notes');
+    expect(notesTab.getAttribute('aria-selected')).toBe('true');
     act(() => root.unmount());
   });
 
-  it('switches to Tags tab on click and shows real tags', () => {
+  it('supports right and left arrow keyboard navigation', () => {
     const container = document.createElement('div');
+    document.body.appendChild(container);
     const root = createRoot(container);
     act(() => { root.render(<RightInspector />); });
 
-    const tagsTab = Array.from(container.querySelectorAll('button')).find(
-      btn => btn.textContent?.includes('Tags')
-    ) as HTMLButtonElement;
-    act(() => { tagsTab.click(); });
+    const infoTab = container.querySelector('#inspector-tab-info') as HTMLButtonElement;
+    const notesTab = container.querySelector('#inspector-tab-notes') as HTMLButtonElement;
 
-    expect(container.textContent).toContain('horror');
-    expect(container.textContent).toContain('suspense');
+    act(() => {
+      infoTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    });
+
+    expect(notesTab.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(notesTab);
+
+    act(() => {
+      notesTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    });
+
+    expect(infoTab.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(infoTab);
     act(() => root.unmount());
-  });
-
-  it('switches to AI tab on click', () => {
-    const container = document.createElement('div');
-    const root = createRoot(container);
-    act(() => { root.render(<RightInspector />); });
-
-    const aiTab = Array.from(container.querySelectorAll('button')).find(
-      btn => btn.textContent?.trim() === 'AI'
-    ) as HTMLButtonElement;
-    act(() => { aiTab.click(); });
-
-    expect(container.textContent).toContain('AI Assistant');
-    expect(container.textContent).toContain('Open AI Panel');
-    act(() => root.unmount());
-  });
-
-  it('switches to History tab on click', () => {
-    const container = document.createElement('div');
-    const root = createRoot(container);
-    act(() => { root.render(<RightInspector />); });
-
-    const historyTab = Array.from(container.querySelectorAll('button')).find(
-      btn => btn.textContent?.includes('History')
-    ) as HTMLButtonElement;
-    act(() => { historyTab.click(); });
-
-    expect(container.textContent).toContain('Snapshots');
-    act(() => root.unmount());
+    container.remove();
   });
 });

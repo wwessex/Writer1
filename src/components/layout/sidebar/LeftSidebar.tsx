@@ -180,16 +180,23 @@ export function LeftSidebar({
                   meta={formatWordCount(wc)}
                   onClick={() => setActiveChapter(chapter.id)}
                   onIconClick={hasScenes ? () => toggleExpand(chapter.id) : undefined}
+                  expandButtonLabel={hasScenes ? `${isExpanded ? 'Collapse' : 'Expand'} ${chapter.title || 'Untitled'}` : undefined}
+                  ariaExpanded={hasScenes ? isExpanded : undefined}
+                  ariaControls={hasScenes ? `chapter-scenes-${chapter.id}` : undefined}
                 />
                 {hasScenes && isExpanded &&
-                  chapter.scenes.map((scene) => (
-                    <TreeRow
-                      key={scene.id}
-                      level={1}
-                      title={scene.title || 'Untitled Scene'}
-                      meta={scene.wordGoal > 0 ? formatWordCount(scene.wordGoal) : undefined}
-                    />
-                  ))}
+                  (
+                    <div id={`chapter-scenes-${chapter.id}`}>
+                      {chapter.scenes.map((scene) => (
+                        <TreeRow
+                          key={scene.id}
+                          level={1}
+                          title={scene.title || 'Untitled Scene'}
+                          meta={scene.wordGoal > 0 ? formatWordCount(scene.wordGoal) : undefined}
+                        />
+                      ))}
+                    </div>
+                  )}
               </div>
             );
           })}
