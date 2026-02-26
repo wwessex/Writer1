@@ -65,11 +65,23 @@ export function AppShellLayout() {
     disabled: rightPanelCollapsed,
   });
 
+  const handleSearch = () => {
+    const searchInput = document.querySelector<HTMLInputElement>('input[placeholder="Search in project"]');
+    if (searchInput) {
+      searchInput.focus();
+      return;
+    }
+
+    const searchTrigger = document.querySelector<HTMLButtonElement>('button[aria-label="Search"]');
+    searchTrigger?.focus();
+  };
+
   return (
     <div className="h-[100dvh] min-w-[1100px] bg-[var(--bg)] text-[var(--text)] flex flex-col">
       <TopBar
         focusMode={focusMode}
         onFocusMode={() => setFocusMode((mode) => !mode)}
+        onSearch={handleSearch}
         onToggleInspector={() => setInspectorCollapsed((c) => !c)}
       />
 
@@ -80,6 +92,7 @@ export function AppShellLayout() {
           width={sidebarResize.size}
           resizeHandleProps={sidebarResize.handleProps}
           isResizing={sidebarResize.isResizing}
+          onSearch={handleSearch}
         />
         <EditorPane />
         <RightInspector
