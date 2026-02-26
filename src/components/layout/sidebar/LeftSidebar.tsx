@@ -14,6 +14,7 @@ interface LeftSidebarProps {
   isResizing?: boolean;
   onCreateChapter?: () => void;
   onImport?: () => void;
+  onSearch?: () => void;
 }
 
 function formatWordCount(count: number): string {
@@ -28,7 +29,15 @@ function getChapterWordCount(chapter: Chapter): number {
   return countWords(editorToPlainText(chapter.content));
 }
 
-export function LeftSidebar({ collapsed = false, width = 280, resizeHandleProps, isResizing, onCreateChapter, onImport }: LeftSidebarProps) {
+export function LeftSidebar({
+  collapsed = false,
+  width = 280,
+  resizeHandleProps,
+  isResizing,
+  onCreateChapter,
+  onImport,
+  onSearch,
+}: LeftSidebarProps) {
   const { state, setActiveChapter, createChapter } = useApp();
   const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
@@ -87,6 +96,7 @@ export function LeftSidebar({ collapsed = false, width = 280, resizeHandleProps,
         <button
           className="h-9 w-9 rounded-xl hover:bg-[var(--btn-bg)] flex items-center justify-center text-[var(--text-secondary)] transition-colors group relative"
           aria-label="Search"
+          onClick={onSearch}
           title="Search"
         >
           <Search size={16} />
@@ -137,6 +147,7 @@ export function LeftSidebar({ collapsed = false, width = 280, resizeHandleProps,
             placeholder="Search in project"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={onSearch}
           />
           <Search
             size={14}

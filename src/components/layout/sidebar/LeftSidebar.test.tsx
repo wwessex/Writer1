@@ -52,6 +52,19 @@ describe('LeftSidebar', () => {
     act(() => root.unmount());
   });
 
+  it('invokes onSearch when collapsed search button is clicked', () => {
+    const onSearch = vi.fn();
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    act(() => { root.render(<LeftSidebar collapsed onSearch={onSearch} />); });
+
+    const searchButton = container.querySelector('button[aria-label="Search"]') as HTMLButtonElement;
+    act(() => { searchButton.click(); });
+
+    expect(onSearch).toHaveBeenCalledOnce();
+    act(() => root.unmount());
+  });
+
   it('renders expanded state with project header', () => {
     const container = document.createElement('div');
     const root = createRoot(container);
