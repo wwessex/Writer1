@@ -31,9 +31,7 @@ export const APP_MENUS: AppMenuConfig[] = [
       { divider: true },
       { label: 'Export Backup', action: COMMAND_IDS.EXPORT_BACKUP },
       { label: 'Import Backup', action: COMMAND_IDS.IMPORT_BACKUP },
-      { label: 'Export History...', action: COMMAND_IDS.EXPORT_HISTORY },
-      { divider: true },
-      { label: 'Settings', action: COMMAND_IDS.SETTINGS }
+      { label: 'Export History...', action: COMMAND_IDS.EXPORT_HISTORY }
     ]
   },
   {
@@ -102,7 +100,9 @@ export const APP_MENUS: AppMenuConfig[] = [
       { label: 'Add Comment', action: COMMAND_IDS.ADD_COMMENT, shortcut: 'Ctrl+Shift+M' },
       { label: 'Comments...', action: COMMAND_IDS.COMMENTS },
       { divider: true },
-      { label: 'Integrations...', action: COMMAND_IDS.INTEGRATIONS }
+      { label: 'Integrations...', action: COMMAND_IDS.INTEGRATIONS },
+      { divider: true },
+      { label: 'Settings', action: COMMAND_IDS.SETTINGS }
     ]
   },
   {
