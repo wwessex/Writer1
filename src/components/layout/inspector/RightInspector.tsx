@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Info, NotebookPen, Tags, Sparkles, History, X } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { countWords, countCharacters, editorToPlainText } from '@/lib/utils';
@@ -33,6 +33,20 @@ interface RightInspectorProps {
 export function RightInspector({ collapsed = false, width = 320, resizeHandleProps, isResizing, onOpenAiPanel }: RightInspectorProps) {
   const [activeTab, setActiveTab] = useState<TabId>('info');
   const { activeChapter } = useApp();
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const handleTabKeyDown = useCallback((event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') {
+      return;
+    }
+
+    event.preventDefault();
+    const direction = event.key === 'ArrowRight' ? 1 : -1;
+    const nextIndex = (index + direction + TABS.length) % TABS.length;
+    const nextTab = TABS[nextIndex];
+    setActiveTab(nextTab.id);
+    tabRefs.current[nextIndex]?.focus();
+  }, []);
 
   if (collapsed) {
     return null;
@@ -56,14 +70,23 @@ export function RightInspector({ collapsed = false, width = 320, resizeHandlePro
       )}
 
       {/* Tab Header */}
-      <div className="h-12 px-3 border-b border-[var(--border)] flex items-center gap-1 shrink-0">
-        {TABS.map((tab) => {
+      <div className="h-12 px-3 border-b border-[var(--border)] flex items-center gap-1 shrink-0" role="tablist" aria-label="Inspector tabs">
+        {TABS.map((tab, index) => {
           const active = tab.id === activeTab;
           const Icon = tab.icon;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
+              onKeyDown={(event) => handleTabKeyDown(event, index)}
+              id={`inspector-tab-${tab.id}`}
+              role="tab"
+              aria-selected={active}
+              aria-controls={`inspector-panel-${tab.id}`}
+              tabIndex={active ? 0 : -1}
+              ref={(element) => {
+                tabRefs.current[index] = element;
+              }}
               className={[
                 'h-8 px-2.5 rounded-lg text-xs transition-colors flex items-center gap-1.5',
                 active
@@ -86,11 +109,21 @@ export function RightInspector({ collapsed = false, width = 320, resizeHandlePro
           </div>
         ) : (
           <>
-            {activeTab === 'info' && <InfoTabContent chapter={activeChapter} />}
-            {activeTab === 'notes' && <NotesTabContent chapter={activeChapter} />}
-            {activeTab === 'tags' && <TagsTabContent chapter={activeChapter} />}
-            {activeTab === 'ai' && <AiTabContent onOpenAiPanel={onOpenAiPanel} />}
-            {activeTab === 'history' && <HistoryTabContent chapter={activeChapter} />}
+            <div role="tabpanel" id="inspector-panel-info" aria-labelledby="inspector-tab-info" hidden={activeTab !== 'info'}>
+              {activeTab === 'info' && <InfoTabContent chapter={activeChapter} />}
+            </div>
+            <div role="tabpanel" id="inspector-panel-notes" aria-labelledby="inspector-tab-notes" hidden={activeTab !== 'notes'}>
+              {activeTab === 'notes' && <NotesTabContent chapter={activeChapter} />}
+            </div>
+            <div role="tabpanel" id="inspector-panel-tags" aria-labelledby="inspector-tab-tags" hidden={activeTab !== 'tags'}>
+              {activeTab === 'tags' && <TagsTabContent chapter={activeChapter} />}
+            </div>
+            <div role="tabpanel" id="inspector-panel-ai" aria-labelledby="inspector-tab-ai" hidden={activeTab !== 'ai'}>
+              {activeTab === 'ai' && <AiTabContent onOpenAiPanel={onOpenAiPanel} />}
+            </div>
+            <div role="tabpanel" id="inspector-panel-history" aria-labelledby="inspector-tab-history" hidden={activeTab !== 'history'}>
+              {activeTab === 'history' && <HistoryTabContent chapter={activeChapter} />}
+            </div>
           </>
         )}
       </div>

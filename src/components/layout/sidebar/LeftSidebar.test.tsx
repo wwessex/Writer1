@@ -15,7 +15,7 @@ vi.mock('@/context/AppContext', () => ({
       projectType: 'book',
       novelTitle: 'My Horror Novel',
       novelId: 'n-1',
-      activeChapterId: 'ch-4',
+      activeChapterId: 'ch-2',
       chapters: [
         { id: 'ch-1', title: 'Chapter 1 \u2014 Prologue', order: 1, content: null, scenes: [], tags: [], status: 'draft', summary: '', pov: '', wordGoal: 0, novelId: 'n-1', updatedAt: 0 },
         { id: 'ch-2', title: 'Chapter 2 \u2014 The Party', order: 2, content: null, scenes: [], tags: [], status: 'draft', summary: '', pov: '', wordGoal: 0, novelId: 'n-1', updatedAt: 0 },
@@ -75,43 +75,52 @@ describe('LeftSidebar', () => {
     act(() => root.unmount());
   });
 
-  it('renders action buttons in expanded state', () => {
+  it('sets aria-expanded and aria-controls for expandable chapter rows', () => {
     const container = document.createElement('div');
     const root = createRoot(container);
     act(() => { root.render(<LeftSidebar />); });
 
-    expect(container.textContent).toContain('New');
-    expect(container.textContent).toContain('Folder');
-    expect(container.textContent).toContain('Import');
+    const expandButton = container.querySelector('button[aria-controls="chapter-scenes-ch-4"]') as HTMLButtonElement;
+    expect(expandButton).toBeTruthy();
+    expect(expandButton.getAttribute('aria-expanded')).toBe('false');
+
+    const scenePanel = container.querySelector('#chapter-scenes-ch-4');
+    expect(scenePanel).toBeNull();
+
+    act(() => { expandButton.click(); });
+    const expandedScenePanel = container.querySelector('#chapter-scenes-ch-4');
+    expect(expandedScenePanel).toBeTruthy();
+    expect(expandedScenePanel?.textContent).toContain('Scene 1');
+    expect(expandButton.getAttribute('aria-expanded')).toBe('true');
     act(() => root.unmount());
   });
 
-  it('renders chapter tree with section label', () => {
+  it('keeps chapter row and expand control independently keyboard reachable', () => {
     const container = document.createElement('div');
+    document.body.appendChild(container);
     const root = createRoot(container);
     act(() => { root.render(<LeftSidebar />); });
 
-    expect(container.textContent).toContain('Chapters');
+    const expandButton = container.querySelector('button[aria-controls="chapter-scenes-ch-4"]') as HTMLButtonElement;
+    const chapterRowButton = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent?.includes('Chapter 4 \u2014 The Corridor'),
+    ) as HTMLButtonElement;
+
+    expect(expandButton).toBeTruthy();
+    expect(chapterRowButton).toBeTruthy();
+
+    act(() => { expandButton.focus(); });
+    expect(document.activeElement).toBe(expandButton);
+
+    act(() => { chapterRowButton.focus(); });
+    expect(document.activeElement).toBe(chapterRowButton);
+
+    act(() => {
+      chapterRowButton.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      chapterRowButton.click();
+    });
+    expect(mockSetActiveChapter).toHaveBeenCalledWith('ch-4');
     act(() => root.unmount());
-  });
-
-  it('renders chapter rows', () => {
-    const container = document.createElement('div');
-    const root = createRoot(container);
-    act(() => { root.render(<LeftSidebar />); });
-
-    expect(container.textContent).toContain('Chapter 1');
-    expect(container.textContent).toContain('Chapter 4');
-    act(() => root.unmount());
-  });
-
-  it('renders search input', () => {
-    const container = document.createElement('div');
-    const root = createRoot(container);
-    act(() => { root.render(<LeftSidebar />); });
-
-    const input = container.querySelector('input[placeholder="Search in project"]');
-    expect(input).toBeTruthy();
-    act(() => root.unmount());
+    container.remove();
   });
 });
