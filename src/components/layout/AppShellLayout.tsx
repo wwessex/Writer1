@@ -11,8 +11,11 @@ import { useResizable } from '@/hooks/useResizable';
  * Requires AppProvider context to be present in the component tree.
  */
 export function AppShellLayout() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const [sidebarCollapsed] = useState(false);
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
+  const leftPanelCollapsed = focusMode || sidebarCollapsed;
+  const rightPanelCollapsed = focusMode || inspectorCollapsed;
 
   const sidebarResize = useResizable({
     initialSize: 280,
@@ -20,7 +23,7 @@ export function AppShellLayout() {
     maxSize: 420,
     direction: 'right',
     persistKey: 'writer1_sidebar_width',
-    disabled: sidebarCollapsed,
+    disabled: leftPanelCollapsed,
   });
 
   const inspectorResize = useResizable({
@@ -29,27 +32,28 @@ export function AppShellLayout() {
     maxSize: 480,
     direction: 'left',
     persistKey: 'writer1_inspector_width',
-    disabled: inspectorCollapsed,
+    disabled: rightPanelCollapsed,
   });
 
   return (
     <div className="h-[100dvh] min-w-[1100px] bg-[var(--bg)] text-[var(--text)] flex flex-col">
       <TopBar
-        onFocusMode={() => setSidebarCollapsed((c) => !c)}
+        focusMode={focusMode}
+        onFocusMode={() => setFocusMode((mode) => !mode)}
         onToggleInspector={() => setInspectorCollapsed((c) => !c)}
       />
 
       {/* Main 3-panel layout */}
       <div className="flex-1 min-h-0 flex">
         <LeftSidebar
-          collapsed={sidebarCollapsed}
+          collapsed={leftPanelCollapsed}
           width={sidebarResize.size}
           resizeHandleProps={sidebarResize.handleProps}
           isResizing={sidebarResize.isResizing}
         />
         <EditorPane />
         <RightInspector
-          collapsed={inspectorCollapsed}
+          collapsed={rightPanelCollapsed}
           width={inspectorResize.size}
           resizeHandleProps={inspectorResize.handleProps}
           isResizing={inspectorResize.isResizing}
@@ -62,6 +66,7 @@ export function AppShellLayout() {
         goalPercent={0}
         saved={true}
         online={true}
+        compact={focusMode}
       />
     </div>
   );

@@ -76,4 +76,31 @@ describe('TopBar', () => {
     expect(container.textContent).toContain('Saved');
     act(() => root.unmount());
   });
+
+  it('renders compact header content and exit label in focus mode', () => {
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    act(() => { root.render(<TopBar focusMode />); });
+
+    const header = container.querySelector('header');
+    expect(header?.className).toContain('h-10');
+    expect(header?.className).not.toContain('h-14');
+    expect(container.textContent).toContain('Exit');
+    expect(container.textContent).not.toContain('Search documents');
+    expect(container.textContent).not.toContain('Writer1 Project');
+    expect(container.querySelector('button[aria-label="Toggle inspector"]')).toBeNull();
+    act(() => root.unmount());
+  });
+
+  it('renders expanded header in normal mode', () => {
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    act(() => { root.render(<TopBar focusMode={false} />); });
+
+    const header = container.querySelector('header');
+    expect(header?.className).toContain('h-14');
+    expect(container.textContent).toContain('Focus');
+    expect(container.textContent).toContain('Search documents');
+    act(() => root.unmount());
+  });
 });
