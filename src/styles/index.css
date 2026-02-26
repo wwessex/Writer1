@@ -81,6 +81,12 @@
   --shadow-float: 0 8px 24px rgba(44, 36, 25, 0.14);
   --shadow-overlay: 0 16px 48px rgba(44, 36, 25, 0.2);
   --btn-shadow: 0 1px 2px rgba(44, 36, 25, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  --success-alpha: color-mix(in srgb, var(--success) 12%, transparent);
+  --success-border: color-mix(in srgb, var(--success) 22%, transparent);
+  --warning-alpha: color-mix(in srgb, var(--warning) 12%, transparent);
+  --warning-border: color-mix(in srgb, var(--warning) 22%, transparent);
+  --danger-alpha: color-mix(in srgb, var(--danger) 12%, transparent);
+  --danger-border: color-mix(in srgb, var(--danger) 22%, transparent);
 }
 
 /* True Dark Theme — near-black surfaces with warm text */
@@ -115,6 +121,12 @@
   --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.42);
   --shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.55);
   --btn-shadow: 0 1px 2px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 248, 236, 0.05);
+  --success-alpha: color-mix(in srgb, var(--success) 12%, transparent);
+  --success-border: color-mix(in srgb, var(--success) 22%, transparent);
+  --warning-alpha: color-mix(in srgb, var(--warning) 12%, transparent);
+  --warning-border: color-mix(in srgb, var(--warning) 22%, transparent);
+  --danger-alpha: color-mix(in srgb, var(--danger) 12%, transparent);
+  --danger-border: color-mix(in srgb, var(--danger) 22%, transparent);
 }
 
 /* High Contrast Theme */
@@ -149,6 +161,12 @@
   --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.35);
   --shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.5);
   --btn-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --success-alpha: color-mix(in srgb, var(--success) 14%, transparent);
+  --success-border: color-mix(in srgb, var(--success) 25%, transparent);
+  --warning-alpha: color-mix(in srgb, var(--warning) 14%, transparent);
+  --warning-border: color-mix(in srgb, var(--warning) 25%, transparent);
+  --danger-alpha: color-mix(in srgb, var(--danger) 14%, transparent);
+  --danger-border: color-mix(in srgb, var(--danger) 25%, transparent);
 }
 
 /* ============================================================
@@ -373,7 +391,7 @@ body.focus-mode:hover .focus-mode-hint { opacity: 1; }
    Writer1 Tailwind Layout — Editor Prose Styles
    ============================================================ */
 .writer1-editor {
-  color: #eceff3;
+  color: var(--text);
   font-size: 17px;
   line-height: 1.7;
   letter-spacing: 0.01em;
@@ -432,14 +450,14 @@ body.focus-mode:hover .focus-mode-hint { opacity: 1; }
 .writer1-editor .ProseMirror blockquote {
   margin: 1em 0;
   padding-left: 1em;
-  border-left: 3px solid #41ddf2;
-  color: #aab2bd;
+  border-left: 3px solid var(--accent);
+  color: var(--text-secondary);
   font-style: italic;
 }
 
 .writer1-editor .ProseMirror hr {
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--border);
   margin: 2em 0;
 }
 
@@ -458,18 +476,18 @@ body.focus-mode:hover .focus-mode-hint { opacity: 1; }
 
 .writer1-editor .ProseMirror p.is-editor-empty:first-child::before {
   content: 'Start writing\2026';
-  color: #7d8794;
+  color: var(--text-muted);
   pointer-events: none;
   float: left;
   height: 0;
 }
 
 .writer1-editor .ProseMirror ::selection {
-  background: rgba(65, 221, 242, 0.2);
+  background: var(--accent-alpha);
 }
 
 .writer1-editor .ProseMirror-focused {
-  caret-color: #41ddf2;
+  caret-color: var(--accent);
 }
 
 /* Screenplay formatting in writer1-editor */
@@ -520,7 +538,55 @@ body.focus-mode:hover .focus-mode-hint { opacity: 1; }
 }
 
 .writer1-editor .find-replace-current {
-  background: rgba(79, 124, 255, 0.35);
+  background: var(--accent-alpha);
   border-radius: 2px;
-  box-shadow: 0 0 0 2px #41ddf2;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* ============================================================
+   Resize handle for resizable panels
+   ============================================================ */
+.resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 10;
+  transition: background var(--transition-fast);
+}
+
+.resize-handle:hover,
+.resize-handle--active {
+  background: var(--accent-alpha);
+}
+
+.resize-handle--right { right: -3px; }
+.resize-handle--left { left: -3px; }
+
+/* ============================================================
+   Focus mode transitions for Tailwind layout
+   ============================================================ */
+.appshell-focus-enter {
+  animation: focusFadeIn 300ms var(--ease-smooth) forwards;
+}
+
+@keyframes focusFadeIn {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+
+/* Saving dot animation */
+@keyframes savingPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.saving-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: savingPulse 1.2s ease-in-out infinite;
 }

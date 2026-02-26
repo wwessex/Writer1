@@ -52,8 +52,8 @@ export function EditorPane({ children }: EditorPaneProps) {
 
   if (!activeChapter) {
     return (
-      <main className="flex-1 min-w-0 min-h-0 bg-[#111315] flex flex-col items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-[#7D8794] animate-in fade-in">
+      <main className="flex-1 min-w-0 min-h-0 bg-[var(--bg)] flex flex-col items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-[var(--text-muted)] animate-in fade-in">
           <span className="text-5xl opacity-25">&#9998;</span>
           <p className="text-sm">Select a chapter to start writing</p>
         </div>
@@ -62,24 +62,24 @@ export function EditorPane({ children }: EditorPaneProps) {
   }
 
   return (
-    <main className="flex-1 min-w-0 min-h-0 bg-[#111315] flex flex-col">
+    <main className="flex-1 min-w-0 min-h-0 bg-[var(--bg)] flex flex-col">
       {/* Document Header */}
-      <div className="px-6 pt-5 pb-3 border-b border-white/5 shrink-0">
+      <div className="px-6 pt-5 pb-3 border-b border-[var(--border-subtle)] shrink-0">
         <input
           value={activeChapter.title}
           onChange={handleTitleChange}
-          className="w-full bg-transparent text-2xl font-semibold leading-tight text-[#ECEFF3] placeholder:text-[#7D8794] outline-none"
+          className="w-full bg-transparent text-2xl font-semibold leading-tight text-[var(--text)] placeholder:text-[var(--text-muted)] outline-none"
           placeholder="Untitled document"
         />
 
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#AAB2BD]">
-          <span className="h-6 px-2 rounded-md border border-white/10 bg-white/5 inline-flex items-center">
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
+          <span className="h-6 px-2 rounded-md border border-[var(--border)] bg-[var(--btn-bg)] inline-flex items-center">
             {STATUS_LABELS[activeChapter.status]}
           </span>
           <span>{formatRelativeTime(activeChapter.updatedAt)}</span>
-          <span className="text-white/10">&bull;</span>
+          <span className="text-[var(--border)]">&bull;</span>
           <span>{wordCount.toLocaleString()} words</span>
-          <span className="text-white/10">&bull;</span>
+          <span className="text-[var(--border)]">&bull;</span>
           <span>{estimateReadingTime(wordCount)}</span>
         </div>
       </div>
