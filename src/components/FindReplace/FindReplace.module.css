@@ -14,6 +14,16 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Exit animation */
+.findBar--closing {
+  animation: findBarSlideUp 0.15s var(--ease-smooth, ease) forwards;
+}
+
+@keyframes findBarSlideUp {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-6px); }
+}
+
 .findRow,
 .replaceRow {
   display: flex;

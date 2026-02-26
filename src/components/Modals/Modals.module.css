@@ -4384,7 +4384,7 @@
   flex-direction: column;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: var(--radius-card, 10px);
+  border-radius: var(--radius-md, 10px);
   cursor: pointer;
   transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
   overflow: hidden;
@@ -4543,7 +4543,7 @@
 .storyCardsFilter { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-size: 0.6875rem; cursor: pointer; transition: all 150ms ease; }
 .storyCardsFilter--active { border-color: var(--accent); color: var(--accent); background: var(--accent-alpha); }
 .storyCardsGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-2); overflow-y: auto; flex: 1; padding: var(--space-1) 0; }
-.storyCard { display: flex; flex-direction: column; padding: var(--space-2); background: var(--btn-bg); border: 1px solid var(--border); border-radius: var(--radius-card, 12px); cursor: pointer; transition: all 200ms ease, transform 250ms var(--ease-spring, ease); }
+.storyCard { display: flex; flex-direction: column; padding: var(--space-2); background: var(--btn-bg); border: 1px solid var(--border); border-radius: var(--radius-md, 12px); cursor: pointer; transition: all 200ms ease, transform 250ms var(--ease-spring, ease); }
 .storyCard:hover { border-color: var(--accent); box-shadow: var(--shadow-subtle); transform: translateY(-2px); }
 .storyCard__avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; font-weight: 700; color: white; margin-bottom: var(--space-1); flex-shrink: 0; }
 .storyCard__avatar--protagonist { background: #4f7cff; }

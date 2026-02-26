@@ -1,13 +1,15 @@
-/* Quick Switcher — Ctrl+K command palette */
+/* Quick Switcher — Ctrl+K command palette, frosted glass */
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 9000;
+  z-index: var(--z-quick-switcher, 1100);
   display: flex;
   align-items: flex-start;
   justify-content: center;
   padding-top: 15vh;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(var(--blur-sm, 8px));
+  -webkit-backdrop-filter: blur(var(--blur-sm, 8px));
   animation: fadeIn 0.12s ease-out;
 }
 
@@ -16,11 +18,23 @@
   to { opacity: 1; }
 }
 
+/* Exit animation for overlay */
+.overlay--closing {
+  animation: fadeOut 0.15s ease-in forwards;
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 .switcher {
   width: 100%;
   max-width: 520px;
-  background: var(--panel);
-  border: 1px solid var(--border);
+  background: var(--glass-bg, var(--panel));
+  backdrop-filter: blur(var(--blur-md, 16px)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur-md, 16px)) saturate(180%);
+  border: 1px solid var(--glass-border, var(--border));
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-overlay);
   overflow: hidden;
@@ -30,6 +44,16 @@
 @keyframes switcherSlideDown {
   from { opacity: 0; transform: translateY(-12px) scale(0.95); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Exit animation */
+.switcher--closing {
+  animation: switcherSlideUp 0.15s var(--ease-smooth, ease) forwards;
+}
+
+@keyframes switcherSlideUp {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-8px) scale(0.97); }
 }
 
 .inputWrapper {

@@ -68,13 +68,14 @@
   -webkit-overflow-scrolling: touch;
 }
 
-/* Chapter card — bento style with soft physics */
+/* Chapter card — bento style with accent border indicator */
 .chapterItem {
   display: flex;
   align-items: flex-start;
   gap: var(--space-1, 8px);
   padding: var(--space-1, 8px);
-  border-radius: var(--radius-md, 10px);
+  padding-left: calc(var(--space-1, 8px) + 3px);
+  border-radius: var(--radius-md, 12px);
   cursor: pointer;
   transition:
     background 180ms ease,
@@ -82,12 +83,27 @@
     box-shadow 180ms ease;
   background: transparent;
   position: relative;
-  will-change: transform;
+}
+
+/* Linear-style left accent indicator */
+.chapterItem::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 0;
+  background: var(--accent);
+  border-radius: 0 2px 2px 0;
+  transition: width 200ms var(--ease-spring, ease);
+}
+
+.chapterItem:hover::before {
+  width: 3px;
 }
 
 .chapterItem:hover {
   background: var(--btn-bg);
-  transform: translateX(2px);
 }
 
 .chapterItem:active {
@@ -99,6 +115,10 @@
   background: var(--accent-alpha);
 }
 
+.chapterItem--active::before {
+  width: 3px;
+}
+
 .chapterItem--active:hover {
   background: var(--accent-alpha);
   transform: none;
@@ -107,8 +127,8 @@
 .chapterItem--dragging {
   opacity: 0.4;
   transform: scale(0.95);
-  box-shadow: var(--shadow-float, 0 4px 12px rgba(0,0,0,0.15));
-  z-index: 10;
+  box-shadow: var(--shadow-float);
+  z-index: var(--z-resize, 10);
   transition: transform 200ms var(--ease-spring, ease), opacity 150ms ease;
 }
 

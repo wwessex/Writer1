@@ -25,14 +25,20 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
-/* Focus mode — full distraction-free */
+/* Focus mode — full distraction-free with zoom entrance */
 .editorPane--focusMode {
   position: fixed;
   inset: 0;
-  z-index: 500;
+  z-index: var(--z-focus-overlay, 500);
   width: 100%;
   background: var(--bg);
   padding: var(--space-3, 24px);
+  animation: focusModeEnter 400ms ease-out;
+}
+
+@keyframes focusModeEnter {
+  from { opacity: 0.8; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .editorPane--focusMode .editorContent {
@@ -167,7 +173,7 @@
 /* Focus mode: dim non-active paragraphs (typewriter mode feel) */
 .editorPane--focusMode .editorWrapper :global(.ProseMirror) > *:not(.ProseMirror-selectednode) {
   opacity: 0.3;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.3s ease;
 }
 
 .editorPane--focusMode .editorWrapper :global(.ProseMirror) > *.has-focus,
@@ -322,18 +328,24 @@
   font-size: 1rem;
 }
 
-/* Focus mode exit bar */
+/* Focus mode exit bar — always subtly visible, brightens on hover */
 .focusModeBar {
   position: fixed;
   bottom: var(--space-3, 24px);
   left: 50%;
-  transform: translateX(-50%) translateY(8px);
-  z-index: 501;
-  opacity: 0;
+  transform: translateX(-50%) translateY(4px);
+  z-index: calc(var(--z-focus-overlay, 500) + 1);
+  opacity: 0.3;
   transition: opacity 0.3s ease, transform 0.3s var(--ease-smooth, ease);
   display: flex;
   align-items: center;
   gap: var(--space-1, 8px);
+  animation: focusBarSlideUp 0.5s 0.3s ease-out both;
+}
+
+@keyframes focusBarSlideUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to { opacity: 0.3; transform: translateX(-50%) translateY(4px); }
 }
 
 .editorPane--focusMode:hover .focusModeBar {
@@ -453,6 +465,16 @@
 @keyframes matchPulse {
   0% { box-shadow: 0 0 0 4px rgba(79, 124, 255, 0.4); }
   100% { box-shadow: 0 0 0 2px var(--accent); }
+}
+
+/* Chapter switch crossfade */
+.editorContent--transitioning {
+  animation: chapterCrossfade 150ms ease-out;
+}
+
+@keyframes chapterCrossfade {
+  0% { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 /* Typewriter mode: extra bottom padding keeps the cursor vertically centered */
