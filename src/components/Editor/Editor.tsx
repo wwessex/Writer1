@@ -35,11 +35,22 @@ export function Editor({ screenplayMode, onToggleScreenplayMode }: EditorProps) 
   const { editor } = useCurrentEditor();
   const { showToast } = useToast();
 
+  // Chapter crossfade: brief animation when switching chapters
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const prevChapterIdRef = useRef(activeChapter?.id);
+
   // Sync editor content when switching chapters. We intentionally depend on
   // activeChapter.id rather than the full object to avoid re-setting content
   // on every keystroke (which would create an update loop).
   useEffect(() => {
     if (!editor || !activeChapter) return;
+    if (prevChapterIdRef.current && prevChapterIdRef.current !== activeChapter.id) {
+      setIsTransitioning(true);
+      requestAnimationFrame(() => {
+        setTimeout(() => setIsTransitioning(false), 150);
+      });
+    }
+    prevChapterIdRef.current = activeChapter.id;
     editor.commands.setContent(activeChapter.content || '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, activeChapter?.id]);
@@ -203,7 +214,7 @@ export function Editor({ screenplayMode, onToggleScreenplayMode }: EditorProps) 
           ))}
         </div>
       )}
-      <div className={styles.editorContent}>
+      <div className={`${styles.editorContent} ${isTransitioning ? styles['editorContent--transitioning'] : ''}`}>
         <EditorContent editor={editor} className={styles.editorWrapper} />
       </div>
       {!isFocusMode && <WritingProgress showToast={showToast} />}

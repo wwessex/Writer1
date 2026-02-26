@@ -262,11 +262,13 @@
 .popoutOverlay {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: var(--z-quick-switcher, 1100);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(var(--blur-sm, 8px));
+  -webkit-backdrop-filter: blur(var(--blur-sm, 8px));
   animation: popoutFadeIn 0.15s ease-out;
 }
 
@@ -281,7 +283,7 @@
   overflow-y: auto;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: var(--radius-card, 12px);
+  border-radius: var(--radius-md, 12px);
   box-shadow: var(--shadow-float, 0 8px 24px rgba(0, 0, 0, 0.25));
   animation: popoutSlideIn 0.2s ease-out;
 }

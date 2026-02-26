@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { IconButton } from './Button';
 import { useWindowResize } from '@/hooks/useResizable';
 import styles from './Dialog.module.css';
@@ -27,6 +27,7 @@ export function Dialog({
   size = 'medium'
 }: DialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [isClosing, setIsClosing] = useState(false);
 
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -47,49 +48,69 @@ export function Dialog({
     disabled: isMobile,
   });
 
+  const handleClose = useCallback(() => {
+    if (isClosing) return;
+    const dialog = dialogRef.current;
+    if (!dialog?.open) { onClose(); return; }
+
+    setIsClosing(true);
+    const card = dialog.querySelector(`.${styles.modal__card}`);
+    const done = () => {
+      setIsClosing(false);
+      dialog.close();
+      onClose();
+    };
+    if (card) {
+      card.addEventListener('animationend', done, { once: true });
+      setTimeout(done, 250); // fallback
+    } else {
+      done();
+    }
+  }, [isClosing, onClose]);
+
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
 
     if (open && !dialog.open) {
+      setIsClosing(false);
       dialog.showModal();
       reset();
-    } else if (!open && dialog.open) {
+    } else if (!open && dialog.open && !isClosing) {
       dialog.close();
     }
-  }, [open, reset]);
+  }, [open, reset, isClosing]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
 
-    const handleClose = () => onClose();
-    const handleClick = (e: MouseEvent) => {
-      if (e.target === dialog) {
-        onClose();
-      }
+    const onNativeClose = () => { if (!isClosing) onClose(); };
+    const onClick = (e: MouseEvent) => {
+      if (e.target === dialog) handleClose();
     };
 
-    dialog.addEventListener('close', handleClose);
-    dialog.addEventListener('click', handleClick);
+    dialog.addEventListener('close', onNativeClose);
+    dialog.addEventListener('click', onClick);
 
     return () => {
-      dialog.removeEventListener('close', handleClose);
-      dialog.removeEventListener('click', handleClick);
+      dialog.removeEventListener('close', onNativeClose);
+      dialog.removeEventListener('click', onClick);
     };
-  }, [onClose]);
+  }, [onClose, handleClose, isClosing]);
 
   const sizeClass = styles[`modal--${size}`];
+  const closingClass = isClosing ? styles['modal--closing'] : '';
 
   return (
-    <dialog ref={dialogRef} className={`${styles.modal} ${sizeClass}`}>
+    <dialog ref={dialogRef} className={`${styles.modal} ${sizeClass} ${closingClass}`}>
       <div
         className={styles.modal__card}
         style={!isMobile ? { width, height, maxWidth: 'none', maxHeight: 'none' } : undefined}
       >
         <div className={styles.modal__header}>
           <h2 className={styles.modal__title}>{title}</h2>
-          <IconButton icon="close" label="Close" onClick={onClose} />
+          <IconButton icon="close" label="Close" onClick={handleClose} />
         </div>
         <div className={styles.modal__body}>{children}</div>
         {footer && <div className={styles.modal__footer}>{footer}</div>}

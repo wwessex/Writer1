@@ -61,7 +61,7 @@
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
-  z-index: 260;
+  z-index: var(--z-dropdown, 260);
   min-width: 210px;
   max-height: min(calc(var(--mobile-overlay-max-height) - 56px), 360px);
   overflow-y: auto;
@@ -69,7 +69,7 @@
   padding-bottom: var(--mobile-panel-padding-bottom);
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: var(--radius-card, 12px);
+  border-radius: var(--radius-md, 12px);
   box-shadow: var(--shadow-float, 0 8px 24px rgba(0,0,0,0.25));
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;

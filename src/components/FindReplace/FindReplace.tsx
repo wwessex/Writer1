@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { IconButton } from '@/components/UI';
 import type { FindReplaceControls } from './useFindReplace';
 import styles from './FindReplace.module.css';
@@ -9,9 +9,12 @@ interface FindReplaceProps {
 
 export function FindReplace({ controls }: FindReplaceProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const [isClosing, setIsClosing] = useState(false);
 
   useEffect(() => {
     if (controls.isOpen) {
+      setIsClosing(false);
       // Small delay to ensure DOM is ready after animation
       requestAnimationFrame(() => {
         searchInputRef.current?.focus();
@@ -20,7 +23,23 @@ export function FindReplace({ controls }: FindReplaceProps) {
     }
   }, [controls.isOpen]);
 
-  if (!controls.isOpen) return null;
+  const handleClose = useCallback(() => {
+    if (isClosing) return;
+    setIsClosing(true);
+    const bar = barRef.current;
+    const done = () => {
+      setIsClosing(false);
+      controls.close();
+    };
+    if (bar) {
+      bar.addEventListener('animationend', done, { once: true });
+      setTimeout(done, 200); // fallback
+    } else {
+      done();
+    }
+  }, [isClosing, controls]);
+
+  if (!controls.isOpen && !isClosing) return null;
 
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -33,7 +52,7 @@ export function FindReplace({ controls }: FindReplaceProps) {
     }
     if (e.key === 'Escape') {
       e.preventDefault();
-      controls.close();
+      handleClose();
     }
   };
 
@@ -44,7 +63,7 @@ export function FindReplace({ controls }: FindReplaceProps) {
     }
     if (e.key === 'Escape') {
       e.preventDefault();
-      controls.close();
+      handleClose();
     }
   };
 
@@ -53,7 +72,7 @@ export function FindReplace({ controls }: FindReplaceProps) {
     : controls.searchTerm ? 'No matches' : '';
 
   return (
-    <div className={styles.findBar} role="search" aria-label="Find and replace">
+    <div ref={barRef} className={`${styles.findBar} ${isClosing ? styles['findBar--closing'] : ''}`} role="search" aria-label="Find and replace">
       <div className={styles.findRow}>
         <input
           ref={searchInputRef}
@@ -105,7 +124,7 @@ export function FindReplace({ controls }: FindReplaceProps) {
           icon="close"
           label="Close (Escape)"
           variant="ghost"
-          onClick={controls.close}
+          onClick={handleClose}
           className={styles.navBtn}
         />
       </div>

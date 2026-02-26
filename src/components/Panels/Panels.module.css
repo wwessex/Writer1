@@ -74,7 +74,7 @@
   padding: var(--space-2, 16px);
   margin: var(--space-1, 8px);
   background: var(--accent-subtle, var(--accent-alpha));
-  border-radius: var(--radius-card, 12px);
+  border-radius: var(--radius-md, 12px);
   border: 1px solid var(--accent);
   font-size: 0.8125rem;
   line-height: 1.5;
@@ -394,8 +394,8 @@
   .aiPanel {
     position: fixed;
     right: 0; top: 0; bottom: 0;
-    z-index: 50;
-    box-shadow: var(--shadow-overlay, -4px 0 16px rgba(0,0,0,0.2));
+    z-index: var(--z-panel, 50);
+    box-shadow: var(--shadow-overlay);
     animation: aiPanelSlideIn 0.3s var(--ease-smooth, ease);
   }
 
