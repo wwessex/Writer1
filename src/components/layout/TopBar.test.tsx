@@ -103,4 +103,26 @@ describe('TopBar', () => {
     expect(container.textContent).toContain('Search documents');
     act(() => root.unmount());
   });
+
+  it('uses responsive classes to preserve controls in constrained space', () => {
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    act(() => { root.render(<TopBar projectTitle="A Very Long Project Title" />); });
+
+    const projectButton = Array.from(container.querySelectorAll('button')).find(
+      (btn) => btn.textContent?.includes('A Very Long Project Title')
+    );
+    expect(projectButton?.className).toContain('max-w-[130px]');
+    expect(projectButton?.className).toContain('lg:max-w-[260px]');
+
+    const newButton = Array.from(container.querySelectorAll('button')).find(
+      (btn) => btn.textContent?.includes('New')
+    );
+    expect(newButton?.className).toContain('hidden lg:flex');
+
+    const searchContainer = container.querySelector('div.hidden.md\\:block');
+    expect(searchContainer).not.toBeNull();
+
+    act(() => root.unmount());
+  });
 });

@@ -7,12 +7,17 @@ import { AppShellLayout } from './AppShellLayout';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const useAppMock = vi.fn();
+const useResponsivePanelsMock = vi.fn();
 const editorToPlainTextMock = vi.fn();
 const countWordsMock = vi.fn();
 const statusBarMock = vi.fn((props: { compact?: boolean }) => <div>StatusBar:{props.compact ? 'compact' : 'normal'}</div>);
 
 vi.mock('@/context/AppContext', () => ({
   useApp: () => useAppMock(),
+}));
+
+vi.mock('@/hooks/useResponsivePanels', () => ({
+  useResponsivePanels: () => useResponsivePanelsMock(),
 }));
 
 vi.mock('@/lib/utils', () => ({
@@ -50,6 +55,11 @@ vi.mock('./inspector/RightInspector', () => ({
 
 describe('AppShellLayout', () => {
   beforeEach(() => {
+    useResponsivePanelsMock.mockReturnValue({
+      shouldCollapseSidebar: false,
+      shouldCollapseInspector: false,
+    });
+
     useAppMock.mockReturnValue({
       state: {
         chapters: [
@@ -168,6 +178,38 @@ describe('AppShellLayout', () => {
       wordCount: 2,
       goalPercent: 2,
     }));
+
+    act(() => root.unmount());
+  });
+
+  it('auto-collapses inspector on medium viewports', () => {
+    useResponsivePanelsMock.mockReturnValue({
+      shouldCollapseSidebar: false,
+      shouldCollapseInspector: true,
+    });
+
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    act(() => { root.render(<AppShellLayout />); });
+
+    expect(container.textContent).toContain('Sidebar:expanded');
+    expect(container.textContent).toContain('Inspector:collapsed');
+
+    act(() => root.unmount());
+  });
+
+  it('auto-collapses both side panels on narrow viewports', () => {
+    useResponsivePanelsMock.mockReturnValue({
+      shouldCollapseSidebar: true,
+      shouldCollapseInspector: true,
+    });
+
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    act(() => { root.render(<AppShellLayout />); });
+
+    expect(container.textContent).toContain('Sidebar:collapsed');
+    expect(container.textContent).toContain('Inspector:collapsed');
 
     act(() => root.unmount());
   });

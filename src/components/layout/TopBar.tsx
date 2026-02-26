@@ -54,12 +54,12 @@ export function TopBar({
   return (
     <header
       className={[
-        'border-b border-[var(--border)] bg-[var(--panel)] backdrop-blur px-4 flex items-center justify-between gap-3 shrink-0 transition-[height] duration-150',
+        'border-b border-[var(--border)] bg-[var(--panel)] backdrop-blur px-3 sm:px-4 flex items-center justify-between gap-2 sm:gap-3 shrink-0 transition-[height] duration-150',
         focusMode ? 'h-10' : 'h-14',
       ].join(' ')}
     >
       {/* Left */}
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 md:flex-none">
         <button
           className="h-9 w-9 rounded-xl hover:bg-[var(--btn-bg)] flex items-center justify-center transition-colors"
           aria-label="Writer1 Home"
@@ -70,7 +70,7 @@ export function TopBar({
         {!focusMode && (
           <>
             <button
-              className="h-9 max-w-[260px] rounded-xl px-3 bg-[var(--btn-bg)] hover:bg-[var(--btn-hover)] border border-[var(--border)] flex items-center gap-2 min-w-0 transition-colors"
+              className="h-9 max-w-[130px] sm:max-w-[220px] lg:max-w-[260px] rounded-xl px-3 bg-[var(--btn-bg)] hover:bg-[var(--btn-hover)] border border-[var(--border)] flex items-center gap-2 min-w-0 transition-colors"
               onClick={onProjectSelect}
             >
               <span className="truncate text-sm font-medium">{projectTitle}</span>
@@ -78,7 +78,7 @@ export function TopBar({
             </button>
 
             <button
-              className="h-9 rounded-xl px-3 hover:bg-[var(--btn-bg)] text-sm text-[var(--text-secondary)] flex items-center gap-1.5 transition-colors"
+              className="hidden lg:flex h-9 rounded-xl px-3 hover:bg-[var(--btn-bg)] text-sm text-[var(--text-secondary)] items-center gap-1.5 transition-colors"
               onClick={onNewChapter}
             >
               <FilePlus size={14} />
@@ -90,7 +90,7 @@ export function TopBar({
 
       {/* Center — search */}
       {!focusMode && (
-        <div className="flex-1 max-w-[520px]">
+        <div className="hidden md:block flex-1 max-w-[520px] min-w-[220px]">
           <button
             className="w-full h-9 rounded-xl border border-[var(--border)] bg-[var(--btn-bg)] hover:bg-[var(--btn-hover)] px-3 flex items-center justify-between text-left transition-colors"
             onClick={onSearch}
@@ -105,10 +105,10 @@ export function TopBar({
       )}
 
       {/* Right */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
         <div
           className={[
-            'h-8 rounded-lg px-2.5 text-xs flex items-center gap-1.5 border transition-all duration-200',
+            'hidden sm:flex h-8 rounded-lg px-2.5 text-xs items-center gap-1.5 border transition-all duration-200',
             statusStyle.className,
           ].join(' ')}
         >
@@ -117,11 +117,11 @@ export function TopBar({
         </div>
 
         <button
-          className="h-9 rounded-xl px-3 hover:bg-[var(--btn-bg)] text-sm text-[var(--text-secondary)] flex items-center gap-1.5 transition-colors"
+          className="h-9 rounded-xl px-2 sm:px-3 hover:bg-[var(--btn-bg)] text-sm text-[var(--text-secondary)] flex items-center gap-1.5 transition-colors"
           onClick={onFocusMode}
         >
           {focusMode ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-          {focusMode ? 'Exit' : 'Focus'}
+          <span className="hidden sm:inline">{focusMode ? 'Exit' : 'Focus'}</span>
         </button>
 
         {!focusMode && (
