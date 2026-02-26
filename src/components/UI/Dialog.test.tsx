@@ -42,7 +42,7 @@ function patchDialog(dialog: HTMLDialogElement) {
 describe('Dialog', () => {
   let container: HTMLDivElement;
   let root: ReturnType<typeof createRoot>;
-  let onCloseMock: ReturnType<typeof vi.fn>;
+  let onCloseMock: ReturnType<typeof vi.fn<() => void>>;
 
   beforeEach(() => {
     vi.useFakeTimers();
