@@ -12,12 +12,8 @@ import {
 import {
   connectProvider,
   disconnectProvider,
-  fetchProviderMetadata,
   refreshProviderConnection,
-  introspectProviderSession,
-  revokeProviderSession,
   type ProviderConnectionMetadata,
-  type ProviderPublicMetadata,
 } from '@/lib/integrations/api';
 import type { AppState, Chapter, ConflictInfo, ConflictResolutionOption, IntegrationConfig, IntegrationType, PersistedIntegrationConfig } from '@/types';
 import { recordTelemetryEvent } from '@/lib/telemetry';
@@ -76,6 +72,8 @@ function createSafePersistedConfig(config: IntegrationConfig): PersistedIntegrat
     status: config.status,
     folderId: config.folderId,
     lastSyncAt: config.lastSyncAt,
+    clientId: config.clientId,
+    refreshToken: config.refreshToken,
   };
 }
 
@@ -93,24 +91,22 @@ function loadConfigs(): IntegrationConfigs {
     }
 
     const parsed = JSON.parse(data) as Partial<Record<IntegrationType, Partial<IntegrationConfig>>>;
-    const scrubSecrets = (raw?: Partial<IntegrationConfig>): Partial<IntegrationConfig> => {
+    const scrubLegacySecrets = (raw?: Partial<IntegrationConfig>): Partial<IntegrationConfig> => {
       if (!raw) return {};
-      const { accessToken: _a, refreshToken: _r, apiKey: _k, ...safe } = raw as Partial<IntegrationConfig> & {
+      const { accessToken: _a, apiKey: _k, ...safe } = raw as Partial<IntegrationConfig> & {
         accessToken?: string;
-        refreshToken?: string;
         apiKey?: string;
       };
-      void _a; void _r; void _k;
+      void _a; void _k;
       return safe;
     };
 
     const normalized = {
-      scrivener: normalizeConfig('scrivener', scrubSecrets(parsed.scrivener)),
-      'google-drive': normalizeConfig('google-drive', scrubSecrets(parsed['google-drive'])),
-      dropbox: normalizeConfig('dropbox', scrubSecrets(parsed.dropbox)),
+      scrivener: normalizeConfig('scrivener', scrubLegacySecrets(parsed.scrivener)),
+      'google-drive': normalizeConfig('google-drive', scrubLegacySecrets(parsed['google-drive'])),
+      dropbox: normalizeConfig('dropbox', scrubLegacySecrets(parsed.dropbox)),
     };
 
-    // Persist back immediately to scrub any legacy secrets from localStorage.
     saveConfigs(normalized);
 
     return normalized;
@@ -224,6 +220,7 @@ function mapMetadataToConfig(metadata: ProviderConnectionMetadata): Partial<Inte
     expiresAt: metadata.expiresAt,
     status: metadata.status,
     sessionToken: metadata.sessionToken,
+    refreshToken: metadata.refreshToken,
   };
 }
 
@@ -238,24 +235,6 @@ function isTokenExpiringSoon(config: IntegrationConfig, thresholdMs = 5 * 60 * 1
   return config.expiresAt - Date.now() <= thresholdMs;
 }
 
-function getProviderAccountLabel(metadata?: ProviderPublicMetadata): string {
-  if (!metadata) return 'Account details unavailable.';
-  if (metadata.accountDisplayName && metadata.accountEmail) {
-    return `${metadata.accountDisplayName} (${metadata.accountEmail})`;
-  }
-  return metadata.accountEmail || metadata.accountDisplayName || 'Connected account';
-}
-
-function getProviderHealthLabel(metadata?: ProviderPublicMetadata): string {
-  if (!metadata?.healthStatus || metadata.healthStatus === 'unknown') {
-    return 'Health unknown';
-  }
-
-  if (metadata.healthStatus === 'healthy') return 'Healthy';
-  if (metadata.healthStatus === 'degraded') return 'Degraded';
-  return 'Unhealthy';
-}
-
 export function IntegrationsModal({ open, onClose }: IntegrationsModalProps) {
   const { state, dispatch } = useApp();
   const [configs, setConfigs] = useState<IntegrationConfigs>(loadConfigs);
@@ -267,16 +246,7 @@ export function IntegrationsModal({ open, onClose }: IntegrationsModalProps) {
       }
     });
   }, []);
-  const [providerMetadata, setProviderMetadata] = useState<Partial<Record<'google-drive' | 'dropbox', ProviderPublicMetadata>>>({});
   const [activeConflict, setActiveConflict] = useState<ConflictInfo | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    void fetchProviderMetadata()
-      .then((response) => setProviderMetadata(response.providers))
-      .catch(() => setProviderMetadata({}));
-  }, [open]);
 
   const applyPullResult = useCallback((pullResult: { chapterUpdates: Chapter[]; conflicts: ConflictInfo[] }) => {
     dispatch({ type: 'SET_CHAPTERS', payload: pullResult.chapterUpdates });
@@ -339,6 +309,7 @@ export function IntegrationsModal({ open, onClose }: IntegrationsModalProps) {
     [configs, updateConfig]
   );
 
+  // Auto-refresh tokens that are about to expire
   useEffect(() => {
     if (!open) return;
 
@@ -347,48 +318,30 @@ export function IntegrationsModal({ open, onClose }: IntegrationsModalProps) {
     const checkProviderSessions = async () => {
       await Promise.all((['google-drive', 'dropbox'] as const).map(async (provider) => {
         const cfg = configs[provider];
-        if (!cfg.connectionId || !cfg.sessionToken) return;
+        if (!cfg.connectionId || !cfg.sessionToken || !cfg.refreshToken || !cfg.clientId) return;
 
-        try {
-          const result = await introspectProviderSession(provider, cfg.sessionToken);
-          if (cancelled) return;
-
-          if (!result.active) {
-            updateConfig(provider, { sessionToken: undefined, status: 'error' });
-            recordTelemetryEvent({ action: 'integrations.token_refresh_failed', contextLengthChars: 0, promptLengthChars: 0, responseLengthChars: 0, provider, success: false, errorType: 'session_inactive' });
-            void reportAppError(
-              createAppError('INTEGRATION_AUTH_FAILED', `${provider} session is inactive.`, 'network', 'medium', { cause: result }),
-              { category: 'integration_auth_failure', context: `provider=${provider}` }
-            );
-            return;
-          }
-
-          updateConfig(provider, {
-            status: result.status || cfg.status || 'connected',
-            expiresAt: result.expiresAt || cfg.expiresAt,
-          });
-
-          if (isTokenExpiringSoon({ ...cfg, expiresAt: result.expiresAt || cfg.expiresAt })) {
-            const refreshed = await refreshProviderConnection(provider, cfg.connectionId);
+        if (isTokenExpiringSoon(cfg)) {
+          try {
+            const refreshed = await refreshProviderConnection(provider, cfg.connectionId, cfg);
             if (cancelled) return;
             updateConfig(provider, mapMetadataToConfig(refreshed.connection));
+          } catch (error) {
+            if (cancelled) return;
+            updateConfig(provider, { status: 'error' });
+            recordTelemetryEvent({
+              action: 'integrations.token_refresh_failed',
+              contextLengthChars: 0,
+              promptLengthChars: 0,
+              responseLengthChars: 0,
+              provider,
+              success: false,
+              errorType: error instanceof Error ? error.message : 'unknown_error',
+            });
+            void reportAppError(
+              createAppError('INTEGRATION_AUTH_FAILED', `${provider} token refresh failed.`, 'network', 'medium', { cause: error }),
+              { category: 'integration_auth_failure', context: `provider=${provider}` }
+            );
           }
-        } catch (error) {
-          if (cancelled) return;
-          updateConfig(provider, { status: 'error' });
-          recordTelemetryEvent({
-            action: 'integrations.token_refresh_failed',
-            contextLengthChars: 0,
-            promptLengthChars: 0,
-            responseLengthChars: 0,
-            provider,
-            success: false,
-            errorType: error instanceof Error ? error.message : 'unknown_error',
-          });
-          void reportAppError(
-            createAppError('INTEGRATION_AUTH_FAILED', `${provider} token refresh failed.`, 'network', 'medium', { cause: error }),
-            { category: 'integration_auth_failure', context: `provider=${provider}` }
-          );
         }
       }));
     };
@@ -423,7 +376,6 @@ export function IntegrationsModal({ open, onClose }: IntegrationsModalProps) {
 
           <GoogleDriveCard
             config={configs['google-drive']}
-            metadata={providerMetadata['google-drive']}
             appState={state}
             onToggle={() => toggleEnabled('google-drive')}
             onUpdate={(updates) => updateConfig('google-drive', updates)}
@@ -432,7 +384,6 @@ export function IntegrationsModal({ open, onClose }: IntegrationsModalProps) {
 
           <DropboxCard
             config={configs.dropbox}
-            metadata={providerMetadata.dropbox}
             appState={state}
             onToggle={() => toggleEnabled('dropbox')}
             onUpdate={(updates) => updateConfig('dropbox', updates)}
@@ -531,7 +482,6 @@ function OperationFeedback({
 
 interface IntegrationCardBaseProps {
   config: IntegrationConfig;
-  metadata?: ProviderPublicMetadata;
   appState: Pick<AppState, 'novelId' | 'projectType' | 'chapters'>;
   onToggle: () => void;
   onUpdate: (updates: Partial<IntegrationConfig>) => void;
@@ -594,11 +544,13 @@ function ScrivenerCard({ config, appState, onToggle, onUpdate, onApplyPull }: In
   );
 }
 
-function GoogleDriveCard({ config, metadata, appState, onToggle, onUpdate, onApplyPull }: IntegrationCardBaseProps) {
+function GoogleDriveCard({ config, appState, onToggle, onUpdate, onApplyPull }: IntegrationCardBaseProps) {
   const status = getConnectionStatus(config);
   const [operationState, setOperationState] = useState<OperationState>('idle');
-  const [operationMessage, setOperationMessage] = useState('Connect account to get started.');
+  const [operationMessage, setOperationMessage] = useState('Enter your Google OAuth Client ID to get started.');
+  const [clientId, setClientId] = useState(config.clientId || '');
   const expired = isTokenExpired(config);
+  const hasCredentials = Boolean(clientId.trim());
 
   const run = useCallback(async (task: () => Promise<string>) => {
     setOperationState('loading');
@@ -627,28 +579,42 @@ function GoogleDriveCard({ config, metadata, appState, onToggle, onUpdate, onApp
       onToggle={onToggle}
     >
       <div className={styles.integrationCard__section}>
-        <p className={styles.integrationCard__fieldHint}>
-          {metadata?.available === false
-            ? `${metadata.displayName || 'Google Drive'} connect is unavailable right now.`
-            : 'Connect account securely through your server-managed Google Drive integration.'}
-          {metadata?.scopes?.length ? ` Scopes: ${metadata.scopes.join(', ')}` : ''}
-        </p>
-        <p className={styles.integrationCard__fieldHint}>Account: {getProviderAccountLabel(metadata)}</p>
-        <p className={styles.integrationCard__fieldHint}>Health: {getProviderHealthLabel(metadata)}{metadata?.healthMessage ? ` — ${metadata.healthMessage}` : ''}</p>
+        <div className={styles.integrationCard__field}>
+          <label className={styles.integrationCard__label}>OAuth Client ID</label>
+          <Input
+            value={clientId}
+            onChange={(e) => {
+              setClientId(e.target.value);
+              onUpdate({ clientId: e.target.value });
+            }}
+            placeholder="your-app.apps.googleusercontent.com"
+          />
+          <p className={styles.integrationCard__fieldHint}>
+            Create a client ID at console.cloud.google.com with the Drive API scope.
+          </p>
+        </div>
+
+        {config.providerUserId && (
+          <p className={styles.integrationCard__fieldHint}>
+            Account: {config.providerUserId}
+          </p>
+        )}
 
         <div className={styles.integrationCard__actions}>
-          <Button variant="primary" disabled={operationState === 'loading' || metadata?.available === false} onClick={() => run(async () => {
+          <Button variant="primary" disabled={operationState === 'loading' || !hasCredentials} onClick={() => run(async () => {
             onUpdate({ status: 'pending' });
             try {
-              const result = await connectProvider('google-drive');
+              const result = await connectProvider('google-drive', clientId.trim());
               onUpdate(mapMetadataToConfig(result.connection));
               const connectResult = await connectIntegration('google-drive', {
                 ...config,
+                clientId: clientId.trim(),
                 ...mapMetadataToConfig(result.connection),
               });
               recordTelemetryEvent({ action: 'integrations.connect_success', contextLengthChars: 0, promptLengthChars: 0, responseLengthChars: 0, provider: 'google-drive', success: true });
               return connectResult.message;
             } catch (error) {
+              onUpdate({ status: 'error' });
               recordTelemetryEvent({ action: 'integrations.connect_fail', contextLengthChars: 0, promptLengthChars: 0, responseLengthChars: 0, provider: 'google-drive', success: false, errorType: error instanceof Error ? error.message : 'unknown_error' });
               throw error;
             }
@@ -657,21 +623,23 @@ function GoogleDriveCard({ config, metadata, appState, onToggle, onUpdate, onApp
             {connectOrReconnectLabel}
           </Button>
           <Button variant="default" disabled={operationState === 'loading' || !config.connectionId} onClick={() => run(async () => {
-            await revokeProviderSession('google-drive', config.connectionId!, config.sessionToken);
-            await disconnectProvider('google-drive', config.connectionId!);
-            onUpdate({ connectionId: undefined, providerUserId: undefined, scopes: undefined, expiresAt: undefined, status: 'disconnected', sessionToken: undefined });
+            await disconnectProvider('google-drive', config.connectionId!, config.sessionToken);
+            onUpdate({ connectionId: undefined, providerUserId: undefined, scopes: undefined, expiresAt: undefined, status: 'disconnected', sessionToken: undefined, refreshToken: undefined });
             return 'Google account disconnected.';
           })}>
             <span className="material-symbols-rounded">link_off</span>
             Disconnect
           </Button>
           <Button variant="default" disabled={operationState === 'loading' || !config.sessionToken} onClick={() => run(async () => {
-            if (expired && config.connectionId) {
-              const refresh = await refreshProviderConnection('google-drive', config.connectionId);
-              onUpdate(mapMetadataToConfig(refresh.connection));
+            let currentConfig = config;
+            if (expired && config.refreshToken && config.clientId) {
+              const refresh = await refreshProviderConnection('google-drive', config.connectionId!, config);
+              const updates = mapMetadataToConfig(refresh.connection);
+              onUpdate(updates);
+              currentConfig = { ...config, ...updates };
             }
-            const pushResult = await pushIntegrationData('google-drive', config, appState);
-            const pullResult = await pullIntegrationData('google-drive', config, appState);
+            const pushResult = await pushIntegrationData('google-drive', currentConfig, appState);
+            const pullResult = await pullIntegrationData('google-drive', currentConfig, appState);
             onApplyPull(pullResult);
             return `${pushResult.message} Synced ${pullResult.chapterUpdates.length} chapter(s).`;
           })}>
@@ -694,12 +662,14 @@ function GoogleDriveCard({ config, metadata, appState, onToggle, onUpdate, onApp
 }
 
 
-function DropboxCard({ config, metadata, appState, onToggle, onUpdate, onApplyPull }: IntegrationCardBaseProps) {
+function DropboxCard({ config, appState, onToggle, onUpdate, onApplyPull }: IntegrationCardBaseProps) {
   const status = getConnectionStatus(config);
   const [folder, setFolder] = useState(config.folderId || '/DraftHarbour');
+  const [appKey, setAppKey] = useState(config.clientId || '');
   const [operationState, setOperationState] = useState<OperationState>('idle');
-  const [operationMessage, setOperationMessage] = useState('Connect account to get started.');
+  const [operationMessage, setOperationMessage] = useState('Enter your Dropbox App Key to get started.');
   const expired = isTokenExpired(config);
+  const hasCredentials = Boolean(appKey.trim());
 
   const run = useCallback(async (task: (cardConfig: IntegrationConfig) => Promise<string>) => {
     setOperationState('loading');
@@ -707,6 +677,7 @@ function DropboxCard({ config, metadata, appState, onToggle, onUpdate, onApplyPu
       const cardConfig: IntegrationConfig = {
         ...config,
         folderId: folder,
+        clientId: appKey.trim(),
       };
       const message = await task(cardConfig);
       const syncedAt = Date.now();
@@ -717,7 +688,7 @@ function DropboxCard({ config, metadata, appState, onToggle, onUpdate, onApplyPu
       setOperationState('error');
       setOperationMessage(error instanceof Error ? error.message : 'Unexpected integration error.');
     }
-  }, [config, folder, onUpdate]);
+  }, [config, folder, appKey, onUpdate]);
 
   const connectOrReconnectLabel = config.connectionId && expired ? 'Reconnect' : 'Connect';
 
@@ -732,14 +703,20 @@ function DropboxCard({ config, metadata, appState, onToggle, onUpdate, onApplyPu
       onToggle={onToggle}
     >
       <div className={styles.integrationCard__section}>
-        <p className={styles.integrationCard__fieldHint}>
-          {metadata?.available === false
-            ? `${metadata.displayName || 'Dropbox'} connect is unavailable right now.`
-            : 'Connect account securely through your server-managed Dropbox integration.'}
-          {metadata?.scopes?.length ? ` Scopes: ${metadata.scopes.join(', ')}` : ''}
-        </p>
-        <p className={styles.integrationCard__fieldHint}>Account: {getProviderAccountLabel(metadata)}</p>
-        <p className={styles.integrationCard__fieldHint}>Health: {getProviderHealthLabel(metadata)}{metadata?.healthMessage ? ` — ${metadata.healthMessage}` : ''}</p>
+        <div className={styles.integrationCard__field}>
+          <label className={styles.integrationCard__label}>App Key</label>
+          <Input
+            value={appKey}
+            onChange={(e) => {
+              setAppKey(e.target.value);
+              onUpdate({ clientId: e.target.value });
+            }}
+            placeholder="your-dropbox-app-key"
+          />
+          <p className={styles.integrationCard__fieldHint}>
+            Create an app at dropbox.com/developers and copy the App Key.
+          </p>
+        </div>
 
         <div className={styles.integrationCard__field}>
           <label className={styles.integrationCard__label}>Sync Folder Path</label>
@@ -753,11 +730,17 @@ function DropboxCard({ config, metadata, appState, onToggle, onUpdate, onApplyPu
           </p>
         </div>
 
+        {config.providerUserId && (
+          <p className={styles.integrationCard__fieldHint}>
+            Account: {config.providerUserId}
+          </p>
+        )}
+
         <div className={styles.integrationCard__actions}>
-          <Button variant="primary" disabled={operationState === 'loading' || metadata?.available === false} onClick={() => run(async (cardConfig) => {
+          <Button variant="primary" disabled={operationState === 'loading' || !hasCredentials} onClick={() => run(async (cardConfig) => {
             onUpdate({ status: 'pending' });
             try {
-              const result = await connectProvider('dropbox');
+              const result = await connectProvider('dropbox', appKey.trim());
               onUpdate(mapMetadataToConfig(result.connection));
               const connectResult = await connectIntegration('dropbox', {
                 ...cardConfig,
@@ -766,6 +749,7 @@ function DropboxCard({ config, metadata, appState, onToggle, onUpdate, onApplyPu
               recordTelemetryEvent({ action: 'integrations.connect_success', contextLengthChars: 0, promptLengthChars: 0, responseLengthChars: 0, provider: 'dropbox', success: true });
               return connectResult.message;
             } catch (error) {
+              onUpdate({ status: 'error' });
               recordTelemetryEvent({ action: 'integrations.connect_fail', contextLengthChars: 0, promptLengthChars: 0, responseLengthChars: 0, provider: 'dropbox', success: false, errorType: error instanceof Error ? error.message : 'unknown_error' });
               throw error;
             }
@@ -774,21 +758,23 @@ function DropboxCard({ config, metadata, appState, onToggle, onUpdate, onApplyPu
             {connectOrReconnectLabel}
           </Button>
           <Button variant="default" disabled={operationState === 'loading' || !config.connectionId} onClick={() => run(async () => {
-            await revokeProviderSession('dropbox', config.connectionId!, config.sessionToken);
-            await disconnectProvider('dropbox', config.connectionId!);
-            onUpdate({ connectionId: undefined, providerUserId: undefined, scopes: undefined, expiresAt: undefined, status: 'disconnected', sessionToken: undefined });
+            await disconnectProvider('dropbox', config.connectionId!, config.sessionToken);
+            onUpdate({ connectionId: undefined, providerUserId: undefined, scopes: undefined, expiresAt: undefined, status: 'disconnected', sessionToken: undefined, refreshToken: undefined });
             return 'Dropbox account disconnected.';
           })}>
             <span className="material-symbols-rounded">link_off</span>
             Disconnect
           </Button>
           <Button variant="default" disabled={operationState === 'loading' || !config.sessionToken} onClick={() => run(async (cardConfig) => {
-            if (expired && config.connectionId) {
-              const refresh = await refreshProviderConnection('dropbox', config.connectionId);
-              onUpdate(mapMetadataToConfig(refresh.connection));
+            let currentConfig = cardConfig;
+            if (expired && config.refreshToken && config.clientId) {
+              const refresh = await refreshProviderConnection('dropbox', config.connectionId!, config);
+              const updates = mapMetadataToConfig(refresh.connection);
+              onUpdate(updates);
+              currentConfig = { ...cardConfig, ...updates };
             }
-            const pushResult = await pushIntegrationData('dropbox', cardConfig, appState);
-            const pullResult = await pullIntegrationData('dropbox', cardConfig, appState);
+            const pushResult = await pushIntegrationData('dropbox', currentConfig, appState);
+            const pullResult = await pullIntegrationData('dropbox', currentConfig, appState);
             onApplyPull(pullResult);
             return `${pushResult.message} Synced ${pullResult.chapterUpdates.length} chapter(s).`;
           })}>

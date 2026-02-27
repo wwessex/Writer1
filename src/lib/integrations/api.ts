@@ -1,11 +1,18 @@
 /**
  * Provider connection management for Dropbox and Google Drive.
- * Browser only talks to backend endpoints for public metadata and OAuth orchestration.
+ * Fully client-side OAuth2 PKCE — no backend server required.
  */
 
-import type { IntegrationType } from '@/types';
-import { openOAuthPopup } from './oauth';
-import { fetchEnvelope } from './providerClient';
+import type { IntegrationConfig, IntegrationType } from '@/types';
+import {
+  generateCodeVerifier,
+  generateCodeChallenge,
+  getRedirectUri,
+  openOAuthPopup,
+  exchangeCodeForTokens,
+  refreshAccessToken,
+  type OAuthTokenResponse,
+} from './oauth';
 
 export type ProviderConnectionStatus = 'disconnected' | 'pending' | 'connected' | 'error';
 
@@ -16,6 +23,7 @@ export interface ProviderConnectionMetadata {
   expiresAt: number;
   status: ProviderConnectionStatus;
   sessionToken: string;
+  refreshToken?: string;
   sessionExpiresAt?: number;
 }
 
@@ -71,18 +79,60 @@ function ensureOAuthProvider(provider: IntegrationType): asserts provider is 'go
   }
 }
 
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const envelope = await fetchEnvelope<T>(url, init);
-  if (!envelope.ok) {
-    throw new IntegrationApiError(envelope.error.message, {
-      code: envelope.error.code,
-      status: envelope.error.status,
-    });
-  }
+// ── OAuth provider configuration ──
 
-  return envelope.data;
+const DROPBOX_AUTH_URL = 'https://www.dropbox.com/oauth2/authorize';
+const DROPBOX_TOKEN_URL = 'https://api.dropboxapi.com/oauth2/token';
+
+const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
+const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+
+function buildDropboxAuthUrl(appKey: string, redirectUri: string, codeChallenge: string): string {
+  const params = new URLSearchParams({
+    client_id: appKey,
+    response_type: 'code',
+    redirect_uri: redirectUri,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
+    token_access_type: 'offline',
+  });
+  return `${DROPBOX_AUTH_URL}?${params.toString()}`;
 }
 
+function buildGoogleAuthUrl(clientId: string, redirectUri: string, codeChallenge: string): string {
+  const params = new URLSearchParams({
+    client_id: clientId,
+    response_type: 'code',
+    redirect_uri: redirectUri,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
+    scope: GOOGLE_DRIVE_SCOPE,
+    access_type: 'offline',
+    prompt: 'consent',
+  });
+  return `${GOOGLE_AUTH_URL}?${params.toString()}`;
+}
+
+function tokenResponseToMetadata(
+  _provider: IntegrationType,
+  tokens: OAuthTokenResponse,
+): ProviderConnectionMetadata {
+  const now = Date.now();
+  const expiresIn = tokens.expires_in ?? 3600;
+
+  return {
+    connectionId: tokens.account_id || tokens.uid || crypto.randomUUID(),
+    providerUserId: tokens.account_id || tokens.uid || '',
+    scopes: tokens.scope ? tokens.scope.split(/[\s,]+/) : [],
+    expiresAt: now + expiresIn * 1000,
+    status: 'connected',
+    sessionToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+  };
+}
+
+// ── Public API — all client-side ──
 
 export interface ProviderSessionIntrospectionResponse {
   provider: IntegrationType;
@@ -92,149 +142,215 @@ export interface ProviderSessionIntrospectionResponse {
   status?: ProviderConnectionStatus;
 }
 
-export async function createProviderSession(provider: IntegrationType, connectionId: string): Promise<ProviderConnectionResponse> {
-  ensureOAuthProvider(provider);
-
-  return fetchJson<ProviderConnectionResponse>(`/api/integrations/providers/${provider}/token/create`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify({ connectionId }),
-  });
-}
-
-export async function introspectProviderSession(provider: IntegrationType, sessionToken: string): Promise<ProviderSessionIntrospectionResponse> {
-  ensureOAuthProvider(provider);
-
-  return fetchJson<ProviderSessionIntrospectionResponse>(`/api/integrations/providers/${provider}/token/introspect`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify({ sessionToken }),
-  });
-}
-
-export async function revokeProviderSession(
-  provider: IntegrationType,
-  connectionId: string,
-  sessionToken?: string
-): Promise<{ provider: IntegrationType; revoked: true }> {
-  ensureOAuthProvider(provider);
-
-  return fetchJson<{ provider: IntegrationType; revoked: true }>(`/api/integrations/providers/${provider}/token/revoke`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify({ connectionId, sessionToken }),
-  });
-}
-
-export async function fetchProviderMetadata(): Promise<ProvidersMetadataResponse> {
-  return fetchJson<ProvidersMetadataResponse>('/api/integrations/providers', {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-    },
-  });
-}
-
 /**
- * Initiate OAuth through a backend-provided authorize URL and complete with an opaque token.
+ * Create a new provider session from a stored connection.
+ * Client-side: refresh the access token using the stored refresh token.
  */
-export async function connectProvider(provider: IntegrationType): Promise<ProviderConnectionResponse> {
+export async function createProviderSession(
+  provider: IntegrationType,
+  _connectionId: string,
+  config?: IntegrationConfig,
+): Promise<ProviderConnectionResponse> {
   ensureOAuthProvider(provider);
 
-  const start = await fetchJson<{ authorizeUrl: string }>(`/api/integrations/providers/${provider}/connect/start`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-  });
-
-  if (!start.authorizeUrl) {
-    throw new IntegrationApiError('Server did not provide an authorization URL.', {
-      code: 'UNKNOWN',
-      status: 500,
-    });
-  }
-
-  const callbackUrl = await openOAuthPopup(start.authorizeUrl);
-  const params = new URL(callbackUrl).searchParams;
-  const connectToken = params.get('connect_token');
-
-  if (!connectToken) {
-    throw new IntegrationApiError('Authentication callback was missing connect token.', {
+  if (!config?.refreshToken || !config?.clientId) {
+    throw new IntegrationApiError('Missing refresh token or client ID. Reconnect your account.', {
       code: 'UNAUTHORIZED',
       status: 401,
     });
   }
 
-  return fetchJson<ProviderConnectionResponse>(`/api/integrations/providers/${provider}/connect/complete`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify({ connectToken }),
-  });
-}
+  const tokenUrl = provider === 'dropbox' ? DROPBOX_TOKEN_URL : GOOGLE_TOKEN_URL;
+  const tokens = await refreshAccessToken(tokenUrl, config.refreshToken, config.clientId);
 
-export async function disconnectProvider(
-  provider: IntegrationType,
-  connectionId: string
-): Promise<{ provider: IntegrationType; disconnected: true }> {
-  ensureOAuthProvider(provider);
-
-  if (!connectionId) {
-    throw new IntegrationApiError('Connection identifier is required.', {
-      code: 'NOT_FOUND',
-      status: 404,
-    });
-  }
-
-  return fetchJson<{ provider: IntegrationType; disconnected: true }>(
-    `/api/integrations/providers/${provider}/disconnect`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({ connectionId }),
-    }
-  );
+  return {
+    provider,
+    connection: tokenResponseToMetadata(provider, {
+      ...tokens,
+      refresh_token: tokens.refresh_token || config.refreshToken,
+      account_id: config.providerUserId,
+    }),
+  };
 }
 
 /**
- * Refresh an expired access token using server-managed provider credentials.
+ * Check whether the current session token is still valid.
+ * Client-side: just check expiry time — no server call needed.
  */
-export async function refreshProviderConnection(
+export async function introspectProviderSession(
   provider: IntegrationType,
-  connectionId: string
+  _sessionToken: string,
+  config?: IntegrationConfig,
+): Promise<ProviderSessionIntrospectionResponse> {
+  ensureOAuthProvider(provider);
+
+  const expiresAt = config?.expiresAt;
+  const active = expiresAt ? expiresAt > Date.now() : false;
+
+  return {
+    provider,
+    active,
+    connectionId: config?.connectionId,
+    expiresAt,
+    status: active ? 'connected' : 'error',
+  };
+}
+
+/**
+ * Revoke the provider session token.
+ * Client-side: revoke directly at the provider's revoke endpoint.
+ */
+export async function revokeProviderSession(
+  provider: IntegrationType,
+  _connectionId: string,
+  sessionToken?: string,
+): Promise<{ provider: IntegrationType; revoked: true }> {
+  ensureOAuthProvider(provider);
+
+  if (sessionToken) {
+    try {
+      if (provider === 'dropbox') {
+        await fetch('https://api.dropboxapi.com/2/auth/token/revoke', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${sessionToken}` },
+        });
+      } else {
+        await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(sessionToken)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        });
+      }
+    } catch {
+      // Best-effort revocation — token may already be invalid
+    }
+  }
+
+  return { provider, revoked: true };
+}
+
+/**
+ * Return locally-known provider metadata. No server call needed.
+ */
+export async function fetchProviderMetadata(): Promise<ProvidersMetadataResponse> {
+  return {
+    providers: {
+      'google-drive': {
+        provider: 'google-drive',
+        displayName: 'Google Drive',
+        available: true,
+        scopes: [GOOGLE_DRIVE_SCOPE],
+        healthStatus: 'healthy',
+      },
+      dropbox: {
+        provider: 'dropbox',
+        displayName: 'Dropbox',
+        available: true,
+        scopes: ['files.content.write', 'files.content.read', 'account_info.read'],
+        healthStatus: 'healthy',
+      },
+    },
+  };
+}
+
+/**
+ * Initiate OAuth PKCE flow entirely in the browser.
+ * Opens a popup for the provider's authorization page, exchanges the code for tokens,
+ * and returns connection metadata with the access token.
+ */
+export async function connectProvider(
+  provider: IntegrationType,
+  clientId?: string,
 ): Promise<ProviderConnectionResponse> {
   ensureOAuthProvider(provider);
 
-  if (!connectionId) {
-    throw new IntegrationApiError('Cannot refresh without an existing connection.', {
-      code: 'NOT_FOUND',
-      status: 404,
+  if (!clientId) {
+    throw new IntegrationApiError(
+      provider === 'dropbox'
+        ? 'Dropbox App Key is required. Enter it in the integration settings.'
+        : 'Google OAuth Client ID is required. Enter it in the integration settings.',
+      { code: 'UNAUTHORIZED', status: 401 },
+    );
+  }
+
+  const codeVerifier = generateCodeVerifier();
+  const codeChallenge = await generateCodeChallenge(codeVerifier);
+  const redirectUri = getRedirectUri();
+
+  const authUrl = provider === 'dropbox'
+    ? buildDropboxAuthUrl(clientId, redirectUri, codeChallenge)
+    : buildGoogleAuthUrl(clientId, redirectUri, codeChallenge);
+
+  const callbackUrl = await openOAuthPopup(authUrl);
+  const params = new URL(callbackUrl).searchParams;
+
+  const error = params.get('error');
+  if (error) {
+    throw new IntegrationApiError(
+      params.get('error_description') || error || 'Authorization was denied.',
+      { code: 'UNAUTHORIZED', status: 401 },
+    );
+  }
+
+  const code = params.get('code');
+  if (!code) {
+    throw new IntegrationApiError('No authorization code received from provider.', {
+      code: 'UNAUTHORIZED',
+      status: 401,
     });
   }
 
+  const tokenUrl = provider === 'dropbox' ? DROPBOX_TOKEN_URL : GOOGLE_TOKEN_URL;
+  const tokens = await exchangeCodeForTokens(tokenUrl, code, codeVerifier, clientId, redirectUri);
 
-  return fetchJson<ProviderConnectionResponse>(`/api/integrations/providers/${provider}/token/refresh`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify({ connectionId }),
-  });
+  return {
+    provider,
+    connection: tokenResponseToMetadata(provider, tokens),
+  };
+}
+
+/**
+ * Disconnect a provider. Client-side: revoke token and clear state.
+ */
+export async function disconnectProvider(
+  provider: IntegrationType,
+  connectionId: string,
+  sessionToken?: string,
+): Promise<{ provider: IntegrationType; disconnected: true }> {
+  ensureOAuthProvider(provider);
+
+  if (sessionToken) {
+    await revokeProviderSession(provider, connectionId, sessionToken);
+  }
+
+  return { provider, disconnected: true };
+}
+
+/**
+ * Refresh an expired access token using the stored refresh token.
+ */
+export async function refreshProviderConnection(
+  provider: IntegrationType,
+  _connectionId: string,
+  config?: IntegrationConfig,
+): Promise<ProviderConnectionResponse> {
+  ensureOAuthProvider(provider);
+
+  if (!config?.refreshToken || !config?.clientId) {
+    throw new IntegrationApiError('Cannot refresh without refresh token and client ID. Reconnect your account.', {
+      code: 'UNAUTHORIZED',
+      status: 401,
+    });
+  }
+
+  const tokenUrl = provider === 'dropbox' ? DROPBOX_TOKEN_URL : GOOGLE_TOKEN_URL;
+  const tokens = await refreshAccessToken(tokenUrl, config.refreshToken, config.clientId);
+
+  return {
+    provider,
+    connection: tokenResponseToMetadata(provider, {
+      ...tokens,
+      refresh_token: tokens.refresh_token || config.refreshToken,
+      account_id: config.providerUserId,
+    }),
+  };
 }

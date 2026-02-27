@@ -486,13 +486,17 @@ export interface IntegrationConfig {
   status?: 'disconnected' | 'pending' | 'connected' | 'error';
   folderId?: string;
   lastSyncAt?: number;
-  /** Short-lived server-issued session artifact used as Bearer token. */
+  /** OAuth access token used as Bearer token for provider API calls. */
   sessionToken?: string;
+  /** OAuth client ID (Google) or App Key (Dropbox) for PKCE auth flow. */
+  clientId?: string;
+  /** OAuth refresh token for obtaining new access tokens client-side. */
+  refreshToken?: string;
 }
 
 export type PersistedIntegrationConfig = Pick<
   IntegrationConfig,
-  'type' | 'enabled' | 'connectionId' | 'providerUserId' | 'scopes' | 'expiresAt' | 'status' | 'folderId' | 'lastSyncAt'
+  'type' | 'enabled' | 'connectionId' | 'providerUserId' | 'scopes' | 'expiresAt' | 'status' | 'folderId' | 'lastSyncAt' | 'clientId' | 'refreshToken'
 >;
 
 export type DhprojIntegrations = Partial<Record<IntegrationType, PersistedIntegrationConfig>>;
