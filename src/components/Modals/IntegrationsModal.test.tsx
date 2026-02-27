@@ -147,7 +147,7 @@ describe('IntegrationsModal', () => {
     act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
 
     // By default, card bodies are hidden (not enabled). Find the toggle checkboxes.
-    const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+    const checkboxes = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
     expect(checkboxes.length).toBe(3); // one per card
 
     // Enable Scrivener (first card)
@@ -164,7 +164,7 @@ describe('IntegrationsModal', () => {
   it('enables Google Drive card with credential input', async () => {
     act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
 
-    const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+    const checkboxes = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
     // Enable Google Drive (second card)
     await act(async () => {
       checkboxes[1].click();
@@ -181,7 +181,7 @@ describe('IntegrationsModal', () => {
   it('enables Dropbox card with App Key and folder inputs', async () => {
     act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
 
-    const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+    const checkboxes = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
     // Enable Dropbox (third card)
     await act(async () => {
       checkboxes[2].click();
@@ -202,7 +202,7 @@ describe('IntegrationsModal', () => {
   it('persists config to localStorage when toggling', async () => {
     act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
 
-    const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+    const checkboxes = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
     await act(async () => {
       checkboxes[0].click();
     });
