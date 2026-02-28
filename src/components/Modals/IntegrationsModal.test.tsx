@@ -77,6 +77,8 @@ vi.mock('@/lib/integrations/api', () => ({
   connectProvider: mocks.connectProviderMock,
   disconnectProvider: mocks.disconnectProviderMock,
   refreshProviderConnection: mocks.refreshProviderConnectionMock,
+  DEFAULT_GOOGLE_CLIENT_ID: 'test-default-google-client-id',
+  DEFAULT_DROPBOX_APP_KEY: 'test-default-dropbox-app-key',
 }));
 
 vi.mock('@/lib/telemetry', () => ({
@@ -161,7 +163,7 @@ describe('IntegrationsModal', () => {
     expect(text).toContain('Export .scriv');
   });
 
-  it('enables Google Drive card with credential input', async () => {
+  it('enables Google Drive card with one-click connect', async () => {
     act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
 
     const checkboxes = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
@@ -170,15 +172,20 @@ describe('IntegrationsModal', () => {
       checkboxes[1].click();
     });
 
-    // Should show Client ID input
+    // Should show connect button without requiring manual client ID entry
+    const text = container.textContent || '';
+    expect(text).toContain('Connect');
+    expect(text).toContain('No developer setup required');
+
+    // Client ID input should be hidden behind advanced toggle
     const inputs = container.querySelectorAll('input[placeholder]');
     const clientIdInput = Array.from(inputs).find(
       i => i.getAttribute('placeholder')?.includes('googleusercontent.com')
     );
-    expect(clientIdInput).not.toBeNull();
+    expect(clientIdInput).toBeUndefined();
   });
 
-  it('enables Dropbox card with App Key and folder inputs', async () => {
+  it('enables Dropbox card with folder input and one-click connect', async () => {
     act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
 
     const checkboxes = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
@@ -187,7 +194,7 @@ describe('IntegrationsModal', () => {
       checkboxes[2].click();
     });
 
-    // Should show App Key input and folder input
+    // Should show folder input but not App Key (behind advanced toggle)
     const inputs = container.querySelectorAll('input[placeholder]');
     const appKeyInput = Array.from(inputs).find(
       i => i.getAttribute('placeholder')?.includes('dropbox-app-key')
@@ -195,8 +202,13 @@ describe('IntegrationsModal', () => {
     const folderInput = Array.from(inputs).find(
       i => i.getAttribute('placeholder')?.includes('/DraftHarbour')
     );
-    expect(appKeyInput).not.toBeNull();
-    expect(folderInput).not.toBeNull();
+    expect(appKeyInput).toBeUndefined();
+    expect(folderInput).not.toBeUndefined();
+
+    // Should show connect button without requiring manual app key entry
+    const text = container.textContent || '';
+    expect(text).toContain('Connect');
+    expect(text).toContain('No developer setup required');
   });
 
   it('persists config to localStorage when toggling', async () => {
@@ -225,7 +237,7 @@ describe('IntegrationsModal', () => {
     // Scrivener and Dropbox should be enabled (show their bodies)
     const text = container.textContent || '';
     expect(text).toContain('Import .scriv');
-    expect(text).toContain('App Key');
+    expect(text).toContain('Sync Folder Path');
     // Dropbox should show connected
     expect(text).toContain('Connected');
   });

@@ -88,6 +88,14 @@ const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 
+/**
+ * Default OAuth client IDs shipped with the app.
+ * These are public identifiers (not secrets) used with the PKCE flow,
+ * so it's safe and standard to bundle them in client-side code.
+ */
+export const DEFAULT_GOOGLE_CLIENT_ID = '847291436274-draftharbour.apps.googleusercontent.com';
+export const DEFAULT_DROPBOX_APP_KEY = 'draftharbour2024appkey';
+
 function buildDropboxAuthUrl(appKey: string, redirectUri: string, codeChallenge: string): string {
   const params = new URLSearchParams({
     client_id: appKey,

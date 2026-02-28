@@ -1577,6 +1577,27 @@
   text-decoration: none;
 }
 
+.integrationCard__advancedToggle {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.integrationCard__advancedToggle:hover {
+  color: var(--text);
+}
+
+.integrationCard__advancedToggle .material-symbols-rounded {
+  font-size: 1rem;
+}
+
 /* ===== AI Writing Modal ===== */
 .aiSettings {
   padding: 1rem;
