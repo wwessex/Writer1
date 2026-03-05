@@ -201,3 +201,58 @@
   min-width: 32px;
   text-align: right;
 }
+
+.quickJumpItem__badges {
+  display: flex;
+  gap: 4px;
+  margin-left: 4px;
+}
+
+.quickJumpItem__badge {
+  font-size: 0.5625rem;
+  padding: 1px 5px;
+  border-radius: 999px;
+  border: 1px solid var(--border, rgba(148, 163, 184, 0.4));
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.quickJumpItem__badge--good {
+  color: var(--success, #22c55e);
+  border-color: color-mix(in srgb, var(--success, #22c55e) 45%, transparent);
+}
+
+.quickJumpItem__badge--watch {
+  color: var(--warning, #f59e0b);
+  border-color: color-mix(in srgb, var(--warning, #f59e0b) 45%, transparent);
+}
+
+.quickJumpItem__badge--fix {
+  color: var(--danger, #ef4444);
+  border-color: color-mix(in srgb, var(--danger, #ef4444) 45%, transparent);
+}
+
+.recommendationList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recommendationItem {
+  background: var(--btn-bg);
+  border-radius: var(--radius-sm, 8px);
+  padding: 8px;
+}
+
+.recommendationItem__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.recommendationItem__summary {
+  margin: 6px 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}

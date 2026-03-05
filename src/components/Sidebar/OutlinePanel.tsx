@@ -3,6 +3,7 @@ import { useApp } from '@/context/AppContext';
 import { Input, Textarea, Button, IconButton } from '@/components/UI';
 import { Select } from '@/components/UI/Select';
 import { countWords, editorToPlainText } from '@/lib/utils';
+import { buildProjectHeuristicInsights, type ChapterHeuristicRecommendation } from '@/lib/projectMetrics';
 import type { ChapterStatus, Scene } from '@/types';
 import styles from './OutlinePanel.module.css';
 
@@ -18,7 +19,8 @@ export function OutlinePanel() {
   const [expandedSections, setExpandedSections] = useState({
     quickJump: true,
     details: true,
-    scenes: false
+    scenes: false,
+    insights: true
   });
 
   const isScreenplay = state.projectType === 'screenplay';
@@ -29,6 +31,23 @@ export function OutlinePanel() {
     state.chapters.forEach(ch => (ch.scenes || []).forEach(scene => (scene.productionTags || []).forEach(tag => tags.add(tag))));
     return Array.from(tags).sort();
   }, [state.chapters]);
+
+  const [aiPromptDraft, setAiPromptDraft] = useState('');
+
+  const heuristicInsights = useMemo(() => buildProjectHeuristicInsights(state.chapters), [state.chapters]);
+
+  const insightsByChapter = useMemo(() => new Map(heuristicInsights.map(insight => [insight.chapterId, insight])), [heuristicInsights]);
+
+  const activeRecommendations = activeChapter ? (insightsByChapter.get(activeChapter.id)?.recommendations || []) : [];
+
+  const handlePrefillPrompt = async (recommendation: ChapterHeuristicRecommendation) => {
+    setAiPromptDraft(recommendation.quickFixPrompt);
+    try {
+      await navigator.clipboard.writeText(recommendation.quickFixPrompt);
+    } catch {
+      // noop: clipboard may be blocked by browser permissions
+    }
+  };
 
   if (!activeChapter) {
     return (
@@ -77,6 +96,8 @@ export function OutlinePanel() {
               {state.chapters.map((ch, idx) => {
                 const isActive = ch.id === state.activeChapterId;
                 const words = countWords(editorToPlainText(ch.content));
+                const chapterInsights = insightsByChapter.get(ch.id);
+                const chapterBadges = (chapterInsights?.recommendations || []).slice(0, 2);
                 return (
                   <button
                     key={ch.id}
@@ -89,6 +110,19 @@ export function OutlinePanel() {
                       {ch.status === 'planned' ? '' : ch.status.charAt(0).toUpperCase()}
                     </span>
                     <span className={styles.quickJumpItem__words}>{words.toLocaleString()}</span>
+                    {chapterBadges.length > 0 && (
+                      <span className={styles.quickJumpItem__badges}>
+                        {chapterBadges.map(badge => (
+                          <span
+                            key={`${ch.id}-${badge.metric}`}
+                            className={`${styles.quickJumpItem__badge} ${styles[`quickJumpItem__badge--${badge.severity}`]}`}
+                            title={badge.summary}
+                          >
+                            {badge.badge}
+                          </span>
+                        ))}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -165,6 +199,49 @@ export function OutlinePanel() {
                 />
               </div>
             </div>
+          </div>
+        )}
+      </div>
+
+
+      <div className={styles.section}>
+        <button
+          className={styles.section__header}
+          onClick={() => toggleSection('insights')}
+        >
+          <span className="material-symbols-rounded">
+            {expandedSections.insights ? 'expand_more' : 'chevron_right'}
+          </span>
+          <span>Heuristic Insights ({activeRecommendations.length})</span>
+        </button>
+        {expandedSections.insights && (
+          <div className={styles.section__content}>
+            {activeRecommendations.length === 0 ? (
+              <p className={styles.outline__emptyHint}>No critical recommendations for this chapter.</p>
+            ) : (
+              <div className={styles.recommendationList}>
+                {activeRecommendations.map(recommendation => (
+                  <div key={recommendation.metric} className={styles.recommendationItem}>
+                    <div className={styles.recommendationItem__header}>
+                      <span className={`${styles.quickJumpItem__badge} ${styles[`quickJumpItem__badge--${recommendation.severity}`]}`}>
+                        {recommendation.badge}
+                      </span>
+                      <Button variant="ghost" onClick={() => void handlePrefillPrompt(recommendation)}>
+                        Quick Fix
+                      </Button>
+                    </div>
+                    <p className={styles.recommendationItem__summary}>{recommendation.summary}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {aiPromptDraft && (
+              <div className={styles.field}>
+                <label className={styles.field__label}>AI Prompt (prefilled)</label>
+                <Textarea value={aiPromptDraft} onChange={e => setAiPromptDraft(e.target.value)} rows={4} />
+              </div>
+            )}
           </div>
         )}
       </div>
