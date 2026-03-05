@@ -3,6 +3,7 @@ import { Dialog, Button, Input, Textarea } from '@/components/UI';
 import { useToast } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
 import { editorToPlainText } from '@/lib/utils';
+import { formatContinuityContext, getContinuityMemorySnapshot } from '@/lib/continuityMemory';
 import {
   loadAIConfig,
   saveAIConfig,
@@ -353,6 +354,9 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       const chapterText = activeChapter
         ? editorToPlainText(activeChapter.content)
         : '';
+      const continuitySnapshot = getContinuityMemorySnapshot(state.novelId, state.chapters);
+      const continuityContext = formatContinuityContext(continuitySnapshot);
+      const enrichedContext = [continuityContext, chapterText].filter(Boolean).join('\n\n');
 
       // Abort any previous request
       abortRef.current?.abort();
@@ -369,7 +373,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         const result = await provider.execute({
           action: presetId || 'custom',
           prompt: promptText,
-          context: chapterText,
+          context: enrichedContext,
           projectType: state.projectType,
           sectionTitle: activeChapter?.title,
           signal: controller.signal,
@@ -388,7 +392,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         provider.destroy();
       }
     },
-    [activeChapter, config, isConfigured, state.projectType]
+    [activeChapter, config, isConfigured, state.projectType, state.chapters, state.novelId]
   );
 
   const handleSubmit = () => {

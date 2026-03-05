@@ -1,5 +1,6 @@
 import type { Chapter, Scene, TimelineParadoxFinding, TimelineParadoxSeverity } from '@/types';
 import { editorToPlainText } from '@/lib/utils';
+import { getContinuityMemorySnapshot } from '@/lib/continuityMemory';
 
 interface SceneContext {
   chapter: Chapter;
@@ -192,7 +193,7 @@ export interface TimelineConsistencyResult {
   extractedTimelineCount: number;
 }
 
-export function analyzeTimelineConsistency(chapters: Chapter[]): TimelineConsistencyResult {
+export function analyzeTimelineConsistency(chapters: Chapter[], novelId = ''): TimelineConsistencyResult {
   const contexts = extractSceneContexts(chapters);
   const findings: TimelineParadoxFinding[] = [];
 
@@ -341,6 +342,23 @@ export function analyzeTimelineConsistency(chapters: Chapter[]): TimelineConsist
           )
         );
       }
+    }
+  }
+
+
+  if (novelId) {
+    const continuity = getContinuityMemorySnapshot(novelId, chapters);
+    for (const conflict of continuity.conflicts) {
+      const chapter = chapters.find(candidate => candidate.id === conflict.chapterId);
+      if (!chapter) continue;
+      findings.push({
+        id: `continuity-${conflict.id}`,
+        severity: conflict.severity,
+        type: 'continuity_conflict',
+        explanation: conflict.message,
+        involvedChapterIds: [conflict.chapterId],
+        involvedSceneIds: (chapter.scenes || []).map(scene => scene.id),
+      });
     }
   }
 

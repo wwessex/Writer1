@@ -1,5 +1,6 @@
 import type { JSONContent } from '@tiptap/core';
 import type { Chapter, CharacterEntity, CharacterVoiceProfile } from '@/types';
+import { getContinuityMemorySnapshot } from '@/lib/continuityMemory';
 
 const WORD_REGEX = /[A-Za-zÀ-ÖØ-öø-ÿ0-9']+/g;
 const SENTENCE_SPLIT_REGEX = /[.!?]+/;
@@ -272,4 +273,16 @@ export function getDialogueSimilarityAlerts(
   }
 
   return alerts.sort((a, b) => b.similarity - a.similarity);
+}
+
+
+export function getVoiceContinuityWarnings(novelId: string, chapters: Chapter[], activeChapterContent: JSONContent | null): string[] {
+  if (!novelId) return [];
+  const snapshot = getContinuityMemorySnapshot(novelId, chapters);
+  const known = new Set(snapshot.characters.map(character => normalizeSpeakerLabel(character.canonicalName)));
+  const draftSpeakers = Object.keys(extractDialogueBySpeaker(activeChapterContent)).map(normalizeSpeakerLabel);
+
+  return draftSpeakers
+    .filter(speaker => speaker && !known.has(speaker))
+    .map(speaker => `${speaker} appears in dialogue but is missing from canonical continuity.`);
 }
