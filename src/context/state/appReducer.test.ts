@@ -24,6 +24,7 @@ function createState(): AppState {
   return {
     ...createInitialAppState({ isMobile: false, isOnline: true }),
     novelId: 'novel-1',
+    storyBlueprint: null,
     chapters: [createChapter()],
     activeChapterId: 'chapter-1'
   };
@@ -92,6 +93,10 @@ describe('appReducer', () => {
         assert: state => expect(state.settings.autosaveMs).toBe(999)
       },
       {
+        action: { type: 'SET_STORY_BLUEPRINT', payload: { genre: 'Fantasy', subgenre: 'Epic', targetAudience: 'Adult', ageBand: '18+', tone: 'Serious', voice: 'Close third', structure: 'three-act', targetWordCount: 100000, pacingProfile: 'balanced' } },
+        assert: state => expect(state.storyBlueprint?.genre).toBe('Fantasy')
+      },
+      {
         action: { type: 'SET_ONLINE', payload: false },
         assert: state => expect(state.isOnline).toBe(false)
       },
@@ -131,5 +136,6 @@ describe('appReducer', () => {
     expect(result.novelTitle).toBe('My Novel');
     expect(result.isOnline).toBe(false);
     expect(result.settings).toBeDefined();
+    expect(result.storyBlueprint).toBeNull();
   });
 });

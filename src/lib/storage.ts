@@ -1,12 +1,13 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Novel, Chapter, Snapshot, BackupData, BackupDataV3, LegacyBackupData, ProjectType, CommentThread, DhprojData, DhprojManifest, AppSettings, CharacterEntity, WorldEntry, DhprojIntegrations, IntegrationType, PersistedIntegrationConfig } from '@/types';
+import type { Novel, Chapter, Snapshot, BackupData, BackupDataV3, LegacyBackupData, ProjectType, CommentThread, DhprojData, DhprojManifest, AppSettings, CharacterEntity, WorldEntry, DhprojIntegrations, IntegrationType, PersistedIntegrationConfig, StoryBlueprint } from '@/types';
 import type { ProgressData, DailyProgress } from '@/lib/progressTracker';
 import { generateId } from '@/lib/utils';
 import {
   COMMENT_THREADS_STORAGE_PREFIX,
   INTEGRATIONS_STORAGE_KEY,
   PROGRESS_STORAGE_KEY,
-  SETTINGS_STORAGE_KEY
+  SETTINGS_STORAGE_KEY,
+  STORY_BLUEPRINTS_STORAGE_KEY
 } from '@/lib/storageKeys';
 
 const CURRENT_BACKUP_VERSION = 3;
@@ -172,7 +173,9 @@ export async function deleteNovel(id: string): Promise<void> {
     await db.chapters.where('novelId').equals(id).delete();
     await db.novels.delete(id);
   });
+  deleteStoryBlueprint(id);
 }
+
 
 export async function getOrCreateDefaultNovel(): Promise<Novel> {
   let novel = await db.novels.orderBy('updatedAt').last();
@@ -398,6 +401,40 @@ export function deleteCommentThread(chapterId: string, threadId: string): void {
   saveCommentThreads(chapterId, threads);
 }
 
+
+function loadStoryBlueprints(): Record<string, StoryBlueprint> {
+  try {
+    const raw = localStorage.getItem(STORY_BLUEPRINTS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return {};
+    return parsed as Record<string, StoryBlueprint>;
+  } catch {
+    return {};
+  }
+}
+
+function saveStoryBlueprints(blueprints: Record<string, StoryBlueprint>): void {
+  localStorage.setItem(STORY_BLUEPRINTS_STORAGE_KEY, JSON.stringify(blueprints));
+}
+
+export function getStoryBlueprint(novelId: string): StoryBlueprint | null {
+  const blueprints = loadStoryBlueprints();
+  return blueprints[novelId] || null;
+}
+
+export function upsertStoryBlueprint(novelId: string, blueprint: StoryBlueprint): void {
+  const blueprints = loadStoryBlueprints();
+  blueprints[novelId] = blueprint;
+  saveStoryBlueprints(blueprints);
+}
+
+export function deleteStoryBlueprint(novelId: string): void {
+  const blueprints = loadStoryBlueprints();
+  delete blueprints[novelId];
+  saveStoryBlueprints(blueprints);
+}
+
 // Replace entire novel data (for sync)
 export async function replaceNovelData(novelId: string, chapters: Chapter[]): Promise<void> {
   await db.transaction('rw', [db.chapters, db.snapshots], async () => {
@@ -514,6 +551,7 @@ export async function clearAllData(): Promise<void> {
   Object.keys(localStorage)
     .filter(key => key.startsWith(COMMENT_THREADS_STORAGE_PREFIX))
     .forEach(key => localStorage.removeItem(key));
+  localStorage.removeItem(STORY_BLUEPRINTS_STORAGE_KEY);
 }
 
 

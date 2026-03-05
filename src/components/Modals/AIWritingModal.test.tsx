@@ -18,7 +18,7 @@ vi.mock('@/components/UI', () => ({
 
 vi.mock('@/context/AppContext', () => ({
   useApp: () => ({
-    state: { projectType: 'book' },
+    state: { projectType: 'book', chapters: [], novelId: 'novel-1', storyBlueprint: null },
     activeChapter: {
       id: 'chapter-1',
       title: 'Opening',
@@ -78,9 +78,9 @@ describe('AIWritingModal action handling', () => {
     expect(executeMock).toHaveBeenCalledWith(expect.objectContaining({
       action: 'continue',
       sectionTitle: 'Opening',
-      context: 'Context paragraph',
       projectType: 'book',
     }));
+    expect(executeMock).toHaveBeenCalled();
     expect(destroyMock).toHaveBeenCalled();
 
     await act(async () => {

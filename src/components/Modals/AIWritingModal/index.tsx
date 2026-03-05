@@ -18,7 +18,7 @@ import {
 } from '@/lib/ai';
 import { getBrokerBaseUrl, getBrokerEndpoint } from '@/lib/featureFlags';
 import type { AIProviderConfig, AvailabilityStatus } from '@/lib/ai';
-import type { ProjectType } from '@/types';
+import type { ProjectType, StoryBlueprint } from '@/types';
 import styles from '../Modals.module.css';
 
 /* ------------------------------------------------------------------ */
@@ -215,6 +215,21 @@ Response line.
 
 Action: End on a visual turn, reveal, or decision.`;
 
+
+function formatStoryBlueprintContext(storyBlueprint: StoryBlueprint | null): string {
+  if (!storyBlueprint) return '';
+  return [
+    'Story Blueprint Constraints:',
+    `- Genre/Subgenre: ${storyBlueprint.genre || 'Unspecified'} / ${storyBlueprint.subgenre || 'Unspecified'}`,
+    `- Target audience / age band: ${storyBlueprint.targetAudience || 'Unspecified'} / ${storyBlueprint.ageBand || 'Unspecified'}`,
+    `- Tone / voice: ${storyBlueprint.tone || 'Unspecified'} / ${storyBlueprint.voice || 'Unspecified'}`,
+    `- Structure: ${storyBlueprint.structure}`,
+    `- Target word count: ${storyBlueprint.targetWordCount || 0}`,
+    `- Pacing profile: ${storyBlueprint.pacingProfile}`,
+    'Apply these constraints consistently in all outputs unless explicitly overridden by user prompt.'
+  ].join('\n');
+}
+
 function getPresetPrompts(projectType: ProjectType): PresetPrompt[] {
   return projectType === 'screenplay' ? SCREENPLAY_PRESET_PROMPTS : BOOK_PRESET_PROMPTS;
 }
@@ -356,7 +371,8 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         : '';
       const continuitySnapshot = getContinuityMemorySnapshot(state.novelId, state.chapters);
       const continuityContext = formatContinuityContext(continuitySnapshot);
-      const enrichedContext = [continuityContext, chapterText].filter(Boolean).join('\n\n');
+      const blueprintContext = formatStoryBlueprintContext(state.storyBlueprint);
+      const enrichedContext = [blueprintContext, continuityContext, chapterText].filter(Boolean).join('\n\n');
 
       // Abort any previous request
       abortRef.current?.abort();
@@ -392,7 +408,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         provider.destroy();
       }
     },
-    [activeChapter, config, isConfigured, state.projectType, state.chapters, state.novelId]
+    [activeChapter, config, isConfigured, state.projectType, state.chapters, state.novelId, state.storyBlueprint]
   );
 
   const handleSubmit = () => {

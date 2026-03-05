@@ -9,7 +9,7 @@ import {
   type ReactNode,
   type Dispatch
 } from 'react';
-import type { Chapter, Novel, Scene, ProjectType, AppSettings, AppState } from '@/types';
+import type { Chapter, Novel, Scene, ProjectType, AppSettings, AppState, StoryBlueprint } from '@/types';
 import * as storage from '@/lib/storage';
 import { debounce, generateId } from '@/lib/utils';
 import { createDefaultSettings, normalizeSidebarPanels, type SettingsUpdate } from './appSettings';
@@ -49,6 +49,7 @@ interface AppContextType {
   canRedoReorder: boolean;
   updateNovelTitle: (title: string) => void;
   updateSettings: (settings: SettingsUpdate) => void;
+  updateStoryBlueprint: (blueprint: StoryBlueprint) => void;
   addScene: (chapterId: string, initialData?: Partial<Scene>) => string | undefined;
   updateScene: (chapterId: string, sceneId: string, updates: Partial<Scene>) => void;
   deleteScene: (chapterId: string, sceneId: string) => void;
@@ -152,6 +153,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       : await loadDefaultNovelAndChapters();
     trackProjectOpen(result.novel.id);
     dispatch({ type: 'SET_NOVEL', payload: result });
+    dispatch({ type: 'SET_STORY_BLUEPRINT', payload: storage.getStoryBlueprint(result.novel.id) });
     const lastChapterId = workspace.lastOpenedChapterByProject[result.novel.id];
     if (lastChapterId) {
       dispatch({ type: 'SET_ACTIVE_CHAPTER', payload: lastChapterId });
@@ -163,6 +165,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!result) return;
     trackProjectOpen(id);
     dispatch({ type: 'SET_NOVEL', payload: result });
+    dispatch({ type: 'SET_STORY_BLUEPRINT', payload: storage.getStoryBlueprint(id) });
     const workspace = getWorkspaceStore();
     const lastChapterId = workspace.lastOpenedChapterByProject[id];
     if (lastChapterId) {
@@ -175,6 +178,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const result = await createNovelWithFirstChapter(title, projectType);
       trackProjectOpen(result.novel.id);
       dispatch({ type: 'SET_NOVEL', payload: result });
+      dispatch({ type: 'SET_STORY_BLUEPRINT', payload: null });
       return result.novel;
     },
 
@@ -189,6 +193,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       const result = await loadDefaultNovelAndChapters();
       dispatch({ type: 'SET_NOVEL', payload: result });
+      dispatch({ type: 'SET_STORY_BLUEPRINT', payload: storage.getStoryBlueprint(result.novel.id) });
     },
 
     createChapter: async () => {
@@ -296,6 +301,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     updateSettings: (settings: SettingsUpdate) => {
       dispatch({ type: 'SET_SETTINGS', payload: settings });
+    },
+
+    updateStoryBlueprint: (blueprint: StoryBlueprint) => {
+      const currentNovelId = stateRef.current.novelId;
+      storage.upsertStoryBlueprint(currentNovelId, blueprint);
+      dispatch({ type: 'SET_STORY_BLUEPRINT', payload: blueprint });
     },
 
     addScene: (chapterId: string, initialData?: Partial<Scene>): string | undefined => {
