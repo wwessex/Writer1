@@ -47,3 +47,13 @@
     padding: 3px 12px 4px;
   }
 }
+
+.progressAhead {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.progressBehind {
+  color: var(--warning);
+  font-weight: 600;
+}

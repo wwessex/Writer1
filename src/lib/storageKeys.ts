@@ -2,6 +2,9 @@
 export const SETTINGS_STORAGE_KEY = 'draftharbour_settings_v1';
 export const PROGRESS_STORAGE_KEY = 'draftharbour_progress_v1';
 export const INTEGRATIONS_STORAGE_KEY = 'draftharbour_integrations';
+export const GOAL_TRENDS_STORAGE_KEY = 'draftharbour_goal_trends_v1';
+export const PROGRESS_SNAPSHOTS_STORAGE_KEY = 'draftharbour_progress_snapshots_v1';
+
 export const COMMENT_THREADS_STORAGE_PREFIX = 'draftharbour_comment_threads_';
 
 export const STORY_BLUEPRINTS_STORAGE_KEY = 'draftharbour_story_blueprints_v1';

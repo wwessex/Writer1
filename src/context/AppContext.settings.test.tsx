@@ -36,7 +36,8 @@ describe('AppContext settings behavior', () => {
     const updated = mergeSettings(defaults, {
       typography: { fontSize: 20 },
       assist: { languageToolEnabled: true },
-      sidebarPanels: { collapsed: { outline: true } }
+      sidebarPanels: { collapsed: { outline: true } },
+      goalConfiguration: { dailyWordTarget: 900, weeklyWordTarget: 5400, draftCompletionDeadline: '2026-10-01', milestoneCheckpoints: [{ id: 'm1', label: 'Act 1', targetWords: 20000, targetDate: '2026-08-01' }] }
     });
 
     const persisted = JSON.stringify(createSettingsEnvelope(updated));
@@ -50,5 +51,8 @@ describe('AppContext settings behavior', () => {
     expect(reloaded.assist.languageToolEnabled).toBe(true);
     expect(reloaded.assist.languageToolUrl).toBe(defaults.assist.languageToolUrl);
     expect(reloaded.sidebarPanels.collapsed?.outline).toBe(true);
+    expect(reloaded.goalConfiguration.dailyWordTarget).toBe(900);
+    expect(reloaded.goalConfiguration.weeklyWordTarget).toBe(5400);
+    expect(reloaded.goalConfiguration.milestoneCheckpoints).toHaveLength(1);
   });
 });
