@@ -16,3 +16,5 @@ export { ExportHistoryModal } from './ExportHistoryModal';
 export { TranslationModal } from './TranslationModal';
 export { CorkboardModal } from './CorkboardModal';
 export { StoryCardsModal } from './StoryCardsModal';
+
+export { PublishAssistantModal } from './PublishAssistantModal';

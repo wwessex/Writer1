@@ -4,7 +4,7 @@ import { useToast } from '@/components/UI';
 import { HelpTooltip } from '@/components/UI/Tooltip';
 import { useApp } from '@/context/AppContext';
 import type { ExportFormat, ExportProfile, ManuscriptLocale, ManuscriptExportOptions } from '@/types';
-import { exportToDocx, exportToPdf, exportToRtf, exportToFountain, exportToScreenplayPdf, exportToMarkdown, exportToPlainText } from '@/lib/export';
+import { exportToDocx, exportToPdf, exportToRtf, exportToFountain, exportToScreenplayPdf, exportToMarkdown, exportToPlainText, exportPublishingBundle } from '@/lib/export';
 import type { FountainExportOptions } from '@/lib/export';
 import { getProfileDefaults, validateExport, getValidationIssues, hasValidationErrors } from '@/lib/exportValidation';
 import { recordExport } from '@/lib/exportHistory';
@@ -117,6 +117,15 @@ const EXPORT_PRESETS: ExportPreset[] = [
     projectTypes: ['book', 'screenplay'],
   },
   {
+    id: 'publishing-bundle',
+    name: 'Publishing Bundle',
+    icon: 'inventory_2',
+    description: 'Manuscript + metadata JSON/TXT + marketing copy files for launch workflows.',
+    format: 'publishingBundle',
+    includeHeadings: true,
+    projectTypes: ['book'],
+  },
+  {
     id: 'plain-text-file',
     name: 'Plain Text File',
     icon: 'text_snippet',
@@ -127,7 +136,7 @@ const EXPORT_PRESETS: ExportPreset[] = [
   },
 ];
 
-type ExportTab = 'presets' | 'manuscript' | 'custom';
+type ExportTab = 'presets' | 'manuscript' | 'custom' | 'publishing';
 
 export function ExportModal({ open, onClose }: ExportModalProps) {
   const { state } = useApp();
@@ -157,6 +166,16 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
   const [includeSectionTitles, setIncludeSectionTitles] = useState(true);
   const [includeMetadataBlock, setIncludeMetadataBlock] = useState(true);
   const [filenameConvention, setFilenameConvention] = useState<FountainExportOptions['filenameConvention']>('title');
+  const [includeKdpTemplate, setIncludeKdpTemplate] = useState(true);
+  const [bookDescription, setBookDescription] = useState('');
+  const [shortSynopsis, setShortSynopsis] = useState('');
+  const [longSynopsis, setLongSynopsis] = useState('');
+  const [authorBioShort, setAuthorBioShort] = useState('');
+  const [authorBioLong, setAuthorBioLong] = useState('');
+  const [keywordSuggestions, setKeywordSuggestions] = useState('');
+  const [categorySuggestions, setCategorySuggestions] = useState('');
+  const [backCoverCopy, setBackCoverCopy] = useState('');
+  const [hookLines, setHookLines] = useState('');
 
   const isScreenplay = state.projectType === 'screenplay';
 
@@ -168,6 +187,7 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
     fountain: 'Fountain',
     markdown: 'Markdown',
     txt: 'Plain Text',
+    publishingBundle: 'Publishing Bundle',
   };
 
   const totalWords = state.chapters.reduce((sum, ch) => sum + countWords(editorToPlainText(ch.content)), 0);
@@ -254,13 +274,31 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
         case 'txt':
           await exportToPlainText(state.chapters, state.novelTitle, includeHeadings);
           break;
+        case 'publishingBundle':
+          await exportPublishingBundle(state.chapters, state.novelTitle, {
+            includeHeadings,
+            includeKdpTemplate,
+            manuscriptFormat: 'docx',
+            data: {
+              bookDescription,
+              shortSynopsis,
+              longSynopsis,
+              authorBioShort,
+              authorBioLong,
+              keywordSuggestions: keywordSuggestions.split(',').map(item => item.trim()).filter(Boolean),
+              categorySuggestions: categorySuggestions.split(/[;,]/).map(item => item.trim()).filter(Boolean),
+              backCoverCopy,
+              hookLines: hookLines.split('\n').map(item => item.trim()).filter(Boolean),
+            },
+          });
+          break;
       }
 
       // Record to export history
       const safeTitle = state.novelTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase();
       recordExport({
         format,
-        filename: `${safeTitle}.${format === 'screenplayPdf' ? 'pdf' : format === 'markdown' ? 'md' : format}`,
+        filename: `${safeTitle}.${format === 'screenplayPdf' ? 'pdf' : format === 'markdown' ? 'md' : format === 'publishingBundle' ? 'bundle' : format}`,
         novelTitle: state.novelTitle,
         chapterCount: state.chapters.length,
         wordCount: totalWords,
@@ -336,6 +374,15 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
           <span className="material-symbols-rounded">tune</span>
           Custom
         </button>
+        {!isScreenplay && (
+          <button
+            className={`${styles.exportTab} ${activeTab === 'publishing' ? styles.exportTabActive : ''}`}
+            onClick={() => setActiveTab('publishing')}
+          >
+            <span className="material-symbols-rounded">campaign</span>
+            Publishing
+          </button>
+        )}
       </div>
 
       {/* ── Presets Tab ── */}
@@ -668,6 +715,33 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
                 </Button>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+
+      {activeTab === 'publishing' && !isScreenplay && (
+        <div className={styles.exportManualSection}>
+          <p className={styles.exportOptionHeading}>Publishing Bundle</p>
+          <label className={styles.checkbox}>
+            <input type="checkbox" checked={includeKdpTemplate} onChange={e => setIncludeKdpTemplate(e.target.checked)} />
+            <span>Include Amazon KDP-style metadata template</span>
+          </label>
+          <label className={styles.exportField}><span>Book description / blurb</span><textarea rows={4} value={bookDescription} onChange={e => setBookDescription(e.target.value)} /></label>
+          <label className={styles.exportField}><span>Short synopsis</span><textarea rows={3} value={shortSynopsis} onChange={e => setShortSynopsis(e.target.value)} /></label>
+          <label className={styles.exportField}><span>Long synopsis</span><textarea rows={5} value={longSynopsis} onChange={e => setLongSynopsis(e.target.value)} /></label>
+          <label className={styles.exportField}><span>Author bio (short)</span><textarea rows={3} value={authorBioShort} onChange={e => setAuthorBioShort(e.target.value)} /></label>
+          <label className={styles.exportField}><span>Author bio (long)</span><textarea rows={4} value={authorBioLong} onChange={e => setAuthorBioLong(e.target.value)} /></label>
+          <label className={styles.exportField}><span>Keyword suggestions (comma separated)</span><textarea rows={2} value={keywordSuggestions} onChange={e => setKeywordSuggestions(e.target.value)} /></label>
+          <label className={styles.exportField}><span>Category suggestions (comma/semicolon separated)</span><textarea rows={2} value={categorySuggestions} onChange={e => setCategorySuggestions(e.target.value)} /></label>
+          <label className={styles.exportField}><span>Back-cover copy</span><textarea rows={4} value={backCoverCopy} onChange={e => setBackCoverCopy(e.target.value)} /></label>
+          <label className={styles.exportField}><span>Hook lines (one per line)</span><textarea rows={4} value={hookLines} onChange={e => setHookLines(e.target.value)} /></label>
+
+          <div className={styles.exportButtons}>
+            <Button variant="primary" onClick={() => handleExport('publishingBundle')} disabled={exporting}>
+              <span className="material-symbols-rounded">inventory_2</span>
+              Export Publishing Bundle
+            </Button>
           </div>
         </div>
       )}

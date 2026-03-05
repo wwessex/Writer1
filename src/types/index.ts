@@ -216,7 +216,7 @@ export interface TextAnalysis {
   longSentences: string[];
 }
 
-export type ExportFormat = 'docx' | 'pdf' | 'screenplayPdf' | 'rtf' | 'fountain' | 'markdown' | 'txt';
+export type ExportFormat = 'docx' | 'pdf' | 'screenplayPdf' | 'rtf' | 'fountain' | 'markdown' | 'txt' | 'publishingBundle';
 
 // ── Manuscript export profiles & options ──
 

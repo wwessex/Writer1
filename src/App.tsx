@@ -15,7 +15,7 @@ import { FindReplace, useFindReplace } from '@/components/FindReplace';
 import {
   ExportModal, SnapshotModal, AnalysisModal, WordCountModal, DashboardModal, OnboardingModal,
   CharacterBibleModal, CommentModal,
-  ProjectsModal, SceneTemplatesModal, CorkboardModal, StoryCardsModal
+  ProjectsModal, SceneTemplatesModal, CorkboardModal, StoryCardsModal, PublishAssistantModal
 } from '@/components/Modals';
 import { SettingsWindow, AboutWindow } from '@/components/Windows';
 import { ToastProvider, useToast } from '@/components/UI';
@@ -342,6 +342,7 @@ function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits }: {
       </Suspense>
       <CorkboardModal open={modals.corkboard} onClose={() => closeModal('corkboard')} />
       <StoryCardsModal open={modals.storyCards} onClose={() => closeModal('storyCards')} />
+      <PublishAssistantModal open={modals.publishAssistant} onClose={() => closeModal('publishAssistant')} />
 
       <SettingsWindow open={modals.settings} onClose={() => closeModal('settings')} />
       <AboutWindow open={modals.about} onClose={() => closeModal('about')} />
