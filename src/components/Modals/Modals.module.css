@@ -4584,3 +4584,45 @@
 .storyCard__expandedRow strong { color: var(--text); margin-right: 4px; }
 .storyCardsEmpty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; text-align: center; padding: var(--space-4); color: var(--text-muted); font-size: 0.875rem; }
 .storyCardsEmpty .material-symbols-rounded { font-size: 2.5rem; opacity: 0.4; }
+
+.aiPipelinePanel {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.aiPipelinePanel h4 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.625rem;
+  font-size: 0.875rem;
+}
+
+.aiPipelineToneToggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  margin-bottom: 0.625rem;
+}
+
+.aiPipelineGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.aiPipelineStageRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.aiPipelineStageRow select {
+  min-width: 170px;
+}
