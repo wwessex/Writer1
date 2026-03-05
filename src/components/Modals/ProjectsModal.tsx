@@ -3,7 +3,7 @@ import { Dialog, Button } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
 import { getAllNovels, deleteNovel } from '@/lib/storage';
 import { editorToPlainText, countWords } from '@/lib/utils';
-import type { Novel, ProjectType } from '@/types';
+import type { Novel, ProjectType, StoryBlueprint, StoryStructurePreference, PacingProfile } from '@/types';
 import { getWorkspaceStore, isProjectLockedElsewhere, togglePinnedProject, trackProjectOpen } from '@/context/services/workspaceService';
 import styles from './Modals.module.css';
 
@@ -14,8 +14,21 @@ interface ProjectsModalProps {
 
 const isDesktop = () => typeof window !== 'undefined' && '__TAURI__' in window;
 
+
+const DEFAULT_BLUEPRINT: StoryBlueprint = {
+  genre: '',
+  subgenre: '',
+  targetAudience: '',
+  ageBand: '',
+  tone: '',
+  voice: '',
+  structure: 'three-act',
+  targetWordCount: 80000,
+  pacingProfile: 'balanced'
+};
+
 export function ProjectsModal({ open, onClose }: ProjectsModalProps) {
-  const { state, loadNovelById, createNewNovel, loadNovel } = useApp();
+  const { state, loadNovelById, createNewNovel, loadNovel, updateStoryBlueprint } = useApp();
   const [novels, setNovels] = useState<Novel[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -23,6 +36,8 @@ export function ProjectsModal({ open, onClose }: ProjectsModalProps) {
   const [newType, setNewType] = useState<ProjectType>('book');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [workspace, setWorkspace] = useState(() => getWorkspaceStore());
+  const [blueprintStep, setBlueprintStep] = useState(0);
+  const [storyBlueprint, setStoryBlueprint] = useState<StoryBlueprint>(state.storyBlueprint || DEFAULT_BLUEPRINT);
 
   const refreshNovels = useCallback(async () => {
     const all = await getAllNovels();
@@ -37,8 +52,10 @@ export function ProjectsModal({ open, onClose }: ProjectsModalProps) {
       setNewType('book');
       setConfirmDeleteId(null);
       setWorkspace(getWorkspaceStore());
+      setBlueprintStep(0);
+      setStoryBlueprint(state.storyBlueprint || DEFAULT_BLUEPRINT);
     }
-  }, [open, refreshNovels]);
+  }, [open, refreshNovels, state.storyBlueprint]);
 
 
   const handleSwitchProject = async (id: string) => {
@@ -60,6 +77,7 @@ export function ProjectsModal({ open, onClose }: ProjectsModalProps) {
     if (!newTitle.trim()) return;
     setLoading(true);
     await createNewNovel(newTitle.trim(), newType);
+    updateStoryBlueprint(storyBlueprint);
     setLoading(false);
     onClose();
   };
@@ -74,6 +92,19 @@ export function ProjectsModal({ open, onClose }: ProjectsModalProps) {
     await refreshNovels();
     setConfirmDeleteId(null);
     setLoading(false);
+  };
+
+
+  const updateBlueprintField = <K extends keyof StoryBlueprint>(field: K, value: StoryBlueprint[K]) => {
+    setStoryBlueprint(prev => ({ ...prev, [field]: value }));
+  };
+
+  const setStructure = (value: StoryStructurePreference) => {
+    updateBlueprintField('structure', value);
+  };
+
+  const setPacing = (value: PacingProfile) => {
+    updateBlueprintField('pacingProfile', value);
   };
 
   const totalWords = state.chapters.reduce((sum, ch) => {
@@ -168,6 +199,16 @@ export function ProjectsModal({ open, onClose }: ProjectsModalProps) {
             <div className={styles.projectsCreateTypeRow}>
               <label className={styles.projectsTypeOption}><input type="radio" name="projectType" value="book" checked={newType === 'book'} onChange={() => setNewType('book')} /><span>Book</span></label>
               <label className={styles.projectsTypeOption}><input type="radio" name="projectType" value="screenplay" checked={newType === 'screenplay'} onChange={() => setNewType('screenplay')} /><span>Screenplay</span></label>
+            </div>
+            <p className={styles.projectsListHeading}>Story Blueprint (Step {blueprintStep + 1} of 5)</p>
+            {blueprintStep === 0 && <><input type="text" className={styles.projectsCreateInput} value={storyBlueprint.genre} onChange={e => updateBlueprintField('genre', e.target.value)} placeholder="Genre" /><input type="text" className={styles.projectsCreateInput} value={storyBlueprint.subgenre} onChange={e => updateBlueprintField('subgenre', e.target.value)} placeholder="Subgenre" /></>}
+            {blueprintStep === 1 && <><input type="text" className={styles.projectsCreateInput} value={storyBlueprint.targetAudience} onChange={e => updateBlueprintField('targetAudience', e.target.value)} placeholder="Target audience" /><input type="text" className={styles.projectsCreateInput} value={storyBlueprint.ageBand} onChange={e => updateBlueprintField('ageBand', e.target.value)} placeholder="Age band" /></>}
+            {blueprintStep === 2 && <><input type="text" className={styles.projectsCreateInput} value={storyBlueprint.tone} onChange={e => updateBlueprintField('tone', e.target.value)} placeholder="Tone" /><input type="text" className={styles.projectsCreateInput} value={storyBlueprint.voice} onChange={e => updateBlueprintField('voice', e.target.value)} placeholder="Voice" /></>}
+            {blueprintStep === 3 && <div className={styles.projectsCreateTypeRow}><label className={styles.projectsTypeOption}><input type="radio" checked={storyBlueprint.structure === 'three-act'} onChange={() => setStructure('three-act')} /><span>3-Act</span></label><label className={styles.projectsTypeOption}><input type="radio" checked={storyBlueprint.structure === 'save-the-cat'} onChange={() => setStructure('save-the-cat')} /><span>Save the Cat</span></label><label className={styles.projectsTypeOption}><input type="radio" checked={storyBlueprint.structure === 'hero-journey'} onChange={() => setStructure('hero-journey')} /><span>Hero's Journey</span></label></div>}
+            {blueprintStep === 4 && <><input type="number" className={styles.projectsCreateInput} value={storyBlueprint.targetWordCount} onChange={e => updateBlueprintField('targetWordCount', Number(e.target.value) || 0)} placeholder="Target word count" /><div className={styles.projectsCreateTypeRow}><label className={styles.projectsTypeOption}><input type="radio" checked={storyBlueprint.pacingProfile === 'fast'} onChange={() => setPacing('fast')} /><span>Fast</span></label><label className={styles.projectsTypeOption}><input type="radio" checked={storyBlueprint.pacingProfile === 'balanced'} onChange={() => setPacing('balanced')} /><span>Balanced</span></label><label className={styles.projectsTypeOption}><input type="radio" checked={storyBlueprint.pacingProfile === 'slow-burn'} onChange={() => setPacing('slow-burn')} /><span>Slow Burn</span></label></div></>}
+            <div className={styles.projectsCreateActions}>
+              <Button variant="ghost" onClick={() => setBlueprintStep(step => Math.max(0, step - 1))} disabled={blueprintStep === 0}>Prev Blueprint Step</Button>
+              <Button variant="ghost" onClick={() => setBlueprintStep(step => Math.min(4, step + 1))} disabled={blueprintStep === 4}>Next Blueprint Step</Button>
             </div>
           </div>
           <div className={styles.projectsCreateActions}>

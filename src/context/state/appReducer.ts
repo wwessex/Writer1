@@ -1,4 +1,4 @@
-import type { AppSettings, AppState, Chapter, Novel, ProjectType } from '@/types';
+import type { AppSettings, AppState, Chapter, Novel, ProjectType, StoryBlueprint } from '@/types';
 import { createDefaultSettings, mergeSettings, type SettingsUpdate } from '@/context/appSettings';
 
 export type AppAction =
@@ -11,6 +11,7 @@ export type AppAction =
   | { type: 'DELETE_CHAPTER'; payload: string }
   | { type: 'REORDER_CHAPTERS'; payload: string[] }
   | { type: 'SET_NOVEL_TITLE'; payload: string }
+  | { type: 'SET_STORY_BLUEPRINT'; payload: StoryBlueprint | null }
   | { type: 'SET_SETTINGS'; payload: SettingsUpdate }
   | { type: 'SET_ONLINE'; payload: boolean }
   | { type: 'SET_SAVING'; payload: boolean }
@@ -26,6 +27,7 @@ export function createInitialAppState(options?: { isMobile?: boolean; isOnline?:
     projectType: 'book',
     novelId: '',
     novelTitle: 'My Novel',
+    storyBlueprint: null,
     chapters: [],
     activeChapterId: null,
     isOnline: options?.isOnline ?? true,
@@ -96,6 +98,9 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
     case 'SET_NOVEL_TITLE':
       return { ...state, novelTitle: action.payload };
+
+    case 'SET_STORY_BLUEPRINT':
+      return { ...state, storyBlueprint: action.payload };
 
     case 'SET_SETTINGS':
       return {
