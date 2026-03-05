@@ -70,13 +70,19 @@
   color: var(--text);
 }
 
-.exportField select {
+.exportField select,
+.exportField textarea {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
   color: var(--text);
   padding: 0.5rem 0.625rem;
   font-size: 0.8125rem;
+}
+
+.exportField textarea {
+  resize: vertical;
+  min-height: 3rem;
 }
 
 /* Snapshot Modal */

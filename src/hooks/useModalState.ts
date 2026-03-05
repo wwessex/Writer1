@@ -24,7 +24,8 @@ export type ModalKey =
   | 'aiPanel'
   | 'translation'
   | 'corkboard'
-  | 'storyCards';
+  | 'storyCards'
+  | 'publishAssistant';
 
 type ModalState = Record<ModalKey, boolean>;
 
@@ -54,6 +55,7 @@ const initialState: ModalState = {
   translation: false,
   corkboard: false,
   storyCards: false,
+  publishAssistant: false,
 };
 
 function modalReducer(state: ModalState, action: ModalAction): ModalState {

@@ -22,6 +22,9 @@ const FORMAT_ICONS: Record<string, string> = {
   screenplayPdf: 'movie',
   rtf: 'article',
   fountain: 'theaters',
+  markdown: 'code',
+  txt: 'text_snippet',
+  publishingBundle: 'inventory_2',
 };
 
 export function ExportHistoryModal({ open, onClose }: ExportHistoryModalProps) {
