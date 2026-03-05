@@ -21,6 +21,7 @@ import { SettingsWindow, AboutWindow } from '@/components/Windows';
 import { ToastProvider, useToast } from '@/components/UI';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { buildCharacterVoiceProfiles } from '@/lib/voiceFingerprint';
+import { buildContinuityMemory, saveContinuityMemory } from '@/lib/continuityMemory';
 import type { CharacterEntity } from '@/types';
 import { useModalState } from '@/hooks/useModalState';
 import { useProjectFileActions } from '@/hooks/useProjectFileActions';
@@ -237,6 +238,12 @@ function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits }: {
     menuState: { editorFocused, hasSelection: hasTextSelection },
     showToast,
   });
+
+  useEffect(() => {
+    if (!state.novelId) return;
+    const snapshot = buildContinuityMemory(state.novelId, state.chapters);
+    saveContinuityMemory(snapshot);
+  }, [state.novelId, state.chapters, state.isSaving]);
 
   useCrashRecovery({
     hasUnsavedEdits,

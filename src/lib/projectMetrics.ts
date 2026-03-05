@@ -1,5 +1,6 @@
 import type { Chapter, ChapterStatus } from '@/types';
 import { countWords, countSentences, countParagraphs, countCharacters, editorToPlainText } from '@/lib/utils';
+import { getContinuityMemorySnapshot } from '@/lib/continuityMemory';
 
 export interface ChapterMetric {
   id: string;
@@ -14,6 +15,14 @@ export interface ChapterMetric {
   updatedAt: number;
 }
 
+export interface ContinuityHealthMetrics {
+  characterCount: number;
+  timelineEventCount: number;
+  worldRuleCount: number;
+  unresolvedThreadCount: number;
+  conflictCount: number;
+}
+
 export interface ProjectMetrics {
   chapters: ChapterMetric[];
   totalWords: number;
@@ -23,6 +32,7 @@ export interface ProjectMetrics {
   totalChapters: number;
   avgWordsPerChapter: number;
   statusCounts: Record<ChapterStatus, number>;
+  continuity: ContinuityHealthMetrics;
 }
 
 export function buildChapterMetrics(chapters: Chapter[]): ChapterMetric[] {
@@ -70,11 +80,31 @@ export function summarizeProjectMetrics(chapterMetrics: ChapterMetric[]): Projec
     totalChapters,
     avgWordsPerChapter: totalChapters > 0 ? Math.round(totalWords / totalChapters) : 0,
     statusCounts,
+    continuity: {
+      characterCount: 0,
+      timelineEventCount: 0,
+      worldRuleCount: 0,
+      unresolvedThreadCount: 0,
+      conflictCount: 0,
+    },
   };
 }
 
-export function getProjectMetrics(chapters: Chapter[]): ProjectMetrics {
-  return summarizeProjectMetrics(buildChapterMetrics(chapters));
+export function getProjectMetrics(chapters: Chapter[], novelId = ''): ProjectMetrics {
+  const base = summarizeProjectMetrics(buildChapterMetrics(chapters));
+  if (!novelId) return base;
+
+  const continuity = getContinuityMemorySnapshot(novelId, chapters);
+  return {
+    ...base,
+    continuity: {
+      characterCount: continuity.characters.length,
+      timelineEventCount: continuity.timelineEvents.length,
+      worldRuleCount: continuity.worldRules.length,
+      unresolvedThreadCount: continuity.unresolvedThreads.length,
+      conflictCount: continuity.conflicts.length,
+    },
+  };
 }
 
 

@@ -240,7 +240,8 @@ export type TimelineParadoxType =
   | 'travel_time_violation'
   | 'age_regression'
   | 'state_transition_conflict'
-  | 'missing_prerequisite';
+  | 'missing_prerequisite'
+  | 'continuity_conflict';
 
 export interface TimelineParadoxFinding {
   id: string;

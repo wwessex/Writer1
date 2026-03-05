@@ -6,6 +6,7 @@ import { Select } from '@/components/UI/Select';
 import { countWords, countSentences, countParagraphs, countCharacters, editorToPlainText } from '@/lib/utils';
 import { buildNarrativeWeather } from '@/lib/narrativeWeather';
 import { analyzeTimelineConsistency } from '@/lib/timelineConsistency';
+import { getContinuityMemorySnapshot } from '@/lib/continuityMemory';
 import { useResizable } from '@/hooks/useResizable';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 import type { ChapterStatus, Scene } from '@/types';
@@ -64,7 +65,7 @@ export function Inspector({ open, onClose, voiceAlerts = [] }: InspectorProps) {
 
 
   const narrativeWeather = useMemo(() => buildNarrativeWeather(state.chapters), [state.chapters]);
-  const timelineConsistency = useMemo(() => analyzeTimelineConsistency(state.chapters), [state.chapters]);
+  const timelineConsistency = useMemo(() => analyzeTimelineConsistency(state.chapters, state.novelId), [state.chapters, state.novelId]);
   const [hoveredWeatherChapterId, setHoveredWeatherChapterId] = useState<string | null>(null);
 
   const weatherFocusPoint = useMemo(() => {
@@ -74,6 +75,7 @@ export function Inspector({ open, onClose, voiceAlerts = [] }: InspectorProps) {
   }, [narrativeWeather.points, hoveredWeatherChapterId, activeChapter?.id]);
 
   const timelineFindings = useMemo(() => timelineConsistency.findings.slice().sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]), [timelineConsistency.findings]);
+  const continuityMemory = useMemo(() => getContinuityMemorySnapshot(state.novelId, state.chapters), [state.novelId, state.chapters]);
 
   const wordGoalProgress = useMemo(() => {
     if (!activeChapter?.wordGoal || activeChapter.wordGoal <= 0) return 0;
@@ -220,6 +222,19 @@ export function Inspector({ open, onClose, voiceAlerts = [] }: InspectorProps) {
                   {activeChapter.wordGoal > 0 && (
                     <div className={styles.progressBar}>
                       <div className={styles.progressFill} style={{ width: `${wordGoalProgress}%` }} />
+                    </div>
+                  )}
+
+                  {continuityMemory.conflicts.length > 0 && (
+                    <div className={styles.statsCard} role="status" aria-live="polite">
+                      <div className={styles.stat}>
+                        <span className="material-symbols-rounded" style={{ color: 'var(--warning)' }}>rule</span>
+                        <span className={styles.statLabel}>Continuity conflicts</span>
+                      </div>
+                      <div className={styles.stat}>
+                        <span className={styles.statValue}>{continuityMemory.conflicts.length}</span>
+                        <span className={styles.statLabel}>canonical warnings</span>
+                      </div>
                     </div>
                   )}
 
