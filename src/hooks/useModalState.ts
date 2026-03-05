@@ -25,7 +25,11 @@ export type ModalKey =
   | 'translation'
   | 'corkboard'
   | 'storyCards'
-  | 'publishAssistant';
+  | 'publishAssistant'
+  | 'writingSprint'
+  | 'guidedFlow'
+  | 'coverDesign'
+  | 'share';
 
 type ModalState = Record<ModalKey, boolean>;
 
@@ -56,6 +60,10 @@ const initialState: ModalState = {
   corkboard: false,
   storyCards: false,
   publishAssistant: false,
+  writingSprint: false,
+  guidedFlow: false,
+  coverDesign: false,
+  share: false,
 };
 
 function modalReducer(state: ModalState, action: ModalAction): ModalState {

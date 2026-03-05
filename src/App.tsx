@@ -8,6 +8,9 @@ import TextStyle from '@tiptap/extension-text-style';
 import FontFamily from '@tiptap/extension-font-family';
 import { ScreenplayParagraph, CommentAnchorMark } from '@/components/Editor/screenplayExtension';
 import { FindReplaceExtension } from '@/lib/findReplaceExtension';
+import { InlineAIExtension } from '@/lib/inlineAIExtension';
+import { SuggestionModeExtension } from '@/lib/suggestionModeExtension';
+import { GrammarCheckExtension } from '@/lib/grammarExtension';
 import { useApp, AppProvider } from '@/context/AppContext';
 import { AppShell } from '@/components/AppShell/AppShell';
 import { QuickSwitcher } from '@/components/QuickSwitcher';
@@ -15,7 +18,8 @@ import { FindReplace, useFindReplace } from '@/components/FindReplace';
 import {
   ExportModal, SnapshotModal, AnalysisModal, WordCountModal, DashboardModal, OnboardingModal,
   CharacterBibleModal, CommentModal,
-  ProjectsModal, SceneTemplatesModal, CorkboardModal, StoryCardsModal, PublishAssistantModal
+  ProjectsModal, SceneTemplatesModal, CorkboardModal, StoryCardsModal, PublishAssistantModal,
+  WritingSprintModal, GuidedFlowModal, CoverDesignModal, ShareModal
 } from '@/components/Modals';
 import { SettingsWindow, AboutWindow } from '@/components/Windows';
 import { ToastProvider, useToast } from '@/components/UI';
@@ -56,6 +60,9 @@ const createExtensions = (screenplayMode: boolean) => [
   FontFamily,
   CommentAnchorMark,
   FindReplaceExtension,
+  InlineAIExtension,
+  SuggestionModeExtension,
+  GrammarCheckExtension,
 ];
 
 const AIWritingModal = lazy(() => import('@/components/Modals/AIWritingModal').then((module) => ({ default: module.AIWritingModal })));
@@ -343,6 +350,10 @@ function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits }: {
       <CorkboardModal open={modals.corkboard} onClose={() => closeModal('corkboard')} />
       <StoryCardsModal open={modals.storyCards} onClose={() => closeModal('storyCards')} />
       <PublishAssistantModal open={modals.publishAssistant} onClose={() => closeModal('publishAssistant')} />
+      <WritingSprintModal open={modals.writingSprint} onClose={() => closeModal('writingSprint')} />
+      <GuidedFlowModal open={modals.guidedFlow} onClose={() => closeModal('guidedFlow')} />
+      <CoverDesignModal open={modals.coverDesign} onClose={() => closeModal('coverDesign')} />
+      <ShareModal open={modals.share} onClose={() => closeModal('share')} />
 
       <SettingsWindow open={modals.settings} onClose={() => closeModal('settings')} />
       <AboutWindow open={modals.about} onClose={() => closeModal('about')} />
