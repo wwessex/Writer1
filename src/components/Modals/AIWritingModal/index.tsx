@@ -17,8 +17,16 @@ import {
   SERVER_PROXY_LABELS,
 } from '@/lib/ai';
 import { getBrokerBaseUrl, getBrokerEndpoint } from '@/lib/featureFlags';
+import { recordAIRevision } from '@/lib/aiRevisionLog';
+import {
+  AI_WRITING_PIPELINE_STAGES,
+  applyInsertionMode,
+  renderPipelinePrompt,
+  type PipelineInsertionMode,
+} from '@/lib/ai/pipelines';
 import type { AIProviderConfig, AvailabilityStatus } from '@/lib/ai';
 import type { ProjectType, StoryBlueprint } from '@/types';
+import type { JSONContent } from '@tiptap/core';
 import styles from '../Modals.module.css';
 
 /* ------------------------------------------------------------------ */
@@ -239,7 +247,7 @@ function getPresetPrompts(projectType: ProjectType): PresetPrompt[] {
 /* ------------------------------------------------------------------ */
 
 export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
-  const { activeChapter, state } = useApp();
+  const { activeChapter, state, updateChapter } = useApp();
   const { showToast } = useToast();
   const isScreenplay = state.projectType === 'screenplay';
   const presetPrompts = useMemo(() => getPresetPrompts(state.projectType), [state.projectType]);
@@ -260,6 +268,14 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   const [response, setResponse] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [includeToneMatchPass, setIncludeToneMatchPass] = useState(false);
+  const [pipelineModes, setPipelineModes] = useState<Record<string, PipelineInsertionMode>>({
+    'beat-to-scene': 'replace',
+    expansion: 'replace',
+    dialogue: 'replace',
+    grammar: 'replace',
+    tone: 'replace',
+  });
 
   // Ref for aborting in-flight requests
   const abortRef = useRef<AbortController | null>(null);
@@ -411,6 +427,95 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
     [activeChapter, config, isConfigured, state.projectType, state.chapters, state.novelId, state.storyBlueprint]
   );
 
+  const plainTextToDoc = useCallback((text: string): JSONContent => ({
+    type: 'doc',
+    content: (text || '')
+      .split(/\n+/)
+      .map(line => line.trim())
+      .filter(Boolean)
+      .map(line => ({
+        type: 'paragraph',
+        content: [{ type: 'text', text: line }],
+      })),
+  }), []);
+
+  const handleRunPipeline = useCallback(async () => {
+    if (!isConfigured) {
+      setError('Configure AI first before running the writing pipeline.');
+      return;
+    }
+
+    const chapterText = activeChapter ? editorToPlainText(activeChapter.content) : '';
+    const continuitySnapshot = getContinuityMemorySnapshot(state.novelId, state.chapters);
+    const continuityContext = formatContinuityContext(continuitySnapshot);
+    const blueprintContext = formatStoryBlueprintContext(state.storyBlueprint);
+    const enrichedContext = [blueprintContext, continuityContext, chapterText].filter(Boolean).join('\n\n');
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setLoading(true);
+    setError(null);
+    setResponse('');
+
+    const provider = createProvider(config);
+    const stages = AI_WRITING_PIPELINE_STAGES.filter(stage => includeToneMatchPass || !stage.optional);
+    const stageLogs: Array<{ stageId: string; label: string; action: string; insertionMode: PipelineInsertionMode }> = [];
+
+    try {
+      let workingDraft = chapterText;
+      for (const stage of stages) {
+        const stagePrompt = renderPipelinePrompt(stage.promptTemplate, {
+          chapterText,
+          currentDraft: workingDraft,
+          userPrompt: prompt,
+          toneReference: state.storyBlueprint?.tone || state.storyBlueprint?.voice || '',
+        });
+
+        const result = await provider.execute({
+          action: stage.action,
+          prompt: stagePrompt,
+          context: enrichedContext,
+          projectType: state.projectType,
+          sectionTitle: activeChapter?.title,
+          signal: controller.signal,
+        });
+
+        const insertionMode = pipelineModes[stage.id] || 'replace';
+        workingDraft = applyInsertionMode(workingDraft, result.text, insertionMode);
+        stageLogs.push({
+          stageId: stage.id,
+          label: stage.label,
+          action: stage.action,
+          insertionMode,
+        });
+      }
+
+      setResponse(workingDraft);
+      if (activeChapter) {
+        recordAIRevision({
+          novelId: state.novelId,
+          chapterId: activeChapter.id,
+          chapterTitle: activeChapter.title,
+          pipelineLabel: 'AI Writing Pipeline',
+          beforeText: chapterText,
+          afterText: workingDraft,
+          stages: stageLogs,
+        });
+      }
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
+      }
+      const message = err instanceof Error ? err.message : 'Pipeline run failed.';
+      setError(message);
+    } finally {
+      setLoading(false);
+      provider.destroy();
+    }
+  }, [activeChapter, config, includeToneMatchPass, isConfigured, pipelineModes, prompt, state.chapters, state.novelId, state.projectType, state.storyBlueprint]);
+
   const handleSubmit = () => {
     sendPrompt(prompt);
   };
@@ -428,6 +533,22 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         showToast('Failed to copy to clipboard', 'error');
       });
     }
+  };
+
+  const handleInsertResponse = () => {
+    if (!activeChapter || !response.trim()) return;
+    const chapterText = editorToPlainText(activeChapter.content);
+    updateChapter(activeChapter.id, { content: plainTextToDoc(response) });
+    recordAIRevision({
+      novelId: state.novelId,
+      chapterId: activeChapter.id,
+      chapterTitle: activeChapter.title,
+      pipelineLabel: 'AI Insert Response',
+      beforeText: chapterText,
+      afterText: response,
+      stages: [],
+    });
+    showToast('AI output inserted into chapter', 'success', 'check');
   };
 
   const handleTestConnection = async () => {
@@ -614,11 +735,25 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
           </div>
           <div className={styles.aiFooterRight}>
             {response && (
-              <Button variant="ghost" onClick={handleCopyResponse}>
-                <span className="material-symbols-rounded">content_copy</span>
-                Copy
-              </Button>
+              <>
+                <Button variant="ghost" onClick={handleCopyResponse}>
+                  <span className="material-symbols-rounded">content_copy</span>
+                  Copy
+                </Button>
+                <Button variant="ghost" onClick={handleInsertResponse}>
+                  <span className="material-symbols-rounded">edit_document</span>
+                  Insert to Chapter
+                </Button>
+              </>
             )}
+            <Button
+              variant="default"
+              onClick={handleRunPipeline}
+              disabled={loading}
+            >
+              <span className="material-symbols-rounded">pipeline</span>
+              {loading ? 'Running pipeline...' : 'Run Pipeline'}
+            </Button>
             <Button
               variant="primary"
               onClick={handleSubmit}
@@ -929,6 +1064,38 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
             <span className="material-symbols-rounded">theaters</span>
             Insert Screenplay Scene Template
           </button>
+        </div>
+
+        <div className={styles.aiPipelinePanel}>
+          <h4>
+            <span className="material-symbols-rounded">pipeline</span>
+            Sequential pipeline
+          </h4>
+          <label className={styles.aiPipelineToneToggle}>
+            <input
+              type="checkbox"
+              checked={includeToneMatchPass}
+              onChange={e => setIncludeToneMatchPass(e.target.checked)}
+            />
+            Include optional tone-matching pass
+          </label>
+          <div className={styles.aiPipelineGrid}>
+            {AI_WRITING_PIPELINE_STAGES.map(stage => (
+              <label key={stage.id} className={styles.aiPipelineStageRow}>
+                <span>{stage.label}</span>
+                <select
+                  value={pipelineModes[stage.id] || 'replace'}
+                  onChange={e => setPipelineModes(prev => ({ ...prev, [stage.id]: e.target.value as PipelineInsertionMode }))}
+                  disabled={stage.optional && !includeToneMatchPass}
+                  className={styles.aiSelect}
+                >
+                  <option value="replace">Replace</option>
+                  <option value="append">Append</option>
+                  <option value="side-by-side">Side-by-side compare</option>
+                </select>
+              </label>
+            ))}
+          </div>
         </div>
       </div>
 
