@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useState, useCallback } from 'react';
-import { Dialog, Button } from '@/components/UI';
+import { Dialog, Button, useToast } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
 import { getProjectMetrics } from '@/lib/projectMetrics';
 import {
@@ -8,6 +8,8 @@ import {
   getMonthlyHistory,
   type DailyProgress,
   type ProgressData,
+  recordProgressSnapshot,
+  getProgressSnapshots,
 } from '@/lib/progressTracker';
 import { getGoalTrendSnapshots, upsertGoalTrendSnapshot } from '@/lib/storage';
 import { COMMAND_IDS, type CommandId } from '@/lib/commands';
@@ -23,13 +25,17 @@ const OVERDUE_DAYS = 14;
 
 export function DashboardModal({ open, onClose, onAction }: DashboardModalProps) {
   const { state, setActiveChapter, updateSettings } = useApp();
+  const { showToast } = useToast();
   const [progress, setProgress] = useState<ProgressData | null>(null);
   const [weeklyHistory, setWeeklyHistory] = useState<DailyProgress[]>([]);
   const [monthlyHistory, setMonthlyHistory] = useState<DailyProgress[]>([]);
-  const [editingGoal, setEditingGoal] = useState<'daily' | 'novel' | 'deadline' | null>(null);
+  const [editingGoal, setEditingGoal] = useState<'daily' | 'weekly' | 'novel' | 'deadline' | null>(null);
   const [goalInputValue, setGoalInputValue] = useState('');
 
   const stats = useMemo(() => getProjectMetrics(state.chapters), [state.chapters]);
+  const goals = state.settings.goalConfiguration ?? { dailyWordTarget: 0, weeklyWordTarget: 0, draftCompletionDeadline: '', milestoneCheckpoints: [] };
+  const dailyGoal = goals.dailyWordTarget || state.settings.dailyWordGoal;
+  const weeklyGoal = goals.weeklyWordTarget;
 
   const overdue = useMemo(() => {
     const cutoff = Date.now() - OVERDUE_DAYS * 24 * 60 * 60 * 1000;
@@ -57,7 +63,7 @@ export function DashboardModal({ open, onClose, onAction }: DashboardModalProps)
   // Record progress and load history when modal opens
   useEffect(() => {
     if (open) {
-      const data = recordDailyWords(stats.totalWords, state.settings.dailyWordGoal);
+      const data = recordDailyWords(stats.totalWords, dailyGoal);
       setProgress(data);
       const monthly = getMonthlyHistory();
       const weekly = getWeeklyHistory();
@@ -70,11 +76,18 @@ export function DashboardModal({ open, onClose, onAction }: DashboardModalProps)
       upsertGoalTrendSnapshot({
         date: today,
         wordsToday,
-        dailyGoal: state.settings.dailyWordGoal,
-        goalMet: state.settings.dailyWordGoal > 0 && wordsToday >= state.settings.dailyWordGoal,
+        dailyGoal,
+        goalMet: dailyGoal > 0 && wordsToday >= dailyGoal,
+      });
+      recordProgressSnapshot({
+        date: today,
+        totalWords: wordsToday,
+        dailyGoal,
+        weeklyGoal,
+        novelGoal: state.settings.novelWordGoal,
       });
     }
-  }, [open, stats.totalWords, state.settings.dailyWordGoal]);
+  }, [open, stats.totalWords, dailyGoal, weeklyGoal, state.settings.novelWordGoal]);
 
   const novelGoalPercent = state.settings.novelWordGoal > 0
     ? Math.min(100, Math.round((stats.totalWords / state.settings.novelWordGoal) * 100))
@@ -82,8 +95,8 @@ export function DashboardModal({ open, onClose, onAction }: DashboardModalProps)
 
   const todayEntry = monthlyHistory.find(d => d.date === new Date().toISOString().slice(0, 10));
   const todayWords = todayEntry?.wordsWritten ?? 0;
-  const dailyGoalPercent = state.settings.dailyWordGoal > 0
-    ? Math.min(100, Math.round((todayWords / state.settings.dailyWordGoal) * 100))
+  const dailyGoalPercent = dailyGoal > 0
+    ? Math.min(100, Math.round((todayWords / dailyGoal) * 100))
     : 0;
 
   const goalTrend = (() => {
@@ -106,7 +119,7 @@ export function DashboardModal({ open, onClose, onAction }: DashboardModalProps)
 
   // Deadline calculations
   const deadlineInfo = useMemo(() => {
-    const deadline = state.settings.novelDeadline;
+    const deadline = goals.draftCompletionDeadline || state.settings.novelDeadline;
     if (!deadline) return null;
 
     const deadlineDate = new Date(deadline + 'T23:59:59');
@@ -125,7 +138,7 @@ export function DashboardModal({ open, onClose, onAction }: DashboardModalProps)
       isPast: daysRemaining < 0,
       formattedDate: deadlineDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
     };
-  }, [state.settings.novelDeadline, state.settings.novelWordGoal, stats.totalWords]);
+  }, [goals.draftCompletionDeadline, state.settings.novelDeadline, state.settings.novelWordGoal, stats.totalWords]);
 
   const chapterLabel = state.projectType === 'screenplay' ? 'Scenes' : 'Chapters';
   const chapterSingleLabel = state.projectType === 'screenplay' ? 'scene' : 'chapter';
@@ -137,24 +150,35 @@ export function DashboardModal({ open, onClose, onAction }: DashboardModalProps)
 
   const maxChapterWords = Math.max(...stats.chapters.map(c => c.words), 1);
 
-  const handleStartEditGoal = useCallback((type: 'daily' | 'novel' | 'deadline') => {
+  const handleStartEditGoal = useCallback((type: 'daily' | 'weekly' | 'novel' | 'deadline') => {
     setEditingGoal(type);
-    if (type === 'daily') setGoalInputValue(String(state.settings.dailyWordGoal || ''));
+    if (type === 'daily') setGoalInputValue(String(dailyGoal || ''));
+    else if (type === 'weekly') setGoalInputValue(String(weeklyGoal || ''));
     else if (type === 'novel') setGoalInputValue(String(state.settings.novelWordGoal || ''));
-    else setGoalInputValue(state.settings.novelDeadline || '');
-  }, [state.settings.dailyWordGoal, state.settings.novelWordGoal, state.settings.novelDeadline]);
+    else setGoalInputValue(goals.draftCompletionDeadline || state.settings.novelDeadline || '');
+  }, [dailyGoal, weeklyGoal, state.settings.novelWordGoal, goals.draftCompletionDeadline, state.settings.novelDeadline]);
 
   const handleSaveGoal = useCallback(() => {
     if (!editingGoal) return;
     if (editingGoal === 'daily') {
-      updateSettings({ dailyWordGoal: parseInt(goalInputValue) || 0 });
+      const value = parseInt(goalInputValue) || 0;
+      updateSettings({ dailyWordGoal: value, goalConfiguration: { dailyWordTarget: value } });
+    } else if (editingGoal === 'weekly') {
+      updateSettings({ goalConfiguration: { weeklyWordTarget: parseInt(goalInputValue) || 0 } });
     } else if (editingGoal === 'novel') {
       updateSettings({ novelWordGoal: parseInt(goalInputValue) || 0 });
     } else {
-      updateSettings({ novelDeadline: goalInputValue });
+      updateSettings({ novelDeadline: goalInputValue, goalConfiguration: { draftCompletionDeadline: goalInputValue } });
     }
     setEditingGoal(null);
   }, [editingGoal, goalInputValue, updateSettings]);
+
+  useEffect(() => {
+    if (!open || !deadlineInfo || dailyGoal <= 0) return;
+    if (!deadlineInfo.isPast && deadlineInfo.dailyNeeded > dailyGoal) {
+      showToast('You are currently behind your draft pace. A short session now can close the gap.', 'warning', 'schedule');
+    }
+  }, [open, deadlineInfo, dailyGoal, showToast]);
 
   return (
     <Dialog open={open} onClose={onClose} title="Project Dashboard" size="large">
@@ -195,7 +219,7 @@ export function DashboardModal({ open, onClose, onAction }: DashboardModalProps)
                 <span className={styles.dashboardStreakCard__value}>{todayWords.toLocaleString()}</span>
                 <span className={styles.dashboardStreakCard__label}>Words Today</span>
               </div>
-              {state.settings.dailyWordGoal > 0 && <div className={styles.dashboardStreakCard__best}>Goal: {state.settings.dailyWordGoal.toLocaleString()}</div>}
+              {dailyGoal > 0 && <div className={styles.dashboardStreakCard__best}>Goal: {dailyGoal.toLocaleString()}</div>}
             </div>
 
             <div className={styles.dashboardStreakCard}>
@@ -235,22 +259,53 @@ export function DashboardModal({ open, onClose, onAction }: DashboardModalProps)
               ) : (
                 <>
                   <span className={styles.goalCard__value}>
-                    {state.settings.dailyWordGoal > 0 ? `${state.settings.dailyWordGoal.toLocaleString()} words/day` : 'Not set'}
+                    {dailyGoal > 0 ? `${dailyGoal.toLocaleString()} words/day` : 'Not set'}
                   </span>
-                  {state.settings.dailyWordGoal > 0 && (
+                  {dailyGoal > 0 && (
                     <div className={styles.progressBar}>
                       <div className={styles.progressBar__fill} style={{ width: `${dailyGoalPercent}%`, background: dailyGoalPercent >= 100 ? 'var(--success, #22c55e)' : 'var(--accent)' }} />
                     </div>
                   )}
-                  {state.settings.dailyWordGoal > 0 && (
+                  {dailyGoal > 0 && (
                     <span className={styles.goalCard__meta}>
-                      {todayWords.toLocaleString()} / {state.settings.dailyWordGoal.toLocaleString()} ({dailyGoalPercent}%)
+                      {todayWords.toLocaleString()} / {dailyGoal.toLocaleString()} ({dailyGoalPercent}%)
                       {dailyGoalPercent >= 100 && ' — Goal met!'}
                     </span>
                   )}
                 </>
               )}
             </div>
+
+            <div className={styles.goalCard}>
+              <div className={styles.goalCard__header}>
+                <span className={styles.goalCard__title}>Weekly Word Target</span>
+                <button className={styles.goalCard__editBtn} onClick={() => handleStartEditGoal('weekly')}>
+                  <span className="material-symbols-rounded">edit</span>
+                </button>
+              </div>
+              {editingGoal === 'weekly' ? (
+                <div className={styles.goalCard__editRow}>
+                  <input
+                    type="number"
+                    className={styles.goalCard__input}
+                    value={goalInputValue}
+                    onChange={e => setGoalInputValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleSaveGoal(); if (e.key === 'Escape') setEditingGoal(null); }}
+                    placeholder="e.g. 7000"
+                    autoFocus
+                  />
+                  <Button variant="primary" size="small" onClick={handleSaveGoal}>Save</Button>
+                </div>
+              ) : (
+                <>
+                  <span className={styles.goalCard__value}>{weeklyGoal > 0 ? `${weeklyGoal.toLocaleString()} words/week` : 'Not set'}</span>
+                  {weeklyGoal > 0 && (
+                    <span className={styles.goalCard__meta}>{weeklyHistory.reduce((sum, day) => sum + day.wordsWritten, 0).toLocaleString()} written this week</span>
+                  )}
+                </>
+              )}
+            </div>
+
 
             <div className={styles.goalCard}>
               <div className={styles.goalCard__header}>
@@ -339,6 +394,54 @@ export function DashboardModal({ open, onClose, onAction }: DashboardModalProps)
               </span>
             </div>
           )}
+          {goals.milestoneCheckpoints.length > 0 && (
+            <div className={styles.dashboardTrend}>
+              {goals.milestoneCheckpoints.map(milestone => {
+                const reached = stats.totalWords >= milestone.targetWords;
+                return (
+                  <span key={milestone.id} className={reached ? styles.dashboardTrend__positive : styles.dashboardTrend__negative}>
+                    {milestone.label}: {stats.totalWords.toLocaleString()} / {milestone.targetWords.toLocaleString()}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className={styles.dashboardGoal}>
+          <h4><span className="material-symbols-rounded">show_chart</span>Burn-down Pace</h4>
+          {(() => {
+            const snapshots = getProgressSnapshots(14);
+            if (snapshots.length < 2 || state.settings.novelWordGoal <= 0) {
+              return <span className={styles.goalCard__meta}>Need 2+ days of snapshots and a novel goal.</span>;
+            }
+            const maxRemaining = Math.max(...snapshots.map(s => Math.max(0, state.settings.novelWordGoal - s.totalWords)), 1);
+            const latest = snapshots[snapshots.length - 1];
+            const idealRemaining = Math.max(0, state.settings.novelWordGoal - Math.round((state.settings.novelWordGoal / snapshots.length) * snapshots.length));
+            const actualRemaining = Math.max(0, state.settings.novelWordGoal - latest.totalWords);
+            const ahead = actualRemaining <= idealRemaining;
+            return (
+              <>
+                <div className={styles.dashboardTrend}>
+                  <span className={ahead ? styles.dashboardTrend__positive : styles.dashboardTrend__negative}>
+                    {ahead ? 'Ahead of plan' : 'Behind plan'} by {Math.abs(actualRemaining - idealRemaining).toLocaleString()} words
+                  </span>
+                </div>
+                <div className={styles.weeklyChart}>
+                  {snapshots.slice(-7).map(snap => {
+                    const remaining = Math.max(0, state.settings.novelWordGoal - snap.totalWords);
+                    return (
+                      <div key={snap.date} className={styles.weeklyChart__day}>
+                        <div className={styles.weeklyChart__barWrap}>
+                          <div className={styles.weeklyChart__bar} style={{ height: `${Math.max(3, (remaining / maxRemaining) * 100)}%` }} title={`${snap.date}: ${remaining.toLocaleString()} remaining`} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
         </div>
 
         <div className={styles.dashboardGoal}>

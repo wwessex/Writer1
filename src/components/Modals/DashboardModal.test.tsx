@@ -45,6 +45,7 @@ vi.mock('@/context/AppContext', () => ({
         novelWordGoal: 50000,
         novelDeadline: '2026-06-30',
         theme: 'light',
+        goalConfiguration: { dailyWordTarget: 500, weeklyWordTarget: 3000, draftCompletionDeadline: '2026-06-30', milestoneCheckpoints: [{ id: 'm1', label: 'Quarter Draft', targetWords: 10000, targetDate: '2026-03-15' }] },
       },
     },
     setActiveChapter: mockSetActiveChapter,
@@ -86,6 +87,11 @@ vi.mock('@/lib/progressTracker', () => ({
     { date: '2026-02-25', wordsWritten: 200, goalMet: false },
     { date: '2026-02-24', wordsWritten: 600, goalMet: true },
   ],
+  getProgressSnapshots: () => [
+    { date: '2026-02-24', totalWords: 5000, dailyGoal: 500, weeklyGoal: 3000, novelGoal: 50000 },
+    { date: '2026-02-25', totalWords: 5400, dailyGoal: 500, weeklyGoal: 3000, novelGoal: 50000 },
+  ],
+  recordProgressSnapshot: vi.fn(),
   getMonthlyHistory: () => [
     { date: '2026-02-25', wordsWritten: 200, goalMet: false },
     { date: '2026-02-24', wordsWritten: 600, goalMet: true },
@@ -116,12 +122,15 @@ vi.mock('@/lib/commands', () => ({
   },
 }));
 
+const mockShowToast = vi.fn();
+
 vi.mock('@/components/UI', () => ({
   Dialog: ({ open, children, title }: { open: boolean; children?: ReactNode; title?: string }) =>
     open ? <div data-testid="dialog"><h2>{title}</h2>{children}</div> : null,
   Button: ({ children, onClick, disabled, size }: { children?: ReactNode; onClick?: () => void; disabled?: boolean; size?: string }) => (
     <button onClick={onClick} disabled={disabled} data-size={size}>{children}</button>
   ),
+  useToast: () => ({ showToast: mockShowToast }),
 }));
 
 import { DashboardModal } from './DashboardModal';
@@ -158,6 +167,7 @@ describe('DashboardModal', () => {
     expect(container.textContent).toContain('Daily Word Goal');
     expect(container.textContent).toContain('Novel Word Goal');
     expect(container.textContent).toContain('Deadline');
+    expect(container.textContent).toContain('Weekly Word Target');
   });
 
   it('shows deadline info with days remaining', async () => {
@@ -199,6 +209,7 @@ describe('DashboardModal', () => {
   it('shows goal trend comparison', async () => {
     await act(async () => { root.render(<DashboardModal open onClose={vi.fn()} />); });
     expect(container.textContent).toContain('vs trend');
+    expect(container.textContent).toContain('Quarter Draft');
   });
 
   it('allows inline editing of daily goal', async () => {
@@ -229,6 +240,11 @@ describe('DashboardModal', () => {
   it('shows overdue chapters section', async () => {
     await act(async () => { root.render(<DashboardModal open onClose={vi.fn()} />); });
     expect(container.textContent).toContain('Overdue');
+  });
+
+  it('shows burn-down pace card', async () => {
+    await act(async () => { root.render(<DashboardModal open onClose={vi.fn()} />); });
+    expect(container.textContent).toContain('Burn-down Pace');
   });
 
   it('shows quick actions', async () => {

@@ -140,6 +140,20 @@ export interface SidebarPanelsSettings {
   visible?: Partial<Record<SidebarPanelId, boolean>>;
 }
 
+export interface GoalMilestone {
+  id: string;
+  label: string;
+  targetWords: number;
+  targetDate: string;
+}
+
+export interface GoalConfiguration {
+  dailyWordTarget: number;
+  weeklyWordTarget: number;
+  draftCompletionDeadline: string;
+  milestoneCheckpoints: GoalMilestone[];
+}
+
 export interface AppSettings {
   autosaveMs: number;
   dailyWordGoal: number;
@@ -157,6 +171,7 @@ export interface AppSettings {
   typewriterMode: boolean;
   releaseChannel: 'stable' | 'beta' | 'nightly';
   sidebarPanels: SidebarPanelsSettings;
+  goalConfiguration: GoalConfiguration;
 }
 
 export interface AppState {

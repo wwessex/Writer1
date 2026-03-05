@@ -1,12 +1,15 @@
 import type { AppSettings, ProjectType, SidebarPanelId, SidebarPanelsSettings } from '@/types';
 
-export type SettingsUpdate = Partial<Omit<AppSettings, 'sync' | 'assist' | 'typography' | 'sidebarPanels'>> & {
+export type SettingsUpdate = Partial<Omit<AppSettings, 'sync' | 'assist' | 'typography' | 'sidebarPanels' | 'goalConfiguration'>> & {
   sync?: Partial<AppSettings['sync']>;
   assist?: Partial<AppSettings['assist']>;
   typography?: Partial<AppSettings['typography']>;
   sidebarPanels?: Partial<AppSettings['sidebarPanels']> & {
     collapsed?: Partial<NonNullable<AppSettings['sidebarPanels']['collapsed']>>;
     visible?: Partial<NonNullable<AppSettings['sidebarPanels']['visible']>>;
+  };
+  goalConfiguration?: Partial<AppSettings['goalConfiguration']> & {
+    milestoneCheckpoints?: AppSettings['goalConfiguration']['milestoneCheckpoints'];
   };
 };
 
@@ -80,7 +83,13 @@ export const createDefaultSettings = (isMobile: boolean): AppSettings => ({
   onboardingComplete: false,
   typewriterMode: false,
   releaseChannel: 'stable',
-  sidebarPanels: {}
+  sidebarPanels: {},
+  goalConfiguration: {
+    dailyWordTarget: 0,
+    weeklyWordTarget: 0,
+    draftCompletionDeadline: '',
+    milestoneCheckpoints: []
+  }
 });
 
 export const mergeSettings = (current: AppSettings, updates: SettingsUpdate): AppSettings => ({
@@ -109,5 +118,10 @@ export const mergeSettings = (current: AppSettings, updates: SettingsUpdate): Ap
       ...current.sidebarPanels.visible,
       ...updates.sidebarPanels?.visible
     }
+  },
+  goalConfiguration: {
+    ...current.goalConfiguration,
+    ...updates.goalConfiguration,
+    milestoneCheckpoints: updates.goalConfiguration?.milestoneCheckpoints ?? current.goalConfiguration.milestoneCheckpoints
   }
 });

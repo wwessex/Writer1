@@ -5,13 +5,13 @@ import { generateId } from '@/lib/utils';
 import {
   COMMENT_THREADS_STORAGE_PREFIX,
   INTEGRATIONS_STORAGE_KEY,
+  GOAL_TRENDS_STORAGE_KEY,
   PROGRESS_STORAGE_KEY,
   SETTINGS_STORAGE_KEY,
   STORY_BLUEPRINTS_STORAGE_KEY
 } from '@/lib/storageKeys';
 
 const CURRENT_BACKUP_VERSION = 3;
-const GOAL_TREND_STORAGE_KEY = 'draftharbour_goal_trends_v1';
 const MAX_GOAL_TREND_ENTRIES = 90;
 
 export interface GoalTrendSnapshot {
@@ -458,7 +458,7 @@ export async function replaceNovelData(novelId: string, chapters: Chapter[]): Pr
 
 function loadGoalTrendSnapshots(): GoalTrendSnapshot[] {
   try {
-    const raw = localStorage.getItem(GOAL_TREND_STORAGE_KEY);
+    const raw = localStorage.getItem(GOAL_TRENDS_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -474,7 +474,7 @@ function loadGoalTrendSnapshots(): GoalTrendSnapshot[] {
 }
 
 function saveGoalTrendSnapshots(entries: GoalTrendSnapshot[]): void {
-  localStorage.setItem(GOAL_TREND_STORAGE_KEY, JSON.stringify(entries.slice(-MAX_GOAL_TREND_ENTRIES)));
+  localStorage.setItem(GOAL_TRENDS_STORAGE_KEY, JSON.stringify(entries.slice(-MAX_GOAL_TREND_ENTRIES)));
 }
 
 function loadStoredEntities<T>(key: string): T[] {

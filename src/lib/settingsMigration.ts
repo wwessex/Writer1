@@ -34,6 +34,9 @@ const asNumber = (value: unknown, fallback: number): number =>
 const asString = (value: unknown, fallback: string): string =>
   typeof value === 'string' ? value : fallback;
 
+const asDateString = (value: unknown, fallback: string): string =>
+  typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : fallback;
+
 const asPanelOrder = (value: unknown): SidebarPanelId[] | undefined => {
   if (!Array.isArray(value)) return undefined;
 
@@ -56,6 +59,40 @@ const asPanelFlags = (value: unknown): Partial<Record<SidebarPanelId, boolean>> 
   }, {});
 
   return Object.keys(flags).length > 0 ? flags : undefined;
+};
+
+
+const sanitizeMilestones = (
+  rawMilestones: unknown,
+  defaults: AppSettings['goalConfiguration']['milestoneCheckpoints']
+): AppSettings['goalConfiguration']['milestoneCheckpoints'] => {
+  if (!Array.isArray(rawMilestones)) return defaults;
+
+  return rawMilestones
+    .filter(isRecord)
+    .map((milestone, index) => ({
+      id: asString(milestone.id, `milestone-${index + 1}`),
+      label: asString(milestone.label, `Milestone ${index + 1}`),
+      targetWords: asNumber(milestone.targetWords, 0),
+      targetDate: asDateString(milestone.targetDate, '')
+    }))
+    .filter(milestone => milestone.targetWords > 0);
+};
+
+const sanitizeGoalConfiguration = (
+  rawGoalConfiguration: unknown,
+  defaults: AppSettings['goalConfiguration']
+): AppSettings['goalConfiguration'] => {
+  if (!isRecord(rawGoalConfiguration)) {
+    return defaults;
+  }
+
+  return {
+    dailyWordTarget: asNumber(rawGoalConfiguration.dailyWordTarget, defaults.dailyWordTarget),
+    weeklyWordTarget: asNumber(rawGoalConfiguration.weeklyWordTarget, defaults.weeklyWordTarget),
+    draftCompletionDeadline: asDateString(rawGoalConfiguration.draftCompletionDeadline, defaults.draftCompletionDeadline),
+    milestoneCheckpoints: sanitizeMilestones(rawGoalConfiguration.milestoneCheckpoints, defaults.milestoneCheckpoints)
+  };
 };
 
 const sanitizeSidebarPanels = (
@@ -87,6 +124,7 @@ const sanitizeSettings = (rawSettings: unknown, defaults: AppSettings): AppSetti
     autosaveMs: asNumber(rawSettings.autosaveMs, defaults.autosaveMs),
     dailyWordGoal: asNumber(rawSettings.dailyWordGoal, defaults.dailyWordGoal),
     novelWordGoal: asNumber(rawSettings.novelWordGoal, defaults.novelWordGoal),
+    novelDeadline: asDateString(rawSettings.novelDeadline, defaults.novelDeadline),
     sync: {
       novelId: asString(sync.novelId, defaults.sync.novelId),
       url: asString(sync.url, defaults.sync.url),
@@ -116,7 +154,11 @@ const sanitizeSettings = (rawSettings: unknown, defaults: AppSettings): AppSetti
     },
     onboardingComplete: asBoolean(rawSettings.onboardingComplete, defaults.onboardingComplete),
     typewriterMode: asBoolean(rawSettings.typewriterMode, defaults.typewriterMode),
-    sidebarPanels: sanitizeSidebarPanels(rawSettings.sidebarPanels, defaults.sidebarPanels)
+    releaseChannel: rawSettings.releaseChannel === 'stable' || rawSettings.releaseChannel === 'beta' || rawSettings.releaseChannel === 'nightly'
+      ? rawSettings.releaseChannel
+      : defaults.releaseChannel,
+    sidebarPanels: sanitizeSidebarPanels(rawSettings.sidebarPanels, defaults.sidebarPanels),
+    goalConfiguration: sanitizeGoalConfiguration(rawSettings.goalConfiguration, defaults.goalConfiguration)
   };
 };
 

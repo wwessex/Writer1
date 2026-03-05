@@ -3,7 +3,67 @@
  * All data is stored in localStorage for offline-first behavior.
  */
 
-const STORAGE_KEY = 'draftharbour_progress_v1';
+import { PROGRESS_STORAGE_KEY, PROGRESS_SNAPSHOTS_STORAGE_KEY } from '@/lib/storageKeys';
+
+const STORAGE_KEY = PROGRESS_STORAGE_KEY;
+const MAX_PROGRESS_SNAPSHOTS = 180;
+
+
+export interface ProgressSnapshot {
+  date: string;
+  totalWords: number;
+  dailyGoal: number;
+  weeklyGoal: number;
+  novelGoal: number;
+}
+
+function loadProgressSnapshots(): ProgressSnapshot[] {
+  try {
+    const raw = localStorage.getItem(PROGRESS_SNAPSHOTS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter(entry => entry && typeof entry === 'object')
+      .map(entry => ({
+        date: typeof entry.date === 'string' ? entry.date : '',
+        totalWords: typeof entry.totalWords === 'number' ? entry.totalWords : 0,
+        dailyGoal: typeof entry.dailyGoal === 'number' ? entry.dailyGoal : 0,
+        weeklyGoal: typeof entry.weeklyGoal === 'number' ? entry.weeklyGoal : 0,
+        novelGoal: typeof entry.novelGoal === 'number' ? entry.novelGoal : 0,
+      }))
+      .filter(entry => entry.date);
+  } catch {
+    return [];
+  }
+}
+
+function saveProgressSnapshots(snapshots: ProgressSnapshot[]): void {
+  localStorage.setItem(PROGRESS_SNAPSHOTS_STORAGE_KEY, JSON.stringify(snapshots));
+}
+
+export function recordProgressSnapshot(snapshot: ProgressSnapshot): ProgressSnapshot[] {
+  const snapshots = loadProgressSnapshots();
+  const existingIndex = snapshots.findIndex(entry => entry.date === snapshot.date);
+
+  if (existingIndex >= 0) {
+    snapshots[existingIndex] = snapshot;
+  } else {
+    snapshots.push(snapshot);
+  }
+
+  snapshots.sort((a, b) => a.date.localeCompare(b.date));
+  const truncated = snapshots.slice(-MAX_PROGRESS_SNAPSHOTS);
+  saveProgressSnapshots(truncated);
+  return truncated;
+}
+
+export function getProgressSnapshots(days: number = 30): ProgressSnapshot[] {
+  const snapshots = loadProgressSnapshots();
+  if (days <= 0) return snapshots;
+  return snapshots.slice(-days);
+}
 
 export interface DailyProgress {
   date: string; // YYYY-MM-DD
