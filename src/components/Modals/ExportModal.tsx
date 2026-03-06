@@ -188,6 +188,7 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
     markdown: 'Markdown',
     txt: 'Plain Text',
     publishingBundle: 'Publishing Bundle',
+    epub: 'ePub',
   };
 
   const totalWords = state.chapters.reduce((sum, ch) => sum + countWords(editorToPlainText(ch.content)), 0);
@@ -292,13 +293,28 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
             },
           });
           break;
+        case 'epub': {
+          const { exportToEpub } = await import('@/lib/export/epub');
+          const { downloadFile } = await import('@/lib/utils');
+          const epubBlob = await exportToEpub(state.chapters, {
+            title: state.novelTitle,
+            author: manuscriptOpts?.authorName || 'Author',
+            description: '',
+            language: 'en',
+            publisher: 'DraftHarbour Studio',
+            date: new Date().toISOString().split('T')[0],
+            identifier: `urn:uuid:${crypto.randomUUID()}`,
+          });
+          downloadFile(epubBlob, `${state.novelTitle || 'book'}.epub`);
+          break;
+        }
       }
 
       // Record to export history
       const safeTitle = state.novelTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase();
       recordExport({
         format,
-        filename: `${safeTitle}.${format === 'screenplayPdf' ? 'pdf' : format === 'markdown' ? 'md' : format === 'publishingBundle' ? 'bundle' : format}`,
+        filename: `${safeTitle}.${format === 'screenplayPdf' ? 'pdf' : format === 'markdown' ? 'md' : format === 'publishingBundle' ? 'bundle' : format === 'epub' ? 'epub' : format}`,
         novelTitle: state.novelTitle,
         chapterCount: state.chapters.length,
         wordCount: totalWords,

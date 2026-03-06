@@ -450,3 +450,50 @@ body.focus-mode:hover .focus-mode-hint { opacity: 1; }
   body { background: white; color: black; }
   .no-print { display: none !important; }
 }
+
+/* Grammar check inline decorations */
+.grammar-error {
+  text-decoration: wavy underline #ef4444;
+  text-decoration-skip-ink: none;
+  text-underline-offset: 3px;
+}
+
+.grammar-warning {
+  text-decoration: wavy underline #f59e0b;
+  text-decoration-skip-ink: none;
+  text-underline-offset: 3px;
+}
+
+.grammar-style {
+  text-decoration: wavy underline #3b82f6;
+  text-decoration-skip-ink: none;
+  text-underline-offset: 3px;
+}
+
+/* Suggestion mode decorations */
+.suggestion-insertion {
+  background-color: rgba(34, 197, 94, 0.2);
+  border-bottom: 2px solid #22c55e;
+}
+
+.suggestion-deletion {
+  background-color: rgba(239, 68, 68, 0.2);
+  text-decoration: line-through;
+  color: #ef4444;
+}
+
+/* Fact check decorations */
+.fact-verified {
+  background-color: rgba(34, 197, 94, 0.1);
+  border-bottom: 1px dashed #22c55e;
+}
+
+.fact-uncertain {
+  background-color: rgba(245, 158, 11, 0.1);
+  border-bottom: 1px dashed #f59e0b;
+}
+
+.fact-likely-wrong {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-bottom: 1px dashed #ef4444;
+}

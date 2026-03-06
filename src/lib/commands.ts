@@ -55,6 +55,12 @@ export const COMMAND_IDS = {
   FORMAT_P: 'formatP',
   TOGGLE_TYPEWRITER_MODE: 'toggleTypewriterMode',
   STORY_CARDS: 'storyCards',
+  WRITING_SPRINT: 'writingSprint',
+  GUIDED_FLOW: 'guidedFlow',
+  COVER_DESIGN: 'coverDesign',
+  SHARE: 'share',
+  FACT_CHECK: 'factCheck',
+  RESEARCH: 'research',
 } as const;
 
 export type CommandId = typeof COMMAND_IDS[keyof typeof COMMAND_IDS];
@@ -124,6 +130,12 @@ export const COMMAND_METADATA: Record<CommandId, CommandMetadata> = {
   [COMMAND_IDS.FORMAT_P]: { id: COMMAND_IDS.FORMAT_P, label: 'Paragraph', icon: 'subject', group: 'Actions' },
   [COMMAND_IDS.TOGGLE_TYPEWRITER_MODE]: { id: COMMAND_IDS.TOGGLE_TYPEWRITER_MODE, label: 'Toggle Typewriter Mode', icon: 'keyboard', shortcut: 'Ctrl+Shift+T', group: 'Views', includeInQuickSwitcher: true },
   [COMMAND_IDS.STORY_CARDS]: { id: COMMAND_IDS.STORY_CARDS, label: 'Story Cards', icon: 'contact_page', group: 'Project', includeInQuickSwitcher: true },
+  [COMMAND_IDS.WRITING_SPRINT]: { id: COMMAND_IDS.WRITING_SPRINT, label: 'Writing Sprint', icon: 'timer', group: 'Project', includeInQuickSwitcher: true },
+  [COMMAND_IDS.GUIDED_FLOW]: { id: COMMAND_IDS.GUIDED_FLOW, label: 'Guided Book Flow', icon: 'route', group: 'AI', includeInQuickSwitcher: true },
+  [COMMAND_IDS.COVER_DESIGN]: { id: COMMAND_IDS.COVER_DESIGN, label: 'Cover Design Studio', icon: 'palette', group: 'Project', includeInQuickSwitcher: true },
+  [COMMAND_IDS.SHARE]: { id: COMMAND_IDS.SHARE, label: 'Share & Collaborate', icon: 'group', group: 'Project', includeInQuickSwitcher: true },
+  [COMMAND_IDS.FACT_CHECK]: { id: COMMAND_IDS.FACT_CHECK, label: 'Fact Check', icon: 'fact_check', group: 'AI', includeInQuickSwitcher: true },
+  [COMMAND_IDS.RESEARCH]: { id: COMMAND_IDS.RESEARCH, label: 'Research Library', icon: 'science', group: 'Project', includeInQuickSwitcher: true },
 };
 
 export interface CommandContext {
@@ -221,6 +233,12 @@ export const COMMAND_HANDLERS: Record<CommandId, CommandHandler> = {
   [COMMAND_IDS.FORMAT_P]: ({ editor }) => editor?.chain().focus().setParagraph().run(),
   [COMMAND_IDS.TOGGLE_TYPEWRITER_MODE]: ({ toggleTypewriterMode }) => toggleTypewriterMode(),
   [COMMAND_IDS.STORY_CARDS]: ({ openModal }) => openModal('storyCards'),
+  [COMMAND_IDS.WRITING_SPRINT]: ({ openModal }) => openModal('writingSprint'),
+  [COMMAND_IDS.GUIDED_FLOW]: ({ openModal }) => openModal('guidedFlow'),
+  [COMMAND_IDS.COVER_DESIGN]: ({ openModal }) => openModal('coverDesign'),
+  [COMMAND_IDS.SHARE]: ({ openModal }) => openModal('share'),
+  [COMMAND_IDS.FACT_CHECK]: ({ showToast }) => showToast('Select text and use /factcheck inline command', 'info', 'fact_check'),
+  [COMMAND_IDS.RESEARCH]: ({ showToast }) => showToast('Research panel — toggle from the sidebar', 'info', 'science'),
 };
 
 export const LOCAL_MENU_COMMANDS: ReadonlySet<CommandId> = new Set([

@@ -28,6 +28,9 @@ vi.mock('@/components/Editor/screenplayExtension', () => ({
 }));
 
 vi.mock('@/lib/findReplaceExtension', () => ({ FindReplaceExtension: {} }));
+vi.mock('@/lib/inlineAIExtension', () => ({ InlineAIExtension: {} }));
+vi.mock('@/lib/suggestionModeExtension', () => ({ SuggestionModeExtension: {} }));
+vi.mock('@/lib/grammarExtension', () => ({ GrammarCheckExtension: {} }));
 
 vi.mock('@/context/AppContext', () => ({
   AppProvider: ({ children }: { children: unknown }) => <>{children}</>,
@@ -74,6 +77,10 @@ vi.mock('@/components/Modals', () => ({
   CorkboardModal: () => null,
   StoryCardsModal: () => null,
   PublishAssistantModal: () => null,
+  WritingSprintModal: () => null,
+  GuidedFlowModal: () => null,
+  CoverDesignModal: () => null,
+  ShareModal: () => null,
 }));
 vi.mock('@/components/Windows', () => ({ SettingsWindow: () => null, AboutWindow: () => null }));
 vi.mock('@/components/UI', () => ({
@@ -106,6 +113,10 @@ vi.mock('@/hooks/useModalState', () => ({
       corkboard: false,
       storyCards: false,
       publishAssistant: false,
+      writingSprint: false,
+      guidedFlow: false,
+      coverDesign: false,
+      share: false,
     },
     openModal: vi.fn(),
     closeModal: vi.fn(),

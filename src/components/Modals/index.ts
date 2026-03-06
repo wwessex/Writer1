@@ -18,3 +18,7 @@ export { CorkboardModal } from './CorkboardModal';
 export { StoryCardsModal } from './StoryCardsModal';
 
 export { PublishAssistantModal } from './PublishAssistantModal';
+export { WritingSprintModal } from './WritingSprintModal';
+export { GuidedFlowModal } from './GuidedFlowModal';
+export { CoverDesignModal } from './CoverDesignModal';
+export { ShareModal } from './ShareModal';

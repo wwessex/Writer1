@@ -20,6 +20,11 @@ vi.mock('./ExportHistoryModal', () => ({ ExportHistoryModal: 'ExportHistoryModal
 vi.mock('./TranslationModal', () => ({ TranslationModal: 'TranslationModal' }));
 vi.mock('./CorkboardModal', () => ({ CorkboardModal: 'CorkboardModal' }));
 vi.mock('./StoryCardsModal', () => ({ StoryCardsModal: 'StoryCardsModal' }));
+vi.mock('./PublishAssistantModal', () => ({ PublishAssistantModal: 'PublishAssistantModal' }));
+vi.mock('./WritingSprintModal', () => ({ WritingSprintModal: 'WritingSprintModal' }));
+vi.mock('./GuidedFlowModal', () => ({ GuidedFlowModal: 'GuidedFlowModal' }));
+vi.mock('./CoverDesignModal', () => ({ CoverDesignModal: 'CoverDesignModal' }));
+vi.mock('./ShareModal', () => ({ ShareModal: 'ShareModal' }));
 
 import * as barrel from './index';
 
@@ -44,6 +49,11 @@ describe('Modals barrel export', () => {
       'TranslationModal',
       'CorkboardModal',
       'StoryCardsModal',
+      'PublishAssistantModal',
+      'WritingSprintModal',
+      'GuidedFlowModal',
+      'CoverDesignModal',
+      'ShareModal',
     ];
 
     for (const name of expected) {

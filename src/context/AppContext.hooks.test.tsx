@@ -35,6 +35,7 @@ vi.mock('@/lib/storage', () => ({
   deleteNovel: vi.fn(async () => undefined),
   updateNovel: vi.fn(async () => undefined),
   createSnapshot: mocks.createSnapshotMock,
+  getStoryBlueprint: vi.fn(() => null),
 }));
 
 vi.mock('@/components/UI', () => ({ useToast: () => ({ showErrorToast: vi.fn(), showToast: vi.fn() }) }));
