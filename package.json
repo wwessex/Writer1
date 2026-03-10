@@ -48,7 +48,6 @@
     "@tiptap/react": "^2.27.2",
     "@tiptap/starter-kit": "^2.27.2",
     "dexie": "^4.0.8",
-    "dexie-react-hooks": "^1.1.7",
     "docx": "^9.5.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.575.0",

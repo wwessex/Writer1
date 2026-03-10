@@ -1,10 +1,11 @@
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { IconButton, Button, Input, Textarea } from '@/components/UI';
 import { Tooltip } from '@/components/UI/Tooltip';
 import { Select } from '@/components/UI/Select';
 import type { Scene, SceneConflictType, SceneSimulationSwapCandidate } from '@/types';
 import { simulateChapterSceneChemistry } from '@/lib/sceneChemistry';
+import { useDragReorder } from '@/hooks/useDragReorder';
 import styles from './ScenePlanner.module.css';
 
 const STATUS_OPTIONS = [
@@ -20,23 +21,23 @@ export function ScenePlanner() {
   const [popoutSceneId, setPopoutSceneId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'planned' | 'draft' | 'revised' | 'final'>('all');
   const [productionTagFilter, setProductionTagFilter] = useState('all');
-  const [dragState, setDragState] = useState<{
-    dragging: boolean;
-    draggedId: string | null;
-    dropTargetId: string | null;
-  }>({
-    dragging: false,
-    draggedId: null,
-    dropTargetId: null
-  });
-  const [justMovedId, setJustMovedId] = useState<string | null>(null);
   const [simulatorOpen, setSimulatorOpen] = useState(false);
   const [simulatedSceneId, setSimulatedSceneId] = useState<string>('');
   const [swapCandidate, setSwapCandidate] = useState<SceneSimulationSwapCandidate>({});
-  const animRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const isScreenplay = state.projectType === 'screenplay';
   const scenes = useMemo(() => activeChapter?.scenes || [], [activeChapter?.scenes]);
+
+  const handleSceneReorder = useCallback((ids: string[]) => {
+    if (activeChapter) {
+      reorderScenes(activeChapter.id, ids);
+    }
+  }, [activeChapter, reorderScenes]);
+
+  const { dragState, justMovedId, handleDragStart, handleDragOver, handleDragEnd, handleDrop } = useDragReorder({
+    items: scenes,
+    onReorder: handleSceneReorder,
+  });
 
   const productionTags = useMemo(() => {
     const tags = new Set<string>();
@@ -56,47 +57,6 @@ export function ScenePlanner() {
       return statusOk && tagOk;
     });
   }, [scenes, statusFilter, productionTagFilter]);
-
-  const handleDragStart = useCallback((e: React.DragEvent, id: string) => {
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', id);
-    setDragState({ dragging: true, draggedId: id, dropTargetId: null });
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent, id: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDragState(prev => ({ ...prev, dropTargetId: id }));
-  }, []);
-
-  const handleDragEnd = useCallback(() => {
-    setDragState({ dragging: false, draggedId: null, dropTargetId: null });
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent, targetId: string) => {
-    e.preventDefault();
-    if (!activeChapter) return;
-
-    const draggedId = e.dataTransfer.getData('text/plain');
-    if (draggedId && draggedId !== targetId) {
-      const scenesCopy = [...scenes];
-      const dragIdx = scenesCopy.findIndex(s => s.id === draggedId);
-      const targetIdx = scenesCopy.findIndex(s => s.id === targetId);
-
-      if (dragIdx !== -1 && targetIdx !== -1) {
-        const [dragged] = scenesCopy.splice(dragIdx, 1);
-        const adjustedTargetIdx = dragIdx < targetIdx ? targetIdx - 1 : targetIdx;
-        scenesCopy.splice(adjustedTargetIdx, 0, dragged);
-        reorderScenes(activeChapter.id, scenesCopy.map(s => s.id));
-
-        setJustMovedId(draggedId);
-        clearTimeout(animRef.current);
-        animRef.current = setTimeout(() => setJustMovedId(null), 300);
-      }
-    }
-
-    setDragState({ dragging: false, draggedId: null, dropTargetId: null });
-  }, [activeChapter, scenes, reorderScenes]);
 
   const handleUpdate = (sceneId: string, updates: Partial<Scene>) => {
     if (!activeChapter) return;

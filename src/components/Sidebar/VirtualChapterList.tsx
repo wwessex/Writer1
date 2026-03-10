@@ -3,6 +3,7 @@ import { useApp } from '@/context/AppContext';
 import { IconButton, Button } from '@/components/UI';
 import { Select } from '@/components/UI/Select';
 import { countWords, editorToPlainText, formatRelativeTime } from '@/lib/utils';
+import { isMobileViewport } from '@/hooks/useIsMobile';
 import type { Chapter } from '@/types';
 import styles from './ChapterList.module.css';
 
@@ -142,7 +143,7 @@ export function VirtualChapterList() {
 
   const handleChapterSelect = useCallback((id: string) => {
     setActiveChapter(id);
-    if (window.matchMedia('(max-width: 820px)').matches && !state.settings.sidebarHidden) {
+    if (isMobileViewport() && !state.settings.sidebarHidden) {
       dispatch({ type: 'TOGGLE_SIDEBAR' });
     }
   }, [setActiveChapter, dispatch, state.settings.sidebarHidden]);

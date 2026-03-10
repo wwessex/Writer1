@@ -20,6 +20,7 @@ vi.mock('./ExportHistoryModal', () => ({ ExportHistoryModal: 'ExportHistoryModal
 vi.mock('./TranslationModal', () => ({ TranslationModal: 'TranslationModal' }));
 vi.mock('./CorkboardModal', () => ({ CorkboardModal: 'CorkboardModal' }));
 vi.mock('./StoryCardsModal', () => ({ StoryCardsModal: 'StoryCardsModal' }));
+vi.mock('./PublishAssistantModal', () => ({ PublishAssistantModal: 'PublishAssistantModal' }));
 
 import * as barrel from './index';
 
@@ -44,6 +45,7 @@ describe('Modals barrel export', () => {
       'TranslationModal',
       'CorkboardModal',
       'StoryCardsModal',
+      'PublishAssistantModal',
     ];
 
     for (const name of expected) {

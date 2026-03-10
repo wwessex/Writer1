@@ -1,5 +1,5 @@
 import type { Chapter, ChapterStatus } from '@/types';
-import { countWords, countSentences, countParagraphs, countCharacters, editorToPlainText } from '@/lib/utils';
+import { analyzeText, countWords, countSentences, countParagraphs, editorToPlainText } from '@/lib/utils';
 import { getContinuityMemorySnapshot } from '@/lib/continuityMemory';
 
 export type HeuristicMetricKey =
@@ -75,14 +75,15 @@ export interface ProjectMetrics {
 export function buildChapterMetrics(chapters: Chapter[]): ChapterMetric[] {
   return chapters.map(chapter => {
     const text = editorToPlainText(chapter.content);
+    const stats = analyzeText(text);
     return {
       id: chapter.id,
       order: chapter.order,
       title: chapter.title,
-      words: countWords(text),
-      sentences: countSentences(text),
-      paragraphs: countParagraphs(text),
-      characters: countCharacters(text),
+      words: stats.wordCount,
+      sentences: stats.sentenceCount,
+      paragraphs: stats.paragraphCount,
+      characters: stats.characterCount,
       status: chapter.status,
       wordGoal: chapter.wordGoal,
       updatedAt: chapter.updatedAt,

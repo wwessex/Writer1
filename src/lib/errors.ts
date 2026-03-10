@@ -107,19 +107,23 @@ async function getStorageMetadata(): Promise<ErrorEnvironmentMetadata['storage']
   }
 }
 
+const cachedStaticMetadata = {
+  appVersion: import.meta.env.VITE_APP_VERSION || '2.0.0',
+  userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+  platform: typeof navigator !== 'undefined' ? (navigator.platform || 'unknown') : 'unknown',
+  language: typeof navigator !== 'undefined' ? navigator.language : 'unknown',
+  brokerConfigured: Boolean(getBrokerBaseUrl()),
+  featureFlags: {
+    integrationsDeveloperMode: isIntegrationDeveloperModeEnabled(),
+    aiDeveloperMode: isAIDeveloperModeEnabled(),
+  },
+};
+
 export async function collectEnvironmentMetadata(): Promise<ErrorEnvironmentMetadata> {
   return {
-    appVersion: import.meta.env.VITE_APP_VERSION || '2.0.0',
-    userAgent: navigator.userAgent,
-    platform: navigator.platform || 'unknown',
+    ...cachedStaticMetadata,
     online: navigator.onLine,
-    language: navigator.language,
     timestamp: Date.now(),
-    brokerConfigured: Boolean(getBrokerBaseUrl()),
-    featureFlags: {
-      integrationsDeveloperMode: isIntegrationDeveloperModeEnabled(),
-      aiDeveloperMode: isAIDeveloperModeEnabled(),
-    },
     storage: await getStorageMetadata(),
   };
 }
