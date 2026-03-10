@@ -130,7 +130,6 @@ Writer1/
 │   │   ├── export/             # Modularized export system
 │   │   │   ├── types.ts        # Export type definitions
 │   │   │   ├── shared.ts       # Shared export utilities
-│   │   │   ├── manuscript.ts   # Manuscript export
 │   │   │   ├── manuscriptDocx.ts  # DOCX manuscript export
 │   │   │   ├── pdf.ts          # PDF export
 │   │   │   ├── rtf.ts          # RTF export
@@ -498,7 +497,7 @@ Located in `src/lib/integrations/`:
 ## Export System
 
 Export functionality is modularized in `src/lib/export/`:
-- `manuscript.ts` / `manuscriptDocx.ts` — DOCX manuscript export
+- `manuscriptDocx.ts` — DOCX manuscript export
 - `pdf.ts` — PDF export
 - `rtf.ts` — RTF export
 - `fountain.ts` — Fountain format export
