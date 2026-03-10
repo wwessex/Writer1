@@ -13,9 +13,7 @@ import { AppShell } from '@/components/AppShell/AppShell';
 import { QuickSwitcher } from '@/components/QuickSwitcher';
 import { FindReplace, useFindReplace } from '@/components/FindReplace';
 import {
-  ExportModal, SnapshotModal, AnalysisModal, WordCountModal, DashboardModal, OnboardingModal,
-  CharacterBibleModal, CommentModal,
-  ProjectsModal, SceneTemplatesModal, CorkboardModal, StoryCardsModal, PublishAssistantModal
+  ExportModal, OnboardingModal, ProjectsModal
 } from '@/components/Modals';
 import { SettingsWindow, AboutWindow } from '@/components/Windows';
 import { ToastProvider, useToast } from '@/components/UI';
@@ -63,6 +61,16 @@ const AdvancedAnalyticsModal = lazy(() => import('@/components/Modals/AdvancedAn
 const IntegrationsModal = lazy(() => import('@/components/Modals/IntegrationsModal').then((module) => ({ default: module.IntegrationsModal })));
 const ExportHistoryModal = lazy(() => import('@/components/Modals/ExportHistoryModal').then((module) => ({ default: module.ExportHistoryModal })));
 const TranslationModal = lazy(() => import('@/components/Modals/TranslationModal').then((module) => ({ default: module.TranslationModal })));
+const SnapshotModal = lazy(() => import('@/components/Modals/SnapshotModal').then((module) => ({ default: module.SnapshotModal })));
+const AnalysisModal = lazy(() => import('@/components/Modals/AnalysisModal').then((module) => ({ default: module.AnalysisModal })));
+const WordCountModal = lazy(() => import('@/components/Modals/WordCountModal').then((module) => ({ default: module.WordCountModal })));
+const DashboardModal = lazy(() => import('@/components/Modals/DashboardModal').then((module) => ({ default: module.DashboardModal })));
+const CharacterBibleModal = lazy(() => import('@/components/Modals/CharacterBibleModal').then((module) => ({ default: module.CharacterBibleModal })));
+const CommentModal = lazy(() => import('@/components/Modals/CommentModal').then((module) => ({ default: module.CommentModal })));
+const SceneTemplatesModal = lazy(() => import('@/components/Modals/SceneTemplatesModal').then((module) => ({ default: module.SceneTemplatesModal })));
+const CorkboardModal = lazy(() => import('@/components/Modals/CorkboardModal').then((module) => ({ default: module.CorkboardModal })));
+const StoryCardsModal = lazy(() => import('@/components/Modals/StoryCardsModal').then((module) => ({ default: module.StoryCardsModal })));
+const PublishAssistantModal = lazy(() => import('@/components/Modals/PublishAssistantModal').then((module) => ({ default: module.PublishAssistantModal })));
 
 function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits }: { screenplayMode: boolean; onToggleScreenplayMode: () => void; hasUnsavedEdits: boolean }) {
   const { state, activeChapter, loadNovel, loadNovelById, createChapter: createNewChapter, dispatch, updateSettings, setActiveChapter } = useApp();
@@ -316,33 +324,25 @@ function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits }: {
       />
 
       <ExportModal open={modals.export} onClose={() => closeModal('export')} />
-      <SnapshotModal open={modals.snapshot} onClose={() => closeModal('snapshot')} />
-      <AnalysisModal open={modals.analysis} onClose={() => closeModal('analysis')} />
-      <WordCountModal open={modals.wordCount} onClose={() => closeModal('wordCount')} />
-      <DashboardModal open={modals.dashboard} onClose={() => closeModal('dashboard')} onAction={handleMenuAction} />
       <OnboardingModal open={modals.onboarding} onClose={handleOnboardingClose} />
-      <CharacterBibleModal open={modals.characterBible} onClose={() => closeModal('characterBible')} />
-      <Suspense fallback={null}>
-        <AIWritingModal open={modals.aiWriting} onClose={() => closeModal('aiWriting')} />
-      </Suspense>
-      <CommentModal open={modals.comments} onClose={() => closeModal('comments')} />
-      <Suspense fallback={null}>
-        <AdvancedAnalyticsModal open={modals.advancedAnalytics} onClose={() => closeModal('advancedAnalytics')} />
-      </Suspense>
-      <Suspense fallback={null}>
-        <IntegrationsModal open={modals.integrations} onClose={() => closeModal('integrations')} />
-      </Suspense>
       <ProjectsModal open={modals.projects} onClose={() => closeModal('projects')} />
-      <SceneTemplatesModal open={modals.sceneTemplates} onClose={() => closeModal('sceneTemplates')} />
       <Suspense fallback={null}>
+        <SnapshotModal open={modals.snapshot} onClose={() => closeModal('snapshot')} />
+        <AnalysisModal open={modals.analysis} onClose={() => closeModal('analysis')} />
+        <WordCountModal open={modals.wordCount} onClose={() => closeModal('wordCount')} />
+        <DashboardModal open={modals.dashboard} onClose={() => closeModal('dashboard')} onAction={handleMenuAction} />
+        <CharacterBibleModal open={modals.characterBible} onClose={() => closeModal('characterBible')} />
+        <AIWritingModal open={modals.aiWriting} onClose={() => closeModal('aiWriting')} />
+        <CommentModal open={modals.comments} onClose={() => closeModal('comments')} />
+        <AdvancedAnalyticsModal open={modals.advancedAnalytics} onClose={() => closeModal('advancedAnalytics')} />
+        <IntegrationsModal open={modals.integrations} onClose={() => closeModal('integrations')} />
+        <SceneTemplatesModal open={modals.sceneTemplates} onClose={() => closeModal('sceneTemplates')} />
         <ExportHistoryModal open={modals.exportHistory} onClose={() => closeModal('exportHistory')} />
-      </Suspense>
-      <Suspense fallback={null}>
         <TranslationModal open={modals.translation} onClose={() => closeModal('translation')} />
+        <CorkboardModal open={modals.corkboard} onClose={() => closeModal('corkboard')} />
+        <StoryCardsModal open={modals.storyCards} onClose={() => closeModal('storyCards')} />
+        <PublishAssistantModal open={modals.publishAssistant} onClose={() => closeModal('publishAssistant')} />
       </Suspense>
-      <CorkboardModal open={modals.corkboard} onClose={() => closeModal('corkboard')} />
-      <StoryCardsModal open={modals.storyCards} onClose={() => closeModal('storyCards')} />
-      <PublishAssistantModal open={modals.publishAssistant} onClose={() => closeModal('publishAssistant')} />
 
       <SettingsWindow open={modals.settings} onClose={() => closeModal('settings')} />
       <AboutWindow open={modals.about} onClose={() => closeModal('about')} />

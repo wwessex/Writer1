@@ -1,5 +1,5 @@
 import type { Chapter, NarrativeClimateBand, NarrativeWeatherPoint } from '@/types';
-import { editorToPlainText } from '@/lib/utils';
+import { clamp, editorToPlainText } from '@/lib/utils';
 
 const POSITIVE_WORDS = new Set([
   'hope', 'joy', 'love', 'warm', 'bright', 'calm', 'safe', 'smile', 'relief', 'kind', 'gentle', 'glad', 'good', 'great', 'happy', 'wonder'
@@ -8,10 +8,6 @@ const POSITIVE_WORDS = new Set([
 const NEGATIVE_WORDS = new Set([
   'fear', 'dark', 'cold', 'anger', 'grief', 'pain', 'rage', 'storm', 'sad', 'alone', 'loss', 'threat', 'danger', 'hate', 'dread', 'wound'
 ]);
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
 
 function tokenizeWords(text: string): string[] {
   return text.toLowerCase().match(/[a-z']+/g) || [];

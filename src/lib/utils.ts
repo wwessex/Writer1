@@ -186,10 +186,14 @@ export function findLongSentences(text: string, maxWords: number = 30): string[]
 export function analyzeText(text: string) {
   const wordCount = countWords(text);
   const sentenceCount = countSentences(text);
+  const paragraphCount = countParagraphs(text);
+  const characterCount = countCharacters(text);
 
   return {
     wordCount,
     sentenceCount,
+    paragraphCount,
+    characterCount,
     avgSentenceLength: sentenceCount > 0 ? Math.round(wordCount / sentenceCount * 10) / 10 : 0,
     fleschScore: calculateFleschScore(text),
     repetitions: findRepetitions(text),

@@ -1,79 +1,26 @@
-import { useState, useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 import { useApp } from '@/context/AppContext';
 import { IconButton, Button } from '@/components/UI';
 import { Tooltip } from '@/components/UI/Tooltip';
 import { countWords, editorToPlainText, formatRelativeTime } from '@/lib/utils';
+import { useDragReorder } from '@/hooks/useDragReorder';
+import { isMobileViewport } from '@/hooks/useIsMobile';
 import styles from './ChapterList.module.css';
-
-interface DragState {
-  dragging: boolean;
-  draggedId: string | null;
-  dropTargetId: string | null;
-  dropPosition: 'above' | 'below' | null;
-}
 
 export function ChapterList() {
   const { state, dispatch, setActiveChapter, createChapter, reorderChapters } = useApp();
-  const [dragState, setDragState] = useState<DragState>({
-    dragging: false,
-    draggedId: null,
-    dropTargetId: null,
-    dropPosition: null
+  const { dragState, justMovedId, handleDragStart, handleDragOver, handleDragEnd, handleDrop } = useDragReorder({
+    items: state.chapters,
+    onReorder: reorderChapters,
+    trackDropPosition: true,
   });
-  const [justMovedId, setJustMovedId] = useState<string | null>(null);
-  const animTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const handleChapterSelect = useCallback((id: string) => {
     setActiveChapter(id);
-    if (window.matchMedia('(max-width: 820px)').matches && !state.settings.sidebarHidden) {
+    if (isMobileViewport() && !state.settings.sidebarHidden) {
       dispatch({ type: 'TOGGLE_SIDEBAR' });
     }
   }, [setActiveChapter, dispatch, state.settings.sidebarHidden]);
-
-  const handleDragStart = useCallback((e: React.DragEvent, id: string) => {
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', id);
-    setDragState({ dragging: true, draggedId: id, dropTargetId: null, dropPosition: null });
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent, id: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const midY = rect.top + rect.height / 2;
-    const position = e.clientY < midY ? 'above' : 'below';
-    setDragState(prev => ({ ...prev, dropTargetId: id, dropPosition: position }));
-  }, []);
-
-  const handleDragEnd = useCallback(() => {
-    setDragState({ dragging: false, draggedId: null, dropTargetId: null, dropPosition: null });
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent, targetId: string) => {
-    e.preventDefault();
-    const draggedId = e.dataTransfer.getData('text/plain');
-
-    if (draggedId && draggedId !== targetId) {
-      const chapters = [...state.chapters];
-      const draggedIndex = chapters.findIndex(ch => ch.id === draggedId);
-      const targetIndex = chapters.findIndex(ch => ch.id === targetId);
-
-      if (draggedIndex !== -1 && targetIndex !== -1) {
-        const [dragged] = chapters.splice(draggedIndex, 1);
-        const adjustedTargetIndex = draggedIndex < targetIndex ? targetIndex - 1 : targetIndex;
-        const insertIndex = dragState.dropPosition === 'below' ? adjustedTargetIndex + 1 : adjustedTargetIndex;
-        chapters.splice(insertIndex, 0, dragged);
-        reorderChapters(chapters.map(ch => ch.id));
-
-        // Trigger animation on the moved item
-        setJustMovedId(draggedId);
-        clearTimeout(animTimeoutRef.current);
-        animTimeoutRef.current = setTimeout(() => setJustMovedId(null), 300);
-      }
-    }
-
-    setDragState({ dragging: false, draggedId: null, dropTargetId: null, dropPosition: null });
-  }, [state.chapters, reorderChapters, dragState.dropPosition]);
 
   return (
     <section className={styles.chapterList} role="navigation" aria-label={state.projectType === 'screenplay' ? 'Scenes' : 'Chapters'}>

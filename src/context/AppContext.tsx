@@ -26,8 +26,10 @@ import {
 } from './services/appServices';
 import { getWorkspaceStore, setLastOpenedChapter, trackProjectOpen } from './services/workspaceService';
 
+import { isMobileViewport } from '@/hooks/useIsMobile';
+
 const MAX_UNDO_STACK = 20;
-const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches;
+const isMobile = isMobileViewport();
 
 interface AppContextType {
   state: AppState;
