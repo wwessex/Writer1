@@ -2,76 +2,165 @@
 
 ## Project Overview
 
-DraftHarbour Studio is an **offline-first Progressive Web Application (PWA)** for writing novels and screenplays. It is a React + TypeScript application built with Vite, featuring rich text editing via Tiptap, chapter/scene management, multi-format export, AI writing assistance, and optional cloud sync integrations.
+DraftHarbour Studio is an **offline-first Progressive Web Application (PWA)** for writing novels and screenplays, with cross-platform desktop (Tauri) and mobile (Capacitor/iOS) builds. It is a React + TypeScript application built with Vite, featuring rich text editing via Tiptap, chapter/scene management, multi-format export, AI writing assistance, writing analysis tools, and optional cloud sync integrations.
 
 **Key characteristics:**
 - React 19 + TypeScript with Vite build tooling
 - Tiptap 2 (ProseMirror) rich text editor via `@tiptap/react`
 - IndexedDB for local data persistence (Dexie ORM)
 - Dual project types: **Book** and **Screenplay**
-- CSS Modules for component-scoped styling
+- CSS Modules + Tailwind CSS 4 for styling
 - PWA via `vite-plugin-pwa` + Workbox
-- ~24,100 lines of source code across ~95 TypeScript/TSX and ~23 CSS files
+- Tauri 2 desktop app (macOS, Windows, Linux)
+- Capacitor 8 mobile app (iOS)
+- Server-side integration broker (PHP proxy + TypeScript handler)
+- ~241 TypeScript/TSX files and ~25 CSS files
 
 ## Architecture
 
 ```
 Writer1/
 ├── index.html                  # Vite entry HTML (mounts #root)
-├── vite.config.ts              # Vite + React + PWA plugin config
+├── vite.config.ts              # Vite + React + Tailwind + PWA plugin config
 ├── tsconfig.json               # TypeScript config (strict, ES2022, @/* alias)
 ├── eslint.config.js            # ESLint flat config (typescript-eslint + react-hooks)
+├── capacitor.config.ts         # Capacitor mobile config (iOS)
 ├── package.json                # npm deps, scripts
 ├── public/                     # Static assets served as-is
 │   ├── assets/                 # PWA icons, branding images
 │   ├── brand/                  # Logo SVGs
 │   └── CNAME                   # GitHub Pages custom domain
+├── api/                        # PHP server proxy for AI/integrations
+│   ├── index.php               # Entry point: CORS, routing, rate limiting
+│   ├── _config.php             # API keys, rate limits, allowed origins
+│   ├── _rateLimit.php          # Rate limiting implementation
+│   └── _chatHandler.php        # AI chat request handler
+├── desktop/                    # Tauri desktop application
+│   ├── package.json            # Desktop build scripts
+│   └── src-tauri/              # Rust source + Tauri config
+│       ├── tauri.conf.json     # Bundle targets, signing, deep links
+│       ├── src/main.rs         # Rust entry point
+│       └── Cargo.toml          # Rust dependencies
+├── ios/                        # Capacitor iOS project
+│   └── App/                    # Xcode project (AppDelegate, storyboards)
+├── scripts/                    # Build & QA scripts
+│   ├── check-bundle-size.mjs   # Bundle size validation
+│   ├── check-asset-duplicates.mjs
+│   ├── check-touched-coverage.mjs
+│   ├── test-inventory.mjs      # Test file organization check
+│   ├── verify-vite-config.mjs
+│   └── verify-release-artifacts.mjs
+├── docs/                       # Operational documentation
+│   ├── design-error-handling.md
+│   ├── asset-audit.md
+│   └── releases/              # Release checklists, runbooks, manifests
 ├── src/
 │   ├── main.tsx                # React entry point, StrictMode mount
 │   ├── App.tsx                 # Root component: editor setup, keyboard shortcuts, layout
 │   ├── App.module.css          # Root layout styles
 │   ├── styles/index.css        # Global CSS: reset, design tokens, themes
 │   ├── types/index.ts          # All TypeScript interfaces and type aliases
-│   ├── context/AppContext.tsx   # React Context + useReducer state management
 │   ├── declarations.d.ts       # CSS module type declarations
 │   ├── vite-env.d.ts           # Vite client types
+│   ├── context/
+│   │   ├── AppContext.tsx       # React Context provider (delegates to services/state)
+│   │   ├── appSettings.ts      # Settings type definitions and defaults
+│   │   ├── services/           # Side-effect services (storage, secrets)
+│   │   │   ├── appServices.ts  # Novel/chapter loading, settings persistence
+│   │   │   └── workspaceService.ts  # Workspace & last-opened tracking
+│   │   └── state/
+│   │       └── appReducer.ts   # Pure reducer for AppState
 │   ├── hooks/
 │   │   ├── useModalState.ts    # Modal open/close/toggle reducer
 │   │   └── useResizable.ts     # Draggable panel resize hook
+│   ├── server/
+│   │   └── integrationBroker.ts  # Node.js/Lambda backend handler
+│   ├── test/
+│   │   └── setup.ts            # Vitest global setup (matchMedia stub)
 │   ├── components/
+│   │   ├── AppShell/           # Main layout grid component
 │   │   ├── Editor/             # Tiptap editor wrapper, screenplay extension
 │   │   ├── FindReplace/        # In-editor find & replace (Ctrl+F/H)
 │   │   ├── Header/             # Top header bar + formatting toolbar
 │   │   ├── Inspector/          # Right panel: chapter metadata, stats
 │   │   ├── Menu/               # Application menu bar
-│   │   ├── Modals/             # 14 modal dialogs (export, settings, AI, etc.)
+│   │   ├── Modals/             # Modal dialogs (export, settings, AI, etc.)
+│   │   │   └── AIWritingModal/ # Multi-provider AI writing assistant
 │   │   ├── Panels/             # AI suggestions sliding panel
 │   │   ├── QuickSwitcher/      # Ctrl+K quick chapter/action/search switcher
 │   │   ├── Sidebar/            # Left panel: chapter list, outline, scene planner
 │   │   ├── UI/                 # Shared primitives: Button, Dialog, Input, Pill, Toast, Tooltip
 │   │   ├── Windows/            # Settings and About floating windows
+│   │   ├── layout/             # Layout sub-components (editor, inspector, sidebar)
+│   │   ├── PanelErrorBoundary.tsx
 │   │   └── ErrorBoundary.tsx   # Top-level React error boundary
 │   ├── lib/
-│   │   ├── storage.ts          # Dexie DB schema, CRUD for novels/chapters/snapshots
 │   │   ├── commands.ts         # Typed command registry (COMMAND_IDS + handlers)
-│   │   ├── export.ts           # DOCX, PDF, screenplay PDF, RTF, Fountain export
-│   │   ├── import.ts           # DOCX, RTF, TXT, Fountain import with chapter detection
 │   │   ├── utils.ts            # Text analysis, word count, Flesch score, debounce, IDs
+│   │   ├── import.ts           # DOCX, RTF, TXT, Fountain import with chapter detection
 │   │   ├── search.ts           # Content search for quick switcher
 │   │   ├── adapters.ts         # Data shape adapters between formats
 │   │   ├── encryption.ts       # AES-GCM encryption helpers for sync
+│   │   ├── errors.ts           # Centralized error handling & sanitization
 │   │   ├── exportHistory.ts    # Export history tracking
+│   │   ├── exportValidation.ts # Post-export validation
+│   │   ├── featureFlags.ts     # Runtime feature toggles (env-based)
 │   │   ├── findReplaceExtension.ts  # Tiptap ProseMirror find/replace plugin
 │   │   ├── plugins.ts          # Plugin system manifest + hooks
+│   │   ├── policy.ts           # Managed settings policy enforcement
 │   │   ├── progressTracker.ts  # Daily word goal and progress tracking
 │   │   ├── projectMetrics.ts   # Novel/project-level metrics computation
 │   │   ├── telemetry.ts        # Privacy-respecting usage telemetry
-│   │   ├── ai/                 # AI provider abstraction (Chrome AI, OpenAI)
-│   │   └── integrations/       # Cloud sync: Dropbox, Google Drive, Scrivener
+│   │   ├── nativeMenuAdapter.ts  # Tauri native menu ↔ React command bridge
+│   │   ├── desktopSecrets.ts   # Tauri keychain secret storage
+│   │   ├── desktopUpdater.ts   # Desktop auto-update (channels: stable/beta/nightly)
+│   │   ├── secureCache.ts      # AES-GCM encrypted local caching
+│   │   ├── aiRevisionLog.ts    # History of AI-assisted text revisions
+│   │   ├── voiceFingerprint.ts # Character voice consistency analysis
+│   │   ├── narrativeWeather.ts # Emotional tone & pacing tracking
+│   │   ├── sceneChemistry.ts   # Scene dynamics & conflict analysis
+│   │   ├── continuityMemory.ts # Continuity & consistency tracking
+│   │   ├── timelineConsistency.ts  # Timeline event ordering validation
+│   │   ├── storage/            # Modularized data persistence
+│   │   │   ├── db.ts           # Dexie database instance
+│   │   │   ├── novels.ts       # Novel CRUD
+│   │   │   ├── chapters.ts     # Chapter CRUD
+│   │   │   ├── snapshots.ts    # Snapshot CRUD
+│   │   │   └── migrations.ts   # Schema migrations
+│   │   ├── export/             # Modularized export system
+│   │   │   ├── types.ts        # Export type definitions
+│   │   │   ├── shared.ts       # Shared export utilities
+│   │   │   ├── manuscriptDocx.ts  # DOCX manuscript export
+│   │   │   ├── pdf.ts          # PDF export
+│   │   │   ├── rtf.ts          # RTF export
+│   │   │   ├── fountain.ts     # Fountain format export
+│   │   │   ├── screenplay.ts   # Screenplay-specific export
+│   │   │   └── boundary/       # External library adapters
+│   │   │       ├── docxCompat.ts
+│   │   │       └── pdfmake.ts
+│   │   ├── ai/                 # AI provider abstraction
+│   │   │   ├── chromeAI.ts     # Browser-native window.ai provider
+│   │   │   ├── openaiProvider.ts  # OpenAI-compatible API provider
+│   │   │   ├── serverProxyProvider.ts  # Server broker proxy provider
+│   │   │   ├── providerManager.ts  # Provider auto-detection & config
+│   │   │   ├── availability.ts # Runtime provider availability detection
+│   │   │   └── pipelines.ts    # Staged AI revision workflows
+│   │   └── integrations/       # Cloud sync
+│   │       ├── dropbox.ts      # Dropbox OAuth2 sync
+│   │       ├── googleDrive.ts  # Google Drive OAuth2 sync
+│   │       ├── dropboxDirect.ts   # Direct Dropbox API client
+│   │       ├── googleDriveDirect.ts  # Direct Google Drive API client
+│   │       ├── scrivener.ts    # Scrivener project import/export
+│   │       ├── sync.ts         # Bidirectional sync with conflict detection
+│   │       ├── orchestration.ts  # Multi-provider sync coordination
+│   │       ├── brokerClient.ts # Client for server-side integration broker
+│   │       └── providerClient.ts  # HTTP client with retry policy
 │   └── assets/                 # Imported assets (icons, images)
 └── .github/workflows/
-    ├── deploy.yml              # Deploy to GitHub Pages (npm ci → build → deploy)
-    └── build-static-zip.yml    # Build dist/ and upload ZIP artifact
+    ├── deploy.yml              # Deploy to GitHub Pages
+    ├── build-static-zip.yml    # Build dist/ ZIP artifact
+    ├── pr-check.yml            # Pull request validation
+    └── desktop-release.yml     # Desktop app release builds
 ```
 
 ## Technology Stack
@@ -81,14 +170,18 @@ Writer1/
 | UI Framework | React | 19.x |
 | Language | TypeScript | ~5.6 |
 | Build Tool | Vite | 6.x |
-| Editor | Tiptap (ProseMirror) via `@tiptap/react` | 2.11.5 |
+| Editor | Tiptap (ProseMirror) via `@tiptap/react` | 2.27.2 |
 | Database | Dexie (IndexedDB) | 4.0.8 |
+| Styling | CSS Modules + Tailwind CSS | 4.2 |
 | Export | docx, pdfmake, built-in RTF/Fountain | 9.5.0 / 0.2.10 |
 | Import | jszip (DOCX), custom RTF/TXT/Fountain parsers | 3.10.1 |
-| Testing | Vitest | 4.x |
+| Testing | Vitest + @vitest/coverage-v8 | 4.x |
 | Linting | ESLint (flat config) + typescript-eslint | 9.x |
 | PWA | vite-plugin-pwa + Workbox | 0.21.x |
-| Icons | Material Symbols Rounded (Google Fonts CDN) | — |
+| Icons | lucide-react + Material Symbols (Google Fonts CDN) | 0.575.0 |
+| Desktop | Tauri | 2.x |
+| Mobile | Capacitor (iOS) | 8.x |
+| Pre-commit | Husky + lint-staged | 9.x |
 
 ## Development Workflow
 
@@ -99,12 +192,41 @@ npm install
 
 ### Scripts
 ```bash
+# Core development
 npm run dev          # Vite dev server with HMR
 npm run build        # TypeScript check + Vite production build → dist/
 npm run preview      # Preview production build locally
-npm run lint         # ESLint across all .ts/.tsx files
+npm run lint         # ESLint across all .ts/.tsx files (--max-warnings 0)
 npm run typecheck    # TypeScript --noEmit type checking only
 npm run test         # Vitest test runner (single run)
+
+# Full CI pipeline (runs all checks)
+npm run ci           # lint → typecheck → verify:vite-config → test:coverage → build → bundle:check → assets:check
+
+# Testing & coverage
+npm run test:coverage     # Vitest with coverage enabled
+npm run coverage:changed  # Coverage check for changed files only
+npm run test:inventory    # Validate test file organization
+
+# Bundle & asset analysis
+npm run bundle:analyze    # Build + check bundle sizes
+npm run bundle:check      # Check bundle sizes (CI mode)
+npm run assets:check      # Detect duplicate assets
+
+# Desktop (Tauri)
+npm run desktop:dev       # Tauri dev mode
+npm run desktop:build     # Tauri production build
+npm run desktop:build:mac # macOS universal build
+npm run desktop:build:win # Windows build
+npm run desktop:build:linux  # Linux build
+
+# Mobile (Capacitor)
+npm run build:native      # Build + cap sync
+npm run cap:sync          # Sync web assets to native projects
+npm run cap:open:ios      # Open in Xcode
+
+# Release
+npm run release:verify-artifacts  # Validate release artifacts
 ```
 
 ### Path Aliases
@@ -117,10 +239,21 @@ import type { Chapter } from '@/types';
 ### PWA During Development
 The PWA service worker is auto-registered by `vite-plugin-pwa`. During development, Workbox manages caching. If stale caches cause issues, clear Application → Cache Storage in DevTools.
 
+### Feature Flags
+Runtime toggles via environment variables in `src/lib/featureFlags.ts`:
+- `VITE_INTEGRATIONS_DEVELOPER_MODE` — enables integration dev tools
+- `VITE_AI_DEVELOPER_MODE` — enables AI debug features
+- `VITE_BROKER_BASE_URL` — server broker endpoint URL
+
 ## State Management
 
 ### AppContext (React Context + useReducer)
-All application state lives in `src/context/AppContext.tsx`:
+Application state is managed through `src/context/AppContext.tsx`, which delegates to:
+
+- **`src/context/state/appReducer.ts`** — pure reducer function with all action types
+- **`src/context/services/appServices.ts`** — side-effect services for storage I/O, settings persistence, and desktop secrets integration
+- **`src/context/services/workspaceService.ts`** — workspace tracking and last-opened chapter persistence
+- **`src/context/appSettings.ts`** — settings type definitions and defaults
 
 ```typescript
 interface AppState {
@@ -139,7 +272,7 @@ The `AppProvider` component exposes:
 - `state` and `dispatch` for the reducer
 - Action methods: `loadNovel`, `createChapter`, `deleteChapter`, `updateChapter`, `reorderChapters`, `setActiveChapter`, etc.
 - Scene CRUD: `addScene`, `updateScene`, `deleteScene`, `reorderScenes`
-- `updateSettings` for persisting settings to localStorage
+- `updateSettings` for persisting settings to localStorage (with desktop keychain support)
 
 Access via the `useApp()` hook:
 ```typescript
@@ -149,6 +282,7 @@ const { state, activeChapter, createChapter, dispatch } = useApp();
 ### Settings Persistence
 - **localStorage** (`draftharbour_settings_v1`): App settings, theme, typography prefs, goal trends, comment threads
 - **IndexedDB** (`DraftHarbourDB`): Novels, chapters (with content), snapshots
+- **Tauri keychain** (desktop only): Sensitive credentials via `src/lib/desktopSecrets.ts`
 
 ### Command System
 All UI actions go through a typed command registry in `src/lib/commands.ts`:
@@ -158,6 +292,13 @@ runCommand(COMMAND_IDS.NEW_CHAPTER, context);
 ```
 
 ## Data Schema (IndexedDB via Dexie)
+
+Storage is modularized in `src/lib/storage/`:
+- `db.ts` — Dexie database instance and initialization
+- `novels.ts` — Novel CRUD operations
+- `chapters.ts` — Chapter CRUD operations
+- `snapshots.ts` — Snapshot/version control CRUD
+- `migrations.ts` — Schema migrations between DB versions
 
 ```typescript
 // Database: DraftHarbourDB — version 3
@@ -203,14 +344,14 @@ ComponentName/
 └── index.ts                   # Re-export barrel
 ```
 
-### CSS Modules
-All component styles use CSS Modules (`.module.css`) imported as `styles`:
+### CSS Modules + Tailwind
+Component styles use CSS Modules (`.module.css`) imported as `styles`:
 ```typescript
 import styles from './Editor.module.css';
 <div className={styles.editor}>
 ```
 
-Global styles and design tokens live in `src/styles/index.css`.
+Tailwind CSS 4 is also available for utility classes. Global styles and design tokens live in `src/styles/index.css`.
 
 ### Theming
 Three themes controlled via `data-theme` attribute on `<html>`:
@@ -265,19 +406,138 @@ const pdfMake = await import('pdfmake/build/pdfmake.min.js');
 ### Autosave
 Chapter content changes are debounced (default 800ms) before writing to IndexedDB. The debounce interval is configurable via settings.
 
+### Code Splitting
+Vite config defines manual chunks for large feature areas:
+- `export` — export libraries (docx, pdfmake)
+- `ai` — AI provider modules
+- `integrations` — cloud sync modules
+
+## Cross-Platform (Desktop & Mobile)
+
+### Tauri Desktop App
+The `desktop/` directory contains a Tauri 2 wrapper for cross-platform desktop distribution.
+
+**Features:**
+- Single-instance enforcement
+- Window state restoration
+- `.dhproj` file associations
+- `draftharbour://` deep links
+- Native menu integration via `src/lib/nativeMenuAdapter.ts`
+- Auto-update system via `src/lib/desktopUpdater.ts` (stable/beta/nightly channels)
+- Secure credential storage via `src/lib/desktopSecrets.ts` (OS keychain)
+
+**Platform detection:**
+```typescript
+import { isDesktop } from '@/lib/desktopSecrets';
+if (isDesktop()) { /* Tauri-specific behavior */ }
+```
+
+### Capacitor iOS App
+The `ios/` directory contains a Capacitor project for iOS distribution. Build with `npm run build:native` then open in Xcode via `npm run cap:open:ios`.
+
+## Writing Analysis Tools
+
+Located in `src/lib/`, these modules provide AI-powered writing insights:
+
+| Module | Purpose |
+|--------|---------|
+| `voiceFingerprint.ts` | Detects similar character voices across chapters by analyzing speech patterns, vocabulary, and sentence structure |
+| `narrativeWeather.ts` | Tracks emotional tone (sentiment) and pacing intensity through chapters to visualize the narrative arc |
+| `sceneChemistry.ts` | Analyzes scene dynamics — tension, stakes, readability, conflict types — and suggests reordering |
+| `continuityMemory.ts` | Tracks character appearances, relationships, timeline events, and world rules; detects continuity conflicts |
+| `timelineConsistency.ts` | Validates event ordering and detects timeline gaps |
+
+## AI Integration
+
+### Providers
+Located in `src/lib/ai/`:
+- **Chrome AI** (`chromeAI.ts`): Browser-native `window.ai` API (Chrome Canary/Dev)
+- **OpenAI** (`openaiProvider.ts`): OpenAI-compatible API endpoints
+- **Server Proxy** (`serverProxyProvider.ts`): Routes through the server-side integration broker, supporting Groq, OpenRouter, and Gemini
+
+### Provider Management
+- `providerManager.ts` — auto-detects best available provider, persists config to localStorage
+- `availability.ts` — runtime detection of which providers are available
+
+### AI Pipelines
+- `pipelines.ts` — staged revision workflows with configurable insertion modes
+- `aiRevisionLog.ts` — tracks before/after text for every AI revision (stored in localStorage, max 100 records) for undo/audit
+
+### AI Writing Modal
+`src/components/Modals/AIWritingModal/` — multi-provider AI writing interface with preset prompts, continuity context injection, BYOK support, and revision history.
+
+## Server-Side Backend
+
+### PHP Proxy (`api/`)
+Server-side proxy that isolates API keys from the client:
+- `index.php` — entry point with CORS handling and routing
+- `_config.php` — API key storage, rate limits, allowed origins
+- `_rateLimit.php` — per-IP rate limiting (default 20 req/60sec)
+- `_chatHandler.php` — forwards AI chat requests to providers
+- Supports BYOK (bring-your-own-key) mode
+
+### Integration Broker (`src/server/integrationBroker.ts`)
+TypeScript request handler deployable as Node.js/Lambda backend:
+- Handles OAuth flows for cloud providers
+- Processes sync operations (connect, push, pull)
+- Routes AI generation requests to multiple providers
+- Error mapping and response normalization
+
+## Cloud Integrations
+
+Located in `src/lib/integrations/`:
+- **Dropbox** (`dropbox.ts`, `dropboxDirect.ts`): OAuth2 file sync
+- **Google Drive** (`googleDrive.ts`, `googleDriveDirect.ts`): OAuth2 file sync
+- **Scrivener** (`scrivener.ts`): Project file import/export
+- **Sync engine** (`sync.ts`): Bidirectional sync with conflict detection
+- **Orchestration** (`orchestration.ts`): Coordinates multi-provider sync
+- **Broker client** (`brokerClient.ts`): Client for server-side integration broker
+- **Provider client** (`providerClient.ts`): HTTP client with retry policy
+
+## Export System
+
+Export functionality is modularized in `src/lib/export/`:
+- `manuscriptDocx.ts` — DOCX manuscript export
+- `pdf.ts` — PDF export
+- `rtf.ts` — RTF export
+- `fountain.ts` — Fountain format export
+- `screenplay.ts` — Screenplay-specific export
+- `shared.ts` — shared utilities
+- `types.ts` — type definitions
+- `boundary/` — external library adapters (`docxCompat.ts`, `pdfmake.ts`)
+
+## Project Types
+
+The app supports two project modes:
+- **Book**: Chapters with prose content, traditional export formats
+- **Screenplay**: Scenes with screenplay-typed paragraphs (scene-heading, action, character, dialogue, parenthetical, transition), Fountain format support, screenplay PDF export
+
+The `projectType` field is stored on the novel and affects chapter creation, editor behavior, export options, and UI labels.
+
 ## Testing
 
 ### Framework: Vitest
 ```bash
-npm run test         # Run all tests once
+npm run test              # Run all tests once
+npm run test:coverage     # Run with coverage
+npm run coverage:changed  # Coverage for changed files only
+npm run test:inventory    # Validate test organization
 ```
 
+### Test Setup
+Global test setup in `src/test/setup.ts` (stubs `window.matchMedia` for jsdom compatibility).
+
 ### Test Files
-Test files are co-located with source using `.test.ts` suffix:
+Test files are co-located with source using `.test.ts` / `.test.tsx` suffix:
 - `src/lib/utils.test.ts` — utility function tests
 - `src/lib/export.screenplay.test.ts` — screenplay export tests
 - `src/lib/import.screenplay.test.ts` — screenplay import tests
 - `src/lib/integrations/sync.test.ts` — sync integration tests
+- `src/context/state/appReducer.test.ts` — state reducer tests
+- `src/server/integrationBroker.contract.test.ts` — broker contract tests
+- `src/lib/nativeMenuAdapter.test.ts` — native menu bridge tests
+- `src/lib/timelineConsistency.test.ts` — timeline validation tests
+- `src/components/AppShell/AppShell.test.tsx` — layout component tests
 
 ### Manual Testing
 For UI features without automated tests, test in browser:
@@ -293,8 +553,8 @@ For UI features without automated tests, test in browser:
 3. Add UI component in `src/components/` with CSS Module
 4. Add business logic in `src/lib/`
 5. Wire into `App.tsx` or relevant parent component
-6. If persisted, update `src/lib/storage.ts` schema/operations
-7. Run `npm run lint && npm run typecheck` to verify
+6. If persisted, update relevant module in `src/lib/storage/`
+7. Run `npm run ci` for full validation (or `npm run lint && npm run typecheck` for quick checks)
 
 ### Adding a New Modal
 1. Add key to `ModalKey` in `src/hooks/useModalState.ts`
@@ -311,50 +571,40 @@ For UI features without automated tests, test in browser:
 
 ### Adding Storage Fields
 1. Add field to type in `src/types/index.ts`
-2. Update `createChapter()` or `createNovel()` in `src/lib/storage.ts`
-3. Handle in relevant components
+2. Update relevant module in `src/lib/storage/` (`chapters.ts`, `novels.ts`, etc.)
+3. Add migration if needed in `src/lib/storage/migrations.ts`
+4. Handle in relevant components
 
 ### Adding Export Formats
 1. Add format to `ExportFormat` type in `src/types/index.ts`
-2. Implement export function in `src/lib/export.ts` (lazy-load heavy deps)
-3. Add option in `src/components/Modals/ExportModal.tsx`
+2. Create export module in `src/lib/export/` (lazy-load heavy deps)
+3. Add library adapter in `src/lib/export/boundary/` if needed
+4. Add option in `src/components/Modals/ExportModal.tsx`
 
 ### Adding Import Formats
 1. Add parser function in `src/lib/import.ts`
 2. Update accepted file extensions in `App.tsx` file input
-
-## AI Integration
-
-Two provider types in `src/lib/ai/`:
-- **Chrome AI** (`chromeAI.ts`): Uses the browser-native `window.ai` API (Chrome Canary/Dev)
-- **OpenAI** (`openaiProvider.ts`): Uses OpenAI-compatible API endpoints
-
-Provider management via `providerManager.ts`: auto-detects best available provider, persists config to localStorage.
-
-## Cloud Integrations
-
-Located in `src/lib/integrations/`:
-- **Dropbox** (`dropbox.ts`): OAuth2 file sync
-- **Google Drive** (`googleDrive.ts`): OAuth2 file sync
-- **Scrivener** (`scrivener.ts`): Project file import/export
-- **Sync engine** (`sync.ts`): Bidirectional sync with conflict detection
-- **Orchestration** (`orchestration.ts`): Coordinates multi-provider sync
-
-## Project Types
-
-The app supports two project modes:
-- **Book**: Chapters with prose content, traditional export formats
-- **Screenplay**: Scenes with screenplay-typed paragraphs (scene-heading, action, character, dialogue, parenthetical, transition), Fountain format support, screenplay PDF export
-
-The `projectType` field is stored on the novel and affects chapter creation, editor behavior, export options, and UI labels.
 
 ## CI/CD
 
 ### GitHub Actions
 - **deploy.yml**: On push to `main` → `npm ci` → `npm run build` → deploy `dist/` to GitHub Pages
 - **build-static-zip.yml**: On push to `main` → build → create ZIP artifact for cPanel deployment
+- **pr-check.yml**: On pull request → runs lint, typecheck, tests, build validation
+- **desktop-release.yml**: Desktop app release builds for macOS, Windows, Linux
 
-Both use Node.js 20.
+All use Node.js 20.
+
+### Pre-commit Hooks
+Husky + lint-staged runs ESLint on staged `.ts/.tsx` files before each commit.
+
+### QA Scripts (`scripts/`)
+- `check-bundle-size.mjs` — validates chunk sizes stay within limits
+- `check-asset-duplicates.mjs` — detects duplicate asset files
+- `check-touched-coverage.mjs` — ensures test coverage for changed files
+- `test-inventory.mjs` — validates test file organization
+- `verify-vite-config.mjs` — validates Vite config integrity
+- `verify-release-artifacts.mjs` — validates release checksums and manifests
 
 ## Git Conventions
 
@@ -371,6 +621,11 @@ Both use Node.js 20.
 - All data stored locally by default (IndexedDB + localStorage)
 - No tracking or analytics beyond optional privacy-respecting telemetry
 - AES-GCM encryption available for sync data (`src/lib/encryption.ts`)
+- Encrypted local caching for sensitive data (`src/lib/secureCache.ts`)
+- Desktop keychain integration for credentials (`src/lib/desktopSecrets.ts`)
+- Error sanitization redacts API keys and tokens from error messages (`src/lib/errors.ts`)
+- Managed settings policy enforcement (`src/lib/policy.ts`)
+- Server proxy (`api/`) isolates API keys from client-side code
 - Optional cloud sync requires explicit user configuration
 - User-provided content in exports is escaped to prevent injection
 - HTML escaping utility in `src/lib/utils.ts` (`escapeHtml`)
@@ -381,18 +636,31 @@ Both use Node.js 20.
 |------|----------|
 | Add/modify types | `src/types/index.ts` |
 | App state management | `src/context/AppContext.tsx` |
-| Data persistence | `src/lib/storage.ts` |
+| State reducer | `src/context/state/appReducer.ts` |
+| State services | `src/context/services/appServices.ts` |
+| Data persistence | `src/lib/storage/` (db, novels, chapters, snapshots, migrations) |
 | Command registry | `src/lib/commands.ts` |
 | Editor config | `src/App.tsx` (extensions), `src/components/Editor/` |
-| Export formats | `src/lib/export.ts` |
+| Export formats | `src/lib/export/` (per-format modules) |
 | Import formats | `src/lib/import.ts` |
 | UI components | `src/components/` (each in own directory) |
+| Layout shell | `src/components/AppShell/` |
 | Shared UI primitives | `src/components/UI/` |
 | Global styles & tokens | `src/styles/index.css` |
 | AI providers | `src/lib/ai/` |
+| AI revision tracking | `src/lib/aiRevisionLog.ts` |
+| Writing analysis | `src/lib/voiceFingerprint.ts`, `narrativeWeather.ts`, `sceneChemistry.ts`, `continuityMemory.ts`, `timelineConsistency.ts` |
 | Cloud integrations | `src/lib/integrations/` |
+| Server broker | `src/server/integrationBroker.ts` |
+| Desktop features | `src/lib/desktopSecrets.ts`, `desktopUpdater.ts`, `nativeMenuAdapter.ts` |
+| Feature flags | `src/lib/featureFlags.ts` |
+| Error handling | `src/lib/errors.ts` |
+| Security/encryption | `src/lib/encryption.ts`, `secureCache.ts` |
 | Tests | Co-located `*.test.ts` files, run with `npm run test` |
 | Build config | `vite.config.ts` |
 | TypeScript config | `tsconfig.json` |
 | Linting | `eslint.config.js` |
 | CI/CD | `.github/workflows/` |
+| QA scripts | `scripts/` |
+| Desktop config | `desktop/src-tauri/tauri.conf.json` |
+| Mobile config | `capacitor.config.ts` |
