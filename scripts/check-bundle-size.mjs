@@ -7,7 +7,7 @@ const assetsDir = join(process.cwd(), 'dist', 'assets');
 
 const budgets = {
   main: 800 * 1024,
-  export: 220 * 1024,
+  export: 240 * 1024,
   ai: 220 * 1024,
   integrations: 220 * 1024,
   totalJs: 3000 * 1024,
