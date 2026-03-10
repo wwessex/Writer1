@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 interface DragState {
   dragging: boolean;
@@ -24,10 +24,16 @@ export function useDragReorder({ items, onReorder, trackDropPosition = false }: 
   const [dragState, setDragState] = useState<DragState>(INITIAL_DRAG_STATE);
   const [justMovedId, setJustMovedId] = useState<string | null>(null);
   const animTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const dropPositionRef = useRef<'above' | 'below' | null>(null);
+
+  useEffect(() => {
+    return () => clearTimeout(animTimeoutRef.current);
+  }, []);
 
   const handleDragStart = useCallback((e: React.DragEvent, id: string) => {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', id);
+    dropPositionRef.current = null;
     setDragState({ dragging: true, draggedId: id, dropTargetId: null, dropPosition: null });
   }, []);
 
@@ -38,6 +44,7 @@ export function useDragReorder({ items, onReorder, trackDropPosition = false }: 
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const midY = rect.top + rect.height / 2;
       const position = e.clientY < midY ? 'above' : 'below';
+      dropPositionRef.current = position;
       setDragState(prev => ({ ...prev, dropTargetId: id, dropPosition: position }));
     } else {
       setDragState(prev => ({ ...prev, dropTargetId: id }));
@@ -45,6 +52,7 @@ export function useDragReorder({ items, onReorder, trackDropPosition = false }: 
   }, [trackDropPosition]);
 
   const handleDragEnd = useCallback(() => {
+    dropPositionRef.current = null;
     setDragState(INITIAL_DRAG_STATE);
   }, []);
 
@@ -60,7 +68,7 @@ export function useDragReorder({ items, onReorder, trackDropPosition = false }: 
       if (draggedIndex !== -1 && targetIndex !== -1) {
         const [dragged] = itemsCopy.splice(draggedIndex, 1);
         const adjustedTargetIndex = draggedIndex < targetIndex ? targetIndex - 1 : targetIndex;
-        const insertIndex = trackDropPosition && dragState.dropPosition === 'below'
+        const insertIndex = trackDropPosition && dropPositionRef.current === 'below'
           ? adjustedTargetIndex + 1
           : adjustedTargetIndex;
         itemsCopy.splice(insertIndex, 0, dragged);
@@ -72,8 +80,9 @@ export function useDragReorder({ items, onReorder, trackDropPosition = false }: 
       }
     }
 
+    dropPositionRef.current = null;
     setDragState(INITIAL_DRAG_STATE);
-  }, [items, onReorder, trackDropPosition, dragState.dropPosition]);
+  }, [items, onReorder, trackDropPosition]);
 
   return { dragState, justMovedId, handleDragStart, handleDragOver, handleDragEnd, handleDrop };
 }
