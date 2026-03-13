@@ -1,89 +1,22 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
-import { Input, Button } from '@/components/UI';
-import { HelpTooltip } from '@/components/UI/Tooltip';
-import { Select } from '@/components/UI/Select';
-import { clearAllData } from '@/lib/storage';
-import { isTelemetryOptedIn, setTelemetryOptIn, clearTelemetryData } from '@/lib/telemetry';
-import { loadAIConfig, saveAIConfig } from '@/lib/ai';
-import type { AIProviderConfig } from '@/lib/ai';
+import { Input } from '@/components/UI';
 import { useWindowResize } from '@/hooks/useResizable';
 import { getManagedPolicy } from '@/lib/policy';
-import { applyUpdateAndRestart, checkForUpdate, deferUpdate, getDeferredUpdateVersion, getLaunchFallbackMessage, getReleaseChannel, setReleaseChannel, type UpdaterSummary } from '@/lib/desktopUpdater';
-import type { ReleaseChannel } from '@/lib/updaterGuardrails';
+import { SettingsSection } from './settings/SettingsSection';
+import { TypographySection } from './settings/TypographySection';
+import { AIProviderSection } from './settings/AIProviderSection';
+import { SyncSection } from './settings/SyncSection';
+import { WritingAssistSection } from './settings/WritingAssistSection';
+import { UpdatesSection } from './settings/UpdatesSection';
+import { ApplicationSection } from './settings/ApplicationSection';
+import { PrivacySection } from './settings/PrivacySection';
+import { DataManagementSection } from './settings/DataManagementSection';
 import styles from './Windows.module.css';
 
 interface SettingsWindowProps {
   open: boolean;
   onClose: () => void;
-}
-
-const LANGUAGE_OPTIONS = [
-  { value: 'en-US', label: 'English (US)' },
-  { value: 'en-GB', label: 'English (UK)' },
-  { value: 'de-DE', label: 'German' },
-  { value: 'fr-FR', label: 'French' },
-  { value: 'es-ES', label: 'Spanish' },
-  { value: 'pt-BR', label: 'Portuguese (BR)' },
-  { value: 'it-IT', label: 'Italian' },
-  { value: 'nl-NL', label: 'Dutch' },
-  { value: 'pl-PL', label: 'Polish' },
-  { value: 'ru-RU', label: 'Russian' }
-];
-
-const FONT_OPTIONS = [
-  { value: 'system', label: 'System Default' },
-  { value: 'serif', label: 'Serif (Georgia)' },
-  { value: 'mono', label: 'Monospace' },
-  { value: 'courier-prime', label: 'Courier Prime' },
-  { value: 'merriweather', label: 'Merriweather' },
-  { value: 'lora', label: 'Lora' }
-];
-
-const FONT_SIZE_OPTIONS = [
-  { value: '14', label: '14px' },
-  { value: '15', label: '15px' },
-  { value: '16', label: '16px' },
-  { value: '17', label: '17px' },
-  { value: '18', label: '18px' },
-  { value: '20', label: '20px' },
-  { value: '22', label: '22px' }
-];
-
-const LINE_HEIGHT_OPTIONS = [
-  { value: '1.5', label: 'Compact (1.5)' },
-  { value: '1.625', label: 'Normal (1.625)' },
-  { value: '1.75', label: 'Relaxed (1.75)' },
-  { value: '2', label: 'Spacious (2.0)' },
-  { value: '2.25', label: 'Wide (2.25)' }
-];
-
-/* ------------------------------------------------------------------ */
-/*  Well-known AI endpoint presets                                      */
-/* ------------------------------------------------------------------ */
-
-interface AIEndpointPreset {
-  id: string;
-  label: string;
-  endpoint: string;
-  defaultModel: string;
-  keyPlaceholder: string;
-  signupUrl: string;
-}
-
-const AI_ENDPOINT_PRESETS: AIEndpointPreset[] = [
-  { id: 'openai', label: 'OpenAI', endpoint: 'https://api.openai.com/v1/chat/completions', defaultModel: 'gpt-4o', keyPlaceholder: 'sk-...', signupUrl: 'platform.openai.com' },
-  { id: 'groq', label: 'Groq', endpoint: 'https://api.groq.com/openai/v1/chat/completions', defaultModel: 'llama-3.3-70b-versatile', keyPlaceholder: 'gsk_...', signupUrl: 'console.groq.com' },
-  { id: 'openrouter', label: 'OpenRouter', endpoint: 'https://openrouter.ai/api/v1/chat/completions', defaultModel: 'google/gemini-2.0-flash-exp:free', keyPlaceholder: 'sk-or-...', signupUrl: 'openrouter.ai' },
-  { id: 'mistral', label: 'Mistral', endpoint: 'https://api.mistral.ai/v1/chat/completions', defaultModel: 'mistral-large-latest', keyPlaceholder: 'api key', signupUrl: 'console.mistral.ai' },
-  { id: 'deepseek', label: 'DeepSeek', endpoint: 'https://api.deepseek.com/v1/chat/completions', defaultModel: 'deepseek-chat', keyPlaceholder: 'sk-...', signupUrl: 'platform.deepseek.com' },
-  { id: 'together', label: 'Together AI', endpoint: 'https://api.together.xyz/v1/chat/completions', defaultModel: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', keyPlaceholder: 'api key', signupUrl: 'api.together.ai' },
-];
-
-function matchAIPresetId(endpoint?: string): string {
-  if (!endpoint?.trim()) return '';
-  const normalized = endpoint.trim().replace(/\/$/, '');
-  return AI_ENDPOINT_PRESETS.find(p => p.endpoint === normalized)?.id ?? '';
 }
 
 const SETTINGS_SECTIONS = [
@@ -167,6 +100,17 @@ const SETTINGS_SECTIONS = [
   }
 ] as const;
 
+const SECTION_ICONS: Record<string, string> = {
+  typography: 'text_format',
+  ai: 'smart_toy',
+  sync: 'cloud_sync',
+  assist: 'spellcheck',
+  updates: 'system_update',
+  app: 'settings',
+  privacy: 'shield',
+  data: 'database',
+};
+
 export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   const { state, updateSettings } = useApp();
   const windowRef = useRef<HTMLDivElement>(null);
@@ -192,24 +136,7 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
     app: false,
     data: true
   });
-  const [telemetryEnabled, setTelemetryEnabled] = useState(isTelemetryOptedIn());
   const managedPolicy = useMemo(() => getManagedPolicy(), []);
-  const [releaseChannel, setReleaseChannelState] = useState<ReleaseChannel>(() => state.settings.releaseChannel ?? getReleaseChannel());
-  const [updateSummary, setUpdateSummary] = useState<UpdaterSummary | null>(null);
-  const [updateBusy, setUpdateBusy] = useState(false);
-  const [aiConfig, setAIConfig] = useState<AIProviderConfig>(loadAIConfig);
-
-  const updateAIConfig = useCallback((updates: Partial<AIProviderConfig>) => {
-    setAIConfig(prev => {
-      const next = { ...prev, ...updates };
-      // Auto-switch to openai-compatible when both endpoint and key are provided
-      if (next.endpoint?.trim() && next.sessionToken?.trim() && next.provider !== 'server-proxy') {
-        next.provider = 'openai-compatible';
-      }
-      saveAIConfig(next);
-      return next;
-    });
-  }, []);
 
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -279,53 +206,6 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   }, [hasSearchQuery, normalizedSearchQuery]);
 
   const visibleSections = SETTINGS_SECTIONS.filter(section => isSectionVisible(section.id));
-
-  useEffect(() => {
-    setReleaseChannel(releaseChannel);
-    updateSettings({ releaseChannel });
-  }, [releaseChannel, updateSettings]);
-
-  useEffect(() => {
-    const fallbackMessage = getLaunchFallbackMessage();
-    if (fallbackMessage) {
-      setUpdateSummary({ available: false, body: fallbackMessage });
-    }
-  }, []);
-
-  const handleCheckUpdates = async () => {
-    setUpdateBusy(true);
-    try {
-      const summary = await checkForUpdate();
-      setUpdateSummary(summary);
-      if (!summary.available) {
-        window.alert('No eligible update found for this channel.');
-      }
-    } catch (error) {
-      console.error('Update check failed', error);
-      window.alert('Update check failed. Guardrails may have switched to fallback mode.');
-    } finally {
-      setUpdateBusy(false);
-    }
-  };
-
-  const handleDeferUpdate = () => {
-    if (!updateSummary?.version) return;
-    deferUpdate(updateSummary.version);
-    window.alert(`Deferred update ${updateSummary.version}.`);
-  };
-
-  const handleApplyUpdate = async () => {
-    setUpdateBusy(true);
-    try {
-      await applyUpdateAndRestart();
-    } catch (error) {
-      console.error('Failed to apply update', error);
-      window.alert('Failed to apply update. Launch fallback remains active.');
-    } finally {
-      setUpdateBusy(false);
-    }
-  };
-
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 820);
@@ -402,13 +282,6 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
     };
   }, [isDragging, dragOffset]);
 
-  const handleResetData = async () => {
-    if (confirm('This will delete ALL your data including novels, chapters, and snapshots. This cannot be undone. Continue?')) {
-      await clearAllData();
-      window.location.reload();
-    }
-  };
-
   const toggleSection = (key: string) => {
     setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -468,510 +341,156 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
 
           {/* Typography Section */}
           {isSectionVisible('typography') && (
-          <section className={styles.section} ref={el => { sectionRefs.current.typography = el; }}>
-            <button className={styles.sectionToggle} onClick={() => toggleSection('typography')}>
-              <h4>
-                <span className="material-symbols-rounded">text_format</span>
-                {highlightMatch('Typography')}
-              </h4>
-              <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
-                {isSectionCollapsed('typography') ? 'expand_more' : 'expand_less'}
-              </span>
-            </button>
-            {!isSectionCollapsed('typography') && (
-              <div className={styles.sectionContent}>
-                {isFieldVisible('typography', 'fontFamily') && <div className={styles.field}>
-                  <label>
-                    {highlightMatch('Font Family')}
-                    <HelpTooltip text="Choose the typeface for your writing area" />
-                  </label>
-                  <Select
-                    options={FONT_OPTIONS}
-                    value={state.settings.typography.fontFamily}
-                    onChange={e => updateSettings({
-                      typography: { ...state.settings.typography, fontFamily: e.target.value }
-                    })}
-                  />
-                </div>}
-                {(isFieldVisible('typography', 'fontSize') || isFieldVisible('typography', 'lineHeight')) && <div className={styles.fieldRow}>
-                  {isFieldVisible('typography', 'fontSize') && <div className={styles.field}>
-                    <label>{highlightMatch('Font Size')}</label>
-                    <Select
-                      options={FONT_SIZE_OPTIONS}
-                      value={String(state.settings.typography.fontSize)}
-                      onChange={e => updateSettings({
-                        typography: { ...state.settings.typography, fontSize: parseInt(e.target.value) }
-                      })}
-                    />
-                  </div>}
-                  {isFieldVisible('typography', 'lineHeight') && <div className={styles.field}>
-                    <label>{highlightMatch('Line Height')}</label>
-                    <Select
-                      options={LINE_HEIGHT_OPTIONS}
-                      value={String(state.settings.typography.lineHeight)}
-                      onChange={e => updateSettings({
-                        typography: { ...state.settings.typography, lineHeight: parseFloat(e.target.value) }
-                      })}
-                    />
-                  </div>}
-                </div>}
-              </div>
-            )}
-          </section>
+            <SettingsSection
+              id="typography"
+              title="Typography"
+              icon={SECTION_ICONS.typography}
+              isCollapsed={!!isSectionCollapsed('typography')}
+              onToggle={() => toggleSection('typography')}
+              highlightMatch={highlightMatch}
+              sectionRef={el => { sectionRefs.current.typography = el; }}
+            >
+              <TypographySection
+                typography={state.settings.typography}
+                updateSettings={updateSettings}
+                isFieldVisible={isFieldVisible}
+                highlightMatch={highlightMatch}
+              />
+            </SettingsSection>
           )}
 
           {/* AI Provider Section */}
           {isSectionVisible('ai') && (
-          <section className={styles.section} ref={el => { sectionRefs.current.ai = el; }}>
-            <button className={styles.sectionToggle} onClick={() => toggleSection('ai')}>
-              <h4>
-                <span className="material-symbols-rounded">smart_toy</span>
-                {highlightMatch('AI Provider')}
-              </h4>
-              <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
-                {isSectionCollapsed('ai') ? 'expand_more' : 'expand_less'}
-              </span>
-            </button>
-            {!isSectionCollapsed('ai') && (
-              <div className={styles.sectionContent}>
-                <div className={styles.privacyNotice}>
-                  <span className="material-symbols-rounded">info</span>
-                  <div>
-                    <p className={styles.privacyNotice__text}>
-                      Pick a provider below, then paste your API key to enable AI writing tools.
-                      Your key is stored locally in your browser and only sent to the endpoint you specify.
-                    </p>
-                  </div>
-                </div>
-                {isFieldVisible('ai', 'aiEndpoint') && <>
-                  <div className={styles.field}>
-                    <label>{highlightMatch('Provider')}</label>
-                    <div className={styles.aiEndpointPresets}>
-                      {AI_ENDPOINT_PRESETS.map(preset => {
-                        const isActive = matchAIPresetId(aiConfig.endpoint) === preset.id;
-                        return (
-                          <button
-                            key={preset.id}
-                            className={`${styles.aiEndpointPreset} ${isActive ? styles['aiEndpointPreset--active'] : ''}`}
-                            onClick={() => updateAIConfig({
-                              endpoint: preset.endpoint,
-                              model: aiConfig.model?.trim() ? aiConfig.model : preset.defaultModel,
-                            })}
-                          >
-                            <strong>{preset.label}</strong>
-                            <small>{preset.signupUrl}</small>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className={styles.field}>
-                    <label>
-                      {highlightMatch('API Endpoint')}
-                      <HelpTooltip text="OpenAI-compatible chat completions endpoint (e.g. https://api.openai.com/v1/chat/completions)" />
-                    </label>
-                    <Input
-                      placeholder="https://api.openai.com/v1/chat/completions"
-                      value={aiConfig.endpoint || ''}
-                      onChange={e => updateAIConfig({ endpoint: e.target.value })}
-                    />
-                  </div>
-                </>}
-                {isFieldVisible('ai', 'aiApiKey') && <div className={styles.field}>
-                  <label>
-                    {highlightMatch('API Key')}
-                    <HelpTooltip text="Your API key from OpenAI or any compatible provider" />
-                  </label>
-                  <Input
-                    type="password"
-                    placeholder={AI_ENDPOINT_PRESETS.find(p => p.id === matchAIPresetId(aiConfig.endpoint))?.keyPlaceholder ?? 'sk-...'}
-                    value={aiConfig.sessionToken || ''}
-                    onChange={e => updateAIConfig({ sessionToken: e.target.value })}
-                  />
-                </div>}
-                {isFieldVisible('ai', 'aiModel') && <div className={styles.field}>
-                  <label>
-                    {highlightMatch('Model')}
-                    <HelpTooltip text="Model identifier sent with requests (e.g. gpt-4o, gpt-4o-mini, gpt-3.5-turbo)" />
-                  </label>
-                  <Input
-                    placeholder={AI_ENDPOINT_PRESETS.find(p => p.id === matchAIPresetId(aiConfig.endpoint))?.defaultModel ?? 'gpt-4o'}
-                    value={aiConfig.model || ''}
-                    onChange={e => updateAIConfig({ model: e.target.value })}
-                  />
-                </div>}
-                {aiConfig.endpoint?.trim() && aiConfig.sessionToken?.trim() && (
-                  <div className={styles.privacyNotice}>
-                    <span className="material-symbols-rounded" style={{ color: 'var(--success, #22c55e)' }}>check_circle</span>
-                    <div>
-                      <p className={styles.privacyNotice__text}>
-                        AI provider configured. Open <strong>AI Writing Tools</strong> from the menu to start using AI assistance.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
+            <SettingsSection
+              id="ai"
+              title="AI Provider"
+              icon={SECTION_ICONS.ai}
+              isCollapsed={!!isSectionCollapsed('ai')}
+              onToggle={() => toggleSection('ai')}
+              highlightMatch={highlightMatch}
+              sectionRef={el => { sectionRefs.current.ai = el; }}
+            >
+              <AIProviderSection
+                isFieldVisible={isFieldVisible}
+                highlightMatch={highlightMatch}
+              />
+            </SettingsSection>
           )}
 
           {/* Online Sync Section */}
           {isSectionVisible('sync') && (
-          <section className={styles.section} ref={el => { sectionRefs.current.sync = el; }}>
-            <button className={styles.sectionToggle} onClick={() => toggleSection('sync')}>
-              <h4>
-                <span className="material-symbols-rounded">cloud_sync</span>
-                {highlightMatch('Online Sync')}
-              </h4>
-              <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
-                {isSectionCollapsed('sync') ? 'expand_more' : 'expand_less'}
-              </span>
-            </button>
-            {!isSectionCollapsed('sync') && (
-              <div className={styles.sectionContent}>
-                {isFieldVisible('sync', 'novelId') && <div className={styles.field}>
-                  <label>
-                    {highlightMatch('Novel ID')}
-                    <HelpTooltip text="A unique identifier for syncing this novel across devices" />
-                  </label>
-                  <Input
-                    value={state.settings.sync.novelId}
-                    onChange={e => updateSettings({
-                      sync: { ...state.settings.sync, novelId: e.target.value }
-                    })}
-                    placeholder="unique-novel-id"
-                  />
-                </div>}
-                {isFieldVisible('sync', 'syncUrl') && <div className={styles.field}>
-                  <label>
-                    {highlightMatch('Sync Server URL')}
-                    <HelpTooltip text="The endpoint of your sync server for cloud backup" />
-                  </label>
-                  <Input
-                    value={state.settings.sync.url}
-                    onChange={e => updateSettings({
-                      sync: { ...state.settings.sync, url: e.target.value }
-                    })}
-                    placeholder="https://your-server.com/sync"
-                  />
-                </div>}
-                {isFieldVisible('sync', 'authHeader') && <div className={styles.field}>
-                  <label>
-                    {highlightMatch('Authorization Header')}
-                    <HelpTooltip text="The full Authorization header value sent with sync requests, e.g. 'Bearer your-token-here'" />
-                  </label>
-                  <Input
-                    type="password"
-                    value={state.settings.sync.auth}
-                    onChange={e => updateSettings({
-                      sync: { ...state.settings.sync, auth: e.target.value }
-                    })}
-                    placeholder="Bearer your-token"
-                  />
-                </div>}
-              </div>
-            )}
-          </section>
+            <SettingsSection
+              id="sync"
+              title="Online Sync"
+              icon={SECTION_ICONS.sync}
+              isCollapsed={!!isSectionCollapsed('sync')}
+              onToggle={() => toggleSection('sync')}
+              highlightMatch={highlightMatch}
+              sectionRef={el => { sectionRefs.current.sync = el; }}
+            >
+              <SyncSection
+                sync={state.settings.sync}
+                updateSettings={updateSettings}
+                isFieldVisible={isFieldVisible}
+                highlightMatch={highlightMatch}
+              />
+            </SettingsSection>
           )}
 
           {/* Writing Assistance Section */}
           {isSectionVisible('assist') && (
-          <section className={styles.section} ref={el => { sectionRefs.current.assist = el; }}>
-            <button className={styles.sectionToggle} onClick={() => toggleSection('assist')}>
-              <h4>
-                <span className="material-symbols-rounded">spellcheck</span>
-                {highlightMatch('Writing Assistance')}
-              </h4>
-              <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
-                {isSectionCollapsed('assist') ? 'expand_more' : 'expand_less'}
-              </span>
-            </button>
-            {!isSectionCollapsed('assist') && (
-              <div className={styles.sectionContent}>
-                {isFieldVisible('assist', 'languageToolEnabled') && <div className={styles.fieldRow}>
-                  <label className={styles.checkbox}>
-                    <input
-                      type="checkbox"
-                      checked={state.settings.assist.languageToolEnabled}
-                      onChange={e => updateSettings({
-                        assist: { ...state.settings.assist, languageToolEnabled: e.target.checked }
-                      })}
-                    />
-                    <span>{highlightMatch('Enable LanguageTool')}</span>
-                    <HelpTooltip text="LanguageTool checks grammar, spelling, and style. The free public API works without an account." position="right" />
-                  </label>
-                </div>}
-                {isFieldVisible('assist', 'languageToolUrl') && <div className={styles.field}>
-                  <label>
-                    {highlightMatch('LanguageTool URL')}
-                    <HelpTooltip text="API endpoint for grammar checking. Use the public server or your own instance." />
-                  </label>
-                  <Input
-                    value={state.settings.assist.languageToolUrl}
-                    onChange={e => updateSettings({
-                      assist: { ...state.settings.assist, languageToolUrl: e.target.value }
-                    })}
-                    placeholder="https://api.languagetool.org/v2/check"
-                  />
-                </div>}
-                {isFieldVisible('assist', 'languageToolLanguage') && <div className={styles.field}>
-                  <label>{highlightMatch('Language')}</label>
-                  <Select
-                    options={LANGUAGE_OPTIONS}
-                    value={state.settings.assist.languageToolLanguage}
-                    onChange={e => updateSettings({
-                      assist: { ...state.settings.assist, languageToolLanguage: e.target.value }
-                    })}
-                  />
-                </div>}
-              </div>
-            )}
-          </section>
+            <SettingsSection
+              id="assist"
+              title="Writing Assistance"
+              icon={SECTION_ICONS.assist}
+              isCollapsed={!!isSectionCollapsed('assist')}
+              onToggle={() => toggleSection('assist')}
+              highlightMatch={highlightMatch}
+              sectionRef={el => { sectionRefs.current.assist = el; }}
+            >
+              <WritingAssistSection
+                assist={state.settings.assist}
+                updateSettings={updateSettings}
+                isFieldVisible={isFieldVisible}
+                highlightMatch={highlightMatch}
+              />
+            </SettingsSection>
           )}
-
 
           {/* Updates Section */}
           {isSectionVisible('updates') && (
-          <section className={styles.section} ref={el => { sectionRefs.current.updates = el; }}>
-            <button className={styles.sectionToggle} onClick={() => toggleSection('updates')}>
-              <h4>
-                <span className="material-symbols-rounded">system_update</span>
-                {highlightMatch('Updates')}
-              </h4>
-              <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
-                {isSectionCollapsed('updates') ? 'expand_more' : 'expand_less'}
-              </span>
-            </button>
-            {!isSectionCollapsed('updates') && (
-              <div className={styles.sectionContent}>
-                <div className={styles.field}>
-                  <label>{highlightMatch('Release Channel')}</label>
-                  <Select
-                    value={releaseChannel}
-                    onChange={e => setReleaseChannelState(e.target.value as ReleaseChannel)}
-                    options={[
-                      { value: 'stable', label: 'Stable' },
-                      { value: 'beta', label: 'Beta' },
-                      { value: 'nightly', label: 'Nightly' },
-                    ]}
-                  />
-                </div>
-                <div className={styles.fieldRow}>
-                  <Button onClick={handleCheckUpdates} disabled={updateBusy}>
-                    <span className="material-symbols-rounded">update</span>
-                    Check for Updates
-                  </Button>
-                  {updateSummary?.available && (
-                    <Button variant="ghost" onClick={handleDeferUpdate} disabled={updateBusy}>
-                      <span className="material-symbols-rounded">schedule</span>
-                      Defer Install
-                    </Button>
-                  )}
-                </div>
-                {updateSummary?.version && (
-                  <div className={styles.updateCard}>
-                    <p className={styles.updateMeta}>Version {updateSummary.version}</p>
-                    {updateSummary.body && <pre className={styles.updateNotes}>{updateSummary.body}</pre>}
-                    {getDeferredUpdateVersion() && <p className={styles.updateMeta}>Deferred: {getDeferredUpdateVersion()}</p>}
-                    {updateSummary.available && (
-                      <Button onClick={handleApplyUpdate} disabled={updateBusy}>
-                        <span className="material-symbols-rounded">restart_alt</span>
-                        Restart to Apply
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
+            <SettingsSection
+              id="updates"
+              title="Updates"
+              icon={SECTION_ICONS.updates}
+              isCollapsed={!!isSectionCollapsed('updates')}
+              onToggle={() => toggleSection('updates')}
+              highlightMatch={highlightMatch}
+              sectionRef={el => { sectionRefs.current.updates = el; }}
+            >
+              <UpdatesSection
+                highlightMatch={highlightMatch}
+              />
+            </SettingsSection>
           )}
 
           {/* App Settings Section */}
           {isSectionVisible('app') && (
-          <section className={styles.section} ref={el => { sectionRefs.current.app = el; }}>
-            <button className={styles.sectionToggle} onClick={() => toggleSection('app')}>
-              <h4>
-                <span className="material-symbols-rounded">settings</span>
-                {highlightMatch('Application')}
-              </h4>
-              <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
-                {isSectionCollapsed('app') ? 'expand_more' : 'expand_less'}
-              </span>
-            </button>
-            {!isSectionCollapsed('app') && (
-              <div className={styles.sectionContent}>
-                {(isFieldVisible('app', 'autosaveMs') || isFieldVisible('app', 'dailyWordGoal')) && <div className={styles.fieldRow}>
-                  {isFieldVisible('app', 'autosaveMs') && <div className={styles.field}>
-                    <label>
-                      {highlightMatch('Autosave (ms)')}
-                      <HelpTooltip text="How long to wait after you stop typing before auto-saving" />
-                    </label>
-                    <Input
-                      type="number"
-                      value={state.settings.autosaveMs}
-                      onChange={e => updateSettings({ autosaveMs: parseInt(e.target.value) || 800 })}
-                      min={100}
-                      max={5000}
-                    />
-                  </div>}
-                  {isFieldVisible('app', 'dailyWordGoal') && <div className={styles.field}>
-                    <label>
-                      {highlightMatch('Daily Word Goal')}
-                      <HelpTooltip text="Set a daily writing target. Progress is tracked in the Dashboard and status bar." />
-                    </label>
-                    <Input
-                      type="number"
-                      value={state.settings.dailyWordGoal || ''}
-                      onChange={e => updateSettings({ dailyWordGoal: parseInt(e.target.value) || 0 })}
-                      placeholder="0"
-                    />
-                  </div>}
-                </div>}
-                {isFieldVisible('app', 'novelWordGoal') && <div className={styles.field}>
-                  <label>
-                    {highlightMatch('Novel Word Goal')}
-                    <HelpTooltip text="Set an overall word goal for your project. A progress bar appears in the status bar." />
-                  </label>
-                  <Input
-                    type="number"
-                    value={state.settings.novelWordGoal || ''}
-                    onChange={e => updateSettings({ novelWordGoal: parseInt(e.target.value) || 0 })}
-                    placeholder="0"
-                  />
-                </div>}
-                <div className={styles.fieldRow}>
-                  <label className={styles.checkbox}>
-                    <input
-                      type="checkbox"
-                      checked={state.settings.typewriterMode}
-                      onChange={e => updateSettings({ typewriterMode: e.target.checked })}
-                    />
-                    <span>Typewriter Scroll Mode</span>
-                    <HelpTooltip text="Keep the cursor line vertically centered in the editor while typing (Ctrl+Shift+T)" position="right" />
-                  </label>
-                </div>
-              </div>
-            )}
-          </section>
+            <SettingsSection
+              id="app"
+              title="Application"
+              icon={SECTION_ICONS.app}
+              isCollapsed={!!isSectionCollapsed('app')}
+              onToggle={() => toggleSection('app')}
+              highlightMatch={highlightMatch}
+              sectionRef={el => { sectionRefs.current.app = el; }}
+            >
+              <ApplicationSection
+                settings={state.settings}
+                updateSettings={updateSettings}
+                isFieldVisible={isFieldVisible}
+                highlightMatch={highlightMatch}
+              />
+            </SettingsSection>
           )}
 
           {/* Privacy & Sync Section */}
           {isSectionVisible('privacy') && (
-          <section className={styles.section} ref={el => { sectionRefs.current.privacy = el; }}>
-            <button className={styles.sectionToggle} onClick={() => toggleSection('privacy')}>
-              <h4>
-                <span className="material-symbols-rounded">shield</span>
-                {highlightMatch('Privacy & Data Sync')}
-              </h4>
-              <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
-                {isSectionCollapsed('privacy') ? 'expand_more' : 'expand_less'}
-              </span>
-            </button>
-            {!isSectionCollapsed('privacy') && (
-              <div className={styles.sectionContent}>
-                <div className={styles.privacyNotice}>
-                  <span className="material-symbols-rounded">info</span>
-                  <div>
-                    <p className={styles.privacyNotice__text}>
-                      <strong>Your writing stays private by default.</strong> DraftHarbour Studio stores everything in
-                      your browser's local storage (IndexedDB). No data leaves your device unless you
-                      explicitly enable cloud sync below. Diagnostics reports include only metadata and
-                      app-state summaries, and automatically redact auth tokens, secrets, and passwords.
-                    </p>
-                  </div>
-                </div>
-
-                {isFieldVisible('privacy', 'cloudSync') && <div className={styles.privacyToggle}>
-                  <div className={styles.privacyToggle__info}>
-                    <span className={styles.privacyToggle__label}>{highlightMatch('Cloud Sync')}</span>
-                    <span className={styles.privacyToggle__desc}>
-                      When enabled, chapter content is sent to your configured sync server.
-                      Data is transmitted over HTTPS. Enable encrypted sync in Integrations for end-to-end encryption.
-                    </span>
-                  </div>
-                  <label className={styles.toggleSwitch}>
-                    <input
-                      type="checkbox"
-                      checked={state.settings.sync.url.trim() !== ''}
-                      disabled={managedPolicy.forceLocalOnly}
-                      onChange={e => {
-                        if (!e.target.checked) {
-                          updateSettings({ sync: { ...state.settings.sync, url: '', auth: '' } });
-                        }
-                      }}
-                    />
-                    <span className={styles.toggleSwitch__slider} />
-                  </label>
-                </div>}
-
-                {isFieldVisible('privacy', 'aiUsageTelemetry') && <div className={styles.privacyToggle}>
-                  <div className={styles.privacyToggle__info}>
-                    <span className={styles.privacyToggle__label}>{highlightMatch('AI Usage Telemetry')}</span>
-                    <span className={styles.privacyToggle__desc}>
-                      Opt in to track your AI usage locally (character counts, latency, action types).
-                      No content or text is ever recorded -- only metadata. Data stays on your device.
-                    </span>
-                  </div>
-                  <label className={styles.toggleSwitch}>
-                    <input
-                      type="checkbox"
-                      checked={telemetryEnabled}
-                      disabled={managedPolicy.disableTelemetry}
-                      onChange={e => {
-                        setTelemetryEnabled(e.target.checked);
-                        setTelemetryOptIn(e.target.checked);
-                      }}
-                    />
-                    <span className={styles.toggleSwitch__slider} />
-                  </label>
-                </div>}
-
-                {telemetryEnabled && (
-                  <Button variant="ghost" onClick={() => { clearTelemetryData(); }}>
-                    <span className="material-symbols-rounded">delete_sweep</span>
-                    Clear Telemetry Data
-                  </Button>
-                )}
-
-                {isFieldVisible('privacy', 'localStorageOnly') && <div className={styles.privacyToggle}>
-                  <div className={styles.privacyToggle__info}>
-                    <span className={styles.privacyToggle__label}>{highlightMatch('Local Storage Only')}</span>
-                    <span className={styles.privacyToggle__desc}>
-                      Grammar checking via LanguageTool sends text to the configured API endpoint.
-                      AI Writing Tools sends chapter context to your configured AI endpoint.
-                      Both are opt-in and disabled by default.
-                    </span>
-                  </div>
-                  <span className="material-symbols-rounded" style={{ color: 'var(--success, #22c55e)', fontSize: '1.5rem' }}>
-                    verified_user
-                  </span>
-                </div>}
-              </div>
-            )}
-          </section>
+            <SettingsSection
+              id="privacy"
+              title="Privacy & Data Sync"
+              icon={SECTION_ICONS.privacy}
+              isCollapsed={!!isSectionCollapsed('privacy')}
+              onToggle={() => toggleSection('privacy')}
+              highlightMatch={highlightMatch}
+              sectionRef={el => { sectionRefs.current.privacy = el; }}
+            >
+              <PrivacySection
+                sync={state.settings.sync}
+                updateSettings={updateSettings}
+                managedPolicy={managedPolicy}
+                isFieldVisible={isFieldVisible}
+                highlightMatch={highlightMatch}
+              />
+            </SettingsSection>
           )}
 
           {/* Data Management Section */}
           {isSectionVisible('data') && (
-          <section className={styles.section} ref={el => { sectionRefs.current.data = el; }}>
-            <button className={styles.sectionToggle} onClick={() => toggleSection('data')}>
-              <h4>
-                <span className="material-symbols-rounded">database</span>
-                {highlightMatch('Data Management')}
-              </h4>
-              <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
-                {isSectionCollapsed('data') ? 'expand_more' : 'expand_less'}
-              </span>
-            </button>
-            {!isSectionCollapsed('data') && (
-              <div className={styles.sectionContent}>
-                {isFieldVisible('data', 'resetAllData') && <Button variant="danger" onClick={handleResetData}>
-                  <span className="material-symbols-rounded">delete_forever</span>
-                  {highlightMatch('Reset All Data')}
-                </Button>}
-              </div>
-            )}
-          </section>
+            <SettingsSection
+              id="data"
+              title="Data Management"
+              icon={SECTION_ICONS.data}
+              isCollapsed={!!isSectionCollapsed('data')}
+              onToggle={() => toggleSection('data')}
+              highlightMatch={highlightMatch}
+              sectionRef={el => { sectionRefs.current.data = el; }}
+            >
+              <DataManagementSection
+                isFieldVisible={isFieldVisible}
+                highlightMatch={highlightMatch}
+              />
+            </SettingsSection>
           )}
         </div>
         {!isMobile && (

@@ -1,17 +1,19 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useApp } from '@/context/AppContext';
-import { Input, Textarea, Button, IconButton } from '@/components/UI';
+import { Textarea, IconButton } from '@/components/UI';
 import { Tooltip } from '@/components/UI/Tooltip';
-import { Select } from '@/components/UI/Select';
 import { countWords, countSentences, countParagraphs, countCharacters, editorToPlainText } from '@/lib/utils';
 import { buildNarrativeWeather } from '@/lib/narrativeWeather';
 import { analyzeTimelineConsistency } from '@/lib/timelineConsistency';
 import { getContinuityMemorySnapshot } from '@/lib/continuityMemory';
 import { useResizable } from '@/hooks/useResizable';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
-import type { ChapterStatus, Scene } from '@/types';
+import type { Scene } from '@/types';
 import type { VoiceSimilarityAlert } from '@/lib/voiceFingerprint';
-import { STATUS_OPTIONS, SCREENPLAY_INT_EXT_OPTIONS, SCREENPLAY_TIME_OPTIONS } from '@/lib/constants';
+import { InspectorDetails } from './InspectorDetails';
+import { InspectorScenes } from './InspectorScenes';
+import { InspectorTimeline } from './InspectorTimeline';
+import { InspectorWeather } from './InspectorWeather';
 import styles from './Inspector.module.css';
 
 const SEVERITY_ORDER = { error: 0, warning: 1, info: 2 } as const;
@@ -177,265 +179,31 @@ export function Inspector({ open, onClose, voiceAlerts = [] }: InspectorProps) {
             <>
               {/* CHAPTER / SCENE METADATA TAB */}
               {activeTab === 'details' && (
-                <div
-                  className={styles.section}
-                  role="tabpanel"
-                  id="inspector-panel-details"
-                  aria-labelledby="inspector-tab-details"
-                >
-                  {/* Word count card */}
-                  <div className={styles.statsCard}>
-                    <div className={styles.stat}>
-                      <span className={styles.statValue}>{chapterWords.toLocaleString()}</span>
-                      <span className={styles.statLabel}>words</span>
-                    </div>
-                    <div className={styles.stat}>
-                      <span className={styles.statValue}>{chapterSentences.toLocaleString()}</span>
-                      <span className={styles.statLabel}>sentences</span>
-                    </div>
-                    <div className={styles.stat}>
-                      <span className={styles.statValue}>{chapterParagraphs.toLocaleString()}</span>
-                      <span className={styles.statLabel}>paragraphs</span>
-                    </div>
-                    <div className={styles.stat}>
-                      <span className={styles.statValue}>{chapterCharacters.toLocaleString()}</span>
-                      <span className={styles.statLabel}>chars</span>
-                    </div>
-                    {activeChapter.wordGoal > 0 && (
-                      <div className={styles.stat}>
-                        <span className={styles.statValue}>{wordGoalProgress}%</span>
-                        <span className={styles.statLabel}>of goal</span>
-                      </div>
-                    )}
-                    <div className={styles.stat}>
-                      <span className={styles.statValue}>{(activeChapter.scenes || []).length}</span>
-                      <span className={styles.statLabel}>scenes</span>
-                    </div>
-                  </div>
-
-                  {activeChapter.wordGoal > 0 && (
-                    <div className={styles.progressBar}>
-                      <div className={styles.progressFill} style={{ width: `${wordGoalProgress}%` }} />
-                    </div>
-                  )}
-
-                  {continuityMemory.conflicts.length > 0 && (
-                    <div className={styles.statsCard} role="status" aria-live="polite">
-                      <div className={styles.stat}>
-                        <span className="material-symbols-rounded" style={{ color: 'var(--warning)' }}>rule</span>
-                        <span className={styles.statLabel}>Continuity conflicts</span>
-                      </div>
-                      <div className={styles.stat}>
-                        <span className={styles.statValue}>{continuityMemory.conflicts.length}</span>
-                        <span className={styles.statLabel}>canonical warnings</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {voiceAlerts.length > 0 && (
-                    <div className={styles.statsCard} role="status" aria-live="polite">
-                      <div className={styles.stat}>
-                        <span className="material-symbols-rounded" style={{ color: 'var(--warning)' }}>warning</span>
-                        <span className={styles.statLabel}>Voice overlap risk</span>
-                      </div>
-                      {voiceAlerts.slice(0, 2).map(alert => (
-                        <div key={`${alert.activeSpeaker}-${alert.comparedSpeaker}`} className={styles.stat}>
-                          <span className={styles.statValue}>{(alert.similarity * 100).toFixed(0)}%</span>
-                          <span className={styles.statLabel}>{alert.activeSpeaker} ↔ {alert.comparedSpeaker}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Synopsis — prominent at the top */}
-                  <div className={styles.field}>
-                    <label className={styles.fieldLabel}>Synopsis</label>
-                    <Textarea
-                      value={activeChapter.summary}
-                      onChange={e => handleFieldChange('summary', e.target.value)}
-                      placeholder={`Brief ${isScreenplay ? 'sequence' : 'chapter'} synopsis...`}
-                      rows={3}
-                    />
-                  </div>
-
-                  {/* Status */}
-                  <div className={styles.field}>
-                    <label className={styles.fieldLabel}>Status</label>
-                    <Select
-                      options={STATUS_OPTIONS}
-                      value={activeChapter.status}
-                      onChange={e => handleFieldChange('status', e.target.value as ChapterStatus)}
-                    />
-                  </div>
-
-                  {/* Part — book grouping */}
-                  {!isScreenplay && (
-                    <div className={styles.field}>
-                      <label className={styles.fieldLabel}>Part</label>
-                      <Input
-                        value={activeChapter.part || ''}
-                        onChange={e => handleFieldChange('part', e.target.value)}
-                        placeholder="e.g. Part I, Act One"
-                        list="part-suggestions"
-                      />
-                      {allProjectParts.length > 0 && (
-                        <datalist id="part-suggestions">
-                          {allProjectParts.map(p => <option key={p} value={p} />)}
-                        </datalist>
-                      )}
-                    </div>
-                  )}
-
-                  {/* POV / Act */}
-                  <div className={styles.field}>
-                    <label className={styles.fieldLabel}>{isScreenplay ? 'Act' : 'POV Character'}</label>
-                    {isScreenplay ? (
-                      <Input
-                        type="number"
-                        value={activeChapter.act || ''}
-                        onChange={e => handleFieldChange('act', parseInt(e.target.value) || 1)}
-                        placeholder="1"
-                      />
-                    ) : (
-                      <Input
-                        value={activeChapter.pov}
-                        onChange={e => handleFieldChange('pov', e.target.value)}
-                        placeholder="Point of view character"
-                      />
-                    )}
-                  </div>
-
-                  {/* Screenplay-specific: Sequence */}
-                  {isScreenplay && (
-                    <div className={styles.field}>
-                      <label className={styles.fieldLabel}>Sequence</label>
-                      <Input
-                        type="number"
-                        value={activeChapter.sequence || ''}
-                        onChange={e => handleFieldChange('sequence', parseInt(e.target.value) || 1)}
-                        placeholder="1"
-                      />
-                    </div>
-                  )}
-
-                  {/* Tags with autocomplete */}
-                  <div className={styles.field}>
-                    <label className={styles.fieldLabel}>Tags</label>
-                    <Input
-                      value={(activeChapter.tags || []).join(', ')}
-                      onChange={e => handleFieldChange('tags', e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
-                      placeholder={isScreenplay ? 'setpiece, flashback' : 'action, romance, cliffhanger'}
-                      list="tag-suggestions"
-                    />
-                    {allProjectTags.length > 0 && (
-                      <datalist id="tag-suggestions">
-                        {allProjectTags.map(t => <option key={t} value={t} />)}
-                      </datalist>
-                    )}
-                  </div>
-
-                  {/* Word Goal */}
-                  <div className={styles.field}>
-                    <label className={styles.fieldLabel}>{isScreenplay ? 'Page Goal' : 'Word Goal'}</label>
-                    <Input
-                      type="number"
-                      value={activeChapter.wordGoal || ''}
-                      onChange={e => handleFieldChange('wordGoal', parseInt(e.target.value) || 0)}
-                      placeholder={isScreenplay ? '5' : '2000'}
-                    />
-                  </div>
-                </div>
+                <InspectorDetails
+                  activeChapter={activeChapter}
+                  isScreenplay={isScreenplay}
+                  chapterWords={chapterWords}
+                  chapterSentences={chapterSentences}
+                  chapterParagraphs={chapterParagraphs}
+                  chapterCharacters={chapterCharacters}
+                  wordGoalProgress={wordGoalProgress}
+                  continuityMemory={continuityMemory}
+                  voiceAlerts={voiceAlerts}
+                  allProjectTags={allProjectTags}
+                  allProjectParts={allProjectParts}
+                  handleFieldChange={handleFieldChange}
+                />
               )}
 
               {/* SCENES TAB — context-sensitive scene fields */}
               {activeTab === 'scenes' && (
-                <div
-                  className={styles.section}
-                  role="tabpanel"
-                  id="inspector-panel-scenes"
-                  aria-labelledby="inspector-tab-scenes"
-                >
-                  {(activeChapter.scenes || []).map(scene => (
-                    <div key={scene.id} className={styles.sceneCard}>
-                      <div className={styles.sceneCardHeader}>
-                        <Input
-                          value={scene.title}
-                          onChange={e => handleSceneChange(scene.id, { title: e.target.value })}
-                          placeholder={isScreenplay ? 'Scene heading' : 'Scene title'}
-                        />
-                        <Tooltip content="Delete scene" position="left">
-                          <IconButton
-                            icon="delete"
-                            label="Delete scene"
-                            variant="ghost"
-                            onClick={() => activeChapter && deleteScene(activeChapter.id, scene.id)}
-                          />
-                        </Tooltip>
-                      </div>
-                      <Textarea
-                        value={scene.summary}
-                        onChange={e => handleSceneChange(scene.id, { summary: e.target.value })}
-                        placeholder="What happens in this scene..."
-                        rows={2}
-                      />
-                      <div className={styles.fieldRow}>
-                        <div className={styles.field}>
-                          <label className={styles.fieldLabel}>Status</label>
-                          <Select
-                            options={STATUS_OPTIONS}
-                            value={scene.status}
-                            onChange={e => handleSceneChange(scene.id, { status: e.target.value as ChapterStatus })}
-                          />
-                        </div>
-                      </div>
-                      {/* Scene-specific context fields */}
-                      <div className={styles.field}>
-                        <label className={styles.fieldLabel}>Location</label>
-                        <Input
-                          value={scene.location || ''}
-                          onChange={e => handleSceneChange(scene.id, { location: e.target.value })}
-                          placeholder="Where does this scene take place?"
-                        />
-                      </div>
-                      <div className={styles.field}>
-                        <label className={styles.fieldLabel}>Characters</label>
-                        <Input
-                          value={scene.pov || ''}
-                          onChange={e => handleSceneChange(scene.id, { pov: e.target.value })}
-                          placeholder="Characters in this scene"
-                        />
-                      </div>
-                      {isScreenplay && (
-                        <>
-                          <div className={styles.fieldRow}>
-                            <div className={styles.field}>
-                              <label className={styles.fieldLabel}>INT/EXT</label>
-                              <Select
-                                options={SCREENPLAY_INT_EXT_OPTIONS}
-                                value={scene.interiorExterior || 'INT'}
-                                onChange={e => handleSceneChange(scene.id, { interiorExterior: e.target.value as Scene['interiorExterior'] })}
-                              />
-                            </div>
-                            <div className={styles.field}>
-                              <label className={styles.fieldLabel}>Time</label>
-                              <Select
-                                options={SCREENPLAY_TIME_OPTIONS}
-                                value={scene.timeOfDay || 'DAY'}
-                                onChange={e => handleSceneChange(scene.id, { timeOfDay: e.target.value as Scene['timeOfDay'] })}
-                              />
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                  <Tooltip content="Add a new scene to this chapter" position="top">
-                    <Button variant="ghost" onClick={() => activeChapter && addScene(activeChapter.id)} className={styles.addBtn}>
-                      <span className="material-symbols-rounded">add</span>
-                      Add Scene
-                    </Button>
-                  </Tooltip>
-                </div>
+                <InspectorScenes
+                  activeChapter={activeChapter}
+                  isScreenplay={isScreenplay}
+                  handleSceneChange={handleSceneChange}
+                  deleteScene={deleteScene}
+                  addScene={addScene}
+                />
               )}
 
               {/* NOTES TAB — rich notes + synopsis */}
@@ -465,95 +233,22 @@ export function Inspector({ open, onClose, voiceAlerts = [] }: InspectorProps) {
 
 
               {activeTab === 'timeline' && (
-                <div
-                  className={styles.section}
-                  role="tabpanel"
-                  id="inspector-panel-timeline"
-                  aria-labelledby="inspector-tab-timeline"
-                >
-                  <div className={styles.timelineSummary}>
-                    <strong>{timelineFindings.length} potential paradox{timelineFindings.length === 1 ? '' : 'es'}</strong>
-                    <span>{timelineConsistency.extractedTimelineCount} scenes analyzed</span>
-                  </div>
-                  {timelineFindings.length === 0 && (
-                    <div className={styles.timelineEmpty}>No timeline contradictions detected.</div>
-                  )}
-                  {timelineFindings.map(finding => (
-                    <button
-                      type="button"
-                      key={finding.id}
-                      className={`${styles.timelineFinding} ${styles[`timelineFinding--${finding.severity}`]}`}
-                      onClick={() => {
-                        const chapterId = finding.involvedChapterIds[0];
-                        if (chapterId) setActiveChapter(chapterId);
-                        setActiveTab('scenes');
-                      }}
-                    >
-                      <div className={styles.timelineFindingHeader}>
-                        <span className={styles.timelineFindingSeverity}>{finding.severity}</span>
-                        <span>{finding.type.replaceAll('_', ' ')}</span>
-                      </div>
-                      <p>{finding.explanation}</p>
-                      <span className={styles.timelineFindingMeta}>
-                        Chapters: {finding.involvedChapterIds.length} · Scenes: {finding.involvedSceneIds.length}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+                <InspectorTimeline
+                  timelineFindings={timelineFindings}
+                  timelineConsistency={timelineConsistency}
+                  setActiveChapter={setActiveChapter}
+                  setActiveTab={setActiveTab}
+                />
               )}
 
               {activeTab === 'weather' && (
-                <div
-                  className={styles.section}
-                  role="tabpanel"
-                  id="inspector-panel-weather"
-                  aria-labelledby="inspector-tab-weather"
-                >
-                  <div className={styles.weatherBandGrid}>
-                    {narrativeWeather.climateBands.map(band => (
-                      <div key={band.id} className={styles.weatherBand}>
-                        <span className={styles.weatherBand__label}>{band.id}</span>
-                        <strong>{band.average}</strong>
-                        <span>{band.label}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {weatherFocusPoint && (
-                    <div className={styles.weatherDetails}>
-                      <strong>{weatherFocusPoint.chapterTitle}</strong>
-                      <span>Sentiment: {weatherFocusPoint.sentimentProxy}</span>
-                      <span>Pacing: {weatherFocusPoint.pacingIntensity}</span>
-                      <span>Dialogue: {weatherFocusPoint.dialogueDensity}%</span>
-                    </div>
-                  )}
-
-                  <div className={styles.weatherTimeline}>
-                    {narrativeWeather.points.map((point) => {
-                      const isActivePoint = point.chapterId === activeChapter?.id;
-                      const weatherScore = Math.round((Math.abs(point.sentimentProxy) + point.pacingIntensity + point.dialogueDensity) / 3);
-                      return (
-                        <button
-                          key={point.chapterId}
-                          type="button"
-                          className={`${styles.weatherPoint} ${isActivePoint ? styles['weatherPoint--active'] : ''}`}
-                          onMouseEnter={() => setHoveredWeatherChapterId(point.chapterId)}
-                          onMouseLeave={() => setHoveredWeatherChapterId(null)}
-                          onFocus={() => setHoveredWeatherChapterId(point.chapterId)}
-                          onBlur={() => setHoveredWeatherChapterId(null)}
-                          onClick={() => setActiveChapter(point.chapterId)}
-                          title={`${point.chapterTitle}
-Sentiment ${point.sentimentProxy} | Pacing ${point.pacingIntensity} | Dialogue ${point.dialogueDensity}%`}
-                        >
-                          <span className={styles.weatherPoint__label}>{point.chapterOrder + 1}. {point.chapterTitle}</span>
-                          <div className={styles.weatherPoint__track}>
-                            <div className={styles.weatherPoint__fill} style={{ width: `${weatherScore}%` }} />
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                <InspectorWeather
+                  narrativeWeather={narrativeWeather}
+                  weatherFocusPoint={weatherFocusPoint}
+                  activeChapter={activeChapter}
+                  setHoveredWeatherChapterId={setHoveredWeatherChapterId}
+                  setActiveChapter={setActiveChapter}
+                />
               )}
             </>
           )}

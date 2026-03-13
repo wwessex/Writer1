@@ -7,11 +7,10 @@ import type { ReleaseChannel } from '@/lib/updaterGuardrails';
 import styles from '../Windows.module.css';
 
 interface UpdatesSectionProps {
-  isFieldVisible: (sectionId: string, fieldId: string) => boolean;
   highlightMatch: (text: string) => React.ReactNode;
 }
 
-export function UpdatesSection({ isFieldVisible, highlightMatch }: UpdatesSectionProps) {
+export function UpdatesSection({ highlightMatch }: UpdatesSectionProps) {
   const { state, updateSettings } = useApp();
   const [releaseChannel, setReleaseChannelState] = useState<ReleaseChannel>(() => state.settings.releaseChannel ?? getReleaseChannel());
   const [updateSummary, setUpdateSummary] = useState<UpdaterSummary | null>(null);
@@ -65,7 +64,7 @@ export function UpdatesSection({ isFieldVisible, highlightMatch }: UpdatesSectio
 
   return (
     <>
-      {isFieldVisible('updates', 'releaseChannel') && <div className={styles.field}>
+      <div className={styles.field}>
         <label>{highlightMatch('Release Channel')}</label>
         <Select
           value={releaseChannel}
@@ -76,34 +75,32 @@ export function UpdatesSection({ isFieldVisible, highlightMatch }: UpdatesSectio
             { value: 'nightly', label: 'Nightly' },
           ]}
         />
-      </div>}
-      {isFieldVisible('updates', 'checkUpdates') && <>
-        <div className={styles.fieldRow}>
-          <Button onClick={handleCheckUpdates} disabled={updateBusy}>
-            <span className="material-symbols-rounded">update</span>
-            Check for Updates
+      </div>
+      <div className={styles.fieldRow}>
+        <Button onClick={handleCheckUpdates} disabled={updateBusy}>
+          <span className="material-symbols-rounded">update</span>
+          Check for Updates
+        </Button>
+        {updateSummary?.available && (
+          <Button variant="ghost" onClick={handleDeferUpdate} disabled={updateBusy}>
+            <span className="material-symbols-rounded">schedule</span>
+            Defer Install
           </Button>
-          {updateSummary?.available && (
-            <Button variant="ghost" onClick={handleDeferUpdate} disabled={updateBusy}>
-              <span className="material-symbols-rounded">schedule</span>
-              Defer Install
+        )}
+      </div>
+      {updateSummary?.version && (
+        <div className={styles.updateCard}>
+          <p className={styles.updateMeta}>Version {updateSummary.version}</p>
+          {updateSummary.body && <pre className={styles.updateNotes}>{updateSummary.body}</pre>}
+          {getDeferredUpdateVersion() && <p className={styles.updateMeta}>Deferred: {getDeferredUpdateVersion()}</p>}
+          {updateSummary.available && (
+            <Button onClick={handleApplyUpdate} disabled={updateBusy}>
+              <span className="material-symbols-rounded">restart_alt</span>
+              Restart to Apply
             </Button>
           )}
         </div>
-        {updateSummary?.version && (
-          <div className={styles.updateCard}>
-            <p className={styles.updateMeta}>Version {updateSummary.version}</p>
-            {updateSummary.body && <pre className={styles.updateNotes}>{updateSummary.body}</pre>}
-            {getDeferredUpdateVersion() && <p className={styles.updateMeta}>Deferred: {getDeferredUpdateVersion()}</p>}
-            {updateSummary.available && (
-              <Button onClick={handleApplyUpdate} disabled={updateBusy}>
-                <span className="material-symbols-rounded">restart_alt</span>
-                Restart to Apply
-              </Button>
-            )}
-          </div>
-        )}
-      </>}
+      )}
     </>
   );
 }
