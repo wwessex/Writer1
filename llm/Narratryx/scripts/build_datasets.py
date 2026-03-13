@@ -18,6 +18,15 @@ except ImportError:
 
 SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
+# Adjectives removed to create stylistically degraded "rejected" prose for DPO pairs.
+_DEGRADED_ADJECTIVES = (
+    r"sudden|ancient|silver|golden|bleak|sacred|solemn|haunting|vivid|trembling|fragile|luminous"
+)
+_DEGRADED_ADJECTIVES_RE = re.compile(rf"\b({_DEGRADED_ADJECTIVES})\b", re.IGNORECASE)
+
+# Minimum word count for truncation fallback when style transforms produce an identical string.
+_MIN_FALLBACK_WORDS = 20
+
 
 def _write_jsonl(records: list[dict[str, Any]], out_file: Path) -> int:
     out_file.parent.mkdir(parents=True, exist_ok=True)
@@ -62,12 +71,7 @@ def build_sft(output_dir: Path, max_records: int) -> int:
 
 def _drop_descriptive_adjectives(text: str) -> str:
     # A light-weight style degrader to create "rejected" prose from chosen text.
-    text = re.sub(
-        r"\b(sudden|ancient|silver|golden|bleak|sacred|solemn|haunting|vivid|trembling|fragile|luminous)\b",
-        "",
-        text,
-        flags=re.IGNORECASE,
-    )
+    text = _DEGRADED_ADJECTIVES_RE.sub("", text)
     text = re.sub(r"\s{2,}", " ", text)
     return text.strip()
 
@@ -105,7 +109,7 @@ def build_dpo(output_dir: Path, max_pairs: int, seed: int) -> int:
 
         rejected = _build_rejected_from_chosen(chosen)
         if rejected == chosen:
-            rejected = " ".join(chosen.split()[: max(20, len(chosen.split()) // 3)])
+            rejected = " ".join(chosen.split()[: max(_MIN_FALLBACK_WORDS, len(chosen.split()) // 3)])
 
         rows.append(
             {
