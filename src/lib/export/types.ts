@@ -1,3 +1,5 @@
+import type { ScreenplayBlockType } from '@/types';
+
 export type PdfAlignment = 'left' | 'right' | 'center' | 'justify';
 
 export type PdfMargin = [number, number, number, number];
@@ -71,4 +73,48 @@ export interface DocxClasses {
   AlignmentType: {
     CENTER: string;
   };
+}
+
+export interface ScreenplayBlock {
+  type: ScreenplayBlockType;
+  text: string;
+}
+
+export interface FountainMetadata {
+  credit?: string;
+  author?: string;
+  draftDate?: string;
+  source?: string;
+}
+
+export interface ScreenplayFountainOptions {
+  sceneSeparator?: string;
+}
+
+export interface FountainExportOptions {
+  includeSectionTitles?: boolean;
+  includeMetadataBlock?: boolean;
+  metadata?: FountainMetadata;
+  sceneSeparator?: string;
+  sectionSeparator?: string;
+  filenameConvention?: 'title' | 'title-screenplay' | 'title-fountain';
+}
+
+export interface PublishingBundleData {
+  bookDescription: string;
+  shortSynopsis: string;
+  longSynopsis: string;
+  authorBioShort: string;
+  authorBioLong: string;
+  keywordSuggestions: string[];
+  categorySuggestions: string[];
+  backCoverCopy: string;
+  hookLines: string[];
+}
+
+export interface PublishingBundleOptions {
+  includeHeadings?: boolean;
+  includeKdpTemplate?: boolean;
+  manuscriptFormat?: 'docx' | 'pdf' | 'rtf' | 'markdown' | 'txt';
+  data: PublishingBundleData;
 }

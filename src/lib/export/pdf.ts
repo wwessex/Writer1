@@ -1,5 +1,6 @@
 import type { Chapter, ManuscriptExportOptions } from '@/types';
 import { editorToPlainText } from '@/lib/utils';
+import { ContentErrors, reportAppError } from '@/lib/errors';
 import { SCREENPLAY_PDF_FONTS, isSceneBreakLine } from './shared';
 import { screenplayChapterToPdfContent } from './screenplay';
 import { loadPdfMake } from './boundary/pdfmake';
@@ -15,6 +16,7 @@ export async function exportToPdf(
   try {
     pdfMakeModule = await loadPdfMake();
   } catch (cause) {
+    void reportAppError(ContentErrors.exportFailed('PDF', cause), { category: 'export_failure' });
     throw new Error('Failed to load the PDF export library. Check your connection and try again.', { cause });
   }
 
@@ -105,6 +107,7 @@ export async function exportToScreenplayPdf(chapters: Chapter[], title: string):
   try {
     pdfMakeModule = await loadPdfMake();
   } catch (cause) {
+    void reportAppError(ContentErrors.exportFailed('PDF', cause), { category: 'export_failure' });
     throw new Error('Failed to load the PDF export library. Check your connection and try again.', { cause });
   }
 

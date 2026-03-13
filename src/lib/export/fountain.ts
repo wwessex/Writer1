@@ -1,22 +1,7 @@
 import type { Chapter } from '@/types';
 import { downloadFile } from '@/lib/utils';
 import { screenplayChapterToFountain } from './screenplay';
-
-export interface FountainMetadata {
-  credit?: string;
-  author?: string;
-  draftDate?: string;
-  source?: string;
-}
-
-export interface FountainExportOptions {
-  includeSectionTitles?: boolean;
-  includeMetadataBlock?: boolean;
-  metadata?: FountainMetadata;
-  sceneSeparator?: string;
-  sectionSeparator?: string;
-  filenameConvention?: 'title' | 'title-screenplay' | 'title-fountain';
-}
+import type { FountainExportOptions } from './types';
 
 export async function exportToFountain(
   chapters: Chapter[],

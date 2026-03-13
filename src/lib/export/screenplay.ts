@@ -1,16 +1,7 @@
 import type { JSONContent } from '@tiptap/core';
 import type { Chapter, ScreenplayBlockType } from '@/types';
-import type { PdfContentNode } from './types';
+import type { PdfContentNode, ScreenplayBlock, ScreenplayFountainOptions } from './types';
 import { extractTextFromNode } from './shared';
-
-export interface ScreenplayBlock {
-  type: ScreenplayBlockType;
-  text: string;
-}
-
-export interface ScreenplayFountainOptions {
-  sceneSeparator?: string;
-}
 
 function isScreenplayBlockType(value: string | null | undefined): value is ScreenplayBlockType {
   return value === 'scene-heading'
