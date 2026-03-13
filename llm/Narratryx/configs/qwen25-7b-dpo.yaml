@@ -1,0 +1,41 @@
+base_model: Qwen/Qwen2.5-7B-Instruct
+model_type: AutoModelForCausalLM
+tokenizer_type: AutoTokenizer
+trust_remote_code: true
+
+adapter: qlora
+load_in_4bit: true
+
+sequence_len: 4096
+sample_packing: false
+
+rl: dpo
+datasets:
+  - path: artifacts/data/dpo_pairs.jsonl
+    type: dpo
+    field_prompt: prompt
+    field_chosen: chosen
+    field_rejected: rejected
+
+output_dir: artifacts/checkpoints/qwen25-7b-dpo
+
+lora_r: 32
+lora_alpha: 64
+lora_dropout: 0.05
+lora_target_linear: true
+
+micro_batch_size: 1
+gradient_accumulation_steps: 16
+num_epochs: 1
+learning_rate: 0.00005
+optimizer: paged_adamw_8bit
+lr_scheduler: cosine
+warmup_ratio: 0.03
+
+beta: 0.1
+bf16: auto
+tf32: true
+
+logging_steps: 10
+save_steps: 200
+save_total_limit: 2
