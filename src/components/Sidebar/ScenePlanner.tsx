@@ -1,12 +1,15 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
-import { IconButton, Button, Input, Textarea } from '@/components/UI';
+import { IconButton } from '@/components/UI';
 import { Tooltip } from '@/components/UI/Tooltip';
 import { Select } from '@/components/UI/Select';
 import type { Scene, SceneConflictType, SceneSimulationSwapCandidate } from '@/types';
 import { simulateChapterSceneChemistry } from '@/lib/sceneChemistry';
 import { useDragReorder } from '@/hooks/useDragReorder';
-import { STATUS_OPTIONS, SCREENPLAY_INT_EXT_OPTIONS, SCREENPLAY_TIME_OPTIONS } from '@/lib/constants';
+import { STATUS_OPTIONS } from '@/lib/constants';
+import { SceneSimulationPanel } from './SceneSimulationPanel';
+import { SceneCard } from './SceneCard';
+import { ScenePopoutEditor } from './ScenePopoutEditor';
 import styles from './ScenePlanner.module.css';
 
 export function ScenePlanner() {
@@ -116,87 +119,15 @@ export function ScenePlanner() {
       </div>
 
       {simulatorOpen && (
-        <div className={styles.simulatorPanel}>
-          <div className={styles.simulatorPanel__header}>
-            <h4>Scene Chemistry Simulation</h4>
-            <p>Pick a scene and test swaps for POV, location, conflict type, and stakes to preview projected impact.</p>
-          </div>
-          <div className={styles.simulatorPanel__grid}>
-            <div>
-              <label>Scene</label>
-              <Select
-                options={scenes.map(scene => ({ value: scene.id, label: scene.title || 'Untitled scene' }))}
-                value={simulatedSceneId || (scenes[0]?.id || '')}
-                onChange={e => setSimulatedSceneId(e.target.value)}
-              />
-            </div>
-            <div>
-              <label>Swap POV</label>
-              <Input
-                value={swapCandidate.pov || ''}
-                onChange={e => setSwapCandidate(prev => ({ ...prev, pov: e.target.value || undefined }))}
-                placeholder="e.g. Antagonist"
-              />
-            </div>
-            <div>
-              <label>Swap Location</label>
-              <Input
-                value={swapCandidate.location || ''}
-                onChange={e => setSwapCandidate(prev => ({ ...prev, location: e.target.value || undefined }))}
-                placeholder="e.g. Flooded subway"
-              />
-            </div>
-            <div>
-              <label>Swap Conflict Type</label>
-              <Select
-                options={[{ value: '', label: 'No swap' }, ...conflictOptions]}
-                value={swapCandidate.conflictType || ''}
-                onChange={e => setSwapCandidate(prev => ({ ...prev, conflictType: (e.target.value || undefined) as SceneConflictType | undefined }))}
-              />
-            </div>
-            <div className={styles.simulatorPanel__full}>
-              <label>Swap Stakes</label>
-              <Textarea
-                value={swapCandidate.stakes || ''}
-                onChange={e => setSwapCandidate(prev => ({ ...prev, stakes: e.target.value || undefined }))}
-                rows={2}
-                placeholder="What is at risk if the scene fails?"
-              />
-            </div>
-          </div>
-
-          {simulationResult && (
-            <div className={styles.simulatorPanel__results}>
-              <div className={styles.simulatorMetrics}>
-                <div>
-                  <strong>Tension</strong>
-                  <span>{simulationResult.metrics.simulated.tension} ({simulationResult.metrics.delta.tension >= 0 ? '+' : ''}{simulationResult.metrics.delta.tension})</span>
-                </div>
-                <div>
-                  <strong>Readability</strong>
-                  <span>{simulationResult.metrics.simulated.readability} ({simulationResult.metrics.delta.readability >= 0 ? '+' : ''}{simulationResult.metrics.delta.readability})</span>
-                </div>
-                <div>
-                  <strong>Thematic alignment</strong>
-                  <span>{simulationResult.metrics.simulated.thematicAlignment} ({simulationResult.metrics.delta.thematicAlignment >= 0 ? '+' : ''}{simulationResult.metrics.delta.thematicAlignment})</span>
-                </div>
-              </div>
-              <p className={styles.simulatorPanel__rationale}>{simulationResult.rationale}</p>
-              <p className={styles.simulatorPanel__direction}><strong>Recommended rewrite direction:</strong> {simulationResult.recommendedRewriteDirection}</p>
-              <p className={styles.simulatorPanel__confidence}>
-                Confidence: <strong>{simulationResult.confidence}%</strong>
-              </p>
-              {simulationResult.lowConfidence && (
-                <div className={styles.simulatorPanel__guardrail}>
-                  <strong>Low-confidence projection.</strong> Add more scene summary detail, explicit stakes, and POV metadata before relying on these deltas.
-                  <ul>
-                    {simulationResult.confidenceRationale.map(reason => <li key={reason}>{reason}</li>)}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        <SceneSimulationPanel
+          scenes={scenes}
+          simulatedSceneId={simulatedSceneId}
+          setSimulatedSceneId={setSimulatedSceneId}
+          swapCandidate={swapCandidate}
+          setSwapCandidate={setSwapCandidate}
+          simulationResult={simulationResult}
+          conflictOptions={conflictOptions}
+        />
       )}
 
       <div className={styles.scenePlanner__items}>
@@ -210,150 +141,26 @@ export function ScenePlanner() {
           value={productionTagFilter}
           onChange={e => setProductionTagFilter(e.target.value)}
         />
-        {filteredScenes.map((scene, index) => {
-          const isDragging = dragState.draggedId === scene.id;
-          const isDropTarget = dragState.dropTargetId === scene.id && dragState.draggedId !== scene.id;
-          const isExpanded = expandedId === scene.id;
-          const isJustMoved = justMovedId === scene.id;
-
-          return (
-            <div
-              key={scene.id}
-              className={[
-                styles.sceneCard,
-                isDragging && styles['sceneCard--dragging'],
-                isDropTarget && styles['sceneCard--dropTarget'],
-                isJustMoved && styles['sceneCard--justMoved']
-              ].filter(Boolean).join(' ')}
-              draggable
-              onDragStart={e => handleDragStart(e, scene.id)}
-              onDragOver={e => handleDragOver(e, scene.id)}
-              onDragEnd={handleDragEnd}
-              onDrop={e => handleDrop(e, scene.id)}
-            >
-              <div className={styles.sceneCard__header} onClick={() => setExpandedId(isExpanded ? null : scene.id)}>
-                <Tooltip content="Drag to reorder" position="left">
-                  <span className={styles.sceneCard__drag}>
-                    <span className="material-symbols-rounded">drag_indicator</span>
-                  </span>
-                </Tooltip>
-                <span className={styles.sceneCard__number}>{index + 1}</span>
-                <span className={styles.sceneCard__title}>{scene.title || 'Untitled Scene'}</span>
-                <span className={`${styles.sceneCard__status} ${styles[`sceneCard__status--${scene.status}`]}`}>
-                  {scene.status}
-                </span>
-                <Tooltip content={isExpanded ? 'Collapse scene details' : 'Expand scene details'} position="left">
-                  <span className="material-symbols-rounded">
-                    {isExpanded ? 'expand_less' : 'expand_more'}
-                  </span>
-                </Tooltip>
-              </div>
-
-              {isExpanded && (
-                <div className={styles.sceneCard__body}>
-                  <div className={styles.sceneCard__field}>
-                    <label>Title</label>
-                    <Input
-                      value={scene.title}
-                      onChange={e => handleUpdate(scene.id, { title: e.target.value })}
-                      placeholder="Scene title"
-                    />
-                  </div>
-                  <div className={styles.sceneCard__field}>
-                    <label>Summary</label>
-                    <Textarea
-                      value={scene.summary}
-                      onChange={e => handleUpdate(scene.id, { summary: e.target.value })}
-                      placeholder="What happens in this scene..."
-                      rows={4}
-                    />
-                  </div>
-                  <div className={styles.sceneCard__fieldRow}>
-                    <div className={styles.sceneCard__field}>
-                      <label>Status</label>
-                      <Select
-                        options={STATUS_OPTIONS}
-                        value={scene.status}
-                        onChange={e => handleUpdate(scene.id, { status: e.target.value as Scene['status'] })}
-                      />
-                    </div>
-                    <div className={styles.sceneCard__field}>
-                      <label>Production Tag</label>
-                      <Input
-                        value={(scene.productionTags || []).join(', ')}
-                        onChange={e => handleUpdate(scene.id, { productionTags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })}
-                        placeholder="vfx, stunt"
-                      />
-                    </div>
-                  </div>
-
-                  {isScreenplay && (
-                    <>
-                      <div className={styles.sceneCard__fieldRow}>
-                        <div className={styles.sceneCard__field}>
-                          <label>Slug Line</label>
-                          <Input
-                            value={scene.slugLine || ''}
-                            onChange={e => handleUpdate(scene.id, { slugLine: e.target.value })}
-                            placeholder="INT. OFFICE - DAY"
-                          />
-                        </div>
-                        <div className={styles.sceneCard__field}>
-                          <label>Location</label>
-                          <Input
-                            value={scene.location || ''}
-                            onChange={e => handleUpdate(scene.id, { location: e.target.value })}
-                            placeholder="Office"
-                          />
-                        </div>
-                      </div>
-                      <div className={styles.sceneCard__fieldRow}>
-                        <div className={styles.sceneCard__field}>
-                          <label>INT/EXT</label>
-                          <Select
-                            options={SCREENPLAY_INT_EXT_OPTIONS}
-                            value={scene.interiorExterior || 'INT'}
-                            onChange={e => handleUpdate(scene.id, { interiorExterior: e.target.value as Scene['interiorExterior'] })}
-                          />
-                        </div>
-                        <div className={styles.sceneCard__field}>
-                          <label>Time</label>
-                          <Select
-                            options={SCREENPLAY_TIME_OPTIONS}
-                            value={scene.timeOfDay || 'DAY'}
-                            onChange={e => handleUpdate(scene.id, { timeOfDay: e.target.value as Scene['timeOfDay'] })}
-                          />
-                        </div>
-                      </div>
-                      <div className={styles.sceneCard__field}>
-                        <label>Page Estimate</label>
-                        <Input
-                          type="number"
-                          value={scene.pageEstimate || ''}
-                          onChange={e => handleUpdate(scene.id, { pageEstimate: parseInt(e.target.value) || 0 })}
-                          placeholder="1"
-                        />
-                      </div>
-                    </>
-                  )}
-
-                  <div className={styles.sceneCard__actions}>
-                    <Tooltip content="Edit scene in expanded view" position="top">
-                      <Button variant="ghost" size="small" onClick={() => setPopoutSceneId(scene.id)}>
-                        <span className="material-symbols-rounded">open_in_full</span>
-                        Expand
-                      </Button>
-                    </Tooltip>
-                    <Button variant="danger" size="small" onClick={() => handleDelete(scene.id)}>
-                      <span className="material-symbols-rounded">delete</span>
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {filteredScenes.map((scene, index) => (
+          <SceneCard
+            key={scene.id}
+            scene={scene}
+            index={index}
+            isScreenplay={isScreenplay}
+            isExpanded={expandedId === scene.id}
+            onToggle={() => setExpandedId(expandedId === scene.id ? null : scene.id)}
+            isDragging={dragState.draggedId === scene.id}
+            isDropTarget={dragState.dropTargetId === scene.id && dragState.draggedId !== scene.id}
+            isJustMoved={justMovedId === scene.id}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+            onDrop={handleDrop}
+            onUpdate={handleUpdate}
+            onDelete={handleDelete}
+            onExpand={setPopoutSceneId}
+          />
+        ))}
       </div>
 
       {filteredScenes.length === 0 && scenes.length === 0 && (
@@ -379,105 +186,12 @@ export function ScenePlanner() {
         const popoutScene = scenes.find(s => s.id === popoutSceneId);
         if (!popoutScene) return null;
         return (
-          <div className={styles.popoutOverlay} onClick={e => { if (e.target === e.currentTarget) setPopoutSceneId(null); }}>
-            <div className={styles.popoutEditor}>
-              <div className={styles.popoutEditor__header}>
-                <h3 className={styles.popoutEditor__title}>{popoutScene.title || 'Untitled Scene'}</h3>
-                <IconButton icon="close" label="Close" variant="ghost" onClick={() => setPopoutSceneId(null)} />
-              </div>
-              <div className={styles.popoutEditor__body}>
-                <div>
-                  <label>Title</label>
-                  <Input
-                    value={popoutScene.title}
-                    onChange={e => handleUpdate(popoutScene.id, { title: e.target.value })}
-                    placeholder="Scene title"
-                  />
-                </div>
-                <div>
-                  <label>Summary</label>
-                  <Textarea
-                    value={popoutScene.summary}
-                    onChange={e => handleUpdate(popoutScene.id, { summary: e.target.value })}
-                    placeholder="Describe what happens in this scene in detail..."
-                    rows={6}
-                  />
-                </div>
-                <div className={styles.popoutEditor__fieldRow}>
-                  <div>
-                    <label>Status</label>
-                    <Select
-                      options={STATUS_OPTIONS}
-                      value={popoutScene.status}
-                      onChange={e => handleUpdate(popoutScene.id, { status: e.target.value as Scene['status'] })}
-                    />
-                  </div>
-                  <div>
-                    <label>Production Tags</label>
-                    <Input
-                      value={(popoutScene.productionTags || []).join(', ')}
-                      onChange={e => handleUpdate(popoutScene.id, { productionTags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })}
-                      placeholder="vfx, stunt"
-                    />
-                  </div>
-                </div>
-                {isScreenplay && (
-                  <>
-                    <div className={styles.popoutEditor__fieldRow}>
-                      <div>
-                        <label>Slug Line</label>
-                        <Input
-                          value={popoutScene.slugLine || ''}
-                          onChange={e => handleUpdate(popoutScene.id, { slugLine: e.target.value })}
-                          placeholder="INT. OFFICE - DAY"
-                        />
-                      </div>
-                      <div>
-                        <label>Location</label>
-                        <Input
-                          value={popoutScene.location || ''}
-                          onChange={e => handleUpdate(popoutScene.id, { location: e.target.value })}
-                          placeholder="Office"
-                        />
-                      </div>
-                    </div>
-                    <div className={styles.popoutEditor__fieldRow}>
-                      <div>
-                        <label>INT/EXT</label>
-                        <Select
-                          options={SCREENPLAY_INT_EXT_OPTIONS}
-                          value={popoutScene.interiorExterior || 'INT'}
-                          onChange={e => handleUpdate(popoutScene.id, { interiorExterior: e.target.value as Scene['interiorExterior'] })}
-                        />
-                      </div>
-                      <div>
-                        <label>Time</label>
-                        <Select
-                          options={SCREENPLAY_TIME_OPTIONS}
-                          value={popoutScene.timeOfDay || 'DAY'}
-                          onChange={e => handleUpdate(popoutScene.id, { timeOfDay: e.target.value as Scene['timeOfDay'] })}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label>Page Estimate</label>
-                      <Input
-                        type="number"
-                        value={popoutScene.pageEstimate || ''}
-                        onChange={e => handleUpdate(popoutScene.id, { pageEstimate: parseInt(e.target.value) || 0 })}
-                        placeholder="1"
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-              <div className={styles.popoutEditor__footer}>
-                <Button variant="primary" onClick={() => setPopoutSceneId(null)}>
-                  Done
-                </Button>
-              </div>
-            </div>
-          </div>
+          <ScenePopoutEditor
+            scene={popoutScene}
+            isScreenplay={isScreenplay}
+            onUpdate={handleUpdate}
+            onClose={() => setPopoutSceneId(null)}
+          />
         );
       })()}
     </section>
