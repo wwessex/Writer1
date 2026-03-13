@@ -8,7 +8,9 @@ import {
   GOAL_TRENDS_STORAGE_KEY,
   PROGRESS_STORAGE_KEY,
   SETTINGS_STORAGE_KEY,
-  STORY_BLUEPRINTS_STORAGE_KEY
+  STORY_BLUEPRINTS_STORAGE_KEY,
+  CHARACTERS_STORAGE_KEY,
+  WORLD_ENTRIES_STORAGE_KEY
 } from '@/lib/storageKeys';
 
 const CURRENT_BACKUP_VERSION = 3;
@@ -20,9 +22,6 @@ export interface GoalTrendSnapshot {
   dailyGoal: number;
   goalMet: boolean;
 }
-
-const CHARACTERS_STORAGE_KEY = 'draftharbour_characters';
-const WORLD_ENTRIES_STORAGE_KEY = 'draftharbour_world';
 const ALLOWED_INTEGRATION_TYPES: IntegrationType[] = ['scrivener', 'google-drive', 'dropbox'];
 const SUPPORTED_DHPROJ_VERSIONS = new Set<number>([1]);
 

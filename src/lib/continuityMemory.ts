@@ -1,7 +1,6 @@
 import type { Chapter } from '@/types';
 import { editorToPlainText } from '@/lib/utils';
-
-const CONTINUITY_STORAGE_PREFIX = 'draftharbour_continuity_memory_';
+import { CONTINUITY_STORAGE_PREFIX } from '@/lib/constants/storageKeys';
 
 export interface ContinuityConflict {
   id: string;

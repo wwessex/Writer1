@@ -1,4 +1,5 @@
 import type { AppSettings } from '@/types';
+import { POLICY_STORAGE_KEY } from '@/lib/constants/storageKeys';
 
 export interface ManagedPolicy {
   forceLocalOnly?: boolean;
@@ -7,8 +8,6 @@ export interface ManagedPolicy {
   disabledAIProviderTypes?: Array<'chrome-ai' | 'managed-cloud' | 'openai-compatible' | 'server-proxy'>;
   settingsOverrides?: Partial<AppSettings>;
 }
-
-const POLICY_STORAGE_KEY = 'draftharbour_managed_policy_v1';
 
 function readPolicyFromWindow(): ManagedPolicy | null {
   const candidate = (window as Window & { __DH_MANAGED_POLICY__?: ManagedPolicy }).__DH_MANAGED_POLICY__;

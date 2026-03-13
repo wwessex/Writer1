@@ -6,8 +6,9 @@ import {
 } from '@/lib/featureFlags';
 import { recordTelemetryEvent } from '@/lib/telemetry';
 
+import { SAFE_MODE_RESTART_KEY } from '@/lib/constants/storageKeys';
+
 const MAX_LOCAL_ERROR_LOGS = 200;
-const SAFE_MODE_RESTART_KEY = 'draftharbour_safe_mode_next_boot';
 
 export type ErrorEventCategory =
   | 'storage_failure'

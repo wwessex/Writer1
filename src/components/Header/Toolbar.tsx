@@ -4,47 +4,10 @@ import { useApp } from '@/context/AppContext';
 import { IconButton } from '@/components/UI';
 import { Tooltip } from '@/components/UI/Tooltip';
 import { Select } from '@/components/UI/Select';
+import { LINE_SPACING_OPTIONS, FONT_FAMILY_OPTIONS } from '@/lib/constants/editorOptions';
+import { FormattingButtons, ListButtons, FORMAT_COMMANDS, LIST_COMMANDS } from './FormattingButtons';
+import { StyleSelector } from './StyleSelector';
 import styles from './Toolbar.module.css';
-
-const STYLE_OPTIONS = [
-  { value: 'p', label: 'Paragraph' },
-  { value: 'h1', label: 'Heading 1' },
-  { value: 'h2', label: 'Heading 2' },
-  { value: 'h3', label: 'Heading 3' },
-  { value: 'h4', label: 'Heading 4' }
-];
-
-const LINE_SPACING_OPTIONS = [
-  { value: '1', label: 'Single' },
-  { value: '1.5', label: '1.5' },
-  { value: '2', label: 'Double' }
-];
-
-const FONT_FAMILY_OPTIONS = [
-  { value: 'default', label: 'Default' },
-  { value: 'serif', label: 'Serif' },
-  { value: 'sans-serif', label: 'Sans Serif' },
-  { value: 'monospace', label: 'Monospace' },
-  { value: '"Georgia", serif', label: 'Georgia' },
-  { value: '"Palatino Linotype", "Book Antiqua", Palatino, serif', label: 'Palatino' },
-  { value: '"Times New Roman", Times, serif', label: 'Times' },
-  { value: '"Courier Prime", "Courier New", Courier, monospace', label: 'Courier Prime' },
-  { value: '"Courier New", Courier, monospace', label: 'Courier' },
-  { value: '"Trebuchet MS", Helvetica, sans-serif', label: 'Trebuchet' },
-  { value: '"Verdana", Geneva, sans-serif', label: 'Verdana' },
-];
-
-const FORMAT_COMMANDS = [
-  { icon: 'format_bold', cmd: 'bold', label: 'Bold', shortcut: 'Ctrl+B' },
-  { icon: 'format_italic', cmd: 'italic', label: 'Italic', shortcut: 'Ctrl+I' },
-  { icon: 'format_underlined', cmd: 'underline', label: 'Underline', shortcut: 'Ctrl+U' },
-  { icon: 'strikethrough_s', cmd: 'strike', label: 'Strikethrough', shortcut: '' }
-];
-
-const LIST_COMMANDS = [
-  { icon: 'format_list_bulleted', cmd: 'bulletList', label: 'Bullet List', shortcut: '' },
-  { icon: 'format_list_numbered', cmd: 'orderedList', label: 'Numbered List', shortcut: '' }
-];
 
 const MOBILE_PRIMARY_COMMANDS = FORMAT_COMMANDS.slice(0, 3);
 const MOBILE_MORE_FORMATTING_COMMANDS = [
@@ -128,36 +91,6 @@ export function Toolbar() {
       };
     }
   }, [moreFormattingOpen]);
-
-  const getCurrentStyle = useCallback(() => {
-    if (!editor) return 'p';
-    if (editor.isActive('heading', { level: 1 })) return 'h1';
-    if (editor.isActive('heading', { level: 2 })) return 'h2';
-    if (editor.isActive('heading', { level: 3 })) return 'h3';
-    if (editor.isActive('heading', { level: 4 })) return 'h4';
-    return 'p';
-  }, [editor]);
-
-  const handleStyleChange = (value: string) => {
-    if (!editor) return;
-
-    switch (value) {
-      case 'h1':
-        editor.chain().focus().toggleHeading({ level: 1 }).run();
-        break;
-      case 'h2':
-        editor.chain().focus().toggleHeading({ level: 2 }).run();
-        break;
-      case 'h3':
-        editor.chain().focus().toggleHeading({ level: 3 }).run();
-        break;
-      case 'h4':
-        editor.chain().focus().toggleHeading({ level: 4 }).run();
-        break;
-      default:
-        editor.chain().focus().setParagraph().run();
-    }
-  };
 
   const [lineSpacing, setLineSpacing] = useState('1.5');
   const [fontFamily, setFontFamily] = useState('default');
@@ -293,12 +226,7 @@ export function Toolbar() {
       <div className={scrollClasses}>
         <div className={styles.toolbar} ref={toolbarRef}>
           <div className={styles.toolbar__group}>
-            <Select
-              options={STYLE_OPTIONS}
-              value={getCurrentStyle()}
-              onChange={e => handleStyleChange(e.target.value)}
-              className={styles.styleSelect}
-            />
+            <StyleSelector editor={editor} className={styles.styleSelect} showTooltip={false} />
             <Select
               options={FONT_FAMILY_OPTIONS}
               value={fontFamily}
@@ -431,14 +359,7 @@ export function Toolbar() {
   return (
     <div className={styles.toolbar}>
       <div className={styles.toolbar__group}>
-        <Tooltip content="Paragraph style" position="bottom">
-          <Select
-            options={STYLE_OPTIONS}
-            value={getCurrentStyle()}
-            onChange={e => handleStyleChange(e.target.value)}
-            className={styles.styleSelect}
-          />
-        </Tooltip>
+        <StyleSelector editor={editor} className={styles.styleSelect} />
         <Tooltip content="Font family" position="bottom">
           <Select
             options={FONT_FAMILY_OPTIONS}
@@ -452,33 +373,13 @@ export function Toolbar() {
       <div className={styles.toolbar__divider} />
 
       <div className={styles.toolbar__group}>
-        {FORMAT_COMMANDS.map(({ icon, cmd, label, shortcut }) => (
-          <Tooltip key={cmd} content={shortcut ? `${label} (${shortcut})` : label} position="bottom">
-            <IconButton
-              icon={icon}
-              label={shortcut ? `${label} (${shortcut})` : label}
-              variant="ghost"
-              active={isActive(cmd)}
-              onClick={() => handleFormatClick(cmd)}
-            />
-          </Tooltip>
-        ))}
+        <FormattingButtons onFormatClick={handleFormatClick} isActive={isActive} />
       </div>
 
       <div className={styles.toolbar__divider} />
 
       <div className={styles.toolbar__group}>
-        {LIST_COMMANDS.map(({ icon, cmd, label }) => (
-          <Tooltip key={cmd} content={label} position="bottom">
-            <IconButton
-              icon={icon}
-              label={label}
-              variant="ghost"
-              active={isActive(cmd)}
-              onClick={() => handleFormatClick(cmd)}
-            />
-          </Tooltip>
-        ))}
+        <ListButtons onFormatClick={handleFormatClick} isActive={isActive} />
       </div>
 
       <div className={styles.toolbar__divider} />

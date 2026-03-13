@@ -6,9 +6,7 @@
 
 import { generateId } from '@/lib/utils';
 import { getManagedPolicy } from '@/lib/policy';
-
-const STORAGE_KEY = 'draftharbour_ai_telemetry_v1';
-const OPT_IN_KEY = 'draftharbour_ai_telemetry_optin';
+import { AI_TELEMETRY_STORAGE_KEY, AI_TELEMETRY_OPT_IN_KEY } from '@/lib/constants/storageKeys';
 const MAX_RECORDS = 200;
 
 export interface TelemetryEvent {
@@ -38,25 +36,25 @@ export interface TelemetrySummary {
 
 export function isTelemetryOptedIn(): boolean {
   if (getManagedPolicy().disableTelemetry) return false;
-  return localStorage.getItem(OPT_IN_KEY) === 'true';
+  return localStorage.getItem(AI_TELEMETRY_OPT_IN_KEY) === 'true';
 }
 
 export function setTelemetryOptIn(enabled: boolean): void {
   if (getManagedPolicy().disableTelemetry) {
-    localStorage.setItem(OPT_IN_KEY, 'false');
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.setItem(AI_TELEMETRY_OPT_IN_KEY, 'false');
+    localStorage.removeItem(AI_TELEMETRY_STORAGE_KEY);
     return;
   }
-  localStorage.setItem(OPT_IN_KEY, String(enabled));
+  localStorage.setItem(AI_TELEMETRY_OPT_IN_KEY, String(enabled));
   if (!enabled) {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(AI_TELEMETRY_STORAGE_KEY);
   }
 }
 
 function loadEvents(): TelemetryEvent[] {
   if (!isTelemetryOptedIn()) return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(AI_TELEMETRY_STORAGE_KEY);
     if (raw) return JSON.parse(raw);
   } catch { /* ignore */ }
   return [];
@@ -64,7 +62,7 @@ function loadEvents(): TelemetryEvent[] {
 
 function saveEvents(events: TelemetryEvent[]): void {
   if (!isTelemetryOptedIn()) return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(events.slice(0, MAX_RECORDS)));
+  localStorage.setItem(AI_TELEMETRY_STORAGE_KEY, JSON.stringify(events.slice(0, MAX_RECORDS)));
 }
 
 export function recordTelemetryEvent(event: Omit<TelemetryEvent, 'id' | 'timestamp'>): void {
@@ -125,7 +123,7 @@ export function getTelemetrySummary(): TelemetrySummary {
 }
 
 export function clearTelemetryData(): void {
-  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(AI_TELEMETRY_STORAGE_KEY);
 }
 
 export function exportTelemetryData(): string {

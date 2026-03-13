@@ -1,6 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-
-const RECOVERY_KEY = 'draftharbour_crash_recovery';
+import { CRASH_RECOVERY_KEY } from '@/lib/constants/storageKeys';
 
 interface RecoveryState {
   novelId: string;
@@ -36,7 +35,7 @@ export function useCrashRecovery({
   useEffect(() => {
     if (recoveryFiredRef.current) return;
     try {
-      const raw = localStorage.getItem(RECOVERY_KEY);
+      const raw = localStorage.getItem(CRASH_RECOVERY_KEY);
       if (!raw) return;
       const prev: RecoveryState = JSON.parse(raw);
       if (!prev.clean && prev.novelId) {
@@ -60,7 +59,7 @@ export function useCrashRecovery({
         clean: false,
       };
       try {
-        localStorage.setItem(RECOVERY_KEY, JSON.stringify(state));
+        localStorage.setItem(CRASH_RECOVERY_KEY, JSON.stringify(state));
       } catch {
         // storage full — non-critical
       }
@@ -75,11 +74,11 @@ export function useCrashRecovery({
   useEffect(() => {
     const markClean = () => {
       try {
-        const raw = localStorage.getItem(RECOVERY_KEY);
+        const raw = localStorage.getItem(CRASH_RECOVERY_KEY);
         if (raw) {
           const state: RecoveryState = JSON.parse(raw);
           state.clean = true;
-          localStorage.setItem(RECOVERY_KEY, JSON.stringify(state));
+          localStorage.setItem(CRASH_RECOVERY_KEY, JSON.stringify(state));
         }
       } catch {
         // best-effort

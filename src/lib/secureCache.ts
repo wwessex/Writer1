@@ -1,7 +1,7 @@
 import { getSecret, isDesktop, setSecret } from '@/lib/desktopSecrets';
+import { CACHE_KEY_STORAGE } from '@/lib/constants/storageKeys';
 
 const CACHE_KEY_SECRET = 'local_cache_encryption_key';
-const FALLBACK_KEY_STORAGE = 'draftharbour_cache_key_v1';
 const BYTE_CHUNK_SIZE = 8 * 1024;
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -41,10 +41,10 @@ async function getOrCreateKeyMaterial(): Promise<string> {
     return created;
   }
 
-  const existing = localStorage.getItem(FALLBACK_KEY_STORAGE);
+  const existing = localStorage.getItem(CACHE_KEY_STORAGE);
   if (existing) return existing;
   const created = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
-  localStorage.setItem(FALLBACK_KEY_STORAGE, created);
+  localStorage.setItem(CACHE_KEY_STORAGE, created);
   return created;
 }
 

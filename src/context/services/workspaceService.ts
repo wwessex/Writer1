@@ -1,9 +1,5 @@
 import { generateId } from '@/lib/utils';
-
-const WORKSPACE_KEY = 'draftharbour_workspace_v1';
-const SESSION_PREFIX = 'draftharbour_session_v1_';
-const LOCKS_KEY = 'draftharbour_project_locks_v1';
-const WINDOW_ID_KEY = 'draftharbour_window_id';
+import { WORKSPACE_KEY, SESSION_PREFIX, LOCKS_KEY, WINDOW_ID_KEY } from '@/lib/constants/storageKeys';
 const LOCK_TTL_MS = 15000;
 
 interface WorkspaceStore {

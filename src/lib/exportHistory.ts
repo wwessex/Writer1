@@ -4,8 +4,7 @@
  */
 
 import { generateId } from '@/lib/utils';
-
-const STORAGE_KEY = 'draftharbour_export_history_v1';
+import { EXPORT_HISTORY_STORAGE_KEY } from '@/lib/constants/storageKeys';
 const MAX_HISTORY = 50;
 
 export interface ExportRecord {
@@ -22,14 +21,14 @@ export interface ExportRecord {
 
 function loadHistory(): ExportRecord[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(EXPORT_HISTORY_STORAGE_KEY);
     if (raw) return JSON.parse(raw);
   } catch { /* ignore */ }
   return [];
 }
 
 function saveHistory(records: ExportRecord[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(records.slice(0, MAX_HISTORY)));
+  localStorage.setItem(EXPORT_HISTORY_STORAGE_KEY, JSON.stringify(records.slice(0, MAX_HISTORY)));
 }
 
 export function getExportHistory(): ExportRecord[] {
@@ -49,7 +48,7 @@ export function recordExport(record: Omit<ExportRecord, 'id' | 'timestamp'>): Ex
 }
 
 export function clearExportHistory(): void {
-  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(EXPORT_HISTORY_STORAGE_KEY);
 }
 
 export function deleteExportRecord(id: string): void {

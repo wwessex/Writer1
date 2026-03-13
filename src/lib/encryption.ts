@@ -80,7 +80,7 @@ export function isEncryptionSupported(): boolean {
 
 // ---- Encrypted Sync Helpers ----
 
-const SYNC_ENCRYPTION_KEY = 'draftharbour_sync_encryption';
+import { SYNC_ENCRYPTION_KEY } from '@/lib/constants/storageKeys';
 
 export interface SyncEncryptionConfig {
   enabled: boolean;

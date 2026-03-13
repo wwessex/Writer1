@@ -6,14 +6,8 @@ import { Select } from '@/components/UI/Select';
 import type { Scene, SceneConflictType, SceneSimulationSwapCandidate } from '@/types';
 import { simulateChapterSceneChemistry } from '@/lib/sceneChemistry';
 import { useDragReorder } from '@/hooks/useDragReorder';
+import { STATUS_OPTIONS, SCREENPLAY_INT_EXT_OPTIONS, SCREENPLAY_TIME_OPTIONS } from '@/lib/constants';
 import styles from './ScenePlanner.module.css';
-
-const STATUS_OPTIONS = [
-  { value: 'planned', label: 'Planned' },
-  { value: 'draft', label: 'Draft' },
-  { value: 'revised', label: 'Revised' },
-  { value: 'final', label: 'Final' }
-];
 
 export function ScenePlanner() {
   const { state, activeChapter, addScene, updateScene, deleteScene, reorderScenes } = useApp();
@@ -317,11 +311,7 @@ export function ScenePlanner() {
                         <div className={styles.sceneCard__field}>
                           <label>INT/EXT</label>
                           <Select
-                            options={[
-                              { value: 'INT', label: 'INT' },
-                              { value: 'EXT', label: 'EXT' },
-                              { value: 'INT/EXT', label: 'INT/EXT' }
-                            ]}
+                            options={SCREENPLAY_INT_EXT_OPTIONS}
                             value={scene.interiorExterior || 'INT'}
                             onChange={e => handleUpdate(scene.id, { interiorExterior: e.target.value as Scene['interiorExterior'] })}
                           />
@@ -329,12 +319,7 @@ export function ScenePlanner() {
                         <div className={styles.sceneCard__field}>
                           <label>Time</label>
                           <Select
-                            options={[
-                              { value: 'DAY', label: 'DAY' },
-                              { value: 'NIGHT', label: 'NIGHT' },
-                              { value: 'DAWN', label: 'DAWN' },
-                              { value: 'DUSK', label: 'DUSK' }
-                            ]}
+                            options={SCREENPLAY_TIME_OPTIONS}
                             value={scene.timeOfDay || 'DAY'}
                             onChange={e => handleUpdate(scene.id, { timeOfDay: e.target.value as Scene['timeOfDay'] })}
                           />
@@ -460,11 +445,7 @@ export function ScenePlanner() {
                       <div>
                         <label>INT/EXT</label>
                         <Select
-                          options={[
-                            { value: 'INT', label: 'INT' },
-                            { value: 'EXT', label: 'EXT' },
-                            { value: 'INT/EXT', label: 'INT/EXT' }
-                          ]}
+                          options={SCREENPLAY_INT_EXT_OPTIONS}
                           value={popoutScene.interiorExterior || 'INT'}
                           onChange={e => handleUpdate(popoutScene.id, { interiorExterior: e.target.value as Scene['interiorExterior'] })}
                         />
@@ -472,12 +453,7 @@ export function ScenePlanner() {
                       <div>
                         <label>Time</label>
                         <Select
-                          options={[
-                            { value: 'DAY', label: 'DAY' },
-                            { value: 'NIGHT', label: 'NIGHT' },
-                            { value: 'DAWN', label: 'DAWN' },
-                            { value: 'DUSK', label: 'DUSK' }
-                          ]}
+                          options={SCREENPLAY_TIME_OPTIONS}
                           value={popoutScene.timeOfDay || 'DAY'}
                           onChange={e => handleUpdate(popoutScene.id, { timeOfDay: e.target.value as Scene['timeOfDay'] })}
                         />

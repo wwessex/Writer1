@@ -1,6 +1,5 @@
 import { generateId } from '@/lib/utils';
-
-const STORAGE_KEY = 'draftharbour_ai_revision_log_v1';
+import { AI_REVISION_LOG_STORAGE_KEY } from '@/lib/constants/storageKeys';
 const MAX_RECORDS = 100;
 
 export interface AIRevisionStageLog {
@@ -24,7 +23,7 @@ export interface AIRevisionRecord {
 
 function loadRevisionLog(): AIRevisionRecord[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(AI_REVISION_LOG_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as AIRevisionRecord[];
     return Array.isArray(parsed) ? parsed : [];
@@ -34,7 +33,7 @@ function loadRevisionLog(): AIRevisionRecord[] {
 }
 
 function saveRevisionLog(records: AIRevisionRecord[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(records.slice(0, MAX_RECORDS)));
+  localStorage.setItem(AI_REVISION_LOG_STORAGE_KEY, JSON.stringify(records.slice(0, MAX_RECORDS)));
 }
 
 export function recordAIRevision(record: Omit<AIRevisionRecord, 'id' | 'timestamp'>): AIRevisionRecord {

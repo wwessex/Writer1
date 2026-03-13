@@ -15,8 +15,7 @@ import { ServerProxyProvider } from './serverProxyProvider';
 import { isChromeAIAvailable, isChromeBrowser } from './availability';
 import { deleteSecret, isDesktop, setSecret } from '@/lib/desktopSecrets';
 import { getManagedPolicy } from '@/lib/policy';
-
-const STORAGE_KEY = 'draftharbour_ai_config';
+import { AI_CONFIG_STORAGE_KEY } from '@/lib/constants/storageKeys';
 const AI_TOKEN_SECRET_KEY = 'ai_session_token';
 
 /* ------------------------------------------------------------------ */
@@ -31,7 +30,7 @@ export function loadAIConfig(): AIProviderConfig {
   }
 
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(AI_CONFIG_STORAGE_KEY);
     if (!raw) {
       return { provider: 'managed-cloud' };
     }
@@ -54,7 +53,7 @@ export function loadAIConfig(): AIProviderConfig {
     // Migrate legacy `apiKey` → `sessionToken` and persist the cleaned config
     if ('apiKey' in safeConfig) {
       const migratedToken = safeConfig.sessionToken || safeConfig.apiKey;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      localStorage.setItem(AI_CONFIG_STORAGE_KEY, JSON.stringify({
         provider: safeConfig.provider,
         endpoint: safeConfig.endpoint,
         model: safeConfig.model,
@@ -92,7 +91,7 @@ export function loadAIConfig(): AIProviderConfig {
 export function saveAIConfig(config: AIProviderConfig): void {
   const policy = getManagedPolicy();
   if (policy.disableAIProviders || policy.disabledAIProviderTypes?.includes(config.provider)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ provider: 'managed-cloud' }));
+    localStorage.setItem(AI_CONFIG_STORAGE_KEY, JSON.stringify({ provider: 'managed-cloud' }));
     return;
   }
 
@@ -111,7 +110,7 @@ export function saveAIConfig(config: AIProviderConfig): void {
     sessionToken: isDesktop() ? undefined : config.sessionToken,
     serverProxy: config.serverProxy,
   };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(safeConfig));
+  localStorage.setItem(AI_CONFIG_STORAGE_KEY, JSON.stringify(safeConfig));
 }
 
 /* ------------------------------------------------------------------ */

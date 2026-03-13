@@ -11,14 +11,8 @@ import { useResizable } from '@/hooks/useResizable';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 import type { ChapterStatus, Scene } from '@/types';
 import type { VoiceSimilarityAlert } from '@/lib/voiceFingerprint';
+import { STATUS_OPTIONS, SCREENPLAY_INT_EXT_OPTIONS, SCREENPLAY_TIME_OPTIONS } from '@/lib/constants';
 import styles from './Inspector.module.css';
-
-const STATUS_OPTIONS = [
-  { value: 'planned', label: 'Planned' },
-  { value: 'draft', label: 'Draft' },
-  { value: 'revised', label: 'Revised' },
-  { value: 'final', label: 'Final' }
-];
 
 const SEVERITY_ORDER = { error: 0, warning: 1, info: 2 } as const;
 
@@ -417,11 +411,7 @@ export function Inspector({ open, onClose, voiceAlerts = [] }: InspectorProps) {
                             <div className={styles.field}>
                               <label className={styles.fieldLabel}>INT/EXT</label>
                               <Select
-                                options={[
-                                  { value: 'INT', label: 'INT' },
-                                  { value: 'EXT', label: 'EXT' },
-                                  { value: 'INT/EXT', label: 'INT/EXT' }
-                                ]}
+                                options={SCREENPLAY_INT_EXT_OPTIONS}
                                 value={scene.interiorExterior || 'INT'}
                                 onChange={e => handleSceneChange(scene.id, { interiorExterior: e.target.value as Scene['interiorExterior'] })}
                               />
@@ -429,12 +419,7 @@ export function Inspector({ open, onClose, voiceAlerts = [] }: InspectorProps) {
                             <div className={styles.field}>
                               <label className={styles.fieldLabel}>Time</label>
                               <Select
-                                options={[
-                                  { value: 'DAY', label: 'DAY' },
-                                  { value: 'NIGHT', label: 'NIGHT' },
-                                  { value: 'DAWN', label: 'DAWN' },
-                                  { value: 'DUSK', label: 'DUSK' }
-                                ]}
+                                options={SCREENPLAY_TIME_OPTIONS}
                                 value={scene.timeOfDay || 'DAY'}
                                 onChange={e => handleSceneChange(scene.id, { timeOfDay: e.target.value as Scene['timeOfDay'] })}
                               />
