@@ -11,7 +11,10 @@ from typing import Any
 
 from datasets import load_dataset
 
-from prepare_narratryx_data import chunk_text, clean_gutenberg_text, normalize_text
+try:
+    from .prepare_narratryx_data import chunk_text, clean_gutenberg_text, normalize_text
+except ImportError:
+    from prepare_narratryx_data import chunk_text, clean_gutenberg_text, normalize_text
 
 SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
