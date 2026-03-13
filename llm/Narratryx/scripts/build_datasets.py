@@ -4,12 +4,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
+import re
 from pathlib import Path
 from typing import Any
 
 from datasets import load_dataset
 
-from prepare_narratryx_data import chunk_text, clean_gutenberg_text, normalize_text
+try:
+    from .prepare_narratryx_data import chunk_text, clean_gutenberg_text, normalize_text
+except ImportError:
+    from prepare_narratryx_data import chunk_text, clean_gutenberg_text, normalize_text
+
+SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
 
 def _write_jsonl(records: list[dict[str, Any]], out_file: Path) -> int:
@@ -53,18 +60,67 @@ def build_sft(output_dir: Path, max_records: int) -> int:
     return _write_jsonl(rows, output_dir / "sft_train.jsonl")
 
 
-def build_dpo(output_dir: Path, max_pairs: int) -> int:
+def _drop_descriptive_adjectives(text: str) -> str:
+    # A light-weight style degrader to create "rejected" prose from chosen text.
+    text = re.sub(
+        r"\b(sudden|ancient|silver|golden|bleak|sacred|solemn|haunting|vivid|trembling|fragile|luminous)\b",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(r"\s{2,}", " ", text)
+    return text.strip()
+
+
+def _flatten_sentence_shapes(text: str) -> str:
+    sentences = [s.strip() for s in SPLIT_RE.split(text) if s.strip()]
+    if not sentences:
+        return text
+    flattened = []
+    for sentence in sentences:
+        short = sentence.split(",")[0].strip()
+        if not short.endswith((".", "!", "?")):
+            short += "."
+        flattened.append(short)
+    return " ".join(flattened)
+
+
+def _build_rejected_from_chosen(chosen: str) -> str:
+    downgraded = _drop_descriptive_adjectives(chosen)
+    downgraded = _flatten_sentence_shapes(downgraded)
+    downgraded = re.sub(r"\b(whispered|murmured|sighed|breathed)\b", "said", downgraded, flags=re.IGNORECASE)
+    return normalize_text(downgraded)
+
+
+def build_dpo(output_dir: Path, max_pairs: int, seed: int) -> int:
     ds = load_dataset("NeuralNovel/Neural-Story-v1", split="train")
+    rng = random.Random(seed)
     rows: list[dict[str, str]] = []
+
     for record in ds:
         prompt = normalize_text(str(record.get("prompt", "") or record.get("instruction", "")))
         chosen = normalize_text(str(record.get("response", "") or record.get("output", "")))
         if not (prompt and chosen):
             continue
-        rejected = "Rewrite this scene with flatter diction and less specificity."
-        rows.append({"prompt": prompt, "chosen": chosen, "rejected": rejected})
+
+        rejected = _build_rejected_from_chosen(chosen)
+        if rejected == chosen:
+            rejected = " ".join(chosen.split()[: max(20, len(chosen.split()) // 3)])
+
+        rows.append(
+            {
+                "prompt": prompt,
+                "chosen": chosen,
+                "rejected": rejected,
+                "pair_source": "style_contrast_transform",
+            }
+        )
+
         if len(rows) >= max_pairs:
             break
+
+    # Small shuffle to prevent sequence bias in training order.
+    rng.shuffle(rows)
     return _write_jsonl(rows, output_dir / "dpo_pairs.jsonl")
 
 
@@ -76,6 +132,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-dpo-pairs", type=int, default=12000)
     p.add_argument("--chunk-size", type=int, default=4096)
     p.add_argument("--overlap", type=int, default=512)
+    p.add_argument("--seed", type=int, default=42)
     return p.parse_args()
 
 
@@ -85,18 +142,20 @@ def main() -> None:
 
     pretrain_count = build_pretrain(args.output_dir, args.max_books, args.chunk_size, args.overlap)
     sft_count = build_sft(args.output_dir, args.max_sft_records)
-    dpo_count = build_dpo(args.output_dir, args.max_dpo_pairs)
+    dpo_count = build_dpo(args.output_dir, args.max_dpo_pairs, args.seed)
 
     manifest = {
         "pretrain_chunks": pretrain_count,
         "sft_records": sft_count,
         "dpo_pairs": dpo_count,
+        "dpo_method": "style_contrast_transform_from_chosen",
         "params": {
             "max_books": args.max_books,
             "max_sft_records": args.max_sft_records,
             "max_dpo_pairs": args.max_dpo_pairs,
             "chunk_size": args.chunk_size,
             "overlap": args.overlap,
+            "seed": args.seed,
         },
     }
 

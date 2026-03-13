@@ -30,9 +30,6 @@ Outputs:
 python scripts/run_training.py --stage sft
 ```
 
-This prints/executes an Axolotl-compatible command:
-`axolotl train configs/qwen25-7b-sft-qlora.yaml`
-
 ## 3) DPO
 
 ```bash
@@ -57,9 +54,36 @@ python scripts/export_model.py \
   --compile-mlc
 ```
 
-## 5) Verification checklist
+## 5) Cloud runtime
 
-- Validate dataset counts in `manifest.json`.
+Run gateway against existing vLLM server:
+
+```bash
+NARRATRYX_VLLM_URL=http://127.0.0.1:8000 \
+uvicorn runtime.cloud.api:app --host 0.0.0.0 --port 8080
+```
+
+Modal deployment entrypoint:
+
+```bash
+modal deploy runtime/cloud/modal_app.py
+```
+
+Self-hosted compose option:
+
+```bash
+docker compose -f configs/deploy/docker-compose.vllm.yaml up
+```
+
+## 6) Browser/runtime modules
+
+- Register `runtime/browser/serviceWorker.js` for chunked model caching route.
+- Use `runtime/browser/modelLoader.ts` to choose WebLLM / Wllama / cloud fallback.
+- Use `runtime/story_bible/*` for IndexedDB schemas, saliency ranking, and context assembly.
+
+## 7) Verification checklist
+
+- Validate dataset counts and `dpo_method` in `manifest.json`.
 - Run `--dry-run` before every training stage.
 - Keep generated artifacts in `artifacts/` and out of git.
 
