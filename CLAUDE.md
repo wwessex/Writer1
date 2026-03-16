@@ -14,7 +14,8 @@ DraftHarbour Studio is an **offline-first Progressive Web Application (PWA)** fo
 - Tauri 2 desktop app (macOS, Windows, Linux)
 - Capacitor 8 mobile app (iOS)
 - Server-side integration broker (PHP proxy + TypeScript handler)
-- ~241 TypeScript/TSX files and ~25 CSS files
+- Narratryx LLM training pipeline (SFT + DPO fine-tuning)
+- ~248 TypeScript/TSX files and ~25 CSS files
 
 ## Architecture
 
@@ -34,7 +35,9 @@ Writer1/
 │   ├── index.php               # Entry point: CORS, routing, rate limiting
 │   ├── _config.php             # API keys, rate limits, allowed origins
 │   ├── _rateLimit.php          # Rate limiting implementation
-│   └── _chatHandler.php        # AI chat request handler
+│   ├── _chatHandler.php        # AI chat request handler
+│   ├── _providers.php          # Provider configuration
+│   └── .htaccess               # Apache routing rules
 ├── desktop/                    # Tauri desktop application
 │   ├── package.json            # Desktop build scripts
 │   └── src-tauri/              # Rust source + Tauri config
@@ -49,7 +52,8 @@ Writer1/
 │   ├── check-touched-coverage.mjs
 │   ├── test-inventory.mjs      # Test file organization check
 │   ├── verify-vite-config.mjs
-│   └── verify-release-artifacts.mjs
+│   ├── verify-release-artifacts.mjs
+│   └── test-rate-limit.php     # PHP rate limiting test utility
 ├── docs/                       # Operational documentation
 │   ├── design-error-handling.md
 │   ├── asset-audit.md
@@ -70,9 +74,23 @@ Writer1/
 │   │   │   └── workspaceService.ts  # Workspace & last-opened tracking
 │   │   └── state/
 │   │       └── appReducer.ts   # Pure reducer for AppState
-│   ├── hooks/
+│   ├── hooks/                  # Custom React hooks (28 files incl. tests)
 │   │   ├── useModalState.ts    # Modal open/close/toggle reducer
-│   │   └── useResizable.ts     # Draggable panel resize hook
+│   │   ├── useResizable.ts     # Draggable panel resize hook
+│   │   ├── useAppKeyboardShortcuts.ts  # Global keyboard shortcut handlers
+│   │   ├── useCommentActions.ts  # Comment thread CRUD actions
+│   │   ├── useCrashRecovery.ts   # Error recovery and data restoration
+│   │   ├── useDesktopRuntime.ts  # Tauri desktop integration hook
+│   │   ├── useDragReorder.ts     # Drag-to-reorder list items
+│   │   ├── useEditorSelectionTracking.ts  # Track editor text selection
+│   │   ├── useFocusModeClass.ts  # Focus mode CSS class toggling
+│   │   ├── useIsMobile.ts        # Mobile viewport detection
+│   │   ├── useLoadNovel.ts       # Novel loading lifecycle
+│   │   ├── useModalAccessibility.ts  # Modal a11y (focus trap, escape)
+│   │   ├── useOnboardingTrigger.ts   # Onboarding flow triggers
+│   │   ├── useProjectFileActions.ts  # File import/export actions
+│   │   ├── useResponsivePanels.ts    # Responsive panel layout
+│   │   └── useVoiceAlerts.ts     # Voice notification alerts
 │   ├── server/
 │   │   └── integrationBroker.ts  # Node.js/Lambda backend handler
 │   ├── test/
@@ -84,14 +102,27 @@ Writer1/
 │   │   ├── Header/             # Top header bar + formatting toolbar
 │   │   ├── Inspector/          # Right panel: chapter metadata, stats
 │   │   ├── Menu/               # Application menu bar
-│   │   ├── Modals/             # Modal dialogs (export, settings, AI, etc.)
-│   │   │   └── AIWritingModal/ # Multi-provider AI writing assistant
+│   │   ├── Modals/             # Modal dialogs (27+ modal files)
+│   │   │   ├── AIWritingModal/ # Multi-provider AI writing assistant
+│   │   │   ├── CommentModal.tsx      # Comment thread UI
+│   │   │   ├── WordCountModal.tsx    # Word count statistics
+│   │   │   ├── PublishAssistantModal.tsx  # Publishing assistant
+│   │   │   ├── TranslationModal.tsx  # Translation UI (NLLB-200)
+│   │   │   ├── CorkboardModal.tsx    # Corkboard view
+│   │   │   ├── StoryCardsModal.tsx   # Story card planning
+│   │   │   └── ...                   # + ExportModal, SnapshotModal, etc.
 │   │   ├── Panels/             # AI suggestions sliding panel
 │   │   ├── QuickSwitcher/      # Ctrl+K quick chapter/action/search switcher
 │   │   ├── Sidebar/            # Left panel: chapter list, outline, scene planner
 │   │   ├── UI/                 # Shared primitives: Button, Dialog, Input, Pill, Toast, Tooltip
 │   │   ├── Windows/            # Settings and About floating windows
-│   │   ├── layout/             # Layout sub-components (editor, inspector, sidebar)
+│   │   ├── layout/             # Layout abstraction layer
+│   │   │   ├── AppShellLayout.tsx  # Main layout shell
+│   │   │   ├── TopBar.tsx          # Top navigation bar
+│   │   │   ├── StatusBar.tsx       # Bottom status bar
+│   │   │   ├── sidebar/            # Left sidebar components (LeftSidebar, SidebarSection, TreeRow)
+│   │   │   ├── editor/             # Editor pane layout (EditorPane)
+│   │   │   └── inspector/          # Right inspector panel (RightInspector)
 │   │   ├── PanelErrorBoundary.tsx
 │   │   └── ErrorBoundary.tsx   # Top-level React error boundary
 │   ├── lib/
@@ -121,6 +152,12 @@ Writer1/
 │   │   ├── sceneChemistry.ts   # Scene dynamics & conflict analysis
 │   │   ├── continuityMemory.ts # Continuity & consistency tracking
 │   │   ├── timelineConsistency.ts  # Timeline event ordering validation
+│   │   ├── translation.ts     # NLLB-200 language codes (200+ languages) + translation prompts
+│   │   ├── updaterGuardrails.ts  # Semver comparison, version pinning, update failure tracking
+│   │   ├── settingsMigration.ts  # Versioned settings persistence with migration chain
+│   │   ├── storageKeys.ts     # localStorage key constants
+│   │   ├── menuConfig.ts      # Menu configuration definitions
+│   │   ├── storage.ts         # Legacy monolithic storage (being modularized → storage/)
 │   │   ├── storage/            # Modularized data persistence
 │   │   │   ├── db.ts           # Dexie database instance
 │   │   │   ├── novels.ts       # Novel CRUD
@@ -144,7 +181,10 @@ Writer1/
 │   │   │   ├── serverProxyProvider.ts  # Server broker proxy provider
 │   │   │   ├── providerManager.ts  # Provider auto-detection & config
 │   │   │   ├── availability.ts # Runtime provider availability detection
-│   │   │   └── pipelines.ts    # Staged AI revision workflows
+│   │   │   ├── pipelines.ts    # Staged AI revision workflows
+│   │   │   ├── types.ts        # AI type definitions
+│   │   │   ├── chrome-ai.d.ts  # Chrome AI API type declarations
+│   │   │   └── index.ts        # Barrel export
 │   │   └── integrations/       # Cloud sync
 │   │       ├── dropbox.ts      # Dropbox OAuth2 sync
 │   │       ├── googleDrive.ts  # Google Drive OAuth2 sync
@@ -154,8 +194,27 @@ Writer1/
 │   │       ├── sync.ts         # Bidirectional sync with conflict detection
 │   │       ├── orchestration.ts  # Multi-provider sync coordination
 │   │       ├── brokerClient.ts # Client for server-side integration broker
-│   │       └── providerClient.ts  # HTTP client with retry policy
+│   │       ├── providerClient.ts  # HTTP client with retry policy
+│   │       ├── api.ts          # API integration utilities
+│   │       ├── oauth.ts        # OAuth flow handler
+│   │       ├── helpers.ts      # Integration helper functions
+│   │       ├── service.ts      # Integration service layer
+│   │       ├── types.ts        # Integration type definitions
+│   │       └── index.ts        # Barrel export
 │   └── assets/                 # Imported assets (icons, images)
+├── llm/                        # Narratryx LLM training pipeline
+│   └── Narratryx/
+│       ├── scripts/            # Dataset prep, training, model export
+│       │   ├── build_datasets.py        # Gutenberg/Neural-Story data prep
+│       │   ├── run_training.py          # SFT + DPO training launcher
+│       │   ├── export_model.py          # GGUF/SafeTensors/MLC export
+│       │   ├── prepare_narratryx_data.py  # Data preprocessing
+│       │   └── run_pipeline.sh          # Full pipeline orchestration
+│       ├── configs/            # Training configs (QLoRA SFT + DPO)
+│       │   ├── qwen25-7b-sft-qlora.yaml
+│       │   └── qwen25-7b-dpo.yaml
+│       ├── docs/               # Architecture + runbook docs
+│       └── requirements.txt    # Python dependencies
 └── .github/workflows/
     ├── deploy.yml              # Deploy to GitHub Pages
     ├── build-static-zip.yml    # Build dist/ ZIP artifact
@@ -283,6 +342,12 @@ const { state, activeChapter, createChapter, dispatch } = useApp();
 - **localStorage** (`draftharbour_settings_v1`): App settings, theme, typography prefs, goal trends, comment threads
 - **IndexedDB** (`DraftHarbourDB`): Novels, chapters (with content), snapshots
 - **Tauri keychain** (desktop only): Sensitive credentials via `src/lib/desktopSecrets.ts`
+
+Settings are versioned via `src/lib/settingsMigration.ts`:
+- Settings are wrapped in a `PersistedSettingsEnvelope` with a `version` field
+- Migrations run sequentially (v1→v2→...) when loading from storage
+- All fields are sanitized with type-safe coercion (invalid values fall back to defaults)
+- Current version: `CURRENT_SETTINGS_VERSION = 2`
 
 ### Command System
 All UI actions go through a typed command registry in `src/lib/commands.ts`:
@@ -424,6 +489,7 @@ The `desktop/` directory contains a Tauri 2 wrapper for cross-platform desktop d
 - `draftharbour://` deep links
 - Native menu integration via `src/lib/nativeMenuAdapter.ts`
 - Auto-update system via `src/lib/desktopUpdater.ts` (stable/beta/nightly channels)
+- Update guardrails via `src/lib/updaterGuardrails.ts` (semver comparison, version pinning, failed-attempt fallback after 3 failures)
 - Secure credential storage via `src/lib/desktopSecrets.ts` (OS keychain)
 
 **Platform detection:**
@@ -466,6 +532,24 @@ Located in `src/lib/ai/`:
 ### AI Writing Modal
 `src/components/Modals/AIWritingModal/` — multi-provider AI writing interface with preset prompts, continuity context injection, BYOK support, and revision history.
 
+### Translation
+- `src/lib/translation.ts` — NLLB-200 language code mappings (200+ languages with ISO 639-3 codes)
+- Auto-corrects commonly misused language codes (e.g. `pus_Arab` → `pbt_Arab`)
+- `src/components/Modals/TranslationModal.tsx` — translation UI leveraging AI providers
+
+## Narratryx LLM Training Pipeline
+
+Located in `llm/Narratryx/`, this is a standalone fiction-focused LLM fine-tuning pipeline. It is **not yet integrated** into the app runtime.
+
+- **Base model**: Qwen2.5-7B-Instruct
+- **Training stages**: Supervised Fine-Tuning (SFT) with QLoRA, then Direct Preference Optimization (DPO)
+- **Data sources**: Project Gutenberg + Neural-Story datasets
+- **Export targets**: GGUF (llama.cpp), SafeTensors (HuggingFace), MLC (browser/WebLLM)
+- **Deployment**: FastAPI gateway + Modal vLLM for inference, with Docker support
+- **Dependencies**: Listed in `llm/Narratryx/requirements.txt` (datasets, huggingface-hub, fastapi, modal, etc.)
+
+This is a Python-based pipeline — separate from the main TypeScript application. See `llm/Narratryx/docs/architecture.md` for design details.
+
 ## Server-Side Backend
 
 ### PHP Proxy (`api/`)
@@ -474,6 +558,8 @@ Server-side proxy that isolates API keys from the client:
 - `_config.php` — API key storage, rate limits, allowed origins
 - `_rateLimit.php` — per-IP rate limiting (default 20 req/60sec)
 - `_chatHandler.php` — forwards AI chat requests to providers
+- `_providers.php` — provider configuration
+- `.htaccess` — Apache routing rules
 - Supports BYOK (bring-your-own-key) mode
 
 ### Integration Broker (`src/server/integrationBroker.ts`)
@@ -528,16 +614,42 @@ npm run test:inventory    # Validate test organization
 Global test setup in `src/test/setup.ts` (stubs `window.matchMedia` for jsdom compatibility).
 
 ### Test Files
-Test files are co-located with source using `.test.ts` / `.test.tsx` suffix:
-- `src/lib/utils.test.ts` — utility function tests
-- `src/lib/export.screenplay.test.ts` — screenplay export tests
-- `src/lib/import.screenplay.test.ts` — screenplay import tests
-- `src/lib/integrations/sync.test.ts` — sync integration tests
+~78 test files co-located with source using `.test.ts` / `.test.tsx` suffix:
+
+**Core & context:**
+- `src/App.test.tsx` — root component tests
 - `src/context/state/appReducer.test.ts` — state reducer tests
-- `src/server/integrationBroker.contract.test.ts` — broker contract tests
-- `src/lib/nativeMenuAdapter.test.ts` — native menu bridge tests
-- `src/lib/timelineConsistency.test.ts` — timeline validation tests
-- `src/components/AppShell/AppShell.test.tsx` — layout component tests
+- `src/context/AppContext.actions.test.tsx` — context action tests
+- `src/context/AppContext.hooks.test.tsx` — context hook tests
+- `src/context/AppContext.settings.test.tsx` — settings tests
+
+**Hooks** (17+ test files):
+- `src/hooks/useAppKeyboardShortcuts.test.ts`, `useCommentActions.test.ts`, `useDragReorder.test.ts`, `useDesktopRuntime.test.tsx`, `useEditorSelectionTracking.test.tsx`, `useFocusModeClass.test.tsx`, `useLoadNovel.test.tsx`, `useModalState.test.ts`, `useOnboardingTrigger.test.tsx`, `useResponsivePanels.test.tsx`, `useVoiceAlerts.test.tsx`
+
+**Lib:**
+- `src/lib/utils.test.ts`, `errors.test.ts`, `commands.test.ts`, `import.test.ts`
+- `src/lib/export.screenplay.test.ts`, `import.screenplay.test.ts`
+- `src/lib/storage.crud.test.ts`, `storage.backup.test.ts`, `storage.snapshot.test.ts`, `storage.coverage.test.ts`
+- `src/lib/voiceFingerprint.test.ts`, `narrativeWeather.test.ts`, `sceneChemistry.test.ts`, `timelineConsistency.test.ts`
+- `src/lib/secureCache.test.ts`, `nativeMenuAdapter.test.ts`, `projectMetrics.test.ts`, `updaterGuardrails.test.ts`
+- `src/lib/ai/pipelines.test.ts`
+- `src/lib/integrations/sync.test.ts`, `api.test.ts`, `dropbox.test.ts`, `googleDrive.test.ts`, `service.test.ts`
+
+**Components:**
+- `src/components/AppShell/AppShell.test.tsx`, `Editor/Editor.persistence.test.tsx`
+- `src/components/Header/*.test.tsx`, `Menu/MenuBar.test.tsx`, `Inspector/Inspector.test.tsx`
+- `src/components/Sidebar/*.test.tsx`, `QuickSwitcher/QuickSwitcher.test.tsx`
+- `src/components/FindReplace/FindReplace.test.tsx`, `Panels/AISuggestionsPanel.test.tsx`
+- `src/components/Modals/*.test.tsx` (Snapshot, Dashboard, Projects, Corkboard, StoryCards, AIWriting, Integrations)
+- `src/components/layout/*.test.tsx` (AppShellLayout, TopBar, StatusBar, sidebar/*, editor/*, inspector/*)
+- `src/components/Windows/AboutWindow.test.tsx`, `UI/Dialog.test.tsx`
+
+**Server:**
+- `src/server/integrationBroker.contract.test.ts`
+
+**Test fixtures:**
+- `src/lib/__snapshots__/fixtures/export/` — screenplay export test fixtures
+- `src/lib/__snapshots__/fixtures/import/` — Fountain import test fixtures
 
 ### Manual Testing
 For UI features without automated tests, test in browser:
@@ -605,6 +717,7 @@ Husky + lint-staged runs ESLint on staged `.ts/.tsx` files before each commit.
 - `test-inventory.mjs` — validates test file organization
 - `verify-vite-config.mjs` — validates Vite config integrity
 - `verify-release-artifacts.mjs` — validates release checksums and manifests
+- `test-rate-limit.php` — PHP rate limiting test utility
 
 ## Git Conventions
 
@@ -615,6 +728,14 @@ Husky + lint-staged runs ESLint on staged `.ts/.tsx` files before each commit.
 ### Commit Messages
 - Short, descriptive summary in present tense ("Add feature" not "Added feature")
 - Reference issue numbers if applicable
+
+## Legacy vs. Modularized Code
+
+Some subsystems have both a legacy monolithic file and a modularized directory:
+- **Storage**: `src/lib/storage.ts` (33KB monolith) alongside `src/lib/storage/` (modularized stubs). The monolith is still the active implementation; the `storage/` modules are partially migrated stubs.
+- **Export**: `src/lib/export.ts` (40KB monolith) alongside `src/lib/export/` (partially modularized). The `export/` directory contains working modules for PDF, Fountain, and Screenplay export, while other formats may still route through the monolith.
+
+When adding new functionality, prefer the modularized modules. Avoid expanding the monolithic files.
 
 ## Security Considerations
 
@@ -652,7 +773,12 @@ Husky + lint-staged runs ESLint on staged `.ts/.tsx` files before each commit.
 | Writing analysis | `src/lib/voiceFingerprint.ts`, `narrativeWeather.ts`, `sceneChemistry.ts`, `continuityMemory.ts`, `timelineConsistency.ts` |
 | Cloud integrations | `src/lib/integrations/` |
 | Server broker | `src/server/integrationBroker.ts` |
-| Desktop features | `src/lib/desktopSecrets.ts`, `desktopUpdater.ts`, `nativeMenuAdapter.ts` |
+| Desktop features | `src/lib/desktopSecrets.ts`, `desktopUpdater.ts`, `nativeMenuAdapter.ts`, `updaterGuardrails.ts` |
+| Translation | `src/lib/translation.ts`, `src/components/Modals/TranslationModal.tsx` |
+| Settings migration | `src/lib/settingsMigration.ts` |
+| Custom hooks | `src/hooks/` (28 files incl. tests) |
+| Layout components | `src/components/layout/` (AppShellLayout, TopBar, StatusBar, sidebar/, editor/, inspector/) |
+| Narratryx LLM | `llm/Narratryx/` (standalone Python training pipeline) |
 | Feature flags | `src/lib/featureFlags.ts` |
 | Error handling | `src/lib/errors.ts` |
 | Security/encryption | `src/lib/encryption.ts`, `secureCache.ts` |
