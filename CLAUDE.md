@@ -14,7 +14,8 @@ DraftHarbour Studio is an **offline-first Progressive Web Application (PWA)** fo
 - Tauri 2 desktop app (macOS, Windows, Linux)
 - Capacitor 8 mobile app (iOS)
 - Server-side integration broker (PHP proxy + TypeScript handler)
-- ~241 TypeScript/TSX files and ~25 CSS files
+- CodeMirror 6 as alternative editor backend
+- ~277 TypeScript/TSX files and ~25 CSS files
 
 ## Architecture
 
@@ -43,11 +44,14 @@ Writer1/
 │       └── Cargo.toml          # Rust dependencies
 ├── ios/                        # Capacitor iOS project
 │   └── App/                    # Xcode project (AppDelegate, storyboards)
+├── llm/                        # LLM fine-tuning / training configs
+│   └── Narratryx/              # Narratryx model configs, docs, scripts
 ├── scripts/                    # Build & QA scripts
 │   ├── check-bundle-size.mjs   # Bundle size validation
 │   ├── check-asset-duplicates.mjs
 │   ├── check-touched-coverage.mjs
 │   ├── test-inventory.mjs      # Test file organization check
+│   ├── test-rate-limit.php     # Rate limiting integration test
 │   ├── verify-vite-config.mjs
 │   └── verify-release-artifacts.mjs
 ├── docs/                       # Operational documentation
@@ -71,8 +75,22 @@ Writer1/
 │   │   └── state/
 │   │       └── appReducer.ts   # Pure reducer for AppState
 │   ├── hooks/
-│   │   ├── useModalState.ts    # Modal open/close/toggle reducer
-│   │   └── useResizable.ts     # Draggable panel resize hook
+│   │   ├── useAppKeyboardShortcuts.ts  # Global keyboard shortcut handler
+│   │   ├── useCommentActions.ts  # Comment CRUD actions
+│   │   ├── useCrashRecovery.ts   # Crash recovery logic
+│   │   ├── useDesktopRuntime.ts  # Tauri desktop runtime detection
+│   │   ├── useDragReorder.ts     # Drag-and-drop reorder logic
+│   │   ├── useEditorSelectionTracking.ts  # Editor selection state
+│   │   ├── useFocusModeClass.ts  # Focus mode CSS class toggle
+│   │   ├── useIsMobile.ts        # Mobile viewport detection
+│   │   ├── useLoadNovel.ts       # Novel loading orchestration
+│   │   ├── useModalAccessibility.ts  # Modal a11y (focus trap, etc.)
+│   │   ├── useModalState.ts      # Modal open/close/toggle reducer
+│   │   ├── useOnboardingTrigger.ts  # First-run onboarding trigger
+│   │   ├── useProjectFileActions.ts  # File import/export actions
+│   │   ├── useResizable.ts       # Draggable panel resize hook
+│   │   ├── useResponsivePanels.ts  # Responsive panel visibility
+│   │   └── useVoiceAlerts.ts     # Voice-related alert notifications
 │   ├── server/
 │   │   └── integrationBroker.ts  # Node.js/Lambda backend handler
 │   ├── test/
@@ -105,7 +123,7 @@ Writer1/
 │   │   ├── exportHistory.ts    # Export history tracking
 │   │   ├── exportValidation.ts # Post-export validation
 │   │   ├── featureFlags.ts     # Runtime feature toggles (env-based)
-│   │   ├── findReplaceExtension.ts  # Tiptap ProseMirror find/replace plugin
+│   │   ├── menuConfig.ts       # Menu bar configuration definitions
 │   │   ├── plugins.ts          # Plugin system manifest + hooks
 │   │   ├── policy.ts           # Managed settings policy enforcement
 │   │   ├── progressTracker.ts  # Daily word goal and progress tracking
@@ -120,7 +138,27 @@ Writer1/
 │   │   ├── narrativeWeather.ts # Emotional tone & pacing tracking
 │   │   ├── sceneChemistry.ts   # Scene dynamics & conflict analysis
 │   │   ├── continuityMemory.ts # Continuity & consistency tracking
+│   │   ├── settingsMigration.ts # Settings schema migration helpers
+│   │   ├── storage.ts          # Legacy storage utilities
+│   │   ├── storageKeys.ts      # Centralized localStorage key constants
 │   │   ├── timelineConsistency.ts  # Timeline event ordering validation
+│   │   ├── translation.ts      # i18n / translation utilities
+│   │   ├── updaterGuardrails.ts  # Desktop updater safety checks
+│   │   ├── editor/             # Editor abstraction layer
+│   │   │   ├── EditorContext.tsx    # React context for editor state
+│   │   │   ├── codemirrorAdapter.ts # CodeMirror ↔ app adapter
+│   │   │   ├── commentExtension.ts  # Comment mark extension
+│   │   │   ├── fountainExtension.ts # Fountain/screenplay editor extension
+│   │   │   ├── jsonToMarkdown.ts    # Tiptap JSON → Markdown converter
+│   │   │   ├── markdownParser.ts    # Markdown → editor document parser
+│   │   │   ├── richPreviewExtension.ts  # Rich text preview extension
+│   │   │   ├── theme.ts            # Editor theme configuration
+│   │   │   ├── types.ts            # Editor type definitions
+│   │   │   ├── typewriterExtension.ts  # Typewriter scroll mode extension
+│   │   │   └── useCodeMirrorEditor.ts  # CodeMirror React hook
+│   │   ├── fixtures/           # Test fixtures
+│   │   │   ├── export/         # Export test data
+│   │   │   └── import/         # Import test data
 │   │   ├── storage/            # Modularized data persistence
 │   │   │   ├── db.ts           # Dexie database instance
 │   │   │   ├── novels.ts       # Novel CRUD
@@ -144,7 +182,9 @@ Writer1/
 │   │   │   ├── serverProxyProvider.ts  # Server broker proxy provider
 │   │   │   ├── providerManager.ts  # Provider auto-detection & config
 │   │   │   ├── availability.ts # Runtime provider availability detection
-│   │   │   └── pipelines.ts    # Staged AI revision workflows
+│   │   │   ├── pipelines.ts    # Staged AI revision workflows
+│   │   │   ├── types.ts        # AI provider type definitions
+│   │   │   └── index.ts        # Barrel re-exports
 │   │   └── integrations/       # Cloud sync
 │   │       ├── dropbox.ts      # Dropbox OAuth2 sync
 │   │       ├── googleDrive.ts  # Google Drive OAuth2 sync
@@ -153,8 +193,14 @@ Writer1/
 │   │       ├── scrivener.ts    # Scrivener project import/export
 │   │       ├── sync.ts         # Bidirectional sync with conflict detection
 │   │       ├── orchestration.ts  # Multi-provider sync coordination
+│   │       ├── api.ts          # Integration API client utilities
 │   │       ├── brokerClient.ts # Client for server-side integration broker
-│   │       └── providerClient.ts  # HTTP client with retry policy
+│   │       ├── helpers.ts      # Integration helper utilities
+│   │       ├── oauth.ts        # OAuth flow helpers
+│   │       ├── providerClient.ts  # HTTP client with retry policy
+│   │       ├── service.ts      # Integration service layer
+│   │       ├── types.ts        # Integration type definitions
+│   │       └── index.ts        # Barrel re-exports
 │   └── assets/                 # Imported assets (icons, images)
 └── .github/workflows/
     ├── deploy.yml              # Deploy to GitHub Pages
@@ -171,6 +217,7 @@ Writer1/
 | Language | TypeScript | ~5.6 |
 | Build Tool | Vite | 6.x |
 | Editor | Tiptap (ProseMirror) via `@tiptap/react` | 2.27.2 |
+| Editor (alt) | CodeMirror 6 (`@codemirror/*`) | 6.x |
 | Database | Dexie (IndexedDB) | 4.0.8 |
 | Styling | CSS Modules + Tailwind CSS | 4.2 |
 | Export | docx, pdfmake, built-in RTF/Fountain | 9.5.0 / 0.2.10 |
@@ -378,8 +425,17 @@ The Tiptap editor is configured in `App.tsx` with:
 - `StarterKit` (headings H1/H2, lists, blockquote, etc.)
 - `ScreenplayParagraph` — custom paragraph node with `screenplayType` attribute for screenplay mode
 - `Underline`, `HorizontalRule`
-- `CommentAnchorMark` — inline mark for comment thread anchors
-- `FindReplaceExtension` — ProseMirror plugin for in-editor search
+- `CommentAnchorMark` — inline mark for comment thread anchors (via `src/lib/editor/commentExtension.ts`)
+
+Additional editor modules in `src/lib/editor/`:
+- `EditorContext.tsx` — React context for shared editor state
+- `codemirrorAdapter.ts` — CodeMirror 6 integration adapter
+- `fountainExtension.ts` — Fountain/screenplay editor support
+- `jsonToMarkdown.ts` / `markdownParser.ts` — format converters
+- `richPreviewExtension.ts` — rich text preview mode
+- `typewriterExtension.ts` — typewriter scrolling mode
+- `theme.ts` — editor theming
+- `useCodeMirrorEditor.ts` — CodeMirror React hook
 
 ### Keyboard Shortcuts
 Global shortcuts in `App.tsx`:
@@ -493,6 +549,10 @@ Located in `src/lib/integrations/`:
 - **Orchestration** (`orchestration.ts`): Coordinates multi-provider sync
 - **Broker client** (`brokerClient.ts`): Client for server-side integration broker
 - **Provider client** (`providerClient.ts`): HTTP client with retry policy
+- **API client** (`api.ts`): Integration API utilities
+- **OAuth** (`oauth.ts`): OAuth flow helpers
+- **Service layer** (`service.ts`): Integration service abstraction
+- **Helpers** (`helpers.ts`): Shared integration utilities
 
 ## Export System
 
@@ -528,16 +588,41 @@ npm run test:inventory    # Validate test organization
 Global test setup in `src/test/setup.ts` (stubs `window.matchMedia` for jsdom compatibility).
 
 ### Test Files
-Test files are co-located with source using `.test.ts` / `.test.tsx` suffix:
-- `src/lib/utils.test.ts` — utility function tests
-- `src/lib/export.screenplay.test.ts` — screenplay export tests
-- `src/lib/import.screenplay.test.ts` — screenplay import tests
-- `src/lib/integrations/sync.test.ts` — sync integration tests
-- `src/context/state/appReducer.test.ts` — state reducer tests
-- `src/server/integrationBroker.contract.test.ts` — broker contract tests
-- `src/lib/nativeMenuAdapter.test.ts` — native menu bridge tests
-- `src/lib/timelineConsistency.test.ts` — timeline validation tests
-- `src/components/AppShell/AppShell.test.tsx` — layout component tests
+~95 test files co-located with source using `.test.ts` / `.test.tsx` suffix. Key areas:
+
+**Library tests** (`src/lib/`):
+- `utils.test.ts`, `errors.test.ts`, `commands.test.ts`, `adapters.test.ts`
+- `export.test.ts`, `export.screenplay.test.ts`, `import.test.ts`, `import.screenplay.test.ts`
+- `narrativeWeather.test.ts`, `sceneChemistry.test.ts`, `voiceFingerprint.test.ts`
+- `timelineConsistency.test.ts`, `projectMetrics.test.ts`, `secureCache.test.ts`
+- `nativeMenuAdapter.test.ts`, `updaterGuardrails.test.ts`
+- `storage.crud.test.ts`, `storage.backup.test.ts`, `storage.snapshot.test.ts`, `storage.coverage.test.ts`
+- `highRisk.characterization.test.ts` — characterization tests for critical paths
+
+**Editor tests** (`src/lib/editor/`):
+- `codemirrorAdapter.test.ts`, `commentExtension.test.ts`, `fountainExtension.test.ts`
+- `jsonToMarkdown.test.ts`, `markdownParser.test.ts`, `richPreviewExtension.test.ts`
+- `typewriterExtension.test.ts`, `theme.test.ts`, `types.test.ts`
+- `EditorContext.test.tsx`, `useCodeMirrorEditor.test.tsx`
+
+**Integration tests** (`src/lib/integrations/`):
+- `sync.test.ts`, `dropbox.test.ts`, `googleDrive.test.ts`, `api.test.ts`, `service.test.ts`
+
+**Component tests** (`src/components/`):
+- `AppShell.test.tsx`, `Editor.persistence.test.tsx`, `FindReplace.test.tsx`
+- `Header.test.tsx`, `SaveStatus.test.tsx`, `Toolbar.test.tsx`
+- `Inspector.test.tsx`, `MenuBar.test.tsx`, `QuickSwitcher.test.tsx`
+- Modal tests: `AIWritingModal.test.tsx`, `CommentModal.test.tsx`, `CorkboardModal.test.tsx`, etc.
+- Sidebar tests: `ChapterList.test.tsx`, `ScenePlanner.test.tsx`, `VirtualChapterList.test.tsx`
+- Layout tests: `AppShellLayout.test.tsx`, `StatusBar.test.tsx`, `TopBar.test.tsx`
+
+**Hook tests** (`src/hooks/`):
+- `useModalState.test.ts`, `useAppKeyboardShortcuts.test.ts`, `useDragReorder.test.ts`
+- `useCommentActions.test.tsx`, `useDesktopRuntime.test.tsx`, `useLoadNovel.test.tsx`
+- `useResponsivePanels.test.tsx`, `useVoiceAlerts.test.tsx`, `useOnboardingTrigger.test.tsx`
+
+**Context tests**: `AppContext.actions.test.tsx`, `AppContext.hooks.test.tsx`, `AppContext.settings.test.tsx`
+**Server tests**: `integrationBroker.contract.test.ts`
 
 ### Manual Testing
 For UI features without automated tests, test in browser:
@@ -603,6 +688,7 @@ Husky + lint-staged runs ESLint on staged `.ts/.tsx` files before each commit.
 - `check-asset-duplicates.mjs` — detects duplicate asset files
 - `check-touched-coverage.mjs` — ensures test coverage for changed files
 - `test-inventory.mjs` — validates test file organization
+- `test-rate-limit.php` — rate limiting integration test for PHP proxy
 - `verify-vite-config.mjs` — validates Vite config integrity
 - `verify-release-artifacts.mjs` — validates release checksums and manifests
 
@@ -640,7 +726,7 @@ Husky + lint-staged runs ESLint on staged `.ts/.tsx` files before each commit.
 | State services | `src/context/services/appServices.ts` |
 | Data persistence | `src/lib/storage/` (db, novels, chapters, snapshots, migrations) |
 | Command registry | `src/lib/commands.ts` |
-| Editor config | `src/App.tsx` (extensions), `src/components/Editor/` |
+| Editor config | `src/App.tsx` (extensions), `src/components/Editor/`, `src/lib/editor/` |
 | Export formats | `src/lib/export/` (per-format modules) |
 | Import formats | `src/lib/import.ts` |
 | UI components | `src/components/` (each in own directory) |
@@ -652,11 +738,17 @@ Husky + lint-staged runs ESLint on staged `.ts/.tsx` files before each commit.
 | Writing analysis | `src/lib/voiceFingerprint.ts`, `narrativeWeather.ts`, `sceneChemistry.ts`, `continuityMemory.ts`, `timelineConsistency.ts` |
 | Cloud integrations | `src/lib/integrations/` |
 | Server broker | `src/server/integrationBroker.ts` |
-| Desktop features | `src/lib/desktopSecrets.ts`, `desktopUpdater.ts`, `nativeMenuAdapter.ts` |
+| Desktop features | `src/lib/desktopSecrets.ts`, `desktopUpdater.ts`, `nativeMenuAdapter.ts`, `updaterGuardrails.ts` |
 | Feature flags | `src/lib/featureFlags.ts` |
 | Error handling | `src/lib/errors.ts` |
 | Security/encryption | `src/lib/encryption.ts`, `secureCache.ts` |
-| Tests | Co-located `*.test.ts` files, run with `npm run test` |
+| Custom hooks | `src/hooks/` (~15 hooks for keyboard, modals, panels, etc.) |
+| Settings migration | `src/lib/settingsMigration.ts` |
+| Storage keys | `src/lib/storageKeys.ts` |
+| Menu config | `src/lib/menuConfig.ts` |
+| i18n / translation | `src/lib/translation.ts` |
+| LLM fine-tuning | `llm/Narratryx/` |
+| Tests | Co-located `*.test.ts` files (~95 files), run with `npm run test` |
 | Build config | `vite.config.ts` |
 | TypeScript config | `tsconfig.json` |
 | Linting | `eslint.config.js` |
