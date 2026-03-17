@@ -11,7 +11,7 @@ vi.mock('@/context/AppContext', () => ({
     activeChapter: {
       id: 'ch-1',
       title: 'Chapter 4 \u2014 The Corridor',
-      content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello world test.' }] }] },
+      content: 'Hello world test.',
       status: 'draft',
       updatedAt: Date.now() - 12 * 60_000,
       wordGoal: 1500,

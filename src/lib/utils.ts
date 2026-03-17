@@ -1,4 +1,4 @@
-import type { JSONContent } from '@tiptap/core';
+import { markdownToPlainText } from '@/lib/editor/markdownParser';
 
 /**
  * Debounce function - delays execution until after wait ms have elapsed
@@ -16,31 +16,10 @@ export function debounce<T extends (...args: any[]) => any>(
 }
 
 /**
- * Convert Tiptap JSON content to plain text
+ * Convert editor content (markdown string) to plain text
  */
-export function editorToPlainText(doc: JSONContent | null): string {
-  if (!doc || !doc.content) return '';
-
-  const lines: string[] = [];
-
-  function extractText(node: JSONContent): string {
-    if (node.type === 'text') {
-      return node.text || '';
-    }
-    if (node.content) {
-      return node.content.map(extractText).join('');
-    }
-    return '';
-  }
-
-  for (const node of doc.content) {
-    const text = extractText(node);
-    if (text || node.type === 'paragraph') {
-      lines.push(text);
-    }
-  }
-
-  return lines.join('\n');
+export function editorToPlainText(content: string | null): string {
+  return markdownToPlainText(content);
 }
 
 /**

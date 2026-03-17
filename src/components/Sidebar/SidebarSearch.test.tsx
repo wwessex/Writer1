@@ -15,7 +15,7 @@ vi.mock('@/context/AppContext', () => ({
         {
           id: 'ch1',
           title: 'Chapter One',
-          content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Once upon a time' }] }] },
+          content: 'Once upon a time',
           order: 0,
           novelId: 'n1',
           updatedAt: Date.now(),

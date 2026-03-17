@@ -22,10 +22,7 @@ function makeChapter(id: string, order: number, scenes: Scene[]): Chapter {
     order,
     title: `Chapter ${order}`,
     updatedAt: 0,
-    content: {
-      type: 'doc',
-      content: [{ type: 'paragraph', content: [{ type: 'text', text: '' }] }],
-    },
+    content: '',
     summary: '',
     pov: '',
     status: 'draft',

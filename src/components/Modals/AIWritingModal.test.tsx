@@ -22,7 +22,7 @@ vi.mock('@/context/AppContext', () => ({
     activeChapter: {
       id: 'chapter-1',
       title: 'Opening',
-      content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Context paragraph' }] }] },
+      content: 'Context paragraph',
     },
   }),
 }));

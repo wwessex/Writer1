@@ -1,6 +1,6 @@
-import type { JSONContent } from '@tiptap/core';
 import type { Chapter, ScreenplayBlockType, ManuscriptExportOptions } from '@/types';
-import { editorToPlainText, downloadFile } from './utils';
+import { downloadFile } from './utils';
+import { markdownToPlainText, markdownToScreenplayBlocks, markdownToBlocks } from './editor/markdownParser';
 import { loadPdfMake } from './export/boundary/pdfmake';
 import { cloneDocxTextRun } from './export/boundary/docxCompat';
 import type { PdfAlignment, PdfContentNode, PdfDocumentDefinition, DocxAlignment, DocxSection, DocxClasses, PdfMakeApi } from './export/types';
@@ -65,62 +65,15 @@ const SCREENPLAY_PDF_FONTS = {
   },
 };
 
-function extractTextFromNode(node: JSONContent | null | undefined): string {
-  if (!node) return '';
-
-  if (typeof node.text === 'string') {
-    return node.text;
-  }
-
-  if (!node.content?.length) {
-    return '';
-  }
-
-  return node.content.map(extractTextFromNode).join('');
-}
-
-function isScreenplayBlockType(value: string | null | undefined): value is ScreenplayBlockType {
-  return value === 'scene-heading'
-    || value === 'action'
-    || value === 'character'
-    || value === 'parenthetical'
-    || value === 'dialogue'
-    || value === 'transition';
-}
-
 /**
- * Convert editor JSON content to screenplay-aware block list.
+ * Convert editor content (markdown/fountain string) to screenplay-aware block list.
  */
-export function screenplayJsonToBlocks(content: JSONContent | null): ScreenplayBlock[] {
-  if (!content?.content?.length) {
-    return [];
-  }
-
-  const blocks: ScreenplayBlock[] = [];
-
-  for (const node of content.content) {
-    if (node.type !== 'paragraph') {
-      continue;
-    }
-
-    const screenplayType = node.attrs?.screenplayType;
-    if (!isScreenplayBlockType(typeof screenplayType === 'string' ? screenplayType : null)) {
-      continue;
-    }
-
-    const text = extractTextFromNode(node).trim();
-    if (!text) {
-      continue;
-    }
-
-    blocks.push({
-      type: screenplayType,
-      text,
-    });
-  }
-
-  return blocks;
+export function screenplayMarkdownToBlocks(content: string | null): ScreenplayBlock[] {
+  return markdownToScreenplayBlocks(content);
 }
+
+/** @deprecated Use screenplayMarkdownToBlocks instead */
+export const screenplayJsonToBlocks = screenplayMarkdownToBlocks;
 
 function normalizeScreenplayText(block: ScreenplayBlock): string {
   if (block.type === 'scene-heading' || block.type === 'character' || block.type === 'transition') {
@@ -130,66 +83,23 @@ function normalizeScreenplayText(block: ScreenplayBlock): string {
   return block.text;
 }
 
-function formatSceneHeadingForFountain(text: string): string {
-  const normalized = text.toUpperCase();
-  const isStandardSceneHeading = /^(INT|EXT|EST|INT\/EXT|I\/E)\.?\s/.test(normalized);
-  return isStandardSceneHeading ? normalized : `.${normalized}`;
-}
-
 /**
- * Convert screenplay chapter JSON into Fountain text.
+ * Convert a screenplay chapter to Fountain text.
+ * Since chapter content is already stored as Fountain/Markdown,
+ * this returns the content directly with minimal cleanup.
  */
-export function screenplayChapterToFountain(chapter: Chapter, options: ScreenplayFountainOptions = {}): string {
-  const sceneSeparator = options.sceneSeparator ?? '\n\n';
-  const chunks: string[] = [];
-  let hasScene = false;
+export function screenplayChapterToFountain(chapter: Chapter, _options?: ScreenplayFountainOptions): string {
+  if (!chapter.content) return '';
 
-  const pushBlock = (text: string, withLeadingSpacer = false) => {
-    if (!text) {
-      return;
-    }
-    if (withLeadingSpacer && chunks.length > 0 && chunks[chunks.length - 1] !== '') {
-      chunks.push('');
-    }
-    chunks.push(text);
-  };
-
-  for (const block of screenplayJsonToBlocks(chapter.content)) {
-    const normalized = normalizeScreenplayText(block);
-
-    switch (block.type) {
-      case 'scene-heading': {
-        if (hasScene && sceneSeparator) {
-          const separatorLines = sceneSeparator.split('\n');
-          chunks.push(...separatorLines);
-        }
-        pushBlock(formatSceneHeadingForFountain(normalized), !hasScene);
-        hasScene = true;
-        break;
-      }
-      case 'action':
-        pushBlock(normalized, true);
-        break;
-      case 'transition':
-        pushBlock(normalized, true);
-        break;
-      case 'character':
-      case 'dialogue':
-      case 'parenthetical':
-      default:
-        pushBlock(normalized, false);
-        break;
-    }
-  }
-
-  return chunks.join('\n').replace(/^\n+/, '').replace(/\n{3,}/g, '\n\n').trim();
+  // Content is already Fountain-formatted Markdown; return with whitespace cleanup
+  return chapter.content.replace(/^\n+/, '').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 /**
  * Build pdfmake content blocks for screenplay formatting.
  */
 export function screenplayChapterToPdfContent(chapter: Chapter): PdfContentNode[] {
-  return screenplayJsonToBlocks(chapter.content).map(block => {
+  return screenplayMarkdownToBlocks(chapter.content).map(block => {
     const normalized = normalizeScreenplayText(block);
 
     switch (block.type) {
@@ -211,36 +121,6 @@ export function screenplayChapterToPdfContent(chapter: Chapter): PdfContentNode[
 }
 
 // ── Helpers for rich text extraction ──
-
-interface InlineRun {
-  text: string;
-  bold?: boolean;
-  italic?: boolean;
-  underline?: boolean;
-  strike?: boolean;
-}
-
-function extractInlineRuns(node: JSONContent | null | undefined): InlineRun[] {
-  if (!node) return [];
-
-  if (node.type === 'text' && typeof node.text === 'string') {
-    const marks = node.marks || [];
-    const run: InlineRun = { text: node.text };
-    for (const mark of marks) {
-      if (mark.type === 'bold') run.bold = true;
-      if (mark.type === 'italic') run.italic = true;
-      if (mark.type === 'underline') run.underline = true;
-      if (mark.type === 'strike') run.strike = true;
-    }
-    return [run];
-  }
-
-  if (node.content?.length) {
-    return node.content.flatMap(child => extractInlineRuns(child));
-  }
-
-  return [];
-}
 
 // Inches → twips (twentieths of a point × 72 points = 1 inch, 1 inch = 1440 twips)
 function inchesToTwips(inches: number): number {
@@ -411,7 +291,7 @@ export async function exportToDocx(
 
     // Word count (approximate)
     const totalWords = chapters.reduce((sum, ch) => {
-      return sum + editorToPlainText(ch.content).split(/\s+/).filter(w => w.length > 0).length;
+      return sum + markdownToPlainText(ch.content).split(/\s+/).filter(w => w.length > 0).length;
     }, 0);
     // Round to nearest thousand
     const roundedWords = Math.round(totalWords / 1000) * 1000;
@@ -624,13 +504,15 @@ function buildDocxChapterContent(
   const { Paragraph, TextRun, AlignmentType } = docxClasses;
   const children: unknown[] = [];
 
-  if (!chapter.content?.content) {
+  if (!chapter.content) {
     return children;
   }
 
-  for (const node of chapter.content.content) {
-    if (node.type === 'paragraph') {
-      const text = extractTextFromNode(node).trim();
+  const blocks = markdownToBlocks(chapter.content);
+
+  for (const block of blocks) {
+    if (block.type === 'paragraph') {
+      const text = block.text.trim();
 
       // Detect scene breaks
       if (isSceneBreakLine(text)) {
@@ -652,8 +534,7 @@ function buildDocxChapterContent(
       if (!text) continue;
 
       // Build runs with inline formatting
-      const runs = extractInlineRuns(node);
-      const textRuns = runs.map(run => new TextRun({
+      const textRuns = block.runs.map(run => new TextRun({
         text: run.text,
         font: fontFamily,
         size: ptToHalfPt(fontSizePt),
@@ -675,17 +556,16 @@ function buildDocxChapterContent(
           children: textRuns,
         }),
       );
-    } else if (node.type === 'heading') {
+    } else if (block.type === 'heading') {
       // Preserve headings within chapter content (H2, etc.)
-      const level = node.attrs?.level ?? 2;
-      const headingText = extractTextFromNode(node);
-      if (headingText.trim()) {
+      const level = block.level ?? 2;
+      if (block.text.trim()) {
         children.push(
           new Paragraph({
             alignment: AlignmentType.CENTER,
             spacing: { before: 400, after: 200 },
             children: [new TextRun({
-              text: headingText,
+              text: block.text,
               font: fontFamily,
               size: ptToHalfPt(level === 1 ? fontSizePt + 4 : fontSizePt + 2),
               bold: true,
@@ -693,7 +573,7 @@ function buildDocxChapterContent(
           }),
         );
       }
-    } else if (node.type === 'horizontalRule') {
+    } else if (block.type === 'horizontalRule') {
       // Horizontal rules → scene break marker
       children.push(
         new Paragraph({
@@ -706,34 +586,29 @@ function buildDocxChapterContent(
           })],
         }),
       );
-    } else if (node.type === 'blockquote') {
+    } else if (block.type === 'blockquote') {
       // Blockquotes: indented
-      for (const child of node.content || []) {
-        if (child.type === 'paragraph') {
-          const runs = extractInlineRuns(child);
-          const textRuns = runs.map(run => new TextRun({
-            text: run.text,
-            font: fontFamily,
-            size: ptToHalfPt(fontSizePt),
-            bold: run.bold,
-            italics: run.italic,
-            underline: run.underline ? { type: 'single' } : undefined,
-            strike: run.strike,
-          }));
-          children.push(
-            new Paragraph({
-              alignment,
-              indent: { left: inchesToTwips(0.5), firstLine: firstLineIndent },
-              spacing: {
-                before: spacingBefore,
-                after: spacingAfter,
-                line: lineSpacingTo240ths(lineSpacing),
-              },
-              children: textRuns,
-            }),
-          );
-        }
-      }
+      const textRuns = block.runs.map(run => new TextRun({
+        text: run.text,
+        font: fontFamily,
+        size: ptToHalfPt(fontSizePt),
+        bold: run.bold,
+        italics: run.italic,
+        underline: run.underline ? { type: 'single' } : undefined,
+        strike: run.strike,
+      }));
+      children.push(
+        new Paragraph({
+          alignment,
+          indent: { left: inchesToTwips(0.5), firstLine: firstLineIndent },
+          spacing: {
+            before: spacingBefore,
+            after: spacingAfter,
+            line: lineSpacingTo240ths(lineSpacing),
+          },
+          children: textRuns,
+        }),
+      );
     }
   }
 
@@ -798,7 +673,7 @@ export async function exportToPdf(
 
     // Word count
     const totalWords = chapters.reduce((sum, ch) => {
-      return sum + editorToPlainText(ch.content).split(/\s+/).filter(w => w.length > 0).length;
+      return sum + markdownToPlainText(ch.content).split(/\s+/).filter(w => w.length > 0).length;
     }, 0);
     const roundedWords = Math.round(totalWords / 1000) * 1000;
     content.push({
@@ -831,7 +706,7 @@ export async function exportToPdf(
       content.push({ text: '', pageBreak: 'before' });
     }
 
-    const text = editorToPlainText(chapter.content);
+    const text = markdownToPlainText(chapter.content);
     const paragraphs = text.split('\n');
 
     for (const para of paragraphs) {
@@ -1088,7 +963,7 @@ function buildRtf(
       parts.push(`\\pard\\qc\\sb480\\sa240\\b\\fs${fontSizeHalf + 4} ${escape(chapter.title)}\\b0\\fs${fontSizeHalf}\\par`);
     }
 
-    const text = editorToPlainText(chapter.content);
+    const text = markdownToPlainText(chapter.content);
     const paragraphs = text.split('\n');
 
     for (const para of paragraphs) {
@@ -1124,96 +999,13 @@ export async function exportToRtf(
 
 // ---- Markdown export ----
 
-function inlineNodesToMarkdown(nodes: JSONContent[]): string {
-  return nodes.map(node => {
-    if (node.type === 'text') {
-      let text = node.text || '';
-      const marks = node.marks || [];
-      for (const mark of marks) {
-        switch (mark.type) {
-          case 'bold': text = `**${text}**`; break;
-          case 'italic': text = `*${text}*`; break;
-          case 'underline': text = `<u>${text}</u>`; break;
-          case 'strike': text = `~~${text}~~`; break;
-        }
-      }
-      return text;
-    }
-    if (node.content) {
-      return inlineNodesToMarkdown(node.content);
-    }
-    return '';
-  }).join('');
-}
-
-function listItemToMarkdown(item: JSONContent): string {
-  if (!item.content) return '';
-  return item.content.map(child => {
-    if (child.type === 'paragraph') {
-      return inlineNodesToMarkdown(child.content || []);
-    }
-    return '';
-  }).join(' ');
-}
-
-function jsonContentToMarkdown(doc: JSONContent | null): string {
-  if (!doc || !doc.content) return '';
-
-  const lines: string[] = [];
-
-  for (const node of doc.content) {
-    switch (node.type) {
-      case 'heading': {
-        const level = node.attrs?.level ?? 1;
-        const prefix = '#'.repeat(level);
-        const text = inlineNodesToMarkdown(node.content || []);
-        lines.push(`${prefix} ${text}`, '');
-        break;
-      }
-      case 'paragraph': {
-        const text = inlineNodesToMarkdown(node.content || []);
-        lines.push(text, '');
-        break;
-      }
-      case 'bulletList': {
-        for (const item of node.content || []) {
-          const text = listItemToMarkdown(item);
-          lines.push(`- ${text}`);
-        }
-        lines.push('');
-        break;
-      }
-      case 'orderedList': {
-        let idx = 1;
-        for (const item of node.content || []) {
-          const text = listItemToMarkdown(item);
-          lines.push(`${idx}. ${text}`);
-          idx++;
-        }
-        lines.push('');
-        break;
-      }
-      case 'blockquote': {
-        const inner = (node.content || []).map(child => {
-          if (child.type === 'paragraph') {
-            return `> ${inlineNodesToMarkdown(child.content || [])}`;
-          }
-          return '';
-        }).join('\n');
-        lines.push(inner, '');
-        break;
-      }
-      case 'horizontalRule':
-        lines.push('---', '');
-        break;
-      default: {
-        const text = inlineNodesToMarkdown(node.content || []);
-        if (text) lines.push(text, '');
-      }
-    }
-  }
-
-  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+/**
+ * Content is now stored as Markdown strings, so this is essentially identity
+ * with minor cleanup.
+ */
+function contentToMarkdown(content: string | null): string {
+  if (!content) return '';
+  return content.replace(/\n{3,}/g, '\n\n').trim();
 }
 
 /**
@@ -1231,7 +1023,7 @@ export async function exportToMarkdown(
       parts.push(`## ${chapter.title}`, '');
     }
 
-    const markdown = jsonContentToMarkdown(chapter.content);
+    const markdown = contentToMarkdown(chapter.content);
     if (markdown) {
       parts.push(markdown, '');
     }
@@ -1256,7 +1048,7 @@ export async function exportToPlainText(
       parts.push(chapter.title, '-'.repeat(chapter.title.length), '');
     }
 
-    const text = editorToPlainText(chapter.content);
+    const text = markdownToPlainText(chapter.content);
     if (text) {
       parts.push(text, '');
     }

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { useCurrentEditor } from '@tiptap/react';
+import { useCurrentEditor } from '@/lib/editor';
 import { Dialog, Button, Textarea, IconButton } from '@/components/UI';
 import { useApp } from '@/context/AppContext';
 import { formatDateTime, generateId } from '@/lib/utils';
@@ -41,15 +41,14 @@ export function CommentModal({ open, onClose }: CommentModalProps) {
 
   const handleAddThread = useCallback(() => {
     if (!activeChapter || !editor || !newCommentText.trim()) return;
-    const { from, to, empty } = editor.state.selection;
+    const { from, to, empty } = editor.getSelection();
     if (empty) return;
 
-    const selectedText = editor.state.doc.textBetween(from, to, ' ').trim();
+    const selectedText = editor.getSelectedText().trim();
     const threadId = generateId();
     const now = Date.now();
 
-    const created = editor.chain().focus().setCommentAnchor({ threadId, state: 'open' }).run();
-    if (!created) return;
+    editor.setCommentAnchor(threadId, from, to, 'open');
 
     const nextThread: CommentThread = {
       id: threadId,
@@ -109,7 +108,7 @@ export function CommentModal({ open, onClose }: CommentModalProps) {
     );
 
     if (editor) {
-      editor.commands.setCommentAnchorState({ threadId, state: nextResolved ? 'resolved' : 'open' });
+      editor.setCommentAnchorState(threadId, nextResolved ? 'resolved' : 'open');
     }
 
     persistThreads(updated);
@@ -123,7 +122,7 @@ export function CommentModal({ open, onClose }: CommentModalProps) {
 
   const handleJumpToAnchor = useCallback((threadId: string) => {
     if (!editor) return;
-    editor.commands.scrollToCommentAnchor(threadId);
+    editor.scrollToCommentAnchor(threadId);
   }, [editor]);
 
   const filteredThreads = useMemo(() => {

@@ -135,22 +135,13 @@ describe('chapter heading detection', () => {
       expect(result.sections).toHaveLength(3);
 
       // Check Chapter 5 content
-      const ch5Texts = (result.sections[0].content.content || [])
-        .map(n => n.content?.[0]?.text)
-        .filter(Boolean);
-      expect(ch5Texts).toContain('Five content here.');
+      expect(result.sections[0].content).toContain('Five content here.');
 
       // Check The Evidence content
-      const evTexts = (result.sections[1].content.content || [])
-        .map(n => n.content?.[0]?.text)
-        .filter(Boolean);
-      expect(evTexts).toContain('Evidence content here.');
+      expect(result.sections[1].content).toContain('Evidence content here.');
 
       // Check Chapter 6 content
-      const ch6Texts = (result.sections[2].content.content || [])
-        .map(n => n.content?.[0]?.text)
-        .filter(Boolean);
-      expect(ch6Texts).toContain('Six content here.');
+      expect(result.sections[2].content).toContain('Six content here.');
     });
 
     it('detects multiple non-standard titles in correct order', async () => {

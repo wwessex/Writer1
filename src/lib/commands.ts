@@ -1,4 +1,4 @@
-import type { Editor } from '@tiptap/react';
+import type { EditorAdapter } from '@/lib/editor';
 import type { RefObject } from 'react';
 import type { ModalKey } from '@/hooks/useModalState';
 import type { ProjectType } from '@/types';
@@ -127,7 +127,7 @@ export const COMMAND_METADATA: Record<CommandId, CommandMetadata> = {
 };
 
 export interface CommandContext {
-  editor: Editor | null;
+  editor: EditorAdapter | null;
   fileInputRef: RefObject<HTMLInputElement | null>;
   importInputRef: RefObject<HTMLInputElement | null>;
   projectFileInputRef: RefObject<HTMLInputElement | null>;
@@ -191,17 +191,17 @@ export const COMMAND_HANDLERS: Record<CommandId, CommandHandler> = {
   [COMMAND_IDS.THEME_DARK]: ({ setTheme }) => setTheme('dark'),
   [COMMAND_IDS.THEME_LIGHT]: ({ setTheme }) => setTheme('light'),
   [COMMAND_IDS.THEME_HIGH_CONTRAST]: ({ setTheme }) => setTheme('high-contrast'),
-  [COMMAND_IDS.UNDO]: ({ editor }) => editor?.chain().focus().undo().run(),
-  [COMMAND_IDS.REDO]: ({ editor }) => editor?.chain().focus().redo().run(),
+  [COMMAND_IDS.UNDO]: ({ editor }) => { editor?.undo(); },
+  [COMMAND_IDS.REDO]: ({ editor }) => { editor?.redo(); },
   [COMMAND_IDS.CUT]: ({ editor }) => {
-    if (editor?.isFocused) {
-      editor.commands.deleteSelection();
+    if (editor?.isFocused()) {
+      editor.deleteSelection();
       return;
     }
     document.execCommand('cut');
   },
   [COMMAND_IDS.COPY]: ({ editor }) => {
-    if (editor?.isFocused) {
+    if (editor?.isFocused()) {
       document.execCommand('copy');
       return;
     }
@@ -210,15 +210,15 @@ export const COMMAND_HANDLERS: Record<CommandId, CommandHandler> = {
   [COMMAND_IDS.PASTE]: () => {
     document.execCommand('paste');
   },
-  [COMMAND_IDS.SELECT_ALL]: ({ editor }) => editor?.commands.selectAll(),
-  [COMMAND_IDS.INSERT_HR]: ({ editor }) => editor?.chain().focus().setHorizontalRule().run(),
-  [COMMAND_IDS.INSERT_BLOCKQUOTE]: ({ editor }) => editor?.chain().focus().toggleBlockquote().run(),
-  [COMMAND_IDS.FORMAT_BOLD]: ({ editor }) => editor?.chain().focus().toggleBold().run(),
-  [COMMAND_IDS.FORMAT_ITALIC]: ({ editor }) => editor?.chain().focus().toggleItalic().run(),
-  [COMMAND_IDS.FORMAT_UNDERLINE]: ({ editor }) => editor?.chain().focus().toggleUnderline().run(),
-  [COMMAND_IDS.FORMAT_H1]: ({ editor }) => editor?.chain().focus().toggleHeading({ level: 1 }).run(),
-  [COMMAND_IDS.FORMAT_H2]: ({ editor }) => editor?.chain().focus().toggleHeading({ level: 2 }).run(),
-  [COMMAND_IDS.FORMAT_P]: ({ editor }) => editor?.chain().focus().setParagraph().run(),
+  [COMMAND_IDS.SELECT_ALL]: ({ editor }) => { editor?.selectAll(); },
+  [COMMAND_IDS.INSERT_HR]: ({ editor }) => { editor?.insertHorizontalRule(); },
+  [COMMAND_IDS.INSERT_BLOCKQUOTE]: ({ editor }) => { editor?.toggleBlockquote(); },
+  [COMMAND_IDS.FORMAT_BOLD]: ({ editor }) => { editor?.toggleBold(); },
+  [COMMAND_IDS.FORMAT_ITALIC]: ({ editor }) => { editor?.toggleItalic(); },
+  [COMMAND_IDS.FORMAT_UNDERLINE]: ({ editor }) => { editor?.toggleUnderline(); },
+  [COMMAND_IDS.FORMAT_H1]: ({ editor }) => { editor?.insertHeading(1); },
+  [COMMAND_IDS.FORMAT_H2]: ({ editor }) => { editor?.insertHeading(2); },
+  [COMMAND_IDS.FORMAT_P]: ({ editor }) => { editor?.setParagraph(); },
   [COMMAND_IDS.TOGGLE_TYPEWRITER_MODE]: ({ toggleTypewriterMode }) => toggleTypewriterMode(),
   [COMMAND_IDS.STORY_CARDS]: ({ openModal }) => openModal('storyCards'),
 };

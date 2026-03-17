@@ -6,28 +6,14 @@ import App from './App';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-vi.mock('@tiptap/react', async () => {
-  const React = await import('react');
+vi.mock('@/lib/editor', () => {
+  const React = require('react');
   return {
     EditorContext: React.createContext({ editor: null }),
     useCurrentEditor: () => ({ editor: null }),
-    useEditor: () => ({ extensionManager: { extensions: [] } }),
+    useCodeMirrorEditor: () => ({ containerRef: { current: null }, adapter: null }),
   };
 });
-
-vi.mock('@tiptap/starter-kit', () => ({ default: { configure: () => ({}) } }));
-vi.mock('@tiptap/extension-underline', () => ({ default: {} }));
-vi.mock('@tiptap/extension-horizontal-rule', () => ({ default: {} }));
-vi.mock('@tiptap/extension-image', () => ({ default: { configure: () => ({}) } }));
-vi.mock('@tiptap/extension-text-style', () => ({ default: {} }));
-vi.mock('@tiptap/extension-font-family', () => ({ default: {} }));
-
-vi.mock('@/components/Editor/screenplayExtension', () => ({
-  ScreenplayParagraph: { configure: () => ({}) },
-  CommentAnchorMark: {},
-}));
-
-vi.mock('@/lib/findReplaceExtension', () => ({ FindReplaceExtension: {} }));
 
 vi.mock('@/context/AppContext', () => ({
   AppProvider: ({ children }: { children: unknown }) => <>{children}</>,
@@ -36,7 +22,7 @@ vi.mock('@/context/AppContext', () => ({
         projectType: 'book',
         novelId: 'n1',
         novelTitle: 'Title',
-        chapters: [{ id: 'c1', content: { type: 'doc', content: [] } }],
+        chapters: [{ id: 'c1', content: '' }],
         activeChapterId: 'c1',
         isOnline: true,
         isSaving: false,
@@ -48,7 +34,7 @@ vi.mock('@/context/AppContext', () => ({
           sidebarPanels: { order: ['chapters'], collapsed: {}, visible: {} },
         },
       },
-      activeChapter: { id: 'c1', content: { type: 'doc', content: [] } },
+      activeChapter: { id: 'c1', content: '' },
       loadNovel: vi.fn(async () => undefined),
       createChapter: vi.fn(async () => undefined),
       dispatch: vi.fn(),

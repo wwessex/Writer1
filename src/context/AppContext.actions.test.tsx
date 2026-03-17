@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
     novelId,
     order,
     title: `Chapter ${order + 1}`,
-    content: { type: 'doc', content: [] },
+    content: '',
     updatedAt: 0,
     summary: '',
     pov: '',

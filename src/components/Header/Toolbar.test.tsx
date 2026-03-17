@@ -7,26 +7,34 @@ import { Toolbar } from './Toolbar';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const createChapterMock = vi.fn();
-const updateSettingsMock = vi.fn();
-const runMock = vi.fn();
 
-const editorChainProxy = (): unknown =>
-  new Proxy({} as Record<string, unknown>, {
-    get: () => () =>
-      new Proxy({} as Record<string, unknown>, {
-        get: () => () => ({ run: runMock }),
-      }),
-  });
-
-vi.mock('@tiptap/react', () => ({
+vi.mock('@/lib/editor', () => ({
+  EditorContext: (() => {
+    const React = require('react');
+    return React.createContext({ editor: null });
+  })(),
   useCurrentEditor: () => ({
     editor: {
       isActive: (_name: string, _attrs?: unknown) => false,
-      chain: () => ({ focus: () => editorChainProxy() }),
-      can: () => ({ undo: () => true, redo: () => true }),
+      toggleBold: vi.fn(),
+      toggleItalic: vi.fn(),
+      toggleUnderline: vi.fn(),
+      toggleStrikethrough: vi.fn(),
+      toggleBulletList: vi.fn(),
+      toggleOrderedList: vi.fn(),
+      toggleBlockquote: vi.fn(),
+      insertHorizontalRule: vi.fn(),
+      insertHeading: vi.fn(),
+      insertImage: vi.fn(),
+      setParagraph: vi.fn(),
+      setLineHeight: vi.fn(),
+      undo: vi.fn(),
+      redo: vi.fn(),
+      canUndo: () => true,
+      canRedo: () => true,
+      focus: vi.fn(),
       on: vi.fn(),
       off: vi.fn(),
-      commands: { setContent: vi.fn(), setImage: vi.fn() },
     },
   }),
 }));
@@ -40,7 +48,7 @@ vi.mock('@/context/AppContext', () => ({
       },
     },
     createChapter: createChapterMock,
-    updateSettings: updateSettingsMock,
+    updateSettings: vi.fn(),
   }),
 }));
 
@@ -79,7 +87,6 @@ describe('Toolbar', () => {
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
-    runMock.mockClear();
   });
 
   afterEach(() => {
@@ -143,24 +150,11 @@ describe('Toolbar', () => {
     });
   });
 
-  it('changing font family select triggers font change', () => {
-    act(() => { root.render(<Toolbar />); });
-    const selects = container.querySelectorAll('select[data-testid="select"]');
-    expect(selects.length).toBeGreaterThanOrEqual(2);
-    // Second select should be font family
-    const fontSelect = selects[1] as HTMLSelectElement;
-    act(() => {
-      const event = new Event('change', { bubbles: true });
-      Object.defineProperty(event, 'target', { value: { value: 'serif' } });
-      fontSelect.dispatchEvent(event);
-    });
-  });
-
   it('renders line spacing select', () => {
     act(() => { root.render(<Toolbar />); });
     const selects = container.querySelectorAll('select[data-testid="select"]');
-    // Desktop toolbar has style, font family, and line spacing selects
-    expect(selects.length).toBeGreaterThanOrEqual(3);
+    // Desktop toolbar has style and line spacing selects
+    expect(selects.length).toBeGreaterThanOrEqual(2);
   });
 });
 

@@ -15,7 +15,7 @@ vi.mock('@/context/AppContext', () => ({
     activeChapter: {
       id: 'c1',
       title: 'Test Chapter',
-      content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Some chapter text here.' }] }] },
+      content: 'Some chapter text here.',
     },
   }),
 }));

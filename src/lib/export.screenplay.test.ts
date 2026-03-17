@@ -30,18 +30,47 @@ const expectedPdfContent = readJsonFixture<ReturnType<typeof screenplayChapterTo
 
 
 function createChapter(id: string, title: string, paragraphs: Array<{ screenplayType?: string; text: string }>): Chapter {
+  // Convert screenplay-typed paragraphs to Fountain Markdown
+  const lines: string[] = [];
+  for (const p of paragraphs) {
+    switch (p.screenplayType) {
+      case 'scene-heading': {
+        if (lines.length > 0) lines.push('');
+        const heading = p.text.toUpperCase();
+        lines.push(/^(INT|EXT|EST|I\/E)\.?\s/i.test(heading) ? heading : `.${heading}`);
+        break;
+      }
+      case 'character':
+        if (lines.length > 0) lines.push('');
+        lines.push(p.text.toUpperCase());
+        break;
+      case 'parenthetical':
+        lines.push(p.text.startsWith('(') ? p.text : `(${p.text})`);
+        break;
+      case 'dialogue':
+        lines.push(p.text);
+        break;
+      case 'transition': {
+        if (lines.length > 0) lines.push('');
+        const t = p.text.toUpperCase();
+        lines.push(t.endsWith('TO:') ? t : `>${t}`);
+        break;
+      }
+      case 'action':
+        if (lines.length > 0) lines.push('');
+        lines.push(p.text);
+        break;
+      default:
+        if (lines.length > 0) lines.push('');
+        lines.push(p.text);
+        break;
+    }
+  }
   return {
     ...screenplayFixture,
     id,
     title,
-    content: {
-      type: 'doc',
-      content: paragraphs.map(paragraph => ({
-        type: 'paragraph',
-        attrs: paragraph.screenplayType ? { screenplayType: paragraph.screenplayType } : {},
-        content: [{ type: 'text', text: paragraph.text }],
-      })),
-    },
+    content: lines.join('\n'),
   };
 }
 
@@ -80,12 +109,11 @@ describe('screenplay export helpers', () => {
 `.FLASHBACK - BEACH
 
 Waves crash hard.
+
 JULES
 I remember this place.
 
 SMASH CUT TO:
-
-***
 
 EXT. ROAD - DAWN
 
@@ -117,17 +145,17 @@ A bus rounds the corner.`
     });
 
     expect(downloadFileMock).toHaveBeenCalledWith(
-      `Title: Project Echo\nCredit: Written for the screen by\nAuthor: Dev Writer\nDraft date: 2026-02-14\nSource: Story outline v2\n\n# Opening\n\nINT. HOUSE - NIGHT\n\nRain pounds the windows.\nSAM\n(whispering)\nWe need to leave. Now.\n\nCUT TO:\n\n===\n\n# Second Movement\n\nEXT. ALLEY - NIGHT\n\nA cat darts between cans.`,
+      `Title: Project Echo\nCredit: Written for the screen by\nAuthor: Dev Writer\nDraft date: 2026-02-14\nSource: Story outline v2\n\n# Opening\n\nInt. House - Night\n\nRain pounds the windows.\n\n@Sam\n(whispering)\nWe need to leave. Now.\n\n>Cut to:\n\n===\n\n# Second Movement\n\nEXT. ALLEY - NIGHT\n\nA cat darts between cans.`,
       'Project Echo.screenplay.fountain',
       'text/plain;charset=utf-8'
     );
   });
 
-  it('handles empty chapters and ignores mixed non-screenplay paragraphs', async () => {
+  it('handles empty chapters and exports all content lines', async () => {
     const mixedChapter = createChapter('chapter-4', 'Mixed', [
-      { text: 'This should be ignored' },
+      { text: 'Plain text line' },
       { screenplayType: 'action', text: 'Only this action exports.' },
-      { text: 'This line is also ignored' },
+      { text: 'Another plain line' },
     ]);
 
     const emptyChapter = createChapter('chapter-5', 'Empty Chapter', []);
@@ -140,7 +168,7 @@ A bus rounds the corner.`
     });
 
     expect(downloadFileMock).toHaveBeenCalledWith(
-      '# Mixed\n\nOnly this action exports.\n\n--\n\n# Empty Chapter',
+      '# Mixed\n\nPlain text line\n\nOnly this action exports.\n\nAnother plain line\n\n--\n\n# Empty Chapter',
       'Noir.fountain-export.fountain',
       'text/plain;charset=utf-8'
     );

@@ -5,7 +5,6 @@
  */
 
 import type { Chapter, ProjectType } from '@/types';
-import type { JSONContent } from '@tiptap/core';
 import { editorToPlainText } from './utils';
 
 // ---- Core Adapter Interface ----
@@ -30,7 +29,7 @@ export interface AdapterMetadata {
 export interface ImportResult {
   chapters: {
     title: string;
-    content: JSONContent | null;
+    content: string | null;
     summary?: string;
     order: number;
   }[];

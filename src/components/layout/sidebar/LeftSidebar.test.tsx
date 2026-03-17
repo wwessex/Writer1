@@ -19,7 +19,7 @@ vi.mock('@/context/AppContext', () => ({
       chapters: [
         { id: 'ch-1', title: 'Chapter 1 \u2014 Prologue', order: 1, content: null, scenes: [], tags: [], status: 'draft', summary: '', pov: '', wordGoal: 0, novelId: 'n-1', updatedAt: 0 },
         { id: 'ch-2', title: 'Chapter 2 \u2014 The Party', order: 2, content: null, scenes: [], tags: [], status: 'draft', summary: '', pov: '', wordGoal: 0, novelId: 'n-1', updatedAt: 0 },
-        { id: 'ch-4', title: 'Chapter 4 \u2014 The Corridor', order: 4, content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Test content here.' }] }] }, scenes: [{ id: 's-1', title: 'Scene 1', summary: '', status: 'draft', pov: '', tags: [], wordGoal: 0 }], tags: [], status: 'draft', summary: '', pov: '', wordGoal: 0, novelId: 'n-1', updatedAt: 0 },
+        { id: 'ch-4', title: 'Chapter 4 \u2014 The Corridor', order: 4, content: 'Test content here.', scenes: [{ id: 's-1', title: 'Scene 1', summary: '', status: 'draft', pov: '', tags: [], wordGoal: 0 }], tags: [], status: 'draft', summary: '', pov: '', wordGoal: 0, novelId: 'n-1', updatedAt: 0 },
       ],
       settings: { sidebarHidden: false },
     },

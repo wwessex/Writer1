@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import type { Editor as TiptapEditor } from '@tiptap/react';
+import type { EditorAdapter } from '@/lib/editor';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
 import { Editor } from '@/components/Editor';
@@ -28,7 +28,7 @@ interface AppShellProps {
   onToggleSidebar: () => void;
   aiPanelOpen: boolean;
   closeAiPanel: () => void;
-  editor: TiptapEditor | null;
+  editor: EditorAdapter | null;
 }
 
 export function AppShell({

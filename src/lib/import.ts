@@ -1,10 +1,9 @@
-import type { JSONContent } from '@tiptap/core';
 import type { ProjectType, ScreenplayBlockType } from '@/types';
 import { ContentErrors, reportAppError } from '@/lib/errors';
 
 interface ParsedChapter {
   title: string;
-  content: JSONContent;
+  content: string;
   metadata?: {
     sourceFormat: 'docx' | 'rtf' | 'txt' | 'fountain';
     originalTitle?: string;
@@ -31,16 +30,10 @@ const NAMED_SECTION_RE = /^(?:interlude|intermission|author'?s?\s*note|coda|post
 const ALL_CAPS_RE = /^[A-Z\s\d]+$/;
 
 /**
- * Convert paragraphs to Tiptap JSON document
+ * Convert paragraphs to a Markdown string.
  */
-function paragraphsToDoc(paragraphs: string[]): JSONContent {
-  return {
-    type: 'doc',
-    content: paragraphs.map(text => ({
-      type: 'paragraph',
-      content: text.trim() ? [{ type: 'text', text: text.trim() }] : []
-    }))
-  };
+function paragraphsToDoc(paragraphs: string[]): string {
+  return paragraphs.join('\n\n');
 }
 
 /**
@@ -172,17 +165,37 @@ function splitIntoChapters(lines: string[], forceHeadingAt?: Set<number>): Parse
   return chapters;
 }
 
-function screenplayBlocksToDoc(blocks: Array<{ type: ScreenplayBlockType; text: string }>): JSONContent {
-  return {
-    type: 'doc',
-    content: blocks.map(block => ({
-      type: 'paragraph',
-      attrs: {
-        screenplayType: block.type
-      },
-      content: block.text.trim() ? [{ type: 'text', text: block.text.trim() }] : []
-    }))
-  };
+function screenplayBlocksToDoc(blocks: Array<{ type: ScreenplayBlockType; text: string }>): string {
+  const lines: string[] = [];
+  for (const block of blocks) {
+    const text = block.text.trim();
+    if (!text) continue;
+    switch (block.type) {
+      case 'scene-heading': {
+        const normalized = text.toUpperCase();
+        const isStandard = /^(INT|EXT|EST|INT\/EXT|I\/E)\.?\s/.test(normalized);
+        lines.push(isStandard ? normalized : `.${normalized}`);
+        break;
+      }
+      case 'character':
+        lines.push(`@${text}`);
+        break;
+      case 'transition':
+        lines.push(`>${text}`);
+        break;
+      case 'parenthetical':
+        lines.push(text);
+        break;
+      case 'dialogue':
+        lines.push(text);
+        break;
+      case 'action':
+      default:
+        lines.push(text);
+        break;
+    }
+  }
+  return lines.join('\n');
 }
 
 function isSceneHeading(line: string): boolean {
@@ -428,39 +441,8 @@ export async function importFountain(file: File): Promise<ImportResult> {
   return parseFountain(text);
 }
 
-export function mapImportedContentToProjectType(content: JSONContent, projectType: ProjectType): JSONContent {
-  const originalNodes = content.content || [];
-
-  if (projectType === 'screenplay') {
-    return {
-      ...content,
-      content: originalNodes.map(node => {
-        if (node.type !== 'paragraph') return node;
-        const screenplayType = typeof node.attrs?.screenplayType === 'string' ? node.attrs.screenplayType : 'action';
-        return {
-          ...node,
-          attrs: {
-            ...node.attrs,
-            screenplayType
-          }
-        };
-      })
-    };
-  }
-
-  return {
-    ...content,
-    content: originalNodes.map(node => {
-      if (node.type !== 'paragraph') return node;
-      if (!node.attrs || !('screenplayType' in node.attrs)) return node;
-      const attrs = { ...node.attrs };
-      delete attrs.screenplayType;
-      return {
-        ...node,
-        attrs: Object.keys(attrs).length > 0 ? attrs : undefined
-      };
-    })
-  };
+export function mapImportedContentToProjectType(content: string, _projectType: ProjectType): string {
+  return content;
 }
 
 /**

@@ -17,11 +17,10 @@ describe('screenplay import', () => {
     expect(result.sections.map(section => section.title)).toEqual(['INT. KITCHEN - DAY', 'EXT. STREET - NIGHT']);
     expect(result.sections.map(section => section.metadata?.sourceFormat)).toEqual(['fountain', 'fountain']);
 
-    const firstNodes = result.sections[0].content.content || [];
-    expect(firstNodes[0]).toMatchObject({ type: 'paragraph', attrs: { screenplayType: 'scene-heading' } });
-    expect(firstNodes[1]).toMatchObject({ type: 'paragraph', attrs: { screenplayType: 'action' } });
-    expect(firstNodes[2]).toMatchObject({ type: 'paragraph', attrs: { screenplayType: 'character' } });
-    expect(firstNodes[3]).toMatchObject({ type: 'paragraph', attrs: { screenplayType: 'dialogue' } });
+    // Content is now a Markdown/Fountain string
+    const firstContent = result.sections[0].content;
+    expect(typeof firstContent).toBe('string');
+    expect(firstContent).toContain('INT. KITCHEN');
   });
 
   it('keeps import resilient and emits notices for partially supported constructs', async () => {
@@ -37,15 +36,14 @@ describe('screenplay import', () => {
   });
 
   it('maps imported content to project-specific schema attributes', () => {
-    const content = {
-      type: 'doc',
-      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello' }] }],
-    };
+    const content = 'Hello world';
 
     const screenplayContent = mapImportedContentToProjectType(content, 'screenplay');
     const bookContent = mapImportedContentToProjectType(screenplayContent, 'book');
 
-    expect(screenplayContent.content?.[0]).toMatchObject({ attrs: { screenplayType: 'action' } });
-    expect(bookContent.content?.[0]).toMatchObject({ attrs: undefined });
+    // Content is now a plain string, mapImportedContentToProjectType is identity
+    expect(typeof screenplayContent).toBe('string');
+    expect(typeof bookContent).toBe('string');
+    expect(bookContent).toBe(content);
   });
 });

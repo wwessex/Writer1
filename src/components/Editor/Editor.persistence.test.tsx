@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { act, type ChangeEventHandler, type ReactNode } from 'react';
+import { act, type ChangeEventHandler } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Editor } from './Editor';
@@ -9,16 +9,21 @@ import { Editor } from './Editor';
 const setContentMock = vi.fn();
 const updateChapterImmediateMock = vi.fn(async () => undefined);
 
-vi.mock('@tiptap/react', () => ({
+vi.mock('@/lib/editor', () => ({
+  EditorContext: (() => {
+    const React = require('react');
+    return React.createContext({ editor: null });
+  })(),
   useCurrentEditor: () => ({
     editor: {
-      commands: { setContent: setContentMock },
-      chain: () => ({ focus: () => ({ setScreenplayBlock: () => ({ run: vi.fn() }) }) }),
+      setContent: setContentMock,
+      dom: null,
+      setScreenplayBlockType: vi.fn(),
+      focus: vi.fn(),
       on: vi.fn(),
       off: vi.fn(),
     },
   }),
-  EditorContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock('@/components/UI', () => ({
@@ -32,7 +37,7 @@ vi.mock('@/components/UI', () => ({
 vi.mock('@/context/AppContext', () => ({
   useApp: () => ({
     state: { settings: { focusMode: false, pageView: false, typewriterMode: false, dailyWordGoal: 0, typography: { fontFamily: 'system', fontSize: 16, lineHeight: 1.6 } }, projectType: 'book', chapters: [] },
-    activeChapter: { id: 'chapter-1', title: 'Old', content: { type: 'doc', content: [] } },
+    activeChapter: { id: 'chapter-1', title: 'Old', content: '' },
     updateChapterImmediate: updateChapterImmediateMock,
     deleteChapter: vi.fn(),
     dispatch: vi.fn(),

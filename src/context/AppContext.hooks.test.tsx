@@ -9,7 +9,7 @@ import { AppProvider, useApp, useActiveChapter, useSettings, useSavingState } fr
 
 const mocks = vi.hoisted(() => ({
   loadDefaultNovelAndChaptersMock: vi.fn(),
-  createSnapshotMock: vi.fn(async () => ({ id: 'snap-1', chapterId: 'ch-1', createdAt: Date.now(), doc: { type: 'doc', content: [] } })),
+  createSnapshotMock: vi.fn(async () => ({ id: 'snap-1', chapterId: 'ch-1', createdAt: Date.now(), doc: '' })),
 }));
 
 const baseNovel: Novel = { id: 'novel-1', title: 'Test Novel', updatedAt: 1, projectType: 'book' };
@@ -17,11 +17,11 @@ mocks.loadDefaultNovelAndChaptersMock.mockImplementation(async () => ({
   novel: baseNovel,
   chapters: [{
     id: 'ch-1', novelId: 'novel-1', order: 0, title: 'Chapter 1',
-    content: { type: 'doc', content: [] }, updatedAt: 0, summary: '',
+    content: 'Chapter one content.', updatedAt: 0, summary: '',
     pov: '', status: 'draft', tags: [], wordGoal: 0, scenes: [],
   }, {
     id: 'ch-2', novelId: 'novel-1', order: 1, title: 'Chapter 2',
-    content: { type: 'doc', content: [] }, updatedAt: 0, summary: '',
+    content: 'Chapter two content.', updatedAt: 0, summary: '',
     pov: '', status: 'draft', tags: [], wordGoal: 0, scenes: [],
   }],
 }));
@@ -202,7 +202,7 @@ describe('AppContext setActiveChapter auto-snapshot', () => {
     expect(app.state.activeChapterId).toBe('ch-2');
     expect(mocks.createSnapshotMock).toHaveBeenCalledWith(
       'ch-1',
-      { type: 'doc', content: [] },
+      'Chapter one content.',
       'Auto'
     );
   });

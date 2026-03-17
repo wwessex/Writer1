@@ -17,7 +17,7 @@ vi.mock('@/context/AppContext', () => ({
     state: {
       projectType: 'book',
       chapters: [
-        { id: 'c1', order: 0, title: 'Chapter One', content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Some text here' }] }] }, status: 'draft', summary: '', pov: '', tags: [], wordGoal: 0, scenes: [], novelId: 'n1', updatedAt: 0 },
+        { id: 'c1', order: 0, title: 'Chapter One', content: 'Some text here', status: 'draft', summary: '', pov: '', tags: [], wordGoal: 0, scenes: [], novelId: 'n1', updatedAt: 0 },
       ],
       settings: { quickSwitcherMode: 'all' },
     },

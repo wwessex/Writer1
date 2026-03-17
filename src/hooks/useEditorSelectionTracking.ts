@@ -1,16 +1,7 @@
 import { useEffect, useState } from 'react';
+import type { EditorAdapter } from '@/lib/editor';
 
-interface SelectionTrackingEditor {
-  state: {
-    selection: {
-      empty: boolean;
-    };
-  };
-  on: (event: 'selectionUpdate' | 'blur', cb: () => void) => void;
-  off: (event: 'selectionUpdate' | 'blur', cb: () => void) => void;
-}
-
-export function useEditorSelectionTracking(editor: SelectionTrackingEditor | null | undefined) {
+export function useEditorSelectionTracking(editor: EditorAdapter | null | undefined) {
   const [hasTextSelection, setHasTextSelection] = useState(false);
 
   useEffect(() => {
@@ -20,7 +11,7 @@ export function useEditorSelectionTracking(editor: SelectionTrackingEditor | nul
     }
 
     const updateSelectionState = () => {
-      setHasTextSelection(!editor.state.selection.empty);
+      setHasTextSelection(!editor.getSelection().empty);
     };
     const handleEditorBlur = () => setHasTextSelection(false);
 

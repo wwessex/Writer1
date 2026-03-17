@@ -1,4 +1,3 @@
-import type { JSONContent } from '@tiptap/core';
 import { pluginManager } from '@/lib/plugins';
 import type {
   Chapter,
@@ -41,80 +40,32 @@ const SHA256_HASH_PATTERN = /^sha256:[a-f0-9]{64}$/;
 const LOCAL_CONFLICT_MARKER = 'LOCAL';
 const REMOTE_CONFLICT_MARKER = 'REMOTE';
 
-function ensureDoc(content: JSONContent | null | undefined): JSONContent {
-  if (content && content.type === 'doc') {
-    return content;
-  }
-
-  return {
-    type: 'doc',
-    content: [],
-  };
+function ensureDoc(content: string | null | undefined): string {
+  return content || '';
 }
 
-function textToDoc(text: string): JSONContent {
-  const lines = text.split(/\n/);
-  return {
-    type: 'doc',
-    content: lines.map((line) => ({
-      type: 'paragraph',
-      content: line.trim() ? [{ type: 'text', text: line }] : [],
-    })),
-  };
+function textToDoc(text: string): string {
+  return text;
 }
 
-function linesToDoc(lines: string[]): JSONContent {
-  return {
-    type: 'doc',
-    content: lines.map((line) => ({
-      type: 'paragraph',
-      content: line.trim() ? [{ type: 'text', text: line }] : [],
-    })),
-  };
+function linesToDoc(lines: string[]): string {
+  return lines.join('\n');
 }
 
-function docToLines(doc: JSONContent | null | undefined): string[] {
-  if (!doc || !Array.isArray(doc.content)) {
+function docToLines(doc: string | null | undefined): string[] {
+  if (!doc) {
     return [];
   }
 
-  return doc.content.map((node) => {
-    if (typeof node.text === 'string') {
-      return node.text;
-    }
-
-    if (Array.isArray(node.content)) {
-      return node.content
-        .map((child) => (typeof child.text === 'string' ? child.text : ''))
-        .join('');
-    }
-
-    return '';
-  });
+  return doc.split('\n');
 }
 
-function docToText(doc: JSONContent | null | undefined): string {
-  return docToLines(doc).join('\n').trim();
+function docToText(doc: string | null | undefined): string {
+  return (doc || '').trim();
 }
 
-function canonicalizeValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(canonicalizeValue);
-  }
-
-  if (value && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, nested]) => [key, canonicalizeValue(nested)]);
-
-    return Object.fromEntries(entries);
-  }
-
-  return value;
-}
-
-function serializeCanonicalContent(content: JSONContent | null | undefined): string {
-  return JSON.stringify(canonicalizeValue(ensureDoc(content)));
+function serializeCanonicalContent(content: string | null | undefined): string {
+  return ensureDoc(content);
 }
 
 function bytesToHex(bytes: Uint8Array): string {
@@ -136,7 +87,7 @@ async function getSubtleCrypto(): Promise<DigestProvider> {
 
 const contentHashMemo = new Map<string, Promise<string>>();
 
-async function hashContent(content: JSONContent | null | undefined): Promise<string> {
+async function hashContent(content: string | null | undefined): Promise<string> {
   const serialized = serializeCanonicalContent(content);
   const memoized = contentHashMemo.get(serialized);
   if (memoized) {
@@ -400,7 +351,7 @@ function buildSyncMetadata(
   chapter: Chapter,
   provider: IntegrationType,
   remoteRevision: string,
-  content: JSONContent | null,
+  content: string | null,
   options?: { lastPulledAt?: number; lastPushedHash?: string }
 ): ChapterSyncMetadata {
   return {
@@ -544,7 +495,7 @@ export async function mergeChapterFromRemote({ chapter, remoteDocument, context 
 export function resolveSyncConflict(
   conflict: ConflictInfo,
   resolution: ConflictResolutionOption
-): JSONContent | null {
+): string | null {
   if (resolution === 'local') {
     return conflict.localContent;
   }

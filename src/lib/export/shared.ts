@@ -1,4 +1,4 @@
-import type { JSONContent } from '@tiptap/core';
+import { markdownToPlainText } from '@/lib/editor/markdownParser';
 
 export const SCREENPLAY_PDF_FONTS = {
   Helvetica: {
@@ -15,11 +15,9 @@ export const SCREENPLAY_PDF_FONTS = {
   },
 };
 
-export function extractTextFromNode(node: JSONContent | null | undefined): string {
-  if (!node) return '';
-  if (typeof node.text === 'string') return node.text;
-  if (!node.content?.length) return '';
-  return node.content.map(extractTextFromNode).join('');
+export function extractTextFromNode(content: string | null | undefined): string {
+  if (!content) return '';
+  return markdownToPlainText(content);
 }
 
 export function isSceneBreakLine(line: string): boolean {

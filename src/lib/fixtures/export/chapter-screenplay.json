@@ -10,15 +10,5 @@
   "tags": [],
   "wordGoal": 0,
   "scenes": [],
-  "content": {
-    "type": "doc",
-    "content": [
-      { "type": "paragraph", "attrs": { "screenplayType": "scene-heading" }, "content": [{ "type": "text", "text": "Int. House - Night" }] },
-      { "type": "paragraph", "attrs": { "screenplayType": "action" }, "content": [{ "type": "text", "text": "Rain pounds the windows." }] },
-      { "type": "paragraph", "attrs": { "screenplayType": "character" }, "content": [{ "type": "text", "text": "Sam" }] },
-      { "type": "paragraph", "attrs": { "screenplayType": "parenthetical" }, "content": [{ "type": "text", "text": "(whispering)" }] },
-      { "type": "paragraph", "attrs": { "screenplayType": "dialogue" }, "content": [{ "type": "text", "text": "We need to leave. Now." }] },
-      { "type": "paragraph", "attrs": { "screenplayType": "transition" }, "content": [{ "type": "text", "text": "Cut to:" }] }
-    ]
-  }
+  "content": "Int. House - Night\n\nRain pounds the windows.\n\n@Sam\n(whispering)\nWe need to leave. Now.\n\n>Cut to:"
 }

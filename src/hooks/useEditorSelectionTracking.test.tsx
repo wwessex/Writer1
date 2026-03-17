@@ -14,20 +14,23 @@ function createEditor(empty = true) {
     blur: new Set(),
   };
 
+  const selection = { empty };
   return {
-    state: { selection: { empty } },
+    state: { selection },
+    getSelection: () => selection,
     on: vi.fn((event: EventName, callback: () => void) => listeners[event].add(callback)),
     off: vi.fn((event: EventName, callback: () => void) => listeners[event].delete(callback)),
     emit: (event: EventName) => listeners[event].forEach(cb => cb()),
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mount(editor: ReturnType<typeof createEditor> | null) {
   const container = document.createElement('div');
   const root = createRoot(container);
 
   function Test({ targetEditor }: { targetEditor: ReturnType<typeof createEditor> | null }) {
-    const hasSelection = useEditorSelectionTracking(targetEditor);
+    const hasSelection = useEditorSelectionTracking(targetEditor as any);
     return <span data-selection={String(hasSelection)} />;
   }
 

@@ -186,6 +186,10 @@ export default defineConfig({
             return 'integrations';
           }
 
+          if (id.includes('@codemirror') || id.includes('@lezer')) {
+            return 'codemirror';
+          }
+
           return undefined;
         }
       }

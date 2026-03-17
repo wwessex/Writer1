@@ -1,5 +1,5 @@
 import { useCallback, useEffect, type Dispatch, type RefObject, type SetStateAction } from 'react';
-import type { Editor } from '@tiptap/react';
+import type { EditorAdapter } from '@/lib/editor';
 import { COMMAND_IDS, type CommandId, runCommand } from '@/lib/commands';
 import type { ModalKey } from '@/hooks/useModalState';
 import type { AppSettings } from '@/types';
@@ -10,7 +10,7 @@ type ToastFn = (message: string, type?: 'success' | 'error' | 'info' | 'warning'
 type AppDispatch = Dispatch<{ type: 'TOGGLE_SIDEBAR' | 'TOGGLE_PAGE_VIEW' | 'TOGGLE_FOCUS_MODE' } | { type: 'SET_THEME'; payload: 'dark' | 'light' | 'high-contrast' }>;
 
 interface UseAppKeyboardShortcutsParams {
-  editor: Editor | null;
+  editor: EditorAdapter | null;
   findReplace: FindReplaceControls;
   fileInputRef: RefObject<HTMLInputElement | null>;
   importInputRef: RefObject<HTMLInputElement | null>;

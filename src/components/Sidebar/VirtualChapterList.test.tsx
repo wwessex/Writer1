@@ -20,7 +20,7 @@ vi.mock('@/context/AppContext', () => ({
         {
           id: 'ch-1',
           title: 'Chapter One',
-          content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello world' }] }] },
+          content: 'Hello world',
           status: 'draft',
           tags: ['action', 'romance'],
           wordGoal: 1000,
@@ -34,7 +34,7 @@ vi.mock('@/context/AppContext', () => ({
         {
           id: 'ch-2',
           title: 'Chapter Two',
-          content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Goodbye world' }] }] },
+          content: 'Goodbye world',
           status: 'revised',
           tags: [],
           wordGoal: 0,
