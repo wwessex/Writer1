@@ -1,6 +1,6 @@
-import type { JSONContent } from '@tiptap/core';
 import type { Chapter, CharacterEntity, CharacterVoiceProfile } from '@/types';
 import { getContinuityMemorySnapshot } from '@/lib/continuityMemory';
+import { extractDialogueBySpeaker as extractDialogueFromMarkdown } from '@/lib/editor/markdownParser';
 
 const WORD_REGEX = /[A-Za-zÀ-ÖØ-öø-ÿ0-9']+/g;
 const SENTENCE_SPLIT_REGEX = /[.!?]+/;
@@ -40,36 +40,6 @@ export const DEFAULT_VOICE_SIMILARITY_CONFIG: VoiceSimilarityConfig = {
   minSampleTokens: 25,
 };
 
-interface ParagraphEntry {
-  screenplayType: string | null;
-  text: string;
-}
-
-function extractText(node: JSONContent | null | undefined): string {
-  if (!node) return '';
-  if (node.type === 'text') {
-    return node.text || '';
-  }
-  const content = node.content || [];
-  return content.map(child => extractText(child)).join('');
-}
-
-function collectParagraphEntries(node: JSONContent | null | undefined, acc: ParagraphEntry[]) {
-  if (!node) return;
-
-  if (node.type === 'paragraph') {
-    const text = extractText(node).trim();
-    if (text) {
-      acc.push({ screenplayType: (node.attrs?.screenplayType as string | undefined) || null, text });
-    }
-    return;
-  }
-
-  for (const child of node.content || []) {
-    collectParagraphEntries(child, acc);
-  }
-}
-
 function normalizeSpeakerLabel(label: string): string {
   return label
     .trim()
@@ -79,38 +49,8 @@ function normalizeSpeakerLabel(label: string): string {
     .toUpperCase();
 }
 
-export function extractDialogueBySpeaker(content: JSONContent | null): Record<string, string[]> {
-  const entries: ParagraphEntry[] = [];
-  collectParagraphEntries(content, entries);
-
-  const bySpeaker: Record<string, string[]> = {};
-  let currentSpeaker: string | null = null;
-
-  for (const entry of entries) {
-    if (entry.screenplayType === 'character') {
-      const normalized = normalizeSpeakerLabel(entry.text);
-      currentSpeaker = normalized || null;
-      continue;
-    }
-
-    if (entry.screenplayType === 'dialogue' || entry.screenplayType === 'parenthetical') {
-      if (!currentSpeaker) continue;
-      if (!bySpeaker[currentSpeaker]) bySpeaker[currentSpeaker] = [];
-      bySpeaker[currentSpeaker].push(entry.text);
-      continue;
-    }
-
-    const colonMatch = entry.text.match(/^([A-Z][A-Z\s'.-]{1,40}):\s+(.+)$/);
-    if (colonMatch) {
-      const speaker = normalizeSpeakerLabel(colonMatch[1]);
-      if (speaker) {
-        if (!bySpeaker[speaker]) bySpeaker[speaker] = [];
-        bySpeaker[speaker].push(colonMatch[2]);
-      }
-    }
-  }
-
-  return bySpeaker;
+export function extractDialogueBySpeaker(content: string | null): Record<string, string[]> {
+  return extractDialogueFromMarkdown(content);
 }
 
 export function computeStyleFeatures(dialogueLines: string[]): VoiceStyleFeatures {
@@ -240,7 +180,7 @@ export function buildCharacterVoiceProfiles(
 }
 
 export function getDialogueSimilarityAlerts(
-  activeChapterContent: JSONContent | null,
+  activeChapterContent: string | null,
   profiles: CharacterVoiceProfile[],
   config: VoiceSimilarityConfig = DEFAULT_VOICE_SIMILARITY_CONFIG,
 ): VoiceSimilarityAlert[] {
@@ -276,7 +216,7 @@ export function getDialogueSimilarityAlerts(
 }
 
 
-export function getVoiceContinuityWarnings(novelId: string, chapters: Chapter[], activeChapterContent: JSONContent | null): string[] {
+export function getVoiceContinuityWarnings(novelId: string, chapters: Chapter[], activeChapterContent: string | null): string[] {
   if (!novelId) return [];
   const snapshot = getContinuityMemorySnapshot(novelId, chapters);
   const known = new Set(snapshot.characters.map(character => normalizeSpeakerLabel(character.canonicalName)));

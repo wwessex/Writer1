@@ -8,20 +8,23 @@ import {
 } from './voiceFingerprint';
 
 function screenplayChapter(id: string, contentRows: Array<{ type: 'character' | 'dialogue'; text: string }>): Chapter {
+  // Convert screenplay rows to Fountain markdown
+  const lines: string[] = [];
+  for (const row of contentRows) {
+    if (row.type === 'character') {
+      lines.push(row.text.toUpperCase());
+    } else {
+      // dialogue follows character
+      lines.push(row.text);
+    }
+  }
   return {
     id,
     novelId: 'novel-1',
     order: 1,
     title: id,
     updatedAt: 0,
-    content: {
-      type: 'doc',
-      content: contentRows.map(row => ({
-        type: 'paragraph',
-        attrs: { screenplayType: row.type },
-        content: [{ type: 'text', text: row.text }],
-      })),
-    },
+    content: lines.join('\n'),
     summary: '',
     pov: '',
     status: 'draft',

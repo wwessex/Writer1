@@ -1,7 +1,6 @@
-import type { JSONContent } from '@tiptap/core';
 import type { Chapter, ScreenplayBlockType } from '@/types';
 import type { PdfContentNode } from './types';
-import { extractTextFromNode } from './shared';
+import { markdownToScreenplayBlocks } from '@/lib/editor/markdownParser';
 
 export interface ScreenplayBlock {
   type: ScreenplayBlockType;
@@ -12,34 +11,12 @@ export interface ScreenplayFountainOptions {
   sceneSeparator?: string;
 }
 
-function isScreenplayBlockType(value: string | null | undefined): value is ScreenplayBlockType {
-  return value === 'scene-heading'
-    || value === 'action'
-    || value === 'character'
-    || value === 'parenthetical'
-    || value === 'dialogue'
-    || value === 'transition';
+export function screenplayMarkdownToBlocks(content: string | null): ScreenplayBlock[] {
+  return markdownToScreenplayBlocks(content);
 }
 
-export function screenplayJsonToBlocks(content: JSONContent | null): ScreenplayBlock[] {
-  if (!content?.content?.length) {
-    return [];
-  }
-
-  const blocks: ScreenplayBlock[] = [];
-
-  for (const node of content.content) {
-    if (node.type !== 'paragraph') continue;
-    const screenplayType = node.attrs?.screenplayType;
-    if (!isScreenplayBlockType(typeof screenplayType === 'string' ? screenplayType : null)) continue;
-
-    const text = extractTextFromNode(node).trim();
-    if (!text) continue;
-    blocks.push({ type: screenplayType, text });
-  }
-
-  return blocks;
-}
+/** @deprecated Use screenplayMarkdownToBlocks instead */
+export const screenplayJsonToBlocks = screenplayMarkdownToBlocks;
 
 function normalizeScreenplayText(block: ScreenplayBlock): string {
   if (block.type === 'scene-heading' || block.type === 'character' || block.type === 'transition') {
@@ -49,51 +26,20 @@ function normalizeScreenplayText(block: ScreenplayBlock): string {
   return block.text;
 }
 
-function formatSceneHeadingForFountain(text: string): string {
-  const normalized = text.toUpperCase();
-  const isStandardSceneHeading = /^(INT|EXT|EST|INT\/EXT|I\/E)\.?\s/.test(normalized);
-  return isStandardSceneHeading ? normalized : `.${normalized}`;
-}
+/**
+ * Convert a screenplay chapter to Fountain text.
+ * Since chapter content is already stored as Fountain/Markdown,
+ * this returns the content directly with minimal cleanup.
+ */
+export function screenplayChapterToFountain(chapter: Chapter, _options?: ScreenplayFountainOptions): string {
+  if (!chapter.content) return '';
 
-export function screenplayChapterToFountain(chapter: Chapter, options: ScreenplayFountainOptions = {}): string {
-  const sceneSeparator = options.sceneSeparator ?? '\n\n';
-  const chunks: string[] = [];
-  let hasScene = false;
-
-  const pushBlock = (text: string, withLeadingSpacer = false) => {
-    if (!text) return;
-    if (withLeadingSpacer && chunks.length > 0 && chunks[chunks.length - 1] !== '') chunks.push('');
-    chunks.push(text);
-  };
-
-  for (const block of screenplayJsonToBlocks(chapter.content)) {
-    const normalized = normalizeScreenplayText(block);
-
-    switch (block.type) {
-      case 'scene-heading': {
-        if (hasScene && sceneSeparator) {
-          const separatorLines = sceneSeparator.split('\n');
-          chunks.push(...separatorLines);
-        }
-        pushBlock(formatSceneHeadingForFountain(normalized), !hasScene);
-        hasScene = true;
-        break;
-      }
-      case 'action':
-      case 'transition':
-        pushBlock(normalized, true);
-        break;
-      default:
-        pushBlock(normalized, false);
-        break;
-    }
-  }
-
-  return chunks.join('\n').replace(/^\n+/, '').replace(/\n{3,}/g, '\n\n').trim();
+  // Content is already Fountain-formatted Markdown; return with whitespace cleanup
+  return chapter.content.replace(/^\n+/, '').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 export function screenplayChapterToPdfContent(chapter: Chapter): PdfContentNode[] {
-  return screenplayJsonToBlocks(chapter.content).map(block => {
+  return screenplayMarkdownToBlocks(chapter.content).map(block => {
     const normalized = normalizeScreenplayText(block);
 
     switch (block.type) {

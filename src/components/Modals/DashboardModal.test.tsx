@@ -16,7 +16,7 @@ vi.mock('@/context/AppContext', () => ({
         {
           id: 'ch-1',
           title: 'Chapter One',
-          content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello world test content here for word count testing.' }] }] },
+          content: 'Hello world test content here for word count testing.',
           status: 'draft',
           tags: [],
           wordGoal: 500,

@@ -23,7 +23,7 @@ export function AppShellLayout() {
   const rightPanelCollapsed = focusMode || shouldCollapseInspector || inspectorCollapsed;
 
   const wordCount = useMemo(
-    () => countWords(editorToPlainText(activeChapter?.content ?? [])),
+    () => countWords(editorToPlainText(activeChapter?.content ?? null)),
     [activeChapter?.content]
   );
 

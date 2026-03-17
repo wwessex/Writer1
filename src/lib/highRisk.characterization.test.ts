@@ -29,7 +29,7 @@ describe('high-risk module characterization snapshots', () => {
       order: 1,
       title: 'Chapter 1',
       updatedAt: 10,
-      content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Local' }] }] },
+      content: 'Local',
       summary: 'Local',
       pov: '',
       status: 'draft',
@@ -38,7 +38,7 @@ describe('high-risk module characterization snapshots', () => {
       scenes: [],
       sync: {
         providerRevisionIds: { dropbox: 'rev-1' },
-        lastSyncedContent: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Base' }] }] },
+        lastSyncedContent: 'Base',
       },
     };
 

@@ -568,7 +568,7 @@ describe('storage – importBackup with snapshots and comments', () => {
       projectType: 'book',
       project: { id: 'old-novel', title: 'With Snapshots', updatedAt: 1 },
       sections: [{ id: 'old-ch', novelId: 'old-novel', order: 0, title: 'Ch 1', updatedAt: 1, content: null, summary: '', pov: '', status: 'draft' as const, tags: [], wordGoal: 0, scenes: [] }],
-      snapshots: [{ id: 'old-snap', chapterId: 'old-ch', createdAt: Date.now(), doc: { type: 'doc', content: [] } }],
+      snapshots: [{ id: 'old-snap', chapterId: 'old-ch', createdAt: Date.now(), doc: '' }],
       commentThreads: [{
         id: 'old-thread', chapterId: 'old-ch',
         anchor: { from: 0, to: 5, length: 5 },
@@ -651,7 +651,7 @@ describe('storage – exportDhproj and importDhproj', () => {
     const novel = await createNovel('Export Test', 'book');
     const chapter = createChapter(novel.id, 0, 'Chapter 1');
     await addChapter(chapter);
-    await createSnapshot(chapter.id, { type: 'doc', content: [] });
+    await createSnapshot(chapter.id, '');
 
     const blob = await exportDhproj(novel.id);
     expect(blob).toBeInstanceOf(Blob);

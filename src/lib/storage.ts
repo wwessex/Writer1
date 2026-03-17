@@ -2,6 +2,7 @@ import Dexie, { type EntityTable } from 'dexie';
 import type { Novel, Chapter, Snapshot, BackupData, BackupDataV3, LegacyBackupData, ProjectType, CommentThread, DhprojData, DhprojManifest, AppSettings, CharacterEntity, WorldEntry, DhprojIntegrations, IntegrationType, PersistedIntegrationConfig, StoryBlueprint } from '@/types';
 import type { ProgressData, DailyProgress } from '@/lib/progressTracker';
 import { generateId } from '@/lib/utils';
+import { jsonToMarkdown } from '@/lib/editor/jsonToMarkdown';
 import {
   COMMENT_THREADS_STORAGE_PREFIX,
   INTEGRATIONS_STORAGE_KEY,
@@ -89,6 +90,31 @@ class DraftHarbourDB extends Dexie {
         await tx.table('novels').toCollection().modify((novel: Novel) => {
           if (!novel.projectType) {
             novel.projectType = 'book';
+          }
+        });
+      });
+
+    // v4: Migrate chapter content from Tiptap JSONContent objects to Markdown strings
+    this.version(4)
+      .stores({
+        novels: 'id, title, projectType, updatedAt',
+        chapters: 'id, novelId, order, title, updatedAt',
+        snapshots: 'id, chapterId, createdAt'
+      })
+      .upgrade(async tx => {
+        await tx.table('chapters').toCollection().modify((chapter: Record<string, unknown>) => {
+          if (chapter.content && typeof chapter.content === 'object') {
+            chapter.content = jsonToMarkdown(chapter.content);
+          }
+          // Also migrate sync.lastSyncedContent if present
+          const sync = chapter.sync as Record<string, unknown> | undefined;
+          if (sync?.lastSyncedContent && typeof sync.lastSyncedContent === 'object') {
+            sync.lastSyncedContent = jsonToMarkdown(sync.lastSyncedContent);
+          }
+        });
+        await tx.table('snapshots').toCollection().modify((snapshot: Record<string, unknown>) => {
+          if (snapshot.doc && typeof snapshot.doc === 'object') {
+            snapshot.doc = jsonToMarkdown(snapshot.doc);
           }
         });
       });

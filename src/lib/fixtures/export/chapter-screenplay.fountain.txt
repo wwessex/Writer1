@@ -1,8 +1,9 @@
-INT. HOUSE - NIGHT
+Int. House - Night
 
 Rain pounds the windows.
-SAM
+
+@Sam
 (whispering)
 We need to leave. Now.
 
-CUT TO:
+>Cut to:

@@ -134,40 +134,20 @@ describe('analyzeText', () => {
 });
 
 describe('editorToPlainText', () => {
-  it('extracts text from a simple Tiptap document', () => {
-    const doc = {
-      type: 'doc',
-      content: [
-        {
-          type: 'paragraph',
-          content: [{ type: 'text', text: 'Hello world' }],
-        },
-        {
-          type: 'paragraph',
-          content: [{ type: 'text', text: 'Second paragraph' }],
-        },
-      ],
-    };
-    expect(editorToPlainText(doc)).toBe('Hello world\nSecond paragraph');
+  it('extracts text from a simple markdown string', () => {
+    expect(editorToPlainText('Hello world\n\nSecond paragraph')).toBe('Hello world\n\nSecond paragraph');
   });
 
   it('returns empty string for null input', () => {
     expect(editorToPlainText(null)).toBe('');
   });
 
-  it('returns empty string for doc with no content', () => {
-    expect(editorToPlainText({ type: 'doc' })).toBe('');
+  it('returns empty string for empty string', () => {
+    expect(editorToPlainText('')).toBe('');
   });
 
-  it('handles empty paragraphs', () => {
-    const doc = {
-      type: 'doc',
-      content: [
-        { type: 'paragraph', content: [] },
-        { type: 'paragraph', content: [{ type: 'text', text: 'Text' }] },
-      ],
-    };
-    expect(editorToPlainText(doc)).toBe('\nText');
+  it('handles markdown with blank lines', () => {
+    expect(editorToPlainText('\n\nText')).toBe('Text');
   });
 });
 

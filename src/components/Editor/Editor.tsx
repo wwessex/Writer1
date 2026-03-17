@@ -1,10 +1,10 @@
 import { useEffect, useCallback, useMemo, useState, useRef } from 'react';
-import { useCurrentEditor, EditorContent } from '@tiptap/react';
+import { useCurrentEditor } from '@/lib/editor';
 import { useApp } from '@/context/AppContext';
 import { Input, IconButton, useToast } from '@/components/UI';
 import { countWords, editorToPlainText } from '@/lib/utils';
 import { WritingProgress } from './WritingProgress';
-import type { ScreenplayBlockType } from './screenplayExtension';
+import type { ScreenplayBlockType } from '@/types';
 import styles from './Editor.module.css';
 
 const FONT_MAP: Record<string, string> = {
@@ -39,9 +39,7 @@ export function Editor({ screenplayMode, onToggleScreenplayMode }: EditorProps) 
   const [isTransitioning, setIsTransitioning] = useState(false);
   const prevChapterIdRef = useRef(activeChapter?.id);
 
-  // Sync editor content when switching chapters. We intentionally depend on
-  // activeChapter.id rather than the full object to avoid re-setting content
-  // on every keystroke (which would create an update loop).
+  // Sync editor content when switching chapters
   useEffect(() => {
     if (!editor || !activeChapter) return;
     if (prevChapterIdRef.current && prevChapterIdRef.current !== activeChapter.id) {
@@ -51,7 +49,7 @@ export function Editor({ screenplayMode, onToggleScreenplayMode }: EditorProps) 
       });
     }
     prevChapterIdRef.current = activeChapter.id;
-    editor.commands.setContent(activeChapter.content || '');
+    editor.setContent(activeChapter.content || '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, activeChapter?.id]);
 
@@ -83,33 +81,9 @@ export function Editor({ screenplayMode, onToggleScreenplayMode }: EditorProps) 
   }, [screenplayMode, state.settings.typography]);
 
   const handleSetScreenplayBlock = useCallback((blockType: ScreenplayBlockType) => {
-    editor?.chain().focus().setScreenplayBlock(blockType).run();
+    editor?.focus();
+    editor?.setScreenplayBlockType(blockType);
   }, [editor]);
-
-  // Typewriter mode: scroll cursor to vertical center on selection change
-  useEffect(() => {
-    if (!editor || !state.settings.typewriterMode) return;
-
-    const handleSelectionUpdate = () => {
-      const { view } = editor;
-      const { from } = view.state.selection;
-      const coords = view.coordsAtPos(from);
-      const editorEl = view.dom.closest(`.${styles.editorContent}`);
-      if (!editorEl || !coords) return;
-
-      const editorRect = editorEl.getBoundingClientRect();
-      const cursorY = coords.top - editorRect.top + editorEl.scrollTop;
-      const targetScrollTop = cursorY - editorRect.height / 2;
-
-      editorEl.scrollTo({
-        top: Math.max(0, targetScrollTop),
-        behavior: 'smooth',
-      });
-    };
-
-    editor.on('selectionUpdate', handleSelectionUpdate);
-    return () => { editor.off('selectionUpdate', handleSelectionUpdate); };
-  }, [editor, state.settings.typewriterMode]);
 
   // Focus-mode session tracking
   const focusStartWordsRef = useRef<number | null>(null);
@@ -215,7 +189,14 @@ export function Editor({ screenplayMode, onToggleScreenplayMode }: EditorProps) 
         </div>
       )}
       <div className={`${styles.editorContent} ${isTransitioning ? styles['editorContent--transitioning'] : ''}`}>
-        <EditorContent editor={editor} className={styles.editorWrapper} />
+        {/* CodeMirror is mounted in App.tsx; the editor DOM is moved here */}
+        {editor?.dom && (
+          <div className={styles.editorWrapper} ref={(el) => {
+            if (el && editor.dom && !el.contains(editor.dom)) {
+              el.appendChild(editor.dom);
+            }
+          }} />
+        )}
       </div>
       {!isFocusMode && <WritingProgress showToast={showToast} />}
       {isFocusMode && (

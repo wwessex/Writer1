@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
-import { useCurrentEditor } from '@tiptap/react';
+import { useCurrentEditor } from '@/lib/editor';
 import { useApp } from '@/context/AppContext';
 import { IconButton } from '@/components/UI';
 import { Tooltip } from '@/components/UI/Tooltip';
@@ -18,20 +18,6 @@ const LINE_SPACING_OPTIONS = [
   { value: '1', label: 'Single' },
   { value: '1.5', label: '1.5' },
   { value: '2', label: 'Double' }
-];
-
-const FONT_FAMILY_OPTIONS = [
-  { value: 'default', label: 'Default' },
-  { value: 'serif', label: 'Serif' },
-  { value: 'sans-serif', label: 'Sans Serif' },
-  { value: 'monospace', label: 'Monospace' },
-  { value: '"Georgia", serif', label: 'Georgia' },
-  { value: '"Palatino Linotype", "Book Antiqua", Palatino, serif', label: 'Palatino' },
-  { value: '"Times New Roman", Times, serif', label: 'Times' },
-  { value: '"Courier Prime", "Courier New", Courier, monospace', label: 'Courier Prime' },
-  { value: '"Courier New", Courier, monospace', label: 'Courier' },
-  { value: '"Trebuchet MS", Helvetica, sans-serif', label: 'Trebuchet' },
-  { value: '"Verdana", Geneva, sans-serif', label: 'Verdana' },
 ];
 
 const FORMAT_COMMANDS = [
@@ -142,75 +128,21 @@ export function Toolbar() {
     if (!editor) return;
 
     switch (value) {
-      case 'h1':
-        editor.chain().focus().toggleHeading({ level: 1 }).run();
-        break;
-      case 'h2':
-        editor.chain().focus().toggleHeading({ level: 2 }).run();
-        break;
-      case 'h3':
-        editor.chain().focus().toggleHeading({ level: 3 }).run();
-        break;
-      case 'h4':
-        editor.chain().focus().toggleHeading({ level: 4 }).run();
-        break;
-      default:
-        editor.chain().focus().setParagraph().run();
+      case 'h1': editor.insertHeading(1); break;
+      case 'h2': editor.insertHeading(2); break;
+      case 'h3': editor.insertHeading(3); break;
+      case 'h4': editor.insertHeading(4); break;
+      default: editor.setParagraph();
     }
+    editor.focus();
   };
 
   const [lineSpacing, setLineSpacing] = useState('1.5');
-  const [fontFamily, setFontFamily] = useState('default');
-
-  // Sync the font dropdown with the current selection's font
-  useEffect(() => {
-    if (!editor) return;
-
-    const updateFontFromSelection = () => {
-      const attrs = editor.getAttributes('textStyle');
-      if (attrs.fontFamily) {
-        // Find matching option or fall back to showing the raw value
-        const match = FONT_FAMILY_OPTIONS.find(opt => opt.value === attrs.fontFamily);
-        setFontFamily(match ? match.value : attrs.fontFamily);
-      } else {
-        setFontFamily('default');
-      }
-    };
-
-    editor.on('selectionUpdate', updateFontFromSelection);
-    editor.on('transaction', updateFontFromSelection);
-    return () => {
-      editor.off('selectionUpdate', updateFontFromSelection);
-      editor.off('transaction', updateFontFromSelection);
-    };
-  }, [editor]);
 
   const handleLineSpacingChange = (value: string) => {
     setLineSpacing(value);
     if (!editor) return;
-    const editorElement = editor.view.dom as HTMLElement;
-    editorElement.style.lineHeight = value;
-  };
-
-  const handleFontFamilyChange = (value: string) => {
-    setFontFamily(value);
-    if (!editor) return;
-
-    const { from, to } = editor.state.selection;
-    const hasSelection = from !== to;
-
-    if (hasSelection) {
-      // Apply font only to the selected text via inline mark
-      if (value === 'default') {
-        editor.chain().focus().unsetFontFamily().run();
-      } else {
-        editor.chain().focus().setFontFamily(value).run();
-      }
-    } else {
-      // No selection: set editor-wide default font
-      const editorElement = editor.view.dom as HTMLElement;
-      editorElement.style.fontFamily = value === 'default' ? '' : value;
-    }
+    editor.setLineHeight(value);
   };
 
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -230,7 +162,7 @@ export function Toolbar() {
     const reader = new FileReader();
     reader.onload = () => {
       const src = reader.result as string;
-      editor.chain().focus().setImage({ src }).run();
+      editor.insertImage(src);
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -240,37 +172,18 @@ export function Toolbar() {
     if (!editor) return;
 
     switch (cmd) {
-      case 'bold':
-        editor.chain().focus().toggleBold().run();
-        break;
-      case 'italic':
-        editor.chain().focus().toggleItalic().run();
-        break;
-      case 'underline':
-        editor.chain().focus().toggleUnderline().run();
-        break;
-      case 'strike':
-        editor.chain().focus().toggleStrike().run();
-        break;
-      case 'bulletList':
-        editor.chain().focus().toggleBulletList().run();
-        break;
-      case 'orderedList':
-        editor.chain().focus().toggleOrderedList().run();
-        break;
-      case 'blockquote':
-        editor.chain().focus().toggleBlockquote().run();
-        break;
-      case 'horizontalRule':
-        editor.chain().focus().setHorizontalRule().run();
-        break;
-      case 'undo':
-        editor.chain().focus().undo().run();
-        break;
-      case 'redo':
-        editor.chain().focus().redo().run();
-        break;
+      case 'bold': editor.toggleBold(); break;
+      case 'italic': editor.toggleItalic(); break;
+      case 'underline': editor.toggleUnderline(); break;
+      case 'strike': editor.toggleStrikethrough(); break;
+      case 'bulletList': editor.toggleBulletList(); break;
+      case 'orderedList': editor.toggleOrderedList(); break;
+      case 'blockquote': editor.toggleBlockquote(); break;
+      case 'horizontalRule': editor.insertHorizontalRule(); break;
+      case 'undo': editor.undo(); break;
+      case 'redo': editor.redo(); break;
     }
+    editor.focus();
   };
 
   const triggerAddComment = useCallback(() => {
@@ -298,12 +211,6 @@ export function Toolbar() {
               value={getCurrentStyle()}
               onChange={e => handleStyleChange(e.target.value)}
               className={styles.styleSelect}
-            />
-            <Select
-              options={FONT_FAMILY_OPTIONS}
-              value={fontFamily}
-              onChange={e => handleFontFamilyChange(e.target.value)}
-              className={styles.fontSelect}
             />
           </div>
 
@@ -410,7 +317,7 @@ export function Toolbar() {
               variant="ghost"
               onPointerDown={(e: React.PointerEvent) => e.preventDefault()}
               onClick={() => handleFormatClick('undo')}
-              disabled={!editor?.can().undo()}
+              disabled={!editor?.canUndo()}
               className={styles.toolbarActionBtn}
             />
             <IconButton
@@ -419,7 +326,7 @@ export function Toolbar() {
               variant="ghost"
               onPointerDown={(e: React.PointerEvent) => e.preventDefault()}
               onClick={() => handleFormatClick('redo')}
-              disabled={!editor?.can().redo()}
+              disabled={!editor?.canRedo()}
               className={styles.toolbarActionBtn}
             />
           </div>
@@ -437,14 +344,6 @@ export function Toolbar() {
             value={getCurrentStyle()}
             onChange={e => handleStyleChange(e.target.value)}
             className={styles.styleSelect}
-          />
-        </Tooltip>
-        <Tooltip content="Font family" position="bottom">
-          <Select
-            options={FONT_FAMILY_OPTIONS}
-            value={fontFamily}
-            onChange={e => handleFontFamilyChange(e.target.value)}
-            className={styles.fontSelect}
           />
         </Tooltip>
       </div>
@@ -551,7 +450,7 @@ export function Toolbar() {
             label="Undo (Ctrl+Z)"
             variant="ghost"
             onClick={() => handleFormatClick('undo')}
-            disabled={!editor?.can().undo()}
+            disabled={!editor?.canUndo()}
           />
         </Tooltip>
         <Tooltip content="Redo (Ctrl+Y)" position="bottom">
@@ -560,7 +459,7 @@ export function Toolbar() {
             label="Redo (Ctrl+Y)"
             variant="ghost"
             onClick={() => handleFormatClick('redo')}
-            disabled={!editor?.can().redo()}
+            disabled={!editor?.canRedo()}
           />
         </Tooltip>
       </div>

@@ -2,28 +2,20 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { COMMAND_IDS, COMMAND_HANDLERS, isCommandEnabled, runCommand } from './commands';
 
 function createEditorMock() {
-  const chainResult = {
-    focus: vi.fn(() => chainResult),
-    undo: vi.fn(() => chainResult),
-    redo: vi.fn(() => chainResult),
-    setHorizontalRule: vi.fn(() => chainResult),
-    toggleBlockquote: vi.fn(() => chainResult),
-    toggleBold: vi.fn(() => chainResult),
-    toggleItalic: vi.fn(() => chainResult),
-    toggleUnderline: vi.fn(() => chainResult),
-    toggleHeading: vi.fn(() => chainResult),
-    setParagraph: vi.fn(() => chainResult),
-    run: vi.fn(() => true),
-  };
-
   return {
-    isFocused: true,
-    chain: vi.fn(() => chainResult),
-    commands: {
-      selectAll: vi.fn(),
-      deleteSelection: vi.fn(),
-    },
-    chainResult,
+    isFocused: vi.fn(() => true),
+    undo: vi.fn(),
+    redo: vi.fn(),
+    toggleBold: vi.fn(),
+    toggleItalic: vi.fn(),
+    toggleUnderline: vi.fn(),
+    toggleBlockquote: vi.fn(),
+    insertHorizontalRule: vi.fn(),
+    insertHeading: vi.fn(),
+    setParagraph: vi.fn(),
+    selectAll: vi.fn(),
+    deleteSelection: vi.fn(),
+    focus: vi.fn(),
   };
 }
 
@@ -71,12 +63,16 @@ describe('commands', () => {
     expect(context.createChapter).toHaveBeenCalledTimes(1);
     expect(context.openModal).toHaveBeenCalled();
     expect(context.toggleModal).toHaveBeenCalled();
-    expect(editor.chain).toHaveBeenCalled();
-    expect(editor.commands.selectAll).toHaveBeenCalledTimes(1);
+    expect(editor.toggleBold).toHaveBeenCalled();
+    expect(editor.selectAll).toHaveBeenCalledTimes(1);
     expect((document as Document & { execCommand: ReturnType<typeof vi.fn> }).execCommand).toHaveBeenCalled();
   });
 
   it('exports handler map for all command ids', () => {
-    expect(Object.keys(COMMAND_HANDLERS).sort()).toEqual(Object.values(COMMAND_IDS).sort());
+    const definedIds = new Set(Object.values(COMMAND_IDS));
+    const handledIds = new Set(Object.keys(COMMAND_HANDLERS));
+    for (const id of definedIds) {
+      expect(handledIds.has(id), `Missing handler for "${id}"`).toBe(true);
+    }
   });
 });

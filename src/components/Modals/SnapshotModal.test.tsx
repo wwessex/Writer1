@@ -8,18 +8,18 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getSnapshots: vi.fn((): Promise<any[]> => Promise.resolve([])),
-  createSnapshot: vi.fn(() => Promise.resolve({ id: 'snap-new', chapterId: 'ch-1', createdAt: Date.now(), doc: { type: 'doc' as const, content: [] as unknown[] } })),
+  createSnapshot: vi.fn(() => Promise.resolve({ id: 'snap-new', chapterId: 'ch-1', createdAt: Date.now(), doc: '' })),
   deleteSnapshot: vi.fn(() => Promise.resolve()),
   updateSnapshotLabel: vi.fn(() => Promise.resolve()),
   showToast: vi.fn(),
   updateChapter: vi.fn(),
   onClose: vi.fn(),
-  activeChapter: null as { id: string; title: string; content: unknown } | null,
+  activeChapter: null as { id: string; title: string; content: string | null } | null,
 }));
 
 const snapshotData = [
-  { id: 'snap-1', chapterId: 'ch-1', createdAt: Date.now() - 60000, doc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'First version of this chapter.' }] }] }, label: 'Auto' },
-  { id: 'snap-2', chapterId: 'ch-1', createdAt: Date.now(), doc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Second version of this chapter.' }] }] }, label: 'Manual Save' },
+  { id: 'snap-1', chapterId: 'ch-1', createdAt: Date.now() - 60000, doc: 'First version of this chapter.', label: 'Auto' },
+  { id: 'snap-2', chapterId: 'ch-1', createdAt: Date.now(), doc: 'Second version of this chapter.', label: 'Manual Save' },
 ];
 
 vi.mock('@/context/AppContext', () => ({
@@ -38,12 +38,7 @@ vi.mock('@/lib/storage', () => ({
 }));
 
 vi.mock('@/lib/utils', () => ({
-  editorToPlainText: (doc: { content?: Array<{ content?: Array<{ text?: string }> }> }) => {
-    if (!doc || !doc.content) return '';
-    return doc.content.map((node: { content?: Array<{ text?: string }> }) =>
-      (node.content || []).map((c: { text?: string }) => c.text || '').join('')
-    ).join('\n');
-  },
+  editorToPlainText: (doc: string | null) => doc || '',
   formatDateTime: (ts: number) => new Date(ts).toISOString(),
   countWords: (text: string) => text.split(/\s+/).filter(Boolean).length,
 }));
@@ -97,7 +92,7 @@ describe('SnapshotModal', () => {
   });
 
   it('renders with active chapter and empty snapshots', async () => {
-    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: { type: 'doc', content: [] } };
+    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: '' };
     mocks.getSnapshots.mockResolvedValue([]);
 
     await act(async () => { root.render(<SnapshotModal open onClose={mocks.onClose} />); });
@@ -110,7 +105,7 @@ describe('SnapshotModal', () => {
   });
 
   it('renders snapshots list when snapshots exist', async () => {
-    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: { type: 'doc', content: [] } };
+    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: '' };
     mocks.getSnapshots.mockResolvedValue(snapshotData);
 
     await act(async () => { root.render(<SnapshotModal open onClose={mocks.onClose} />); });
@@ -122,7 +117,7 @@ describe('SnapshotModal', () => {
   });
 
   it('handles save snapshot button', async () => {
-    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: { type: 'doc', content: [] } };
+    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: 'Some content' };
     mocks.getSnapshots.mockResolvedValue([]);
 
     await act(async () => { root.render(<SnapshotModal open onClose={mocks.onClose} />); });
@@ -137,12 +132,12 @@ describe('SnapshotModal', () => {
     await act(async () => { saveBtn!.click(); });
     await act(async () => { await new Promise(r => setTimeout(r, 10)); });
 
-    expect(mocks.createSnapshot).toHaveBeenCalledWith('ch-1', { type: 'doc', content: [] });
+    expect(mocks.createSnapshot).toHaveBeenCalledWith('ch-1', 'Some content');
     expect(mocks.showToast).toHaveBeenCalledWith('Snapshot saved', 'success', 'photo_camera');
   });
 
   it('handles snapshot selection and preview', async () => {
-    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: { type: 'doc', content: [] } };
+    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: '' };
     mocks.getSnapshots.mockResolvedValue(snapshotData);
 
     await act(async () => { root.render(<SnapshotModal open onClose={mocks.onClose} />); });
@@ -161,7 +156,7 @@ describe('SnapshotModal', () => {
   });
 
   it('handles compare button', async () => {
-    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: { type: 'doc', content: [] } };
+    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: '' };
     mocks.getSnapshots.mockResolvedValue(snapshotData);
 
     await act(async () => { root.render(<SnapshotModal open onClose={mocks.onClose} />); });
@@ -183,7 +178,7 @@ describe('SnapshotModal', () => {
   });
 
   it('handles delete snapshot', async () => {
-    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: { type: 'doc', content: [] } };
+    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: '' };
     mocks.getSnapshots.mockResolvedValue(snapshotData);
 
     // Mock confirm to return true
@@ -203,7 +198,7 @@ describe('SnapshotModal', () => {
   });
 
   it('handles label editing', async () => {
-    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: { type: 'doc', content: [] } };
+    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: '' };
     mocks.getSnapshots.mockResolvedValue(snapshotData);
 
     await act(async () => { root.render(<SnapshotModal open onClose={mocks.onClose} />); });
@@ -221,7 +216,7 @@ describe('SnapshotModal', () => {
   });
 
   it('handles restore with confirm', async () => {
-    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: { type: 'doc', content: [] } };
+    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: '' };
     mocks.getSnapshots.mockResolvedValue(snapshotData);
     vi.spyOn(window, 'confirm').mockReturnValue(true);
 
@@ -248,7 +243,7 @@ describe('SnapshotModal', () => {
   });
 
   it('shows error toast when loading snapshots fails', async () => {
-    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: { type: 'doc', content: [] } };
+    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: '' };
     mocks.getSnapshots.mockRejectedValue(new Error('Load failed'));
 
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -260,7 +255,7 @@ describe('SnapshotModal', () => {
   });
 
   it('shows timeline when multiple snapshots exist', async () => {
-    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: { type: 'doc', content: [] } };
+    mocks.activeChapter = { id: 'ch-1', title: 'Chapter 1', content: '' };
     mocks.getSnapshots.mockResolvedValue(snapshotData);
 
     await act(async () => { root.render(<SnapshotModal open onClose={mocks.onClose} />); });

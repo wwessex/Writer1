@@ -25,12 +25,7 @@ function makeChapter(overrides: Partial<Chapter> = {}): Chapter {
     novelId: 'n-1',
     order: 0,
     title: 'Test Chapter',
-    content: {
-      type: 'doc',
-      content: [
-        { type: 'paragraph', content: [{ type: 'text', text: 'Hello world. This is a test sentence.' }] },
-      ],
-    },
+    content: 'Hello world. This is a test sentence.',
     updatedAt: Date.now(),
     summary: '',
     pov: '',
@@ -157,10 +152,7 @@ describe('projectMetrics', () => {
         makeChapter({
           tags: ['fantasy'],
           summary: 'A kingdom under threat from a dark prophecy and magic',
-          content: {
-            type: 'doc',
-            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'The magic of the kingdom was fading. The sword lay broken.' }] }],
-          },
+          content: 'The magic of the kingdom was fading. The sword lay broken.',
         }),
       ];
       const insights = buildProjectHeuristicInsights(chapters);
@@ -207,10 +199,7 @@ describe('projectMetrics', () => {
 
     it('detects tension words in content', () => {
       const chapters = [makeChapter({
-        content: {
-          type: 'doc',
-          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Danger! The threat was urgent. She was afraid of the fight ahead. Panic set in!' }] }],
-        },
+        content: 'Danger! The threat was urgent. She was afraid of the fight ahead. Panic set in!',
       })];
       const insights = buildProjectHeuristicInsights(chapters);
       expect(insights[0].scores.chapterTensionCurve.score).toBeGreaterThan(30);
@@ -218,10 +207,7 @@ describe('projectMetrics', () => {
 
     it('detects hook words in opening', () => {
       const chapters = [makeChapter({
-        content: {
-          type: 'doc',
-          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Suddenly, before anyone could react, the secret was revealed. Never had there been such a warning. Blood covered the floor.' }] }],
-        },
+        content: 'Suddenly, before anyone could react, the secret was revealed. Never had there been such a warning. Blood covered the floor.',
       })];
       const insights = buildProjectHeuristicInsights(chapters);
       expect(insights[0].scores.openingHookStrength.score).toBeGreaterThan(40);

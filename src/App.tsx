@@ -1,13 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
-import { EditorContext, useCurrentEditor, useEditor } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
-import HorizontalRule from '@tiptap/extension-horizontal-rule';
-import Image from '@tiptap/extension-image';
-import TextStyle from '@tiptap/extension-text-style';
-import FontFamily from '@tiptap/extension-font-family';
-import { ScreenplayParagraph, CommentAnchorMark } from '@/components/Editor/screenplayExtension';
-import { FindReplaceExtension } from '@/lib/findReplaceExtension';
+import { EditorContext, useCodeMirrorEditor } from '@/lib/editor';
+import type { EditorAdapter } from '@/lib/editor';
 import { useApp, AppProvider } from '@/context/AppContext';
 import { AppShell } from '@/components/AppShell/AppShell';
 import { QuickSwitcher } from '@/components/QuickSwitcher';
@@ -36,26 +29,6 @@ import { clearWindowLocks, getSessionState, getWorkspaceStore, heartbeatProjectL
 import './styles/index.css';
 import styles from './App.module.css';
 
-const createExtensions = (screenplayMode: boolean) => [
-  StarterKit.configure({
-    heading: {
-      levels: [1, 2, 3, 4]
-    },
-    paragraph: false
-  }),
-  ScreenplayParagraph.configure({ screenplayMode }),
-  Underline,
-  HorizontalRule,
-  Image.configure({
-    inline: false,
-    allowBase64: true,
-  }),
-  TextStyle,
-  FontFamily,
-  CommentAnchorMark,
-  FindReplaceExtension,
-];
-
 const AIWritingModal = lazy(() => import('@/components/Modals/AIWritingModal').then((module) => ({ default: module.AIWritingModal })));
 const AdvancedAnalyticsModal = lazy(() => import('@/components/Modals/AdvancedAnalyticsModal').then((module) => ({ default: module.AdvancedAnalyticsModal })));
 const IntegrationsModal = lazy(() => import('@/components/Modals/IntegrationsModal').then((module) => ({ default: module.IntegrationsModal })));
@@ -72,9 +45,8 @@ const CorkboardModal = lazy(() => import('@/components/Modals/CorkboardModal').t
 const StoryCardsModal = lazy(() => import('@/components/Modals/StoryCardsModal').then((module) => ({ default: module.StoryCardsModal })));
 const PublishAssistantModal = lazy(() => import('@/components/Modals/PublishAssistantModal').then((module) => ({ default: module.PublishAssistantModal })));
 
-function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits }: { screenplayMode: boolean; onToggleScreenplayMode: () => void; hasUnsavedEdits: boolean }) {
+function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits, editor }: { screenplayMode: boolean; onToggleScreenplayMode: () => void; hasUnsavedEdits: boolean; editor: EditorAdapter | null }) {
   const { state, activeChapter, loadNovel, loadNovelById, createChapter: createNewChapter, dispatch, updateSettings, setActiveChapter } = useApp();
-  const { editor } = useCurrentEditor();
   const { showToast } = useToast();
   const { modals, openModal, closeModal, toggleModal } = useModalState();
   const [isLoading, setIsLoading] = useState(true);
@@ -91,7 +63,7 @@ function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits }: {
       return;
     }
 
-    const updateFocus = () => setEditorFocused(editor.isFocused);
+    const updateFocus = () => setEditorFocused(editor.isFocused());
     updateFocus();
     editor.on('focus', updateFocus);
     editor.on('blur', updateFocus);
@@ -314,7 +286,7 @@ function AppScene({ screenplayMode, onToggleScreenplayMode, hasUnsavedEdits }: {
         onToggleSidebar={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
         aiPanelOpen={modals.aiPanel}
         closeAiPanel={() => closeModal('aiPanel')}
-        editor={editor ?? null}
+        editor={editor}
       />
 
       <QuickSwitcher
@@ -390,19 +362,30 @@ function AppEditorProvider() {
     setScreenplayMode(state.projectType === 'screenplay');
   }, [state.projectType]);
 
-  const extensions = useMemo(() => createExtensions(screenplayMode), [screenplayMode]);
+  const handleChange = useCallback((content: string) => {
+    const chapter = activeChapterRef.current;
+    if (chapter) {
+      updateChapterRef.current(chapter.id, { content });
+      setHasUnsavedEdits(true);
+    }
+  }, []);
 
-  const editor = useEditor({
-    extensions,
-    content: activeChapter?.content || { type: 'doc', content: [{ type: 'paragraph' }] },
-    onUpdate: ({ editor: ed }) => {
-      const chapter = activeChapterRef.current;
-      if (chapter) {
-        updateChapterRef.current(chapter.id, { content: ed.getJSON() });
-        setHasUnsavedEdits(true);
-      }
-    },
+  const { containerRef, adapter } = useCodeMirrorEditor({
+    initialContent: activeChapter?.content || '',
+    onChange: handleChange,
+    screenplayMode,
+    typewriterMode: state.settings.typewriterMode,
   });
+
+  // Sync content when switching chapters
+  const prevChapterIdRef = useRef(activeChapter?.id);
+  useEffect(() => {
+    if (!adapter) return;
+    if (prevChapterIdRef.current !== activeChapter?.id) {
+      adapter.setContent(activeChapter?.content || '');
+      prevChapterIdRef.current = activeChapter?.id;
+    }
+  }, [adapter, activeChapter?.id, activeChapter?.content]);
 
   useEffect(() => {
     if (state.isSaving) return;
@@ -420,20 +403,15 @@ function AppEditorProvider() {
     };
   }, [state.isSaving]);
 
-  useEffect(() => {
-    if (!editor) return;
-    const ext = editor.extensionManager.extensions.find(e => e.name === 'paragraph');
-    if (ext) {
-      ext.options.screenplayMode = screenplayMode;
-    }
-  }, [editor, screenplayMode]);
-
   return (
-    <EditorContext.Provider value={{ editor }}>
+    <EditorContext.Provider value={{ editor: adapter }}>
+      {/* Hidden container for CodeMirror to mount into */}
+      <div ref={containerRef} style={{ display: 'none' }} />
       <AppScene
         screenplayMode={screenplayMode}
         onToggleScreenplayMode={() => setScreenplayMode(mode => !mode)}
         hasUnsavedEdits={hasUnsavedEdits || state.isSaving}
+        editor={adapter}
       />
     </EditorContext.Provider>
   );

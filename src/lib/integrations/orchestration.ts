@@ -4,22 +4,11 @@ import { mergeChapterFromRemote } from './sync';
 import type { NormalizedPullResult, ProviderDocument, ProviderPayload } from './types';
 
 function chapterContentToText(chapter: Chapter): string {
-  if (!chapter.content || !Array.isArray(chapter.content.content)) {
+  if (!chapter.content) {
     return chapter.summary || '';
   }
 
-  return chapter.content.content
-    .map((node) => {
-      if (typeof node.text === 'string') return node.text;
-      if (Array.isArray(node.content)) {
-        return node.content
-          .map((child) => (typeof child.text === 'string' ? child.text : ''))
-          .join(' ');
-      }
-      return '';
-    })
-    .join('\n')
-    .trim();
+  return chapter.content.trim();
 }
 
 export function mapAppStateToProviderPayload(

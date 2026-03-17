@@ -23,7 +23,7 @@ vi.mock('@/components/UI', () => ({
 
 vi.mock('@/context/AppContext', () => ({
   useApp: () => ({
-    state: { novelId: 'n-1', novelTitle: 'Current', projectType: 'book', chapters: [{ id: 'c-1', content: { type: 'doc', content: [] } }] },
+    state: { novelId: 'n-1', novelTitle: 'Current', projectType: 'book', chapters: [{ id: 'c-1', content: '' }] },
     loadNovelById: mocks.loadNovelByIdMock,
     createNewNovel: mocks.createNewNovelMock,
     loadNovel: mocks.loadNovelMock,

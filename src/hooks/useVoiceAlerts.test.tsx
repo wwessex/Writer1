@@ -20,7 +20,7 @@ const chapter: Chapter = {
   order: 1,
   title: 'Opening',
   updatedAt: Date.now(),
-  content: { type: 'doc', content: [{ type: 'paragraph' }] },
+  content: 'Some text',
   summary: '',
   pov: '',
   status: 'draft',

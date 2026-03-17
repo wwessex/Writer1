@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { Editor } from '@tiptap/react';
+import type { EditorAdapter } from '@/lib/editor';
 import { useApp } from '@/context/AppContext';
 import { editorToPlainText, generateId } from '@/lib/utils';
 import { loadAIConfig, createProvider } from '@/lib/ai';
@@ -10,7 +10,7 @@ import styles from './Panels.module.css';
 interface AISuggestionsPanelProps {
   open: boolean;
   onClose: () => void;
-  editor: Editor | null;
+  editor: EditorAdapter | null;
 }
 
 interface Suggestion {
@@ -68,11 +68,7 @@ export function AISuggestionsPanel({ open, onClose, editor }: AISuggestionsPanel
   const provider = createProvider(config);
   const isConfigured = provider.isAvailable();
 
-  const selectedText = editor?.state.doc.textBetween(
-    editor.state.selection.from,
-    editor.state.selection.to,
-    ' '
-  ) || '';
+  const selectedText = editor?.getSelectedText() || '';
 
   const hasSelection = selectedText.trim().length > 0;
 

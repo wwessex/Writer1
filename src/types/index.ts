@@ -1,4 +1,3 @@
-import type { JSONContent } from '@tiptap/core';
 import type { ProgressData } from '@/lib/progressTracker';
 
 export type ProjectType = 'book' | 'screenplay';
@@ -76,7 +75,7 @@ export interface Chapter {
   order: number;
   title: string;
   updatedAt: number;
-  content: JSONContent | null;
+  content: string | null;
   summary: string;
   pov: string;
   status: ChapterStatus;
@@ -93,7 +92,7 @@ export interface ChapterSyncMetadata {
   providerRevisionIds: Partial<Record<IntegrationType, string>>;
   lastPushedHash?: string;
   lastPulledAt?: number;
-  lastSyncedContent?: JSONContent | null;
+  lastSyncedContent?: string | null;
 }
 
 export interface Novel {
@@ -110,7 +109,7 @@ export interface Snapshot {
   id: string;
   chapterId: string;
   createdAt: number;
-  doc: JSONContent;
+  doc: string;
   label?: string;
 }
 
@@ -484,10 +483,10 @@ export interface ConflictInfo {
   provider?: IntegrationType;
   localRevisionId?: string;
   remoteRevisionId?: string;
-  localContent: JSONContent | null;
-  remoteContent: JSONContent | null;
-  baseContent?: JSONContent | null;
-  mergedContent?: JSONContent | null;
+  localContent: string | null;
+  remoteContent: string | null;
+  baseContent?: string | null;
+  mergedContent?: string | null;
   mergeConflictBlocks?: MergeConflictBlock[];
   localUpdatedAt: number;
   remoteUpdatedAt: number;

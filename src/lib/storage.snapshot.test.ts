@@ -17,7 +17,7 @@ describe('storage snapshot operations', () => {
   });
 
   it('creates a snapshot without a label', async () => {
-    const doc = { type: 'doc' as const, content: [{ type: 'paragraph' }] };
+    const doc = 'Some content';
     const snapshot = await createSnapshot('ch-1', doc);
     expect(snapshot.id).toBeTruthy();
     expect(snapshot.chapterId).toBe('ch-1');
@@ -26,13 +26,13 @@ describe('storage snapshot operations', () => {
   });
 
   it('creates a snapshot with a label', async () => {
-    const doc = { type: 'doc' as const, content: [] };
+    const doc = '';
     const snapshot = await createSnapshot('ch-1', doc, 'Auto');
     expect(snapshot.label).toBe('Auto');
   });
 
   it('retrieves snapshots sorted by createdAt', async () => {
-    const doc = { type: 'doc' as const, content: [] };
+    const doc = '';
     await createSnapshot('ch-1', doc, 'First');
     await new Promise(r => setTimeout(r, 5));
     await createSnapshot('ch-1', doc, 'Second');
@@ -45,7 +45,7 @@ describe('storage snapshot operations', () => {
   });
 
   it('only returns snapshots for the given chapter', async () => {
-    const doc = { type: 'doc' as const, content: [] };
+    const doc = '';
     await createSnapshot('ch-1', doc);
     await createSnapshot('ch-2', doc);
 
@@ -55,7 +55,7 @@ describe('storage snapshot operations', () => {
   });
 
   it('updates snapshot label', async () => {
-    const doc = { type: 'doc' as const, content: [] };
+    const doc = '';
     const snapshot = await createSnapshot('ch-1', doc, 'Auto');
 
     await updateSnapshotLabel(snapshot.id, 'Important revision');
@@ -65,7 +65,7 @@ describe('storage snapshot operations', () => {
   });
 
   it('deletes a snapshot', async () => {
-    const doc = { type: 'doc' as const, content: [] };
+    const doc = '';
     const snapshot = await createSnapshot('ch-1', doc);
 
     await deleteSnapshot(snapshot.id);
@@ -75,7 +75,7 @@ describe('storage snapshot operations', () => {
   });
 
   it('handles empty label string', async () => {
-    const doc = { type: 'doc' as const, content: [] };
+    const doc = '';
     const snapshot = await createSnapshot('ch-1', doc, '');
     // Empty string should not set label (due to truthy check)
     expect(snapshot.label).toBeUndefined();

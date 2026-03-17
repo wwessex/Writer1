@@ -40,7 +40,7 @@ describe('storage CRUD behavior', () => {
     const chapter = createChapter(novel.id, 0, 'Chapter 1');
     await addChapter(chapter);
 
-    await createSnapshot(chapter.id, { type: 'doc', content: [{ type: 'paragraph' }] });
+    await createSnapshot(chapter.id, 'Some content');
 
     expect((await getChapters(novel.id)).length).toBe(1);
     expect((await getSnapshots(chapter.id)).length).toBe(1);

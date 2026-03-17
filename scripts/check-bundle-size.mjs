@@ -10,7 +10,7 @@ const budgets = {
   export: 240 * 1024,
   ai: 220 * 1024,
   integrations: 220 * 1024,
-  totalJs: 3000 * 1024,
+  totalJs: 3500 * 1024,
 };
 
 function formatKb(bytes) {

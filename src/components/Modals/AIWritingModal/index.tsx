@@ -26,7 +26,6 @@ import {
 } from '@/lib/ai/pipelines';
 import type { AIProviderConfig, AvailabilityStatus } from '@/lib/ai';
 import type { ProjectType, StoryBlueprint } from '@/types';
-import type { JSONContent } from '@tiptap/core';
 import styles from '../Modals.module.css';
 
 /* ------------------------------------------------------------------ */
@@ -427,17 +426,6 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
     [activeChapter, config, isConfigured, state.projectType, state.chapters, state.novelId, state.storyBlueprint]
   );
 
-  const plainTextToDoc = useCallback((text: string): JSONContent => ({
-    type: 'doc',
-    content: (text || '')
-      .split(/\n+/)
-      .map(line => line.trim())
-      .filter(Boolean)
-      .map(line => ({
-        type: 'paragraph',
-        content: [{ type: 'text', text: line }],
-      })),
-  }), []);
 
   const handleRunPipeline = useCallback(async () => {
     if (!isConfigured) {
@@ -538,7 +526,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   const handleInsertResponse = () => {
     if (!activeChapter || !response.trim()) return;
     const chapterText = editorToPlainText(activeChapter.content);
-    updateChapter(activeChapter.id, { content: plainTextToDoc(response) });
+    updateChapter(activeChapter.id, { content: response });
     recordAIRevision({
       novelId: state.novelId,
       chapterId: activeChapter.id,
