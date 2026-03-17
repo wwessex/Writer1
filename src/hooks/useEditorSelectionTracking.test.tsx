@@ -24,12 +24,12 @@ function createEditor(empty = true) {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mount(editor: ReturnType<typeof createEditor> | null) {
   const container = document.createElement('div');
   const root = createRoot(container);
 
   function Test({ targetEditor }: { targetEditor: ReturnType<typeof createEditor> | null }) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const hasSelection = useEditorSelectionTracking(targetEditor as any);
     return <span data-selection={String(hasSelection)} />;
   }

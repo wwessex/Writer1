@@ -55,7 +55,7 @@ export function detectBlockType(line: string, prevLine: string): ScreenplayBlock
 
   // Character: forced with @ or ALL CAPS after blank line
   if (trimmed.startsWith('@')) return 'character';
-  if (prevLine.trim() === '' && /^[A-Z][A-Z\s'.\-]{0,40}(\s*\(.*\))?$/.test(trimmed) && trimmed.length > 1) {
+  if (prevLine.trim() === '' && /^[A-Z][A-Z\s'.-]{0,40}(\s*\(.*\))?$/.test(trimmed) && trimmed.length > 1) {
     return 'character';
   }
 

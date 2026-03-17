@@ -6,8 +6,8 @@ import App from './App';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-vi.mock('@/lib/editor', () => {
-  const React = require('react');
+vi.mock('@/lib/editor', async () => {
+  const React = await import('react');
   return {
     EditorContext: React.createContext({ editor: null }),
     useCurrentEditor: () => ({ editor: null }),

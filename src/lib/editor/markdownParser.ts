@@ -239,7 +239,7 @@ export function markdownToScreenplayBlocks(md: string | null): ScreenplayBlock[]
       continue;
     }
     const prevLine = i > 0 ? lines[i - 1].trim() : '';
-    if (prevLine === '' && /^[A-Z][A-Z\s'.\-]{0,40}(\s*\(.*\))?$/.test(trimmed) && trimmed.length > 1) {
+    if (prevLine === '' && /^[A-Z][A-Z\s'.-]{0,40}(\s*\(.*\))?$/.test(trimmed) && trimmed.length > 1) {
       blocks.push({ type: 'character', text: trimmed });
       // Check if next line is parenthetical or dialogue
       continue;
@@ -283,7 +283,7 @@ export function extractDialogueBySpeaker(content: string | null): Record<string,
   // Also try extracting prose dialogue: "SPEAKER: dialogue text"
   const lines = content.split('\n');
   for (const line of lines) {
-    const match = line.match(/^([A-Z][A-Z\s'.\-]{1,40}):\s+(.+)$/);
+    const match = line.match(/^([A-Z][A-Z\s'.-]{1,40}):\s+(.+)$/);
     if (match) {
       const speaker = match[1].trim();
       if (!result[speaker]) result[speaker] = [];

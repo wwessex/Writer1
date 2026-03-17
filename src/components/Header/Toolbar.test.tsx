@@ -8,11 +8,8 @@ import { Toolbar } from './Toolbar';
 
 const createChapterMock = vi.fn();
 
-vi.mock('@/lib/editor', () => ({
-  EditorContext: (() => {
-    const React = require('react');
-    return React.createContext({ editor: null });
-  })(),
+vi.mock('@/lib/editor', async () => ({
+  EditorContext: (await import('react')).createContext({ editor: null }),
   useCurrentEditor: () => ({
     editor: {
       isActive: (_name: string, _attrs?: unknown) => false,
