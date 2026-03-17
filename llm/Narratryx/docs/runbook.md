@@ -24,19 +24,42 @@ Outputs:
 - `artifacts/data/dpo_pairs.jsonl`
 - `artifacts/data/manifest.json`
 
-## 2) SFT (QLoRA)
+## 2) Continued pretraining (QLoRA)
+
+```bash
+python scripts/run_training.py --stage cpt
+```
+
+Adapts base model weights toward literary prose using Gutenberg fiction chunks.
+
+## 3) SFT (QLoRA)
 
 ```bash
 python scripts/run_training.py --stage sft
 ```
 
-## 3) DPO
+Chains from the CPT checkpoint to instruction-tune on fiction writing tasks.
+
+## 4) DPO
 
 ```bash
 python scripts/run_training.py --stage dpo
 ```
 
-## 4) Export
+Chains from the SFT checkpoint to refine prose quality via preference optimization.
+
+## 5) Export
+
+**Prerequisites:** GGUF export requires [llama.cpp](https://github.com/ggerganov/llama.cpp).
+Clone the repo and build `llama-quantize`, then ensure `convert-hf-to-gguf.py`
+and `llama-quantize` are on your `PATH` (or run from the llama.cpp directory).
+
+```bash
+# Example: clone and build llama.cpp
+git clone https://github.com/ggerganov/llama.cpp && cd llama.cpp && make
+export PATH="$PWD:$PATH"
+cd -
+```
 
 ```bash
 python scripts/export_model.py \
@@ -54,7 +77,11 @@ python scripts/export_model.py \
   --compile-mlc
 ```
 
-## 5) Cloud runtime
+## 6) Cloud runtime — NOT YET IMPLEMENTED
+
+> The modules referenced below (`runtime/cloud/api.py`, `runtime/cloud/modal_app.py`,
+> `configs/deploy/docker-compose.vllm.yaml`) do not exist yet. These commands document
+> the intended interface for when the runtime layer is built.
 
 Run gateway against existing vLLM server:
 
@@ -75,13 +102,17 @@ Self-hosted compose option:
 docker compose -f configs/deploy/docker-compose.vllm.yaml up
 ```
 
-## 6) Browser/runtime modules
+## 7) Browser/runtime modules — NOT YET IMPLEMENTED
+
+> The modules referenced below (`runtime/browser/serviceWorker.js`,
+> `runtime/browser/modelLoader.ts`, `runtime/story_bible/*`) do not exist yet.
+> These describe the intended architecture for browser-based inference.
 
 - Register `runtime/browser/serviceWorker.js` for chunked model caching route.
 - Use `runtime/browser/modelLoader.ts` to choose WebLLM / Wllama / cloud fallback.
 - Use `runtime/story_bible/*` for IndexedDB schemas, saliency ranking, and context assembly.
 
-## 7) Verification checklist
+## 8) Verification checklist
 
 - Validate dataset counts and `dpo_method` in `manifest.json`.
 - Run `--dry-run` before every training stage.
