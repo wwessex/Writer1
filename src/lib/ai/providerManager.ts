@@ -12,6 +12,8 @@ import type { AIProviderConfig, AIProviderType, AIProvider } from './types';
 import { ChromeAIProvider } from './chromeAI';
 import { OpenAIProvider } from './openaiProvider';
 import { ServerProxyProvider } from './serverProxyProvider';
+import { CustomLlmProvider } from './customLlmProvider';
+import { FallbackProvider, buildFallbackChain } from './fallbackProvider';
 import { isChromeAIAvailable, isChromeBrowser } from './availability';
 import { deleteSecret, isDesktop, setSecret } from '@/lib/desktopSecrets';
 import { getManagedPolicy } from '@/lib/policy';
@@ -76,6 +78,7 @@ export function loadAIConfig(): AIProviderConfig {
       model: safeConfig.model,
       sessionToken: safeConfig.sessionToken,
       serverProxy: safeConfig.serverProxy,
+      customLlm: (safeConfig as AIProviderConfig).customLlm,
     };
 
     if (policy.disabledAIProviderTypes?.includes(loadedConfig.provider)) {
@@ -104,12 +107,19 @@ export function saveAIConfig(config: AIProviderConfig): void {
     }
   }
 
+  // Scrub sensitive fields from customLlm before persisting
+  const safeCustomLlm = config.customLlm ? {
+    ...config.customLlm,
+    apiKey: isDesktop() ? undefined : config.customLlm.apiKey,
+  } : undefined;
+
   const safeConfig: AIProviderConfig = {
     provider: config.provider,
     endpoint: config.endpoint,
     model: config.model,
     sessionToken: isDesktop() ? undefined : config.sessionToken,
     serverProxy: config.serverProxy,
+    customLlm: safeCustomLlm,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(safeConfig));
 }
@@ -121,6 +131,14 @@ export function saveAIConfig(config: AIProviderConfig): void {
 /** Create the appropriate AIProvider instance from a config. */
 export function createProvider(config: AIProviderConfig): AIProvider {
   switch (config.provider) {
+    case 'custom-llm': {
+      // If a fallback is configured, wrap in FallbackProvider
+      const fallbackConfig = buildFallbackChain(config);
+      if (fallbackConfig) {
+        return new FallbackProvider(fallbackConfig);
+      }
+      return new CustomLlmProvider(config);
+    }
     case 'server-proxy':
       return new ServerProxyProvider(config);
     case 'openai-compatible':

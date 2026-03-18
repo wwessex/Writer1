@@ -1,0 +1,296 @@
+/**
+ * Custom LLM provider for local/self-hosted inference.
+ *
+ * Supports:
+ * - Ollama (http://localhost:11434)
+ * - vLLM (OpenAI-compatible API)
+ * - llama.cpp server (OpenAI-compatible API)
+ * - Any generic OpenAI-compatible endpoint
+ *
+ * Features:
+ * - Streaming (SSE) responses with chunk callbacks
+ * - Cancellation via AbortSignal
+ * - Automatic endpoint resolution per backend
+ */
+
+import { fetchWithPolicy } from '@/lib/integrations/providerClient';
+import type { AIProvider, AIProviderConfig, AIRequest, AIResponse, CustomLlmBackend } from './types';
+
+/* ------------------------------------------------------------------ */
+/*  Default endpoints per backend                                      */
+/* ------------------------------------------------------------------ */
+
+export const CUSTOM_LLM_DEFAULTS: Record<CustomLlmBackend, { baseUrl: string; model: string; label: string }> = {
+  ollama: { baseUrl: 'http://localhost:11434', model: 'narratryx:latest', label: 'Ollama' },
+  vllm: { baseUrl: 'http://localhost:8000', model: 'narratryx', label: 'vLLM' },
+  'llama-cpp': { baseUrl: 'http://localhost:8080', model: 'default', label: 'llama.cpp' },
+  'generic-openai': { baseUrl: 'http://localhost:8000', model: 'default', label: 'Custom Endpoint' },
+};
+
+export const CUSTOM_LLM_BACKEND_LABELS: Record<CustomLlmBackend, string> = {
+  ollama: 'Ollama',
+  vllm: 'vLLM',
+  'llama-cpp': 'llama.cpp',
+  'generic-openai': 'Custom Endpoint',
+};
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+function resolveEndpoint(backend: CustomLlmBackend, baseUrl: string): string {
+  const base = baseUrl.replace(/\/+$/, '');
+
+  switch (backend) {
+    case 'ollama':
+      return `${base}/api/chat`;
+    case 'vllm':
+    case 'llama-cpp':
+    case 'generic-openai':
+      return `${base}/v1/chat/completions`;
+  }
+}
+
+function buildSystemPrompt(projectType: 'book' | 'screenplay', sectionTitle?: string): string {
+  const docType = projectType === 'screenplay' ? 'screenplay' : 'novel';
+  const sectionLabel = projectType === 'screenplay' ? 'scene' : 'chapter';
+  const titleNote = sectionTitle ? ` The current ${sectionLabel} is titled "${sectionTitle}".` : '';
+
+  return `You are Narratryx, a creative writing assistant specialised in ${docType} writing.${titleNote} Respond in plain text with clear formatting. Focus on vivid prose, consistent character voice, and strong narrative structure.`;
+}
+
+function buildFullPrompt(request: AIRequest): string {
+  const parts: string[] = [];
+
+  // Inject story bible context if available
+  if (request.storyBibleContext) {
+    const { entities, recentSceneSummaries, styleNotes } = request.storyBibleContext;
+    if (entities.length > 0) {
+      const entityLines = entities
+        .slice(0, 12)
+        .map(e => `- ${e.name} (${e.type}): ${e.description}`)
+        .join('\n');
+      parts.push(`Story Bible Entities:\n${entityLines}`);
+    }
+    if (recentSceneSummaries.length > 0) {
+      parts.push(`Recent scenes:\n${recentSceneSummaries.slice(-5).map(s => `- ${s}`).join('\n')}`);
+    }
+    if (styleNotes) {
+      parts.push(`Style notes: ${styleNotes}`);
+    }
+  }
+
+  if (request.context) {
+    const label = request.projectType === 'screenplay' ? 'scene' : 'chapter';
+    parts.push(`Here is the current ${label} text for context:\n\n---\n${request.context}\n---`);
+  }
+
+  parts.push(request.prompt);
+  return parts.join('\n\n');
+}
+
+/* ------------------------------------------------------------------ */
+/*  Streaming parser                                                   */
+/* ------------------------------------------------------------------ */
+
+async function readStream(
+  response: Response,
+  backend: CustomLlmBackend,
+  onChunk?: (chunk: string, accumulated: string) => void,
+  signal?: AbortSignal,
+): Promise<{ text: string; usage?: { promptTokens?: number; completionTokens?: number } }> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const data = await response.json();
+    return extractNonStreamResponse(data, backend);
+  }
+
+  const decoder = new TextDecoder();
+  let accumulated = '';
+  let usage: { promptTokens?: number; completionTokens?: number } | undefined;
+  let buffer = '';
+
+  try {
+    while (true) {
+      if (signal?.aborted) {
+        reader.cancel();
+        break;
+      }
+
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+
+        if (backend === 'ollama') {
+          // Ollama streams newline-delimited JSON
+          if (!trimmed) continue;
+          try {
+            const parsed = JSON.parse(trimmed);
+            const token = parsed.message?.content ?? '';
+            if (token) {
+              accumulated += token;
+              onChunk?.(token, accumulated);
+            }
+            if (parsed.done && parsed.eval_count) {
+              usage = { promptTokens: parsed.prompt_eval_count, completionTokens: parsed.eval_count };
+            }
+          } catch {
+            // skip malformed lines
+          }
+        } else {
+          // OpenAI-compatible SSE format (vLLM, llama.cpp, generic)
+          if (!trimmed.startsWith('data: ')) continue;
+          const payload = trimmed.slice('data: '.length);
+          if (payload === '[DONE]') continue;
+          try {
+            const parsed = JSON.parse(payload);
+            const token = parsed.choices?.[0]?.delta?.content ?? '';
+            if (token) {
+              accumulated += token;
+              onChunk?.(token, accumulated);
+            }
+            if (parsed.usage) {
+              usage = {
+                promptTokens: parsed.usage.prompt_tokens,
+                completionTokens: parsed.usage.completion_tokens,
+              };
+            }
+          } catch {
+            // skip malformed SSE events
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  return { text: accumulated, usage };
+}
+
+function extractNonStreamResponse(
+  data: Record<string, unknown>,
+  backend: CustomLlmBackend,
+): { text: string; usage?: { promptTokens?: number; completionTokens?: number } } {
+  if (backend === 'ollama') {
+    const msg = data as { message?: { content?: string }; prompt_eval_count?: number; eval_count?: number };
+    return {
+      text: msg.message?.content ?? JSON.stringify(data, null, 2),
+      usage: msg.eval_count ? { promptTokens: msg.prompt_eval_count, completionTokens: msg.eval_count } : undefined,
+    };
+  }
+
+  // OpenAI-compatible format
+  const choices = data as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+  const text = choices.choices?.[0]?.message?.content ?? JSON.stringify(data, null, 2);
+  const usage = choices.usage
+    ? { promptTokens: choices.usage.prompt_tokens, completionTokens: choices.usage.completion_tokens }
+    : undefined;
+  return { text, usage };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Provider class                                                     */
+/* ------------------------------------------------------------------ */
+
+export class CustomLlmProvider implements AIProvider {
+  readonly type = 'custom-llm' as const;
+  readonly supportsStreaming = true;
+
+  constructor(private config: AIProviderConfig) {}
+
+  isAvailable(): boolean {
+    return !!(this.config.customLlm?.baseUrl?.trim() && this.config.customLlm?.model?.trim());
+  }
+
+  async execute(request: AIRequest): Promise<AIResponse> {
+    const llmConfig = this.config.customLlm;
+    if (!llmConfig?.baseUrl?.trim() || !llmConfig?.model?.trim()) {
+      throw new Error('Custom LLM is not configured. Open Settings and configure your inference endpoint.');
+    }
+
+    const start = Date.now();
+    const endpoint = resolveEndpoint(llmConfig.backend, llmConfig.baseUrl);
+    const systemPrompt = buildSystemPrompt(request.projectType, request.sectionTitle);
+    const fullPrompt = buildFullPrompt(request);
+    const useStreaming = llmConfig.streaming !== false && !!request.onStreamChunk;
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (llmConfig.apiKey?.trim()) {
+      headers['Authorization'] = `Bearer ${llmConfig.apiKey.trim()}`;
+    }
+
+    let body: string;
+
+    if (llmConfig.backend === 'ollama') {
+      body = JSON.stringify({
+        model: llmConfig.model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: fullPrompt },
+        ],
+        stream: useStreaming,
+        options: {
+          num_predict: llmConfig.maxTokens ?? 2048,
+          temperature: llmConfig.temperature ?? 0.7,
+        },
+      });
+    } else {
+      body = JSON.stringify({
+        model: llmConfig.model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: fullPrompt },
+        ],
+        max_tokens: llmConfig.maxTokens ?? 2048,
+        temperature: llmConfig.temperature ?? 0.7,
+        stream: useStreaming,
+      });
+    }
+
+    const response = await fetchWithPolicy(endpoint, {
+      method: 'POST',
+      headers,
+      body,
+      signal: request.signal,
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => '');
+      const backendLabel = CUSTOM_LLM_BACKEND_LABELS[llmConfig.backend];
+      throw new Error(`${backendLabel} error (${response.status}): ${errorBody || response.statusText}`);
+    }
+
+    if (useStreaming) {
+      const result = await readStream(response, llmConfig.backend, request.onStreamChunk, request.signal);
+      return {
+        text: result.text,
+        provider: 'custom-llm',
+        latencyMs: Date.now() - start,
+        streamed: true,
+        usage: result.usage,
+      };
+    }
+
+    const data = await response.json();
+    const result = extractNonStreamResponse(data, llmConfig.backend);
+
+    return {
+      text: result.text,
+      provider: 'custom-llm',
+      latencyMs: Date.now() - start,
+      streamed: false,
+      usage: result.usage,
+    };
+  }
+
+  destroy(): void {
+    // No resources to clean up
+  }
+}

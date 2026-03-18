@@ -15,7 +15,13 @@ import {
   SERVER_PROXY_ENDPOINTS,
   SERVER_PROXY_MODELS,
   SERVER_PROXY_LABELS,
+  CUSTOM_LLM_DEFAULTS,
+  CUSTOM_LLM_BACKEND_LABELS,
+  assembleStoryBibleContext,
+  runEvalSuite,
+  saveEvalResult,
 } from '@/lib/ai';
+import { getContinuityMemorySnapshot as getContinuitySnapshot } from '@/lib/continuityMemory';
 import { getBrokerBaseUrl, getBrokerEndpoint } from '@/lib/featureFlags';
 import { recordAIRevision } from '@/lib/aiRevisionLog';
 import {
@@ -24,7 +30,7 @@ import {
   renderPipelinePrompt,
   type PipelineInsertionMode,
 } from '@/lib/ai/pipelines';
-import type { AIProviderConfig, AvailabilityStatus } from '@/lib/ai';
+import type { AIProviderConfig, AvailabilityStatus, CustomLlmBackend, EvalSuiteResult } from '@/lib/ai';
 import type { ProjectType, StoryBlueprint } from '@/types';
 import styles from '../Modals.module.css';
 
@@ -276,6 +282,14 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
     tone: 'replace',
   });
 
+  // Streaming state
+  const [streamingText, setStreamingText] = useState('');
+  const [isStreaming, setIsStreaming] = useState(false);
+
+  // Eval state
+  const [evalRunning, setEvalRunning] = useState(false);
+  const [evalResult, setEvalResult] = useState<EvalSuiteResult | null>(null);
+
   // Ref for aborting in-flight requests
   const abortRef = useRef<AbortController | null>(null);
   const responseRef = useRef<HTMLDivElement>(null);
@@ -316,14 +330,16 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   /* ----- Provider logic --------------------------------------------- */
 
   const isConfigured =
-    config.provider === 'server-proxy'
-      ? !!(config.serverProxy?.serverProvider && config.serverProxy?.model &&
-           (config.serverProxy.userApiKey?.trim() || getBrokerBaseUrl()))
-      : config.provider === 'openai-compatible'
-        ? !!(config.endpoint?.trim() && config.sessionToken?.trim())
-        : config.provider === 'chrome-ai'
-          ? chromeAIAvailable
-          : /* managed-cloud */ !!getBrokerBaseUrl();
+    config.provider === 'custom-llm'
+      ? !!(config.customLlm?.baseUrl?.trim() && config.customLlm?.model?.trim())
+      : config.provider === 'server-proxy'
+        ? !!(config.serverProxy?.serverProvider && config.serverProxy?.model &&
+             (config.serverProxy.userApiKey?.trim() || getBrokerBaseUrl()))
+        : config.provider === 'openai-compatible'
+          ? !!(config.endpoint?.trim() && config.sessionToken?.trim())
+          : config.provider === 'chrome-ai'
+            ? chromeAIAvailable
+            : /* managed-cloud */ !!getBrokerBaseUrl();
 
   // Reset transient state when the modal opens/closes
   useEffect(() => {
@@ -389,6 +405,16 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       const blueprintContext = formatStoryBlueprintContext(state.storyBlueprint);
       const enrichedContext = [blueprintContext, continuityContext, chapterText].filter(Boolean).join('\n\n');
 
+      // Build Story Bible context for custom LLM
+      const storyBibleContext = config.provider === 'custom-llm'
+        ? assembleStoryBibleContext(
+            state.novelId,
+            state.chapters,
+            state.activeChapterId,
+            getContinuitySnapshot(state.novelId, state.chapters),
+          )
+        : undefined;
+
       // Abort any previous request
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -397,8 +423,11 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       setLoading(true);
       setError(null);
       setResponse('');
+      setStreamingText('');
+      setIsStreaming(false);
 
       const provider = createProvider(config);
+      const useStreaming = config.provider === 'custom-llm' && config.customLlm?.streaming !== false;
 
       try {
         const result = await provider.execute({
@@ -408,8 +437,17 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
           projectType: state.projectType,
           sectionTitle: activeChapter?.title,
           signal: controller.signal,
+          storyBibleContext,
+          onStreamChunk: useStreaming
+            ? (_chunk, accumulated) => {
+                setIsStreaming(true);
+                setStreamingText(accumulated);
+              }
+            : undefined,
         });
 
+        setIsStreaming(false);
+        setStreamingText('');
         setResponse(result.text);
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === 'AbortError') {
@@ -420,10 +458,11 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         setError(message);
       } finally {
         setLoading(false);
+        setIsStreaming(false);
         provider.destroy();
       }
     },
-    [activeChapter, config, isConfigured, state.projectType, state.chapters, state.novelId, state.storyBlueprint]
+    [activeChapter, config, isConfigured, state.projectType, state.chapters, state.novelId, state.storyBlueprint, state.activeChapterId]
   );
 
 
@@ -683,18 +722,87 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
     }
   };
 
+  const handleRunEval = useCallback(async () => {
+    if (!isConfigured) {
+      setError('Configure AI first before running evaluation.');
+      return;
+    }
+    setEvalRunning(true);
+    setEvalResult(null);
+    setError(null);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const provider = createProvider(config);
+
+    try {
+      const result = await runEvalSuite(
+        provider,
+        config.customLlm?.model || config.model || 'unknown',
+        undefined,
+        undefined,
+        controller.signal,
+      );
+      setEvalResult(result);
+      saveEvalResult(result);
+      showToast(
+        `Eval complete: ${(result.overallScore * 100).toFixed(0)}% score, ${result.recommendation}`,
+        result.recommendation === 'ready' ? 'success' : 'info',
+      );
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setError(err instanceof Error ? err.message : 'Evaluation failed.');
+    } finally {
+      setEvalRunning(false);
+      provider.destroy();
+    }
+  }, [config, isConfigured, showToast]);
+
+  const handleTestCustomLlm = async () => {
+    if (!config.customLlm?.baseUrl?.trim() || !config.customLlm?.model?.trim()) {
+      setConnectionResult({ type: 'warning', message: 'Enter both a base URL and model name first' });
+      return;
+    }
+    setTestingConnection(true);
+    setConnectionResult(null);
+    try {
+      const provider = createProvider(config);
+      const result = await provider.execute({
+        action: 'custom',
+        prompt: 'Say "Connection successful" in exactly two words.',
+        context: '',
+        projectType: 'book',
+        signal: (() => { const c = new AbortController(); setTimeout(() => c.abort(), 15000); return c.signal; })(),
+      });
+      if (result.text) {
+        setConnectionResult({ type: 'success', message: `Connected to ${CUSTOM_LLM_BACKEND_LABELS[config.customLlm.backend]} (${result.latencyMs}ms)` });
+      } else {
+        setConnectionResult({ type: 'error', message: 'Empty response from model' });
+      }
+      provider.destroy();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setConnectionResult({ type: 'error', message: `Connection failed: ${message}` });
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+
   /* ----- Helpers ---------------------------------------------------- */
 
   const providerModeLabel =
     config.provider === 'chrome-ai' ? 'Using local AI'
-    : config.provider === 'server-proxy'
-      ? `Using ${SERVER_PROXY_LABELS[config.serverProxy?.serverProvider ?? 'groq']}`
-      : config.provider === 'openai-compatible'
-        ? 'Using custom provider'
-        : 'Using cloud AI';
+    : config.provider === 'custom-llm'
+      ? `Using ${CUSTOM_LLM_BACKEND_LABELS[config.customLlm?.backend ?? 'ollama']}`
+      : config.provider === 'server-proxy'
+        ? `Using ${SERVER_PROXY_LABELS[config.serverProxy?.serverProvider ?? 'groq']}`
+        : config.provider === 'openai-compatible'
+          ? 'Using custom provider'
+          : 'Using cloud AI';
   const providerLabel = `AI ready · ${providerModeLabel}`;
   const providerIcon =
     config.provider === 'chrome-ai' ? 'memory'
+    : config.provider === 'custom-llm' ? 'smart_toy'
     : config.provider === 'server-proxy' ? 'dns'
     : 'cloud';
 
@@ -887,6 +995,192 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
             )}
           </div>
 
+          {/* Custom LLM (Ollama / vLLM / llama.cpp) */}
+          <div className={styles.aiProviderSelector}>
+            <h5>Custom LLM (Local / Self-hosted)</h5>
+            <p className={styles.aiSettingsHint}>
+              Connect to your own model running via Ollama, vLLM, llama.cpp, or any OpenAI-compatible server.
+            </p>
+            <div className={styles.aiProviderOptions}>
+              {(['ollama', 'vllm', 'llama-cpp', 'generic-openai'] as const).map(backend => (
+                <button
+                  key={backend}
+                  className={`${styles.aiProviderOption} ${
+                    config.provider === 'custom-llm' && config.customLlm?.backend === backend
+                      ? styles['aiProviderOption--active'] : ''
+                  }`}
+                  onClick={() => {
+                    const defaults = CUSTOM_LLM_DEFAULTS[backend];
+                    updateConfig({
+                      provider: 'custom-llm',
+                      customLlm: {
+                        backend,
+                        baseUrl: config.customLlm?.backend === backend
+                          ? (config.customLlm.baseUrl || defaults.baseUrl)
+                          : defaults.baseUrl,
+                        model: config.customLlm?.backend === backend
+                          ? (config.customLlm.model || defaults.model)
+                          : defaults.model,
+                        apiKey: config.customLlm?.apiKey,
+                        streaming: config.customLlm?.streaming ?? true,
+                        maxTokens: config.customLlm?.maxTokens ?? 2048,
+                        temperature: config.customLlm?.temperature ?? 0.7,
+                        fallbackProvider: config.customLlm?.fallbackProvider,
+                      },
+                    });
+                  }}
+                >
+                  <span className="material-symbols-rounded">smart_toy</span>
+                  <div className={styles.aiProviderOptionText}>
+                    <strong>{CUSTOM_LLM_BACKEND_LABELS[backend]}</strong>
+                    <small>{CUSTOM_LLM_DEFAULTS[backend].baseUrl}</small>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {config.provider === 'custom-llm' && config.customLlm && (
+              <div className={styles.aiSettingsFields}>
+                <label className={styles.aiLabel}>
+                  Base URL
+                  <Input
+                    placeholder={CUSTOM_LLM_DEFAULTS[config.customLlm.backend].baseUrl}
+                    value={config.customLlm.baseUrl || ''}
+                    onChange={e => updateConfig({
+                      customLlm: { ...config.customLlm!, baseUrl: e.target.value },
+                    })}
+                  />
+                </label>
+                <label className={styles.aiLabel}>
+                  Model
+                  <Input
+                    placeholder={CUSTOM_LLM_DEFAULTS[config.customLlm.backend].model}
+                    value={config.customLlm.model || ''}
+                    onChange={e => updateConfig({
+                      customLlm: { ...config.customLlm!, model: e.target.value },
+                    })}
+                  />
+                </label>
+                <label className={styles.aiLabel}>
+                  API Key (optional)
+                  <Input
+                    type="password"
+                    placeholder="Leave blank if not required"
+                    value={config.customLlm.apiKey || ''}
+                    onChange={e => updateConfig({
+                      customLlm: { ...config.customLlm!, apiKey: e.target.value },
+                    })}
+                  />
+                </label>
+                <label className={styles.aiLabel}>
+                  <input
+                    type="checkbox"
+                    checked={config.customLlm.streaming !== false}
+                    onChange={e => updateConfig({
+                      customLlm: { ...config.customLlm!, streaming: e.target.checked },
+                    })}
+                  />
+                  {' '}Enable streaming responses
+                </label>
+                <label className={styles.aiLabel}>
+                  Max tokens
+                  <Input
+                    type="number"
+                    placeholder="2048"
+                    value={String(config.customLlm.maxTokens ?? 2048)}
+                    onChange={e => updateConfig({
+                      customLlm: { ...config.customLlm!, maxTokens: Number(e.target.value) || 2048 },
+                    })}
+                  />
+                </label>
+                <label className={styles.aiLabel}>
+                  Temperature
+                  <Input
+                    type="number"
+                    placeholder="0.7"
+                    value={String(config.customLlm.temperature ?? 0.7)}
+                    onChange={e => updateConfig({
+                      customLlm: { ...config.customLlm!, temperature: Number(e.target.value) || 0.7 },
+                    })}
+                  />
+                </label>
+                <label className={styles.aiLabel}>
+                  Fallback provider (if model fails)
+                  <select
+                    value={config.customLlm.fallbackProvider || ''}
+                    onChange={e => updateConfig({
+                      customLlm: { ...config.customLlm!, fallbackProvider: (e.target.value || undefined) as CustomLlmBackend | undefined },
+                    })}
+                    className={styles.aiSelect}
+                  >
+                    <option value="">None</option>
+                    <option value="managed-cloud">Cloud AI</option>
+                    <option value="chrome-ai">Chrome AI</option>
+                    <option value="openai-compatible">Custom Provider</option>
+                    <option value="server-proxy">Server Proxy</option>
+                  </select>
+                </label>
+              </div>
+            )}
+
+            {config.provider === 'custom-llm' && (
+              <div className={styles.aiSettingsActions}>
+                <Button
+                  variant="default"
+                  size="small"
+                  onClick={() => handleTestCustomLlm()}
+                  disabled={testingConnection || !config.customLlm?.baseUrl?.trim()}
+                >
+                  <span className="material-symbols-rounded">wifi_tethering</span>
+                  {testingConnection ? 'Testing...' : 'Test Connection'}
+                </Button>
+                <Button
+                  variant="default"
+                  size="small"
+                  onClick={() => handleRunEval()}
+                  disabled={evalRunning || !isConfigured}
+                >
+                  <span className="material-symbols-rounded">science</span>
+                  {evalRunning ? 'Evaluating...' : 'Run Quality Eval'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="small"
+                  onClick={() => updateConfig({ provider: chromeAIAvailable ? 'chrome-ai' : 'managed-cloud' })}
+                >
+                  Use Automatic Mode
+                </Button>
+              </div>
+            )}
+
+            {config.provider === 'custom-llm' && connectionResult && (
+              <div className={`${styles.aiConnectionResult} ${styles[`aiConnectionResult--${connectionResult.type}`]}`}>
+                <span className="material-symbols-rounded" style={{ fontSize: '1rem' }}>
+                  {connectionResult.type === 'success' ? 'check_circle' : connectionResult.type === 'error' ? 'error' : 'warning'}
+                </span>
+                {connectionResult.message}
+              </div>
+            )}
+
+            {evalResult && (
+              <div className={styles.aiSettingsFields}>
+                <h5>Evaluation Results</h5>
+                <p className={styles.aiSettingsHint}>
+                  Overall: {(evalResult.overallScore * 100).toFixed(0)}% | Pass rate: {(evalResult.passRate * 100).toFixed(0)}% | Avg latency: {evalResult.averageLatencyMs.toFixed(0)}ms
+                </p>
+                <p className={styles.aiSettingsHint}>
+                  Recommendation: <strong>{evalResult.recommendation === 'ready' ? 'Ready for production' : evalResult.recommendation === 'needs-work' ? 'Needs improvement' : 'Not ready — use hosted model as primary'}</strong>
+                </p>
+                {evalResult.results.map(r => (
+                  <div key={r.promptId} className={styles.aiSettingsHint}>
+                    {r.passed ? '\u2713' : '\u2717'} {r.label}: {(r.weightedScore * 100).toFixed(0)}% ({r.latencyMs}ms)
+                    {r.errors.length > 0 && <span style={{ color: 'var(--color-error)' }}> — {r.errors[0]}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <details open={showCustomProvider} onToggle={e => setShowCustomProvider((e.target as HTMLDetailsElement).open)}>
             <summary className={styles.aiNoticeLink}>Custom provider (advanced)</summary>
 
@@ -991,6 +1285,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
               Settings
             </button>{' '}
             below, pick a provider (e.g. OpenAI, Groq, OpenRouter), and paste your API key.
+            You can also connect a local model via Ollama or vLLM in the Custom LLM section.
             {!isChromeBrowser() && ' Alternatively, use Google Chrome for free on-device AI.'}
           </div>
         </div>
@@ -1088,23 +1383,26 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       </div>
 
       {/* Response area */}
-      {(response || loading || error) && (
+      {(response || loading || error || isStreaming) && (
         <div className={styles.aiResponseArea}>
           <h4>
             <span className="material-symbols-rounded">smart_toy</span>
             Response
+            {isStreaming && <span className={styles.aiStreamingIndicator}> (streaming...)</span>}
           </h4>
-          {loading && (
+          {loading && !isStreaming && (
             <p className={styles.loadingText}>
               {config.provider === 'chrome-ai' && (chromeAIStatus === 'downloadable' || chromeAIStatus === 'downloading')
                 ? 'Downloading AI model...'
-                : 'Generating response...'}
+                : config.provider === 'custom-llm'
+                  ? `Waiting for ${CUSTOM_LLM_BACKEND_LABELS[config.customLlm?.backend ?? 'ollama']}...`
+                  : 'Generating response...'}
             </p>
           )}
           {error && <p className={styles.aiError}>{error}</p>}
-          {response && (
+          {(response || isStreaming) && (
             <div ref={responseRef} className={styles.aiResponseContent}>
-              {response}
+              {isStreaming ? streamingText : response}
             </div>
           )}
         </div>
