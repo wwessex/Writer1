@@ -24,8 +24,12 @@ _DEGRADED_ADJECTIVES = (
 )
 _DEGRADED_ADJECTIVES_RE = re.compile(rf"\b({_DEGRADED_ADJECTIVES})\b", re.IGNORECASE)
 
-# Minimum word count for truncation fallback when style transforms produce an identical string.
-_MIN_FALLBACK_WORDS = 20
+# Adverbs stripped in the fallback degradation path to reduce prose quality without truncating.
+_DEGRADED_ADVERBS = (
+    r"quietly|slowly|carefully|gently|softly|suddenly|swiftly|silently|eagerly|fiercely|"
+    r"wearily|bitterly|tenderly|nervously|desperately|anxiously|gracefully|mournfully"
+)
+_DEGRADED_ADVERBS_RE = re.compile(rf"\b({_DEGRADED_ADVERBS})\b", re.IGNORECASE)
 
 
 def _write_jsonl(records: list[dict[str, Any]], out_file: Path) -> int:
@@ -54,7 +58,11 @@ def _as_instruction(record: dict[str, Any]) -> str | None:
     response = normalize_text(str(record.get("response", "") or record.get("output", "")))
     if not prompt or not response:
         return None
-    return f"### Instruction\n{prompt}\n\n### Response\n{response}"
+    # Use Qwen2.5-Instruct chat template so SFT data aligns with the base model's format.
+    return (
+        f"<|im_start|>user\n{prompt}<|im_end|>\n"
+        f"<|im_start|>assistant\n{response}<|im_end|>"
+    )
 
 
 def build_sft(output_dir: Path, max_records: int) -> int:
@@ -89,11 +97,22 @@ def _flatten_sentence_shapes(text: str) -> str:
     return " ".join(flattened)
 
 
+def _strip_adverbs(text: str) -> str:
+    """Remove expressive adverbs as an additional degradation layer."""
+    text = _DEGRADED_ADVERBS_RE.sub("", text)
+    return re.sub(r"\s{2,}", " ", text).strip()
+
+
 def _build_rejected_from_chosen(chosen: str) -> str:
     downgraded = _drop_descriptive_adjectives(chosen)
     downgraded = _flatten_sentence_shapes(downgraded)
     downgraded = re.sub(r"\b(whispered|murmured|sighed|breathed)\b", "said", downgraded, flags=re.IGNORECASE)
-    return normalize_text(downgraded)
+    result = normalize_text(downgraded)
+    # If primary transforms had no effect, apply adverb stripping as a fallback
+    # instead of truncation, which would teach length bias rather than quality bias.
+    if result == normalize_text(chosen):
+        result = normalize_text(_strip_adverbs(chosen))
+    return result
 
 
 def build_dpo(output_dir: Path, max_pairs: int, seed: int) -> int:
@@ -108,8 +127,10 @@ def build_dpo(output_dir: Path, max_pairs: int, seed: int) -> int:
             continue
 
         rejected = _build_rejected_from_chosen(chosen)
+        # Skip pairs where no degradation could be applied — these would teach
+        # no useful preference signal and are better omitted than truncated.
         if rejected == chosen:
-            rejected = " ".join(chosen.split()[: max(_MIN_FALLBACK_WORDS, len(chosen.split()) // 3)])
+            continue
 
         rows.append(
             {

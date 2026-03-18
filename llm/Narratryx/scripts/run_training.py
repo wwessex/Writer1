@@ -8,6 +8,7 @@ from pathlib import Path
 
 
 STAGE_TO_CONFIG = {
+    "cpt": Path("configs/qwen25-7b-cpt-qlora.yaml"),
     "sft": Path("configs/qwen25-7b-sft-qlora.yaml"),
     "dpo": Path("configs/qwen25-7b-dpo.yaml"),
 }
