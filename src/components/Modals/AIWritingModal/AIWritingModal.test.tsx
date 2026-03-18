@@ -119,6 +119,25 @@ vi.mock('@/lib/ai', () => ({
     openrouter: 'OpenRouter',
     gemini: 'Gemini',
   },
+  CUSTOM_LLM_DEFAULTS: {
+    ollama: { baseUrl: 'http://localhost:11434', model: 'narratryx:latest', label: 'Ollama' },
+    vllm: { baseUrl: 'http://localhost:8000', model: 'narratryx', label: 'vLLM' },
+    'llama-cpp': { baseUrl: 'http://localhost:8080', model: 'default', label: 'llama.cpp' },
+    'generic-openai': { baseUrl: 'http://localhost:8000', model: 'default', label: 'Custom Endpoint' },
+  },
+  CUSTOM_LLM_BACKEND_LABELS: {
+    ollama: 'Ollama',
+    vllm: 'vLLM',
+    'llama-cpp': 'llama.cpp',
+    'generic-openai': 'Custom Endpoint',
+  },
+  assembleStoryBibleContext: vi.fn(() => ({ entities: [], recentSceneSummaries: [], styleNotes: '' })),
+  formatStoryBibleForPrompt: vi.fn(() => ''),
+  runEvalSuite: vi.fn().mockResolvedValue({
+    provider: 'custom-llm', model: 'test', timestamp: Date.now(), results: [],
+    overallScore: 0.75, passRate: 0.8, averageLatencyMs: 500, recommendation: 'ready',
+  }),
+  saveEvalResult: vi.fn(),
 }));
 
 vi.mock('@/lib/ai/pipelines', () => ({

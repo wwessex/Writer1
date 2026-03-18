@@ -4,7 +4,7 @@ export interface ManagedPolicy {
   forceLocalOnly?: boolean;
   disableTelemetry?: boolean;
   disableAIProviders?: boolean;
-  disabledAIProviderTypes?: Array<'chrome-ai' | 'managed-cloud' | 'openai-compatible' | 'server-proxy'>;
+  disabledAIProviderTypes?: Array<'chrome-ai' | 'managed-cloud' | 'openai-compatible' | 'server-proxy' | 'custom-llm'>;
   settingsOverrides?: Partial<AppSettings>;
 }
 

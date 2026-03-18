@@ -35,6 +35,53 @@
 - **Container path:** Dockerfile + compose config for self-hosted GPU deployment.
 - **Browser:** runtime selector for WebLLM/Wllama/cloud plus model chunk caching service worker.
 
+## Runtime integration (app layer)
+
+The DraftHarbour app now includes a production inference path for custom/local LLMs
+via `src/lib/ai/customLlmProvider.ts`. This bridges Narratryx-trained models to the
+writing UI without breaking the training pipeline's isolation.
+
+### Inference backends supported
+
+| Backend | Endpoint format | Streaming | Notes |
+|---------|----------------|-----------|-------|
+| Ollama | `POST /api/chat` (NDJSON) | Yes | Recommended for local dev |
+| vLLM | `POST /v1/chat/completions` (SSE) | Yes | Recommended for cloud/self-hosted |
+| llama.cpp server | `POST /v1/chat/completions` (SSE) | Yes | Lightweight option |
+| Generic OpenAI | `POST /v1/chat/completions` (SSE) | Yes | Any compatible endpoint |
+
+### Deployment path: training → inference
+
+1. Train model via Narratryx pipeline (CPT → SFT → DPO)
+2. Export to GGUF via `scripts/export_model.py`
+3. Load in Ollama: `ollama create narratryx -f Modelfile`
+4. Or deploy with vLLM: `vllm serve ./artifacts/checkpoints/qwen25-7b-dpo`
+5. Configure in DraftHarbour: Settings → Custom LLM → Select backend → Enter URL
+
+### Story Bible context injection
+
+The app's `src/lib/ai/storyBible.ts` implements the runtime version of the Story Bible
+architecture described above. It:
+- Extracts entities from the continuity memory system
+- Ranks them by keyword saliency against current chapter text
+- Assembles a token-budgeted context block injected into every prompt
+- Merges user-defined entities with auto-extracted character/location data
+
+### Fallback chain
+
+When the custom LLM is unreachable, the `FallbackProvider` (`src/lib/ai/fallbackProvider.ts`)
+automatically retries with exponential backoff, then falls through to the configured
+fallback provider (e.g. managed-cloud, Chrome AI).
+
+### Quality evaluation
+
+The `evalFramework.ts` module runs benchmark prompts against the model and scores
+responses on coherence, creativity, consistency, instruction-following, and grammar.
+Results are persisted to localStorage for comparison across model versions.
+
 ## Isolation boundary
 
-Narratryx is intentionally self-contained under `llm/Narratryx` and does not alter app runtime boundaries.
+Narratryx training code is intentionally self-contained under `llm/Narratryx` and does
+not import from or alter app runtime code. The app's `src/lib/ai/customLlmProvider.ts`
+connects to trained models via HTTP API only — no direct code dependency exists between
+the training pipeline and the app runtime.
