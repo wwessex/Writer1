@@ -30,7 +30,7 @@ import {
   renderPipelinePrompt,
   type PipelineInsertionMode,
 } from '@/lib/ai/pipelines';
-import type { AIProviderConfig, AvailabilityStatus, CustomLlmBackend, EvalSuiteResult } from '@/lib/ai';
+import type { AIProviderConfig, AvailabilityStatus, EvalSuiteResult } from '@/lib/ai';
 import type { ProjectType, StoryBlueprint } from '@/types';
 import styles from '../Modals.module.css';
 
@@ -1109,7 +1109,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
                   <select
                     value={config.customLlm.fallbackProvider || ''}
                     onChange={e => updateConfig({
-                      customLlm: { ...config.customLlm!, fallbackProvider: (e.target.value || undefined) as CustomLlmBackend | undefined },
+                      customLlm: { ...config.customLlm!, fallbackProvider: (e.target.value || undefined) as AIProviderConfig['provider'] | undefined },
                     })}
                     className={styles.aiSelect}
                   >
