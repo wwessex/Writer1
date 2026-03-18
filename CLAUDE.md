@@ -2,11 +2,11 @@
 
 ## Project Overview
 
-DraftHarbour Studio is an **offline-first Progressive Web Application (PWA)** for writing novels and screenplays, with cross-platform desktop (Tauri) and mobile (Capacitor/iOS) builds. It is a React + TypeScript application built with Vite, featuring rich text editing via Tiptap, chapter/scene management, multi-format export, AI writing assistance, writing analysis tools, and optional cloud sync integrations.
+DraftHarbour Studio is an **offline-first Progressive Web Application (PWA)** for writing novels and screenplays, with cross-platform desktop (Tauri) and mobile (Capacitor/iOS) builds. It is a React + TypeScript application built with Vite, featuring rich text editing via CodeMirror 6, chapter/scene management, multi-format export, AI writing assistance, writing analysis tools, and optional cloud sync integrations.
 
 **Key characteristics:**
 - React 19 + TypeScript with Vite build tooling
-- Tiptap 2 (ProseMirror) rich text editor via `@tiptap/react`
+- CodeMirror 6 rich text editor with Markdown-based content storage
 - IndexedDB for local data persistence (Dexie ORM)
 - Dual project types: **Book** and **Screenplay**
 - CSS Modules + Tailwind CSS 4 for styling
@@ -14,8 +14,7 @@ DraftHarbour Studio is an **offline-first Progressive Web Application (PWA)** fo
 - Tauri 2 desktop app (macOS, Windows, Linux)
 - Capacitor 8 mobile app (iOS)
 - Server-side integration broker (PHP proxy + TypeScript handler)
-- CodeMirror 6 as alternative editor backend
-- ~277 TypeScript/TSX files and ~25 CSS files
+- ~287 TypeScript/TSX files (including ~103 test files) and ~25 CSS files
 
 ## Architecture
 
@@ -97,7 +96,7 @@ Writer1/
 │   │   └── setup.ts            # Vitest global setup (matchMedia stub)
 │   ├── components/
 │   │   ├── AppShell/           # Main layout grid component
-│   │   ├── Editor/             # Tiptap editor wrapper, screenplay extension
+│   │   ├── Editor/             # CodeMirror editor wrapper, screenplay extension
 │   │   ├── FindReplace/        # In-editor find & replace (Ctrl+F/H)
 │   │   ├── Header/             # Top header bar + formatting toolbar
 │   │   ├── Inspector/          # Right panel: chapter metadata, stats
@@ -180,9 +179,13 @@ Writer1/
 │   │   │   ├── chromeAI.ts     # Browser-native window.ai provider
 │   │   │   ├── openaiProvider.ts  # OpenAI-compatible API provider
 │   │   │   ├── serverProxyProvider.ts  # Server broker proxy provider
+│   │   │   ├── customLlmProvider.ts  # Custom/self-hosted LLM provider
+│   │   │   ├── fallbackProvider.ts   # Provider fallback chain logic
 │   │   │   ├── providerManager.ts  # Provider auto-detection & config
 │   │   │   ├── availability.ts # Runtime provider availability detection
 │   │   │   ├── pipelines.ts    # Staged AI revision workflows
+│   │   │   ├── evalFramework.ts  # AI output evaluation framework
+│   │   │   ├── storyBible.ts   # Story bible context for AI prompts
 │   │   │   ├── types.ts        # AI provider type definitions
 │   │   │   └── index.ts        # Barrel re-exports
 │   │   └── integrations/       # Cloud sync
@@ -216,8 +219,7 @@ Writer1/
 | UI Framework | React | 19.x |
 | Language | TypeScript | ~5.6 |
 | Build Tool | Vite | 6.x |
-| Editor | Tiptap (ProseMirror) via `@tiptap/react` | 2.27.2 |
-| Editor (alt) | CodeMirror 6 (`@codemirror/*`) | 6.x |
+| Editor | CodeMirror 6 (`@codemirror/*`) | 6.x |
 | Database | Dexie (IndexedDB) | 4.0.8 |
 | Styling | CSS Modules + Tailwind CSS | 4.2 |
 | Export | docx, pdfmake, built-in RTF/Fountain | 9.5.0 / 0.2.10 |
@@ -263,6 +265,7 @@ npm run assets:check      # Detect duplicate assets
 # Desktop (Tauri)
 npm run desktop:dev       # Tauri dev mode
 npm run desktop:build     # Tauri production build
+npm run desktop:build:debug  # Tauri debug build
 npm run desktop:build:mac # macOS universal build
 npm run desktop:build:win # Windows build
 npm run desktop:build:linux  # Linux build
@@ -307,6 +310,7 @@ interface AppState {
   projectType: 'book' | 'screenplay';
   novelId: string;
   novelTitle: string;
+  storyBlueprint: StoryBlueprint | null;
   chapters: Chapter[];
   activeChapterId: string | null;
   isOnline: boolean;
@@ -348,8 +352,10 @@ Storage is modularized in `src/lib/storage/`:
 - `migrations.ts` — Schema migrations between DB versions
 
 ```typescript
-// Database: DraftHarbourDB — version 3
-db.version(3).stores({
+// Database: DraftHarbourDB — version 4
+// v3 added projectType index on novels
+// v4 migrated chapter content from Tiptap JSONContent to Markdown strings
+db.version(4).stores({
   novels: 'id, title, projectType, updatedAt',
   chapters: 'id, novelId, order, title, updatedAt',
   snapshots: 'id, chapterId, createdAt'
@@ -364,7 +370,7 @@ interface Chapter {
   order: number;           // Display order
   title: string;
   updatedAt: number;       // Timestamp
-  content: JSONContent | null;  // Tiptap JSON document
+  content: string | null;  // Markdown string (migrated from Tiptap JSON in v4)
   summary: string;
   pov: string;             // Point-of-view character
   status: 'planned' | 'draft' | 'revised' | 'final';
@@ -420,22 +426,22 @@ Adding a new modal:
 3. Create modal component in `src/components/Modals/`
 4. Wire up in `App.tsx`
 
-### Editor Extensions
-The Tiptap editor is configured in `App.tsx` with:
-- `StarterKit` (headings H1/H2, lists, blockquote, etc.)
-- `ScreenplayParagraph` — custom paragraph node with `screenplayType` attribute for screenplay mode
-- `Underline`, `HorizontalRule`
-- `CommentAnchorMark` — inline mark for comment thread anchors (via `src/lib/editor/commentExtension.ts`)
+### Editor System
+The editor uses **CodeMirror 6** as its sole editing backend. Content is stored as Markdown strings in IndexedDB (migrated from Tiptap JSON in DB v4). The editor is initialized via `useCodeMirrorEditor` hook in `App.tsx` and exposed through an `EditorAdapter` interface.
 
-Additional editor modules in `src/lib/editor/`:
+Editor modules in `src/lib/editor/`:
+- `types.ts` — `EditorAdapter` interface abstracting the editor API
 - `EditorContext.tsx` — React context for shared editor state
-- `codemirrorAdapter.ts` — CodeMirror 6 integration adapter
+- `useCodeMirrorEditor.ts` — CodeMirror React hook (primary editor initialization)
+- `codemirrorAdapter.ts` — CodeMirror 6 ↔ app adapter implementing `EditorAdapter`
+- `commentExtension.ts` — Comment anchor mark extension
 - `fountainExtension.ts` — Fountain/screenplay editor support
-- `jsonToMarkdown.ts` / `markdownParser.ts` — format converters
-- `richPreviewExtension.ts` — rich text preview mode
-- `typewriterExtension.ts` — typewriter scrolling mode
-- `theme.ts` — editor theming
-- `useCodeMirrorEditor.ts` — CodeMirror React hook
+- `richPreviewExtension.ts` — Rich text preview mode
+- `typewriterExtension.ts` — Typewriter scrolling mode
+- `theme.ts` — Editor theming
+- `jsonToMarkdown.ts` — Legacy Tiptap JSON → Markdown converter (used in DB migration)
+- `markdownParser.ts` — Markdown → editor document parser
+- `index.ts` — Barrel re-exports
 
 ### Keyboard Shortcuts
 Global shortcuts in `App.tsx`:
@@ -467,6 +473,7 @@ Vite config defines manual chunks for large feature areas:
 - `export` — export libraries (docx, pdfmake)
 - `ai` — AI provider modules
 - `integrations` — cloud sync modules
+- `codemirror` — CodeMirror and Lezer packages
 
 ## Cross-Platform (Desktop & Mobile)
 
@@ -510,14 +517,18 @@ Located in `src/lib/ai/`:
 - **Chrome AI** (`chromeAI.ts`): Browser-native `window.ai` API (Chrome Canary/Dev)
 - **OpenAI** (`openaiProvider.ts`): OpenAI-compatible API endpoints
 - **Server Proxy** (`serverProxyProvider.ts`): Routes through the server-side integration broker, supporting Groq, OpenRouter, and Gemini
+- **Custom LLM** (`customLlmProvider.ts`): Custom/self-hosted LLM provider support
+- **Fallback** (`fallbackProvider.ts`): Provider fallback chain logic for resilience
 
 ### Provider Management
 - `providerManager.ts` — auto-detects best available provider, persists config to localStorage
 - `availability.ts` — runtime detection of which providers are available
 
-### AI Pipelines
+### AI Pipelines & Tools
 - `pipelines.ts` — staged revision workflows with configurable insertion modes
 - `aiRevisionLog.ts` — tracks before/after text for every AI revision (stored in localStorage, max 100 records) for undo/audit
+- `evalFramework.ts` — AI output evaluation and quality scoring framework
+- `storyBible.ts` — story bible context assembly for AI prompts (characters, world, continuity)
 
 ### AI Writing Modal
 `src/components/Modals/AIWritingModal/` — multi-provider AI writing interface with preset prompts, continuity context injection, BYOK support, and revision history.
@@ -588,7 +599,7 @@ npm run test:inventory    # Validate test organization
 Global test setup in `src/test/setup.ts` (stubs `window.matchMedia` for jsdom compatibility).
 
 ### Test Files
-~95 test files co-located with source using `.test.ts` / `.test.tsx` suffix. Key areas:
+~103 test files co-located with source using `.test.ts` / `.test.tsx` suffix. Key areas:
 
 **Library tests** (`src/lib/`):
 - `utils.test.ts`, `errors.test.ts`, `commands.test.ts`, `adapters.test.ts`
@@ -598,6 +609,10 @@ Global test setup in `src/test/setup.ts` (stubs `window.matchMedia` for jsdom co
 - `nativeMenuAdapter.test.ts`, `updaterGuardrails.test.ts`
 - `storage.crud.test.ts`, `storage.backup.test.ts`, `storage.snapshot.test.ts`, `storage.coverage.test.ts`
 - `highRisk.characterization.test.ts` — characterization tests for critical paths
+
+**AI tests** (`src/lib/ai/`):
+- `customLlmProvider.test.ts`, `evalFramework.test.ts`, `fallbackProvider.test.ts`
+- `pipelines.test.ts`, `providerManager.test.ts`, `storyBible.test.ts`
 
 **Editor tests** (`src/lib/editor/`):
 - `codemirrorAdapter.test.ts`, `commentExtension.test.ts`, `fountainExtension.test.ts`
@@ -726,7 +741,7 @@ Husky + lint-staged runs ESLint on staged `.ts/.tsx` files before each commit.
 | State services | `src/context/services/appServices.ts` |
 | Data persistence | `src/lib/storage/` (db, novels, chapters, snapshots, migrations) |
 | Command registry | `src/lib/commands.ts` |
-| Editor config | `src/App.tsx` (extensions), `src/components/Editor/`, `src/lib/editor/` |
+| Editor config | `src/App.tsx` (CodeMirror init), `src/components/Editor/`, `src/lib/editor/` |
 | Export formats | `src/lib/export/` (per-format modules) |
 | Import formats | `src/lib/import.ts` |
 | UI components | `src/components/` (each in own directory) |
@@ -748,7 +763,7 @@ Husky + lint-staged runs ESLint on staged `.ts/.tsx` files before each commit.
 | Menu config | `src/lib/menuConfig.ts` |
 | i18n / translation | `src/lib/translation.ts` |
 | LLM fine-tuning | `llm/Narratryx/` |
-| Tests | Co-located `*.test.ts` files (~95 files), run with `npm run test` |
+| Tests | Co-located `*.test.ts` files (~103 files), run with `npm run test` |
 | Build config | `vite.config.ts` |
 | TypeScript config | `tsconfig.json` |
 | Linting | `eslint.config.js` |
