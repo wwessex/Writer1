@@ -77,8 +77,8 @@ vi.mock('@/lib/integrations/api', () => ({
   connectProvider: mocks.connectProviderMock,
   disconnectProvider: mocks.disconnectProviderMock,
   refreshProviderConnection: mocks.refreshProviderConnectionMock,
-  DEFAULT_GOOGLE_CLIENT_ID: 'test-default-google-client-id',
-  DEFAULT_DROPBOX_APP_KEY: 'test-default-dropbox-app-key',
+  DEFAULT_GOOGLE_CLIENT_ID: '',
+  DEFAULT_DROPBOX_APP_KEY: '',
 }));
 
 vi.mock('@/lib/telemetry', () => ({
@@ -101,6 +101,19 @@ vi.mock('@/components/Modals/ConflictResolutionModal', () => ({
 
 import { IntegrationsModal } from './IntegrationsModal';
 
+// Provide a working localStorage stub for jsdom environments that lack one
+const localStorageStore: Record<string, string> = {};
+const localStorageStub = {
+  getItem: (key: string) => localStorageStore[key] ?? null,
+  setItem: (key: string, value: string) => { localStorageStore[key] = value; },
+  removeItem: (key: string) => { delete localStorageStore[key]; },
+  clear: () => { for (const k of Object.keys(localStorageStore)) delete localStorageStore[k]; },
+  get length() { return Object.keys(localStorageStore).length; },
+  key: (i: number) => Object.keys(localStorageStore)[i] ?? null,
+};
+
+Object.defineProperty(globalThis, 'localStorage', { value: localStorageStub, writable: true });
+
 describe('IntegrationsModal', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -109,7 +122,7 @@ describe('IntegrationsModal', () => {
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
-    localStorage.clear();
+    localStorageStub.clear();
     Object.values(mocks).forEach(m => m.mockClear());
   });
 
@@ -163,7 +176,7 @@ describe('IntegrationsModal', () => {
     expect(text).toContain('Export .scriv');
   });
 
-  it('enables Google Drive card with one-click connect', async () => {
+  it('enables Google Drive card with credential input always visible', async () => {
     act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
 
     const checkboxes = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
@@ -172,20 +185,24 @@ describe('IntegrationsModal', () => {
       checkboxes[1].click();
     });
 
-    // Should show connect button without requiring manual client ID entry
     const text = container.textContent || '';
     expect(text).toContain('Connect');
-    expect(text).toContain('No developer setup required');
+    expect(text).toContain('Google OAuth Client ID');
 
-    // Client ID input should be hidden behind advanced toggle
+    // Client ID input should be visible (not hidden behind advanced toggle)
     const inputs = container.querySelectorAll('input[placeholder]');
     const clientIdInput = Array.from(inputs).find(
       i => i.getAttribute('placeholder')?.includes('googleusercontent.com')
     );
-    expect(clientIdInput).toBeUndefined();
+    expect(clientIdInput).not.toBeUndefined();
+
+    // Connect button should be disabled without credentials
+    const buttons = container.querySelectorAll('button');
+    const connectBtn = Array.from(buttons).find(b => b.textContent?.includes('Connect'));
+    expect(connectBtn?.disabled).toBe(true);
   });
 
-  it('enables Dropbox card with folder input and one-click connect', async () => {
+  it('enables Dropbox card with folder input and credential input always visible', async () => {
     act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
 
     const checkboxes = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
@@ -194,7 +211,7 @@ describe('IntegrationsModal', () => {
       checkboxes[2].click();
     });
 
-    // Should show folder input but not App Key (behind advanced toggle)
+    // Should show both folder input and App Key input (not hidden behind advanced toggle)
     const inputs = container.querySelectorAll('input[placeholder]');
     const appKeyInput = Array.from(inputs).find(
       i => i.getAttribute('placeholder')?.includes('dropbox-app-key')
@@ -202,13 +219,17 @@ describe('IntegrationsModal', () => {
     const folderInput = Array.from(inputs).find(
       i => i.getAttribute('placeholder')?.includes('/DraftHarbour')
     );
-    expect(appKeyInput).toBeUndefined();
+    expect(appKeyInput).not.toBeUndefined();
     expect(folderInput).not.toBeUndefined();
 
-    // Should show connect button without requiring manual app key entry
     const text = container.textContent || '';
     expect(text).toContain('Connect');
-    expect(text).toContain('No developer setup required');
+    expect(text).toContain('Dropbox App Key');
+
+    // Connect button should be disabled without credentials
+    const buttons = container.querySelectorAll('button');
+    const connectBtn = Array.from(buttons).find(b => b.textContent?.includes('Connect'));
+    expect(connectBtn?.disabled).toBe(true);
   });
 
   it('persists config to localStorage when toggling', async () => {
