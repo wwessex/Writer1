@@ -5,11 +5,23 @@ import type { AIProvider, AIProviderConfig, AIRequest, AIResponse, FallbackConfi
 // Mock providerManager to avoid actual provider instantiation
 vi.mock('./providerManager', () => ({
   createProvider: vi.fn(),
+  loadAIConfig: vi.fn(),
+}));
+vi.mock('@/lib/featureFlags', () => ({
+  getBrokerBaseUrl: vi.fn(),
+}));
+vi.mock('@/lib/desktopSecrets', () => ({
+  isDesktop: vi.fn(),
 }));
 
-import { createProvider } from './providerManager';
+import { getBrokerBaseUrl } from '@/lib/featureFlags';
+import { isDesktop } from '@/lib/desktopSecrets';
+import { createProvider, loadAIConfig } from './providerManager';
 
 const mockCreateProvider = vi.mocked(createProvider);
+const mockLoadAIConfig = vi.mocked(loadAIConfig);
+const mockGetBrokerBaseUrl = vi.mocked(getBrokerBaseUrl);
+const mockIsDesktop = vi.mocked(isDesktop);
 
 function makeMockProvider(overrides: Partial<AIProvider> = {}): AIProvider {
   return {
@@ -37,6 +49,9 @@ function makeRequest(): AIRequest {
 describe('FallbackProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLoadAIConfig.mockReturnValue({ provider: 'managed-cloud' });
+    mockGetBrokerBaseUrl.mockReturnValue('https://broker.test');
+    mockIsDesktop.mockReturnValue(false);
   });
 
   it('uses first available provider', async () => {
@@ -243,6 +258,9 @@ describe('FallbackProvider', () => {
 describe('buildFallbackChain', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLoadAIConfig.mockReturnValue({ provider: 'managed-cloud' });
+    mockGetBrokerBaseUrl.mockReturnValue('https://broker.test');
+    mockIsDesktop.mockReturnValue(false);
   });
 
   it('returns null when no fallback configured', () => {
@@ -304,5 +322,126 @@ describe('buildFallbackChain', () => {
       },
     });
     expect(mockCreateProvider).toHaveBeenNthCalledWith(2, { provider: 'managed-cloud' });
+  });
+
+  it('hydrates an openai-compatible fallback into an executable config', () => {
+    const config: AIProviderConfig = {
+      provider: 'custom-llm',
+      endpoint: 'https://api.example.com/v1/chat/completions',
+      sessionToken: 'sk-test',
+      model: 'gpt-4o-mini',
+      customLlm: {
+        backend: 'ollama',
+        baseUrl: 'http://localhost:11434',
+        model: 'test',
+        fallbackProvider: 'openai-compatible',
+      },
+    };
+
+    const chain = buildFallbackChain(config);
+
+    expect(chain).not.toBeNull();
+    expect(chain!.chain[1]).toEqual({
+      provider: 'openai-compatible',
+      endpoint: 'https://api.example.com/v1/chat/completions',
+      sessionToken: 'sk-test',
+      model: 'gpt-4o-mini',
+    });
+  });
+
+  it('hydrates an openai-compatible fallback from persisted config when needed', () => {
+    mockLoadAIConfig.mockReturnValue({
+      provider: 'openai-compatible',
+      endpoint: 'https://api.persisted.example/v1/chat/completions',
+      sessionToken: 'sk-persisted',
+      model: 'gpt-4.1-mini',
+    });
+
+    const config: AIProviderConfig = {
+      provider: 'custom-llm',
+      customLlm: {
+        backend: 'ollama',
+        baseUrl: 'http://localhost:11434',
+        model: 'test',
+        fallbackProvider: 'openai-compatible',
+      },
+    };
+
+    const chain = buildFallbackChain(config);
+
+    expect(chain).not.toBeNull();
+    expect(chain!.chain[1]).toEqual({
+      provider: 'openai-compatible',
+      endpoint: 'https://api.persisted.example/v1/chat/completions',
+      sessionToken: 'sk-persisted',
+      model: 'gpt-4.1-mini',
+    });
+  });
+
+  it('hydrates a server-proxy fallback into an executable config', () => {
+    const config: AIProviderConfig = {
+      provider: 'custom-llm',
+      serverProxy: {
+        serverProvider: 'groq',
+        model: 'llama-3.3-70b-versatile',
+        userApiKey: 'groq-key',
+      },
+      customLlm: {
+        backend: 'ollama',
+        baseUrl: 'http://localhost:11434',
+        model: 'test',
+        fallbackProvider: 'server-proxy',
+      },
+    };
+
+    const chain = buildFallbackChain(config);
+
+    expect(chain).not.toBeNull();
+    expect(chain!.chain[1]).toEqual({
+      provider: 'server-proxy',
+      serverProxy: {
+        serverProvider: 'groq',
+        model: 'llama-3.3-70b-versatile',
+        userApiKey: 'groq-key',
+      },
+    });
+  });
+
+  it('rejects an unconfigured openai-compatible fallback', () => {
+    const config: AIProviderConfig = {
+      provider: 'custom-llm',
+      customLlm: {
+        backend: 'ollama',
+        baseUrl: 'http://localhost:11434',
+        model: 'test',
+        fallbackProvider: 'openai-compatible',
+      },
+    };
+
+    expect(() => buildFallbackChain(config)).toThrow(
+      'Custom Provider fallback is not configured. Add an API endpoint in Custom provider (advanced) before selecting it as a fallback.',
+    );
+  });
+
+  it('rejects an unconfigured server-proxy fallback', () => {
+    mockGetBrokerBaseUrl.mockReturnValue('');
+
+    const config: AIProviderConfig = {
+      provider: 'custom-llm',
+      serverProxy: {
+        serverProvider: 'groq',
+        model: 'llama-3.3-70b-versatile',
+      },
+      customLlm: {
+        backend: 'ollama',
+        baseUrl: 'http://localhost:11434',
+        model: 'test',
+        fallbackProvider: 'server-proxy',
+      },
+    };
+
+    expect(() => buildFallbackChain(config)).toThrow(
+      'Server Proxy fallback is not configured. Add an API key or configure a broker URL before selecting it as a fallback.',
+    );
   });
 });

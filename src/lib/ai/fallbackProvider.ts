@@ -6,8 +6,10 @@
  * to the next provider in the chain.
  */
 
-import type { AIProvider, AIProviderConfig, AIRequest, AIResponse, FallbackConfig } from './types';
-import { createProvider } from './providerManager';
+import { isDesktop } from '@/lib/desktopSecrets';
+import { getBrokerBaseUrl } from '@/lib/featureFlags';
+import type { AIProvider, AIProviderConfig, AIProviderType, AIRequest, AIResponse, FallbackConfig } from './types';
+import { createProvider, loadAIConfig } from './providerManager';
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -38,6 +40,94 @@ function isRetryableError(error: unknown): boolean {
     }
   }
   return true;
+}
+
+function createFallbackValidationError(message: string): Error {
+  return new Error(message);
+}
+
+function resolveFallbackTargetConfig(
+  fallbackType: AIProviderType,
+  primaryConfig: AIProviderConfig,
+  persistedConfig: AIProviderConfig = loadAIConfig(),
+): AIProviderConfig {
+  const persistedFallback = persistedConfig.provider === fallbackType ? persistedConfig : undefined;
+
+  switch (fallbackType) {
+    case 'managed-cloud':
+    case 'chrome-ai':
+      return { provider: fallbackType };
+    case 'openai-compatible': {
+      const endpoint = primaryConfig.endpoint?.trim() || persistedFallback?.endpoint?.trim();
+      if (!endpoint) {
+        throw createFallbackValidationError(
+          'Custom Provider fallback is not configured. Add an API endpoint in Custom provider (advanced) before selecting it as a fallback.',
+        );
+      }
+
+      const sessionToken = primaryConfig.sessionToken?.trim()
+        ? primaryConfig.sessionToken
+        : persistedFallback?.sessionToken;
+      if (!sessionToken?.trim() && !isDesktop()) {
+        throw createFallbackValidationError(
+          'Custom Provider fallback is not configured. Add an API key in Custom provider (advanced) before selecting it as a fallback.',
+        );
+      }
+
+      return {
+        provider: 'openai-compatible',
+        endpoint,
+        model: primaryConfig.model?.trim() || persistedFallback?.model?.trim(),
+        sessionToken,
+      };
+    }
+    case 'server-proxy': {
+      const serverProvider = primaryConfig.serverProxy?.serverProvider ?? persistedFallback?.serverProxy?.serverProvider;
+      const model = primaryConfig.serverProxy?.model?.trim() || persistedFallback?.serverProxy?.model?.trim();
+      const userApiKey = primaryConfig.serverProxy?.userApiKey?.trim()
+        ? primaryConfig.serverProxy.userApiKey
+        : persistedFallback?.serverProxy?.userApiKey;
+
+      if (!serverProvider || !model) {
+        throw createFallbackValidationError(
+          'Server Proxy fallback is not configured. Select a provider and model in Server AI Providers before selecting it as a fallback.',
+        );
+      }
+
+      if (!userApiKey?.trim() && !getBrokerBaseUrl()) {
+        throw createFallbackValidationError(
+          'Server Proxy fallback is not configured. Add an API key or configure a broker URL before selecting it as a fallback.',
+        );
+      }
+
+      return {
+        provider: 'server-proxy',
+        serverProxy: {
+          serverProvider,
+          model,
+          userApiKey,
+        },
+      };
+    }
+    case 'custom-llm':
+      throw createFallbackValidationError('Custom LLM cannot be used as a fallback target.');
+  }
+}
+
+export function getFallbackTargetValidation(
+  fallbackType: AIProviderType,
+  primaryConfig: AIProviderConfig,
+  persistedConfig: AIProviderConfig = loadAIConfig(),
+): { isValid: boolean; reason?: string } {
+  try {
+    resolveFallbackTargetConfig(fallbackType, primaryConfig, persistedConfig);
+    return { isValid: true };
+  } catch (error) {
+    return {
+      isValid: false,
+      reason: error instanceof Error ? error.message : 'Fallback provider is not configured.',
+    };
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -114,7 +204,7 @@ export function buildFallbackChain(primaryConfig: AIProviderConfig): FallbackCon
   if (primaryWithoutFallback.customLlm) {
     delete primaryWithoutFallback.customLlm.fallbackProvider;
   }
-  const fallbackConfig: AIProviderConfig = { provider: fallbackType };
+  const fallbackConfig = resolveFallbackTargetConfig(fallbackType, primaryConfig);
 
   return {
     chain: [primaryWithoutFallback, fallbackConfig],

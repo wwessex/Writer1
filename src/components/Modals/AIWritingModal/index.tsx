@@ -8,6 +8,7 @@ import {
   loadAIConfig,
   saveAIConfig,
   createProvider,
+  getFallbackTargetValidation,
   isChromeAIAvailable,
   checkChromeAIAvailability,
   detectBestProvider,
@@ -341,6 +342,46 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
             ? chromeAIAvailable
             : /* managed-cloud */ !!getBrokerBaseUrl();
 
+  const fallbackOptions = useMemo(() => {
+    const openAICompatibleValidation = getFallbackTargetValidation('openai-compatible', config);
+    const serverProxyValidation = getFallbackTargetValidation('server-proxy', config);
+
+    return [
+      {
+        value: 'managed-cloud' as const,
+        label: 'Cloud AI',
+        disabled: !getBrokerBaseUrl(),
+        reason: 'Cloud AI fallback is not available because no broker URL is configured.',
+      },
+      {
+        value: 'chrome-ai' as const,
+        label: 'Chrome AI',
+        disabled: !chromeAIAvailable,
+        reason: 'Chrome AI fallback is not available on this device.',
+      },
+      {
+        value: 'openai-compatible' as const,
+        label: 'Custom Provider',
+        disabled: !openAICompatibleValidation.isValid,
+        reason: openAICompatibleValidation.reason,
+      },
+      {
+        value: 'server-proxy' as const,
+        label: 'Server Proxy',
+        disabled: !serverProxyValidation.isValid,
+        reason: serverProxyValidation.reason,
+      },
+    ];
+  }, [chromeAIAvailable, config]);
+
+  const selectedFallbackOption = useMemo(() => {
+    const fallbackProvider = config.customLlm?.fallbackProvider;
+    if (!fallbackProvider) {
+      return null;
+    }
+    return fallbackOptions.find(option => option.value === fallbackProvider) ?? null;
+  }, [config.customLlm?.fallbackProvider, fallbackOptions]);
+
   // Reset transient state when the modal opens/closes
   useEffect(() => {
     if (open) {
@@ -358,13 +399,19 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
 
 
   useEffect(() => {
-    if (config.provider === 'openai-compatible' || config.provider === 'server-proxy') {
+    if (config.provider !== 'managed-cloud' && config.provider !== 'chrome-ai') {
       return;
     }
 
+    let cancelled = false;
+
     detectBestProvider().then(bestProvider => {
+      if (cancelled) {
+        return;
+      }
+
       setConfig(prev => {
-        if (prev.provider === 'openai-compatible' || prev.provider === 'server-proxy' || prev.provider === bestProvider) {
+        if ((prev.provider !== 'managed-cloud' && prev.provider !== 'chrome-ai') || prev.provider === bestProvider) {
           return prev;
         }
         const next = { ...prev, provider: bestProvider };
@@ -372,6 +419,10 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         return next;
       });
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [chromeAIAvailable, config.provider]);
 
   // Scroll response area when new content arrives
@@ -426,10 +477,11 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       setStreamingText('');
       setIsStreaming(false);
 
-      const provider = createProvider(config);
       const useStreaming = config.provider === 'custom-llm' && config.customLlm?.streaming !== false;
+      let provider: ReturnType<typeof createProvider> | null = null;
 
       try {
+        provider = createProvider(config);
         const result = await provider.execute({
           action: presetId || 'custom',
           prompt: promptText,
@@ -459,7 +511,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       } finally {
         setLoading(false);
         setIsStreaming(false);
-        provider.destroy();
+        provider?.destroy();
       }
     },
     [activeChapter, config, isConfigured, state.projectType, state.chapters, state.novelId, state.storyBlueprint, state.activeChapterId]
@@ -486,11 +538,12 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
     setError(null);
     setResponse('');
 
-    const provider = createProvider(config);
     const stages = AI_WRITING_PIPELINE_STAGES.filter(stage => includeToneMatchPass || !stage.optional);
     const stageLogs: Array<{ stageId: string; label: string; action: string; insertionMode: PipelineInsertionMode }> = [];
+    let provider: ReturnType<typeof createProvider> | null = null;
 
     try {
+      provider = createProvider(config);
       let workingDraft = chapterText;
       for (const stage of stages) {
         const stagePrompt = renderPipelinePrompt(stage.promptTemplate, {
@@ -539,7 +592,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       setError(message);
     } finally {
       setLoading(false);
-      provider.destroy();
+      provider?.destroy();
     }
   }, [activeChapter, config, includeToneMatchPass, isConfigured, pipelineModes, prompt, state.chapters, state.novelId, state.projectType, state.storyBlueprint]);
 
@@ -733,9 +786,10 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
 
     const controller = new AbortController();
     abortRef.current = controller;
-    const provider = createProvider(config);
+    let provider: ReturnType<typeof createProvider> | null = null;
 
     try {
+      provider = createProvider(config);
       const result = await runEvalSuite(
         provider,
         config.customLlm?.model || config.model || 'unknown',
@@ -754,7 +808,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       setError(err instanceof Error ? err.message : 'Evaluation failed.');
     } finally {
       setEvalRunning(false);
-      provider.destroy();
+      provider?.destroy();
     }
   }, [config, isConfigured, showToast]);
 
@@ -765,8 +819,9 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
     }
     setTestingConnection(true);
     setConnectionResult(null);
+    let provider: ReturnType<typeof createProvider> | null = null;
     try {
-      const provider = createProvider(config);
+      provider = createProvider(config);
       const result = await provider.execute({
         action: 'custom',
         prompt: 'Say "Connection successful" in exactly two words.',
@@ -779,11 +834,11 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       } else {
         setConnectionResult({ type: 'error', message: 'Empty response from model' });
       }
-      provider.destroy();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       setConnectionResult({ type: 'error', message: `Connection failed: ${message}` });
     } finally {
+      provider?.destroy();
       setTestingConnection(false);
     }
   };
@@ -1112,14 +1167,24 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
                       customLlm: { ...config.customLlm!, fallbackProvider: (e.target.value || undefined) as AIProviderConfig['provider'] | undefined },
                     })}
                     className={styles.aiSelect}
+                    title={selectedFallbackOption?.disabled ? selectedFallbackOption.reason : undefined}
                   >
                     <option value="">None</option>
-                    <option value="managed-cloud">Cloud AI</option>
-                    <option value="chrome-ai">Chrome AI</option>
-                    <option value="openai-compatible">Custom Provider</option>
-                    <option value="server-proxy">Server Proxy</option>
+                    {fallbackOptions.map(option => (
+                      <option key={option.value} value={option.value} disabled={option.disabled}>
+                        {option.disabled ? `${option.label} (configure first)` : option.label}
+                      </option>
+                    ))}
                   </select>
                 </label>
+                {selectedFallbackOption?.disabled && selectedFallbackOption.reason && (
+                  <div className={`${styles.aiConnectionResult} ${styles['aiConnectionResult--warning']}`}>
+                    <span className="material-symbols-rounded" style={{ fontSize: '1rem' }}>
+                      warning
+                    </span>
+                    {selectedFallbackOption.reason}
+                  </div>
+                )}
               </div>
             )}
 
