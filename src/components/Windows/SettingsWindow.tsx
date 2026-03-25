@@ -213,6 +213,7 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   const [localLlmTestResult, setLocalLlmTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [localLlmTesting, setLocalLlmTesting] = useState(false);
   const [ollamaModels, setOllamaModels] = useState<string[]>([]);
+  const [ollamaModelsFetching, setOllamaModelsFetching] = useState(false);
 
   const updateAIConfig = useCallback((updates: Partial<AIProviderConfig>) => {
     setAIConfig(prev => {
@@ -257,13 +258,50 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
 
   // Fetch Ollama models when backend is ollama
   const customLlm = aiConfig.customLlm;
+  const customLlmBackend = customLlm?.backend;
+  const customLlmBaseUrl = customLlm?.baseUrl;
   useEffect(() => {
-    if (customLlm?.backend === 'ollama' && customLlm.baseUrl?.trim()) {
-      fetchOllamaModels(customLlm.baseUrl).then(setOllamaModels).catch(() => setOllamaModels([]));
+    if (customLlmBackend === 'ollama' && customLlmBaseUrl?.trim()) {
+      setOllamaModelsFetching(true);
+      fetchOllamaModels(customLlmBaseUrl)
+        .then(models => {
+          setOllamaModels(models);
+          if (models.length === 0 && aiConfig.provider === 'custom-llm') {
+            setLocalLlmTestResult({ ok: false, message: 'Could not fetch models from Ollama. Is it running?' });
+          }
+        })
+        .catch(() => {
+          setOllamaModels([]);
+          if (aiConfig.provider === 'custom-llm') {
+            setLocalLlmTestResult({ ok: false, message: 'Could not connect to Ollama server.' });
+          }
+        })
+        .finally(() => setOllamaModelsFetching(false));
     } else {
       setOllamaModels([]);
     }
-  }, [customLlm]);
+  }, [customLlmBackend, customLlmBaseUrl, aiConfig.provider]);
+
+  // Probe non-Ollama backends for connectivity when selected
+  useEffect(() => {
+    if (aiConfig.provider !== 'custom-llm' || !customLlmBackend || !customLlmBaseUrl?.trim()) return;
+    if (customLlmBackend === 'ollama') return;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    fetch(`${customLlmBaseUrl.replace(/\/+$/, '')}/v1/models`, { signal: controller.signal })
+      .then(res => {
+        if (!res.ok) {
+          setLocalLlmTestResult({ ok: false, message: `Server returned ${res.status}. Check your configuration.` });
+        } else {
+          setLocalLlmTestResult({ ok: true, message: `Connected to ${CUSTOM_LLM_BACKEND_LABELS[customLlmBackend]} successfully.` });
+        }
+      })
+      .catch(() => {
+        setLocalLlmTestResult({ ok: false, message: `Could not reach ${CUSTOM_LLM_BACKEND_LABELS[customLlmBackend]} at ${customLlmBaseUrl}.` });
+      })
+      .finally(() => clearTimeout(timeout));
+    return () => { controller.abort(); clearTimeout(timeout); };
+  }, [customLlmBackend, customLlmBaseUrl, aiConfig.provider]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -696,7 +734,7 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                   <label>{highlightMatch('Backend')}</label>
                   <div className={styles.aiEndpointPresets}>
                     {(Object.keys(CUSTOM_LLM_DEFAULTS) as CustomLlmBackend[]).map(backend => {
-                      const isActive = (aiConfig.customLlm?.backend ?? 'ollama') === backend;
+                      const isActive = aiConfig.provider === 'custom-llm' && aiConfig.customLlm?.backend === backend;
                       return (
                         <button
                           key={backend}
@@ -730,7 +768,9 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                     {highlightMatch('Model')}
                     <HelpTooltip text="Model name or tag (e.g. narratryx:latest)" />
                   </label>
-                  {ollamaModels.length > 0 ? (
+                  {ollamaModelsFetching ? (
+                    <Input placeholder="Fetching models..." disabled />
+                  ) : ollamaModels.length > 0 ? (
                     <Select
                       options={[
                         ...ollamaModels.map(m => ({ value: m, label: m })),

@@ -344,4 +344,85 @@ describe('SettingsWindow', () => {
     expect(text).toContain('Autosave (ms)');
     rendered.unmount();
   });
+
+  it('does not pre-select any backend button when provider is not custom-llm', async () => {
+    const rendered = renderSettingsWindow();
+
+    // Expand the Local AI section
+    const sections = Array.from(rendered.container.querySelectorAll('section'));
+    const localAiSection = sections.find(s => s.textContent?.includes('Local AI'));
+    const toggle = localAiSection!.querySelector('button');
+    await act(async () => { toggle!.click(); });
+
+    // Find all backend preset buttons inside the section
+    const buttons = Array.from(localAiSection!.querySelectorAll('button'));
+    // The active class should not be applied to any backend button
+    const activeButtons = buttons.filter(b =>
+      b.className.includes('active') && (
+        b.textContent?.includes('Ollama') ||
+        b.textContent?.includes('vLLM') ||
+        b.textContent?.includes('llama.cpp') ||
+        b.textContent?.includes('Custom Endpoint')
+      )
+    );
+    expect(activeButtons).toHaveLength(0);
+    rendered.unmount();
+  });
+
+  it('calls saveAIConfig with custom-llm provider when backend button is clicked', async () => {
+    const rendered = renderSettingsWindow();
+
+    // Expand Local AI section
+    const sections = Array.from(rendered.container.querySelectorAll('section'));
+    const localAiSection = sections.find(s => s.textContent?.includes('Local AI'));
+    const toggle = localAiSection!.querySelector('button');
+    await act(async () => { toggle!.click(); });
+
+    // Click the Ollama backend button
+    const buttons = Array.from(localAiSection!.querySelectorAll('button'));
+    const ollamaBtn = buttons.find(b => b.textContent?.includes('Ollama') && b.textContent?.includes('localhost:11434'));
+    expect(ollamaBtn).toBeDefined();
+
+    await act(async () => { ollamaBtn!.click(); });
+
+    expect(mocks.saveAIConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'custom-llm',
+        customLlm: expect.objectContaining({
+          backend: 'ollama',
+          baseUrl: 'http://localhost:11434',
+        }),
+      }),
+    );
+    rendered.unmount();
+  });
+
+  it('shows fetching state for Ollama models after selecting Ollama backend', async () => {
+    // Make fetchOllamaModels hang to observe loading state
+    const { fetchOllamaModels } = await import('@/lib/ai');
+    let resolveModels!: (v: string[]) => void;
+    vi.mocked(fetchOllamaModels).mockReturnValue(new Promise(r => { resolveModels = r; }));
+
+    const rendered = renderSettingsWindow();
+
+    // Expand and click Ollama
+    const sections = Array.from(rendered.container.querySelectorAll('section'));
+    const localAiSection = sections.find(s => s.textContent?.includes('Local AI'));
+    const toggle = localAiSection!.querySelector('button');
+    await act(async () => { toggle!.click(); });
+
+    const buttons = Array.from(localAiSection!.querySelectorAll('button'));
+    const ollamaBtn = buttons.find(b => b.textContent?.includes('Ollama') && b.textContent?.includes('localhost:11434'));
+    await act(async () => { ollamaBtn!.click(); });
+
+    // Should show fetching placeholder
+    const inputs = Array.from(localAiSection!.querySelectorAll('input'));
+    const fetchingInput = inputs.find(i => i.placeholder === 'Fetching models...');
+    expect(fetchingInput).toBeDefined();
+    expect(fetchingInput!.disabled).toBe(true);
+
+    // Resolve the promise to clean up
+    await act(async () => { resolveModels([]); });
+    rendered.unmount();
+  });
 });
