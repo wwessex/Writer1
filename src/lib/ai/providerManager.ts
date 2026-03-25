@@ -14,12 +14,13 @@ import { OpenAIProvider } from './openaiProvider';
 import { ServerProxyProvider } from './serverProxyProvider';
 import { CustomLlmProvider } from './customLlmProvider';
 import { FallbackProvider, buildFallbackChain } from './fallbackProvider';
-import { isChromeAIAvailable, isChromeBrowser } from './availability';
-import { deleteSecret, isDesktop, setSecret } from '@/lib/desktopSecrets';
+import { isChromeAIAvailable, isChromeBrowser, detectLocalLlmServer } from './availability';
+import { deleteSecret, getSecret, isDesktop, setSecret } from '@/lib/desktopSecrets';
 import { getManagedPolicy } from '@/lib/policy';
 
 const STORAGE_KEY = 'draftharbour_ai_config';
 const AI_TOKEN_SECRET_KEY = 'ai_session_token';
+const CUSTOM_LLM_SECRET_KEY = 'custom_llm_api_key';
 
 /* ------------------------------------------------------------------ */
 /*  Config persistence                                                 */
@@ -105,6 +106,11 @@ export function saveAIConfig(config: AIProviderConfig): void {
     } else {
       void deleteSecret(AI_TOKEN_SECRET_KEY);
     }
+    if (config.customLlm?.apiKey) {
+      void setSecret(CUSTOM_LLM_SECRET_KEY, config.customLlm.apiKey);
+    } else {
+      void deleteSecret(CUSTOM_LLM_SECRET_KEY);
+    }
   }
 
   // Scrub sensitive fields from customLlm before persisting
@@ -122,6 +128,29 @@ export function saveAIConfig(config: AIProviderConfig): void {
     customLlm: safeCustomLlm,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(safeConfig));
+}
+
+/**
+ * Hydrate secrets from the OS keychain on desktop.
+ * Call after `loadAIConfig()` to restore API keys that are
+ * deliberately scrubbed from localStorage.
+ */
+export async function hydrateDesktopSecrets(config: AIProviderConfig): Promise<AIProviderConfig> {
+  if (!isDesktop()) return config;
+
+  const [sessionToken, customLlmKey] = await Promise.all([
+    config.sessionToken ? Promise.resolve(config.sessionToken) : getSecret(AI_TOKEN_SECRET_KEY),
+    config.customLlm?.apiKey ? Promise.resolve(config.customLlm.apiKey) : getSecret(CUSTOM_LLM_SECRET_KEY),
+  ]);
+
+  return {
+    ...config,
+    sessionToken: sessionToken ?? config.sessionToken,
+    customLlm: config.customLlm ? {
+      ...config.customLlm,
+      apiKey: customLlmKey ?? config.customLlm.apiKey,
+    } : config.customLlm,
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -162,14 +191,36 @@ export function createProvider(config: AIProviderConfig): AIProvider {
 
 /**
  * Detect the best available provider.
- * Returns 'chrome-ai' when on a supported Chrome build with the APIs
- * available, otherwise falls back to 'managed-cloud'.
+ * Checks Chrome AI first, then probes for local LLM servers,
+ * and falls back to 'managed-cloud'.
  */
 export async function detectBestProvider(): Promise<AIProviderType> {
   if (await isChromeAIAvailable()) {
     return 'chrome-ai';
   }
+  const local = await detectLocalLlmServer();
+  if (local.available) {
+    return 'custom-llm';
+  }
   return 'managed-cloud';
+}
+
+/**
+ * Detect a local LLM server and return a pre-filled config.
+ * Useful for auto-configuring the custom LLM provider in the UI.
+ */
+export async function detectLocalLlmConfig(): Promise<AIProviderConfig | null> {
+  const local = await detectLocalLlmServer();
+  if (!local.available || !local.backend || !local.baseUrl) return null;
+  return {
+    provider: 'custom-llm',
+    customLlm: {
+      backend: local.backend,
+      baseUrl: local.baseUrl,
+      model: local.backend === 'ollama' ? 'narratryx:latest' : 'narratryx',
+      streaming: true,
+    },
+  };
 }
 
 /**

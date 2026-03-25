@@ -17,6 +17,7 @@ import {
   SERVER_PROXY_LABELS,
   CUSTOM_LLM_DEFAULTS,
   CUSTOM_LLM_BACKEND_LABELS,
+  fetchOllamaModels,
   assembleStoryBibleContext,
   runEvalSuite,
   saveEvalResult,
@@ -263,6 +264,16 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionResult, setConnectionResult] = useState<{ type: 'success' | 'error' | 'warning'; message: string } | null>(null);
   const [showCustomProvider, setShowCustomProvider] = useState(false);
+  const [ollamaModelList, setOllamaModelList] = useState<string[]>([]);
+
+  // Fetch Ollama models when backend is ollama and baseUrl is set
+  useEffect(() => {
+    if (config.provider === 'custom-llm' && config.customLlm?.backend === 'ollama' && config.customLlm.baseUrl?.trim()) {
+      fetchOllamaModels(config.customLlm.baseUrl).then(setOllamaModelList).catch(() => setOllamaModelList([]));
+    } else {
+      setOllamaModelList([]);
+    }
+  }, [config.provider, config.customLlm?.backend, config.customLlm?.baseUrl]);
 
   // Chrome AI availability
   const [chromeAIAvailable, setChromeAIAvailable] = useState(false);
@@ -1053,13 +1064,30 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
                 </label>
                 <label className={styles.aiLabel}>
                   Model
-                  <Input
-                    placeholder={CUSTOM_LLM_DEFAULTS[config.customLlm.backend].model}
-                    value={config.customLlm.model || ''}
-                    onChange={e => updateConfig({
-                      customLlm: { ...config.customLlm!, model: e.target.value },
-                    })}
-                  />
+                  {ollamaModelList.length > 0 ? (
+                    <select
+                      value={ollamaModelList.includes(config.customLlm.model || '') ? config.customLlm.model : '__custom__'}
+                      onChange={e => {
+                        if (e.target.value !== '__custom__') {
+                          updateConfig({ customLlm: { ...config.customLlm!, model: e.target.value } });
+                        }
+                      }}
+                      className={styles.aiSelect}
+                    >
+                      {ollamaModelList.map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                      <option value="__custom__">Custom...</option>
+                    </select>
+                  ) : (
+                    <Input
+                      placeholder={CUSTOM_LLM_DEFAULTS[config.customLlm.backend].model}
+                      value={config.customLlm.model || ''}
+                      onChange={e => updateConfig({
+                        customLlm: { ...config.customLlm!, model: e.target.value },
+                      })}
+                    />
+                  )}
                 </label>
                 <label className={styles.aiLabel}>
                   API Key (optional)
@@ -1118,6 +1146,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
                     <option value="chrome-ai">Chrome AI</option>
                     <option value="openai-compatible">Custom Provider</option>
                     <option value="server-proxy">Server Proxy</option>
+                    <option value="custom-llm">Custom LLM</option>
                   </select>
                 </label>
               </div>

@@ -5,8 +5,8 @@ import { HelpTooltip } from '@/components/UI/Tooltip';
 import { Select } from '@/components/UI/Select';
 import { clearAllData } from '@/lib/storage';
 import { isTelemetryOptedIn, setTelemetryOptIn, clearTelemetryData } from '@/lib/telemetry';
-import { loadAIConfig, saveAIConfig } from '@/lib/ai';
-import type { AIProviderConfig } from '@/lib/ai';
+import { loadAIConfig, saveAIConfig, CUSTOM_LLM_DEFAULTS, CUSTOM_LLM_BACKEND_LABELS, fetchOllamaModels, testCustomLlmConnection } from '@/lib/ai';
+import type { AIProviderConfig, CustomLlmBackend, CustomLlmConfig } from '@/lib/ai';
 import { useWindowResize } from '@/hooks/useResizable';
 import { getManagedPolicy } from '@/lib/policy';
 import { applyUpdateAndRestart, checkForUpdate, deferUpdate, getDeferredUpdateVersion, getLaunchFallbackMessage, getReleaseChannel, setReleaseChannel, type UpdaterSummary } from '@/lib/desktopUpdater';
@@ -118,6 +118,17 @@ const SETTINGS_SECTIONS = [
     ]
   },
   {
+    id: 'localai',
+    title: 'Local AI (Custom LLM)',
+    keywords: ['ollama', 'vllm', 'llama', 'local', 'custom', 'self-hosted', 'narratryx'],
+    fields: [
+      { id: 'localaiBackend', label: 'Backend', keywords: ['ollama', 'vllm', 'llama.cpp'] },
+      { id: 'localaiBaseUrl', label: 'Base URL', keywords: ['endpoint', 'url', 'localhost'] },
+      { id: 'localaiModel', label: 'Model', keywords: ['model name', 'narratryx'] },
+      { id: 'localaiApiKey', label: 'API Key', keywords: ['token', 'secret'] },
+    ]
+  },
+  {
     id: 'assist',
     title: 'Writing Assistance',
     keywords: ['grammar', 'spelling', 'language tool'],
@@ -185,6 +196,7 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     typography: false,
     ai: false,
+    localai: true,
     sync: true,
     assist: true,
     updates: false,
@@ -198,6 +210,9 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   const [updateSummary, setUpdateSummary] = useState<UpdaterSummary | null>(null);
   const [updateBusy, setUpdateBusy] = useState(false);
   const [aiConfig, setAIConfig] = useState<AIProviderConfig>(loadAIConfig);
+  const [localLlmTestResult, setLocalLlmTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [localLlmTesting, setLocalLlmTesting] = useState(false);
+  const [ollamaModels, setOllamaModels] = useState<string[]>([]);
 
   const updateAIConfig = useCallback((updates: Partial<AIProviderConfig>) => {
     setAIConfig(prev => {
@@ -210,6 +225,45 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
       return next;
     });
   }, []);
+
+  const updateCustomLlmConfig = useCallback((updates: Partial<CustomLlmConfig>) => {
+    setAIConfig(prev => {
+      const currentLlm = prev.customLlm ?? { backend: 'ollama' as CustomLlmBackend, baseUrl: CUSTOM_LLM_DEFAULTS.ollama.baseUrl, model: CUSTOM_LLM_DEFAULTS.ollama.model };
+      const next: AIProviderConfig = {
+        ...prev,
+        provider: 'custom-llm',
+        customLlm: { ...currentLlm, ...updates },
+      };
+      saveAIConfig(next);
+      return next;
+    });
+    setLocalLlmTestResult(null);
+  }, []);
+
+  const handleLocalLlmTest = useCallback(async () => {
+    const llm = aiConfig.customLlm;
+    if (!llm?.baseUrl?.trim() || !llm?.model?.trim()) return;
+    setLocalLlmTesting(true);
+    setLocalLlmTestResult(null);
+    try {
+      const result = await testCustomLlmConnection(llm);
+      setLocalLlmTestResult(result);
+    } catch {
+      setLocalLlmTestResult({ ok: false, message: 'Test failed unexpectedly.' });
+    } finally {
+      setLocalLlmTesting(false);
+    }
+  }, [aiConfig.customLlm]);
+
+  // Fetch Ollama models when backend is ollama
+  const customLlm = aiConfig.customLlm;
+  useEffect(() => {
+    if (customLlm?.backend === 'ollama' && customLlm.baseUrl?.trim()) {
+      fetchOllamaModels(customLlm.baseUrl).then(setOllamaModels).catch(() => setOllamaModels([]));
+    } else {
+      setOllamaModels([]);
+    }
+  }, [customLlm]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -607,6 +661,127 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                       <p className={styles.privacyNotice__text}>
                         AI provider configured. Open <strong>AI Writing Tools</strong> from the menu to start using AI assistance.
                       </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+          )}
+
+          {/* Local AI (Custom LLM) Section */}
+          {isSectionVisible('localai') && (
+          <section className={styles.section} ref={el => { sectionRefs.current.localai = el; }}>
+            <button className={styles.sectionToggle} onClick={() => toggleSection('localai')}>
+              <h4>
+                <span className="material-symbols-rounded">memory</span>
+                {highlightMatch('Local AI (Custom LLM)')}
+              </h4>
+              <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
+                {isSectionCollapsed('localai') ? 'expand_more' : 'expand_less'}
+              </span>
+            </button>
+            {!isSectionCollapsed('localai') && (
+              <div className={styles.sectionContent}>
+                <div className={styles.privacyNotice}>
+                  <span className="material-symbols-rounded">info</span>
+                  <div>
+                    <p className={styles.privacyNotice__text}>
+                      Connect to a local or self-hosted LLM server (Ollama, vLLM, llama.cpp).
+                      All data stays on your machine.
+                    </p>
+                  </div>
+                </div>
+                {isFieldVisible('localai', 'localaiBackend') && <div className={styles.field}>
+                  <label>{highlightMatch('Backend')}</label>
+                  <div className={styles.aiEndpointPresets}>
+                    {(Object.keys(CUSTOM_LLM_DEFAULTS) as CustomLlmBackend[]).map(backend => {
+                      const isActive = (aiConfig.customLlm?.backend ?? 'ollama') === backend;
+                      return (
+                        <button
+                          key={backend}
+                          className={`${styles.aiEndpointPreset} ${isActive ? styles['aiEndpointPreset--active'] : ''}`}
+                          onClick={() => updateCustomLlmConfig({
+                            backend,
+                            baseUrl: CUSTOM_LLM_DEFAULTS[backend].baseUrl,
+                            model: CUSTOM_LLM_DEFAULTS[backend].model,
+                          })}
+                        >
+                          <strong>{CUSTOM_LLM_BACKEND_LABELS[backend]}</strong>
+                          <small>{CUSTOM_LLM_DEFAULTS[backend].baseUrl}</small>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>}
+                {isFieldVisible('localai', 'localaiBaseUrl') && <div className={styles.field}>
+                  <label>
+                    {highlightMatch('Base URL')}
+                    <HelpTooltip text="The base URL of your inference server" />
+                  </label>
+                  <Input
+                    placeholder={CUSTOM_LLM_DEFAULTS[aiConfig.customLlm?.backend ?? 'ollama'].baseUrl}
+                    value={aiConfig.customLlm?.baseUrl ?? ''}
+                    onChange={e => updateCustomLlmConfig({ baseUrl: e.target.value })}
+                  />
+                </div>}
+                {isFieldVisible('localai', 'localaiModel') && <div className={styles.field}>
+                  <label>
+                    {highlightMatch('Model')}
+                    <HelpTooltip text="Model name or tag (e.g. narratryx:latest)" />
+                  </label>
+                  {ollamaModels.length > 0 ? (
+                    <Select
+                      options={[
+                        ...ollamaModels.map(m => ({ value: m, label: m })),
+                        { value: '__custom__', label: 'Custom...' },
+                      ]}
+                      value={ollamaModels.includes(aiConfig.customLlm?.model ?? '') ? (aiConfig.customLlm?.model ?? '') : '__custom__'}
+                      onChange={e => {
+                        if (e.target.value !== '__custom__') {
+                          updateCustomLlmConfig({ model: e.target.value });
+                        }
+                      }}
+                    />
+                  ) : (
+                    <Input
+                      placeholder={CUSTOM_LLM_DEFAULTS[aiConfig.customLlm?.backend ?? 'ollama'].model}
+                      value={aiConfig.customLlm?.model ?? ''}
+                      onChange={e => updateCustomLlmConfig({ model: e.target.value })}
+                    />
+                  )}
+                </div>}
+                {isFieldVisible('localai', 'localaiApiKey') && <div className={styles.field}>
+                  <label>
+                    {highlightMatch('API Key')}
+                    <HelpTooltip text="Optional API key for authenticated endpoints" />
+                  </label>
+                  <Input
+                    type="password"
+                    placeholder="Optional"
+                    value={aiConfig.customLlm?.apiKey ?? ''}
+                    onChange={e => updateCustomLlmConfig({ apiKey: e.target.value })}
+                  />
+                </div>}
+                <div className={styles.field}>
+                  <Button
+                    onClick={handleLocalLlmTest}
+                    disabled={localLlmTesting || !aiConfig.customLlm?.baseUrl?.trim() || !aiConfig.customLlm?.model?.trim()}
+                    size="small"
+                  >
+                    {localLlmTesting ? 'Testing...' : 'Test Connection'}
+                  </Button>
+                </div>
+                {localLlmTestResult && (
+                  <div className={styles.privacyNotice}>
+                    <span
+                      className="material-symbols-rounded"
+                      style={{ color: localLlmTestResult.ok ? 'var(--success, #22c55e)' : 'var(--error, #ef4444)' }}
+                    >
+                      {localLlmTestResult.ok ? 'check_circle' : 'error'}
+                    </span>
+                    <div>
+                      <p className={styles.privacyNotice__text}>{localLlmTestResult.message}</p>
                     </div>
                   </div>
                 )}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CustomLlmProvider, CUSTOM_LLM_DEFAULTS, CUSTOM_LLM_BACKEND_LABELS } from './customLlmProvider';
+import { CustomLlmProvider, CUSTOM_LLM_DEFAULTS, CUSTOM_LLM_BACKEND_LABELS, fetchOllamaModels, testCustomLlmConnection } from './customLlmProvider';
 import type { AIProviderConfig, AIRequest } from './types';
 
 // Mock fetchWithPolicy
@@ -270,5 +270,97 @@ describe('CUSTOM_LLM_DEFAULTS', () => {
   it('has labels for all backends', () => {
     expect(CUSTOM_LLM_BACKEND_LABELS.ollama).toBe('Ollama');
     expect(CUSTOM_LLM_BACKEND_LABELS.vllm).toBe('vLLM');
+  });
+});
+
+describe('fetchOllamaModels', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returns model names from a successful response', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ models: [{ name: 'narratryx:latest' }, { name: 'llama3:8b' }] }),
+    } as Response);
+
+    const models = await fetchOllamaModels('http://localhost:11434');
+    expect(models).toEqual(['narratryx:latest', 'llama3:8b']);
+  });
+
+  it('returns empty array on fetch failure', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Connection refused'));
+
+    const models = await fetchOllamaModels('http://localhost:11434');
+    expect(models).toEqual([]);
+  });
+
+  it('returns empty array on non-ok response', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: false,
+    } as Response);
+
+    const models = await fetchOllamaModels('http://localhost:11434');
+    expect(models).toEqual([]);
+  });
+
+  it('returns empty array when models is not an array', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ models: 'not-an-array' }),
+    } as Response);
+
+    const models = await fetchOllamaModels('http://localhost:11434');
+    expect(models).toEqual([]);
+  });
+});
+
+describe('testCustomLlmConnection', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returns ok on successful response', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ message: { content: 'Hi' } }),
+    } as Response);
+
+    const result = await testCustomLlmConnection({
+      backend: 'ollama',
+      baseUrl: 'http://localhost:11434',
+      model: 'test',
+    });
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain('Connected');
+  });
+
+  it('returns error on non-ok response', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      text: async () => 'model not found',
+    } as unknown as Response);
+
+    const result = await testCustomLlmConnection({
+      backend: 'ollama',
+      baseUrl: 'http://localhost:11434',
+      model: 'missing',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('404');
+  });
+
+  it('returns error on connection failure', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Connection refused'));
+
+    const result = await testCustomLlmConnection({
+      backend: 'vllm',
+      baseUrl: 'http://localhost:8000',
+      model: 'test',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('Connection failed');
   });
 });

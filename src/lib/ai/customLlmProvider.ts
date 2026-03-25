@@ -200,6 +200,89 @@ function extractNonStreamResponse(
 }
 
 /* ------------------------------------------------------------------ */
+/*  Utilities                                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Fetch the list of available models from an Ollama server.
+ * Returns an empty array on failure.
+ */
+export async function fetchOllamaModels(baseUrl: string): Promise<string[]> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000);
+  try {
+    const url = `${baseUrl.replace(/\/+$/, '')}/api/tags`;
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const models = data?.models;
+    if (!Array.isArray(models)) return [];
+    return models.map((m: { name?: string }) => m.name).filter(Boolean) as string[];
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * Test connectivity to a custom LLM backend.
+ * Sends a minimal request and checks for a valid response.
+ */
+export async function testCustomLlmConnection(
+  config: { backend: CustomLlmBackend; baseUrl: string; model: string; apiKey?: string },
+): Promise<{ ok: boolean; message: string }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const endpoint = resolveEndpoint(config.backend, config.baseUrl);
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (config.apiKey?.trim()) {
+      headers['Authorization'] = `Bearer ${config.apiKey.trim()}`;
+    }
+
+    let body: string;
+    if (config.backend === 'ollama') {
+      body = JSON.stringify({
+        model: config.model,
+        messages: [{ role: 'user', content: 'Hello' }],
+        stream: false,
+        options: { num_predict: 4 },
+      });
+    } else {
+      body = JSON.stringify({
+        model: config.model,
+        messages: [{ role: 'user', content: 'Hello' }],
+        max_tokens: 4,
+        stream: false,
+      });
+    }
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body,
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      return { ok: false, message: `Server returned ${res.status}: ${errText || res.statusText}` };
+    }
+
+    return { ok: true, message: `Connected to ${CUSTOM_LLM_BACKEND_LABELS[config.backend]} successfully.` };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    if (msg.includes('abort')) {
+      return { ok: false, message: 'Connection timed out after 15 seconds.' };
+    }
+    return { ok: false, message: `Connection failed: ${msg}` };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  Provider class                                                     */
 /* ------------------------------------------------------------------ */
 

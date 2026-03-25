@@ -12,7 +12,7 @@
  * since some Chrome builds expose them there instead.
  */
 
-import type { AvailabilityStatus, ChromeAIAvailability } from './types';
+import type { AvailabilityStatus, ChromeAIAvailability, CustomLlmBackend } from './types';
 
 /* ------------------------------------------------------------------ */
 /*  Browser guard — only real Chrome ships usable Built-in AI APIs     */
@@ -132,4 +132,59 @@ export async function isChromeAIAvailable(): Promise<boolean> {
   return Object.values(result).some(
     (s) => s === 'available' || s === 'downloadable' || s === 'downloading',
   );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Local LLM server detection                                         */
+/* ------------------------------------------------------------------ */
+
+export interface LocalLlmDetection {
+  available: boolean;
+  backend?: CustomLlmBackend;
+  baseUrl?: string;
+}
+
+const LOCAL_LLM_PROBES: { backend: CustomLlmBackend; baseUrl: string; path: string }[] = [
+  { backend: 'ollama', baseUrl: 'http://localhost:11434', path: '/api/tags' },
+  { backend: 'vllm', baseUrl: 'http://localhost:8000', path: '/v1/models' },
+  { backend: 'llama-cpp', baseUrl: 'http://localhost:8080', path: '/v1/models' },
+];
+
+const PROBE_TIMEOUT_MS = 1500;
+
+/**
+ * Probe well-known localhost ports to detect a running LLM inference server.
+ * Returns the first backend that responds successfully.
+ */
+export async function detectLocalLlmServer(): Promise<LocalLlmDetection> {
+  const results = await Promise.allSettled(
+    LOCAL_LLM_PROBES.map(async (probe) => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+      try {
+        const res = await fetch(`${probe.baseUrl}${probe.path}`, {
+          method: 'GET',
+          signal: controller.signal,
+        });
+        if (res.ok) return probe;
+        return null;
+      } catch {
+        return null;
+      } finally {
+        clearTimeout(timeout);
+      }
+    }),
+  );
+
+  for (const result of results) {
+    if (result.status === 'fulfilled' && result.value) {
+      return {
+        available: true,
+        backend: result.value.backend,
+        baseUrl: result.value.baseUrl,
+      };
+    }
+  }
+
+  return { available: false };
 }
