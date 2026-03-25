@@ -38,7 +38,22 @@ export const AI_WRITING_PIPELINE_STAGES: PipelineStage[] = [
     id: 'grammar',
     label: '4. Grammar/readability pass',
     action: 'pipeline-grammar',
-    promptTemplate: `Edit for grammar, clarity, readability, and consistency. Do not change story intent.\n\nCurrent draft:\n{{currentDraft}}\n\nOutput only the corrected draft.`,
+    promptTemplate: `You are a proofreader. Fix every error in the draft below. Check for:
+- Spelling mistakes
+- Grammar errors (subject-verb agreement, tense consistency, pronoun reference)
+- Punctuation (missing commas, incorrect apostrophes, run-on sentences)
+- Repeated or missing words
+- Homophones (their/there/they're, its/it's, your/you're, weather/whether, then/than)
+
+Rules:
+- Do NOT add new content or change the meaning
+- Do NOT rephrase for style — only fix errors
+- Preserve all character names, dialogue, and formatting
+
+Current draft:
+{{currentDraft}}
+
+Output only the corrected draft with no commentary.`,
   },
   {
     id: 'tone',

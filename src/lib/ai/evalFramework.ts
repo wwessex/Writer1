@@ -120,6 +120,24 @@ export const EVAL_PROMPTS: EvalPrompt[] = [
     expectedTraits: ["they're", 'tomorrow', 'whether', "children's", 'across', 'seemed'],
     maxLatencyMs: 15000,
   },
+  {
+    id: 'spelling-fix',
+    label: 'Spelling correction',
+    action: 'grammar',
+    prompt: 'Fix all spelling errors in the text. Output only the corrected text.',
+    context: 'The wierd profesor was definately not intrested in the restaraunt\'s reccomendation. He prefered to seperate the deserts from the main corse.',
+    expectedTraits: ['weird', 'professor', 'definitely', 'interested', 'restaurant', 'recommendation', 'preferred', 'separate', 'desserts', 'course'],
+    maxLatencyMs: 15000,
+  },
+  {
+    id: 'homophone-fix',
+    label: 'Homophone correction',
+    action: 'grammar',
+    prompt: 'Fix all homophone and commonly confused word errors. Output only the corrected text.',
+    context: 'Its been a long time sense they went their. Your not going to believe the affect it had on there moral. The principle reason was that he lead them down the wrong path, and the whether made it worse.',
+    expectedTraits: ["it's", 'since', 'there', "you're", 'effect', 'their', 'morale', 'principal', 'led', 'weather'],
+    maxLatencyMs: 15000,
+  },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -189,16 +207,26 @@ function scoreInstructionFollowing(response: string, prompt: string): number {
 
 function scoreGrammar(response: string): number {
   if (!response.trim()) return 0;
-  let score = 0.7; // assume mostly correct
+  let score = 0.6;
 
-  // Basic checks for common issues
+  // Penalise common grammar issues in the output
   const doubleSpaces = (response.match(/  +/g) ?? []).length;
   const unclosedQuotes = (response.match(/"/g) ?? []).length % 2 !== 0;
   const repeatedWords = (response.match(/\b(\w+)\s+\1\b/gi) ?? []).length;
 
-  if (doubleSpaces > 3) score -= 0.1;
+  if (doubleSpaces > 2) score -= 0.1;
   if (unclosedQuotes) score -= 0.1;
-  if (repeatedWords > 2) score -= 0.15;
+  if (repeatedWords > 1) score -= 0.15;
+
+  // Check for common misspellings that should have been caught
+  const commonMisspellings = /\b(teh|recieve|occured|seperate|definately|wierd|accomodate|occurence|tommorow|accross)\b/gi;
+  const misspellingCount = (response.match(commonMisspellings) ?? []).length;
+  if (misspellingCount > 0) score -= 0.15 * Math.min(misspellingCount, 3);
+
+  // Check for homophone errors in output
+  const homophones = /\b(their going|your welcome|its been|could of|should of|would of|alot)\b/gi;
+  const homophoneCount = (response.match(homophones) ?? []).length;
+  if (homophoneCount > 0) score -= 0.1 * Math.min(homophoneCount, 3);
 
   // Reward well-structured text
   const sentences = response.split(/[.!?]+/).filter(s => s.trim());

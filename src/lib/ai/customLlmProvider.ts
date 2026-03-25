@@ -51,10 +51,14 @@ function resolveEndpoint(backend: CustomLlmBackend, baseUrl: string): string {
   }
 }
 
-function buildSystemPrompt(projectType: 'book' | 'screenplay', sectionTitle?: string): string {
+function buildSystemPrompt(projectType: 'book' | 'screenplay', sectionTitle?: string, action?: string): string {
   const docType = projectType === 'screenplay' ? 'screenplay' : 'novel';
   const sectionLabel = projectType === 'screenplay' ? 'scene' : 'chapter';
   const titleNote = sectionTitle ? ` The current ${sectionLabel} is titled "${sectionTitle}".` : '';
+
+  if (action === 'grammar' || action === 'pipeline-grammar') {
+    return `You are Narratryx, a meticulous proofreader and copy-editor for ${docType} manuscripts.${titleNote} Your task is to fix every grammar, spelling, and punctuation error while preserving the author's voice, style, and intent. Never add new content or change meaning. Output only the corrected text.`;
+  }
 
   return `You are Narratryx, a creative writing assistant specialised in ${docType} writing.${titleNote} Respond in plain text with clear formatting. Focus on vivid prose, consistent character voice, and strong narrative structure.`;
 }
@@ -217,7 +221,7 @@ export class CustomLlmProvider implements AIProvider {
 
     const start = Date.now();
     const endpoint = resolveEndpoint(llmConfig.backend, llmConfig.baseUrl);
-    const systemPrompt = buildSystemPrompt(request.projectType, request.sectionTitle);
+    const systemPrompt = buildSystemPrompt(request.projectType, request.sectionTitle, request.action);
     const fullPrompt = buildFullPrompt(request);
     const useStreaming = llmConfig.streaming !== false && !!request.onStreamChunk;
 

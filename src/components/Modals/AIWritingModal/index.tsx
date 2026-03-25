@@ -88,7 +88,7 @@ const BOOK_PRESET_PROMPTS: PresetPrompt[] = [
     label: 'Fix Grammar',
     icon: 'spellcheck',
     prompt:
-      'Review the text for grammar, spelling, and punctuation errors. List each issue found with the original text, the correction, and a brief explanation.'
+      'Proofread and correct every grammar, spelling, and punctuation error in the text. Fix homophones (their/there/they\'re, its/it\'s, your/you\'re), subject-verb agreement, missing or incorrect apostrophes, and run-on sentences. List each correction as: "[original] \u2192 [corrected] (reason)". Do not change meaning or style.'
   }
 ];
 
