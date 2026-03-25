@@ -11,6 +11,7 @@ import {
   isChromeAIAvailable,
   checkChromeAIAvailability,
   detectBestProvider,
+  detectLocalLlmConfig,
   isChromeBrowser,
   SERVER_PROXY_ENDPOINTS,
   SERVER_PROXY_MODELS,
@@ -373,12 +374,28 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       return;
     }
 
-    detectBestProvider().then(bestProvider => {
+    detectBestProvider().then(async bestProvider => {
+      // When a local LLM is detected, also fetch its full config (baseUrl, model)
+      // so that isConfigured evaluates to true and buttons actually work.
+      const localConfig = bestProvider === 'custom-llm'
+        ? await detectLocalLlmConfig()
+        : null;
+
       setConfig(prev => {
         if (prev.provider === 'openai-compatible' || prev.provider === 'server-proxy' || prev.provider === bestProvider) {
+          // Even if provider already matches, populate customLlm if it's missing
+          if (bestProvider === 'custom-llm' && localConfig?.customLlm && !prev.customLlm?.baseUrl?.trim()) {
+            const next = { ...prev, customLlm: localConfig.customLlm };
+            saveAIConfig(next);
+            return next;
+          }
           return prev;
         }
-        const next = { ...prev, provider: bestProvider };
+        const next: AIProviderConfig = {
+          ...prev,
+          provider: bestProvider,
+          ...(localConfig?.customLlm ? { customLlm: localConfig.customLlm } : {}),
+        };
         saveAIConfig(next);
         return next;
       });
@@ -856,7 +873,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
             <Button
               variant="default"
               onClick={handleRunPipeline}
-              disabled={loading}
+              disabled={loading || !isConfigured}
             >
               <span className="material-symbols-rounded">pipeline</span>
               {loading ? 'Running pipeline...' : 'Run Pipeline'}
@@ -1327,7 +1344,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
             key={preset.id}
             className={styles.aiPresetBtn}
             onClick={() => handlePreset(preset)}
-            disabled={loading}
+            disabled={loading || !isConfigured}
           >
             <span className="material-symbols-rounded">{preset.icon}</span>
             {preset.label}
