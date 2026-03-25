@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('./availability', () => ({
   isChromeAIAvailable: vi.fn().mockResolvedValue(false),
   isChromeBrowser: vi.fn().mockReturnValue(false),
+  detectLocalLlmServer: vi.fn().mockResolvedValue({ available: false }),
 }));
 
 vi.mock('./chromeAI', () => {
@@ -63,15 +64,17 @@ vi.mock('@/lib/desktopSecrets', () => ({
   isDesktop: vi.fn().mockReturnValue(false),
   setSecret: vi.fn(),
   deleteSecret: vi.fn(),
+  getSecret: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('@/lib/policy', () => ({
   getManagedPolicy: vi.fn().mockReturnValue({}),
 }));
 
-import { loadAIConfig, saveAIConfig, createProvider, detectBestProvider, isChromeWithoutAI } from './providerManager';
+import { loadAIConfig, saveAIConfig, createProvider, detectBestProvider, isChromeWithoutAI, hydrateDesktopSecrets } from './providerManager';
 import { getManagedPolicy } from '@/lib/policy';
-import { isChromeAIAvailable, isChromeBrowser } from './availability';
+import { isChromeAIAvailable, isChromeBrowser, detectLocalLlmServer } from './availability';
+import { isDesktop, getSecret, setSecret } from '@/lib/desktopSecrets';
 import { buildFallbackChain } from './fallbackProvider';
 
 const mockStorage = new Map<string, string>();
@@ -237,8 +240,9 @@ describe('providerManager', () => {
   });
 
   describe('detectBestProvider', () => {
-    it('returns managed-cloud when Chrome AI unavailable', async () => {
+    it('returns managed-cloud when Chrome AI unavailable and no local server', async () => {
       vi.mocked(isChromeAIAvailable).mockResolvedValue(false);
+      vi.mocked(detectLocalLlmServer).mockResolvedValue({ available: false });
       expect(await detectBestProvider()).toBe('managed-cloud');
     });
 
@@ -246,12 +250,68 @@ describe('providerManager', () => {
       vi.mocked(isChromeAIAvailable).mockResolvedValue(true);
       expect(await detectBestProvider()).toBe('chrome-ai');
     });
+
+    it('returns custom-llm when local server is detected', async () => {
+      vi.mocked(isChromeAIAvailable).mockResolvedValue(false);
+      vi.mocked(detectLocalLlmServer).mockResolvedValue({
+        available: true,
+        backend: 'ollama',
+        baseUrl: 'http://localhost:11434',
+      });
+      expect(await detectBestProvider()).toBe('custom-llm');
+    });
   });
 
   describe('isChromeWithoutAI', () => {
     it('returns false when not Chrome', () => {
       vi.mocked(isChromeBrowser).mockReturnValue(false);
       expect(isChromeWithoutAI()).toBe(false);
+    });
+  });
+
+  describe('hydrateDesktopSecrets', () => {
+    it('returns config unchanged on non-desktop', async () => {
+      vi.mocked(isDesktop).mockReturnValue(false);
+      const config = { provider: 'custom-llm' as const, customLlm: { backend: 'ollama' as const, baseUrl: 'http://localhost:11434', model: 'test' } };
+      const result = await hydrateDesktopSecrets(config);
+      expect(result).toEqual(config);
+    });
+
+    it('injects secrets from keychain on desktop', async () => {
+      vi.mocked(isDesktop).mockReturnValue(true);
+      vi.mocked(getSecret).mockImplementation(async (key: string) => {
+        if (key === 'ai_session_token') return 'session-from-keychain';
+        if (key === 'custom_llm_api_key') return 'llm-key-from-keychain';
+        return null;
+      });
+      const config = { provider: 'custom-llm' as const, customLlm: { backend: 'ollama' as const, baseUrl: 'http://localhost:11434', model: 'test' } };
+      const result = await hydrateDesktopSecrets(config);
+      expect(result.sessionToken).toBe('session-from-keychain');
+      expect(result.customLlm?.apiKey).toBe('llm-key-from-keychain');
+    });
+
+    it('preserves existing keys over keychain', async () => {
+      vi.mocked(isDesktop).mockReturnValue(true);
+      vi.mocked(getSecret).mockResolvedValue('should-not-override');
+      const config = {
+        provider: 'custom-llm' as const,
+        sessionToken: 'already-set',
+        customLlm: { backend: 'ollama' as const, baseUrl: 'http://localhost:11434', model: 'test', apiKey: 'already-set-key' },
+      };
+      const result = await hydrateDesktopSecrets(config);
+      expect(result.sessionToken).toBe('already-set');
+      expect(result.customLlm?.apiKey).toBe('already-set-key');
+    });
+  });
+
+  describe('saveAIConfig stores custom LLM key in keychain', () => {
+    it('calls setSecret for custom LLM apiKey on desktop', () => {
+      vi.mocked(isDesktop).mockReturnValue(true);
+      saveAIConfig({
+        provider: 'custom-llm',
+        customLlm: { backend: 'ollama', baseUrl: 'http://localhost:11434', model: 'test', apiKey: 'my-secret' },
+      });
+      expect(setSecret).toHaveBeenCalledWith('custom_llm_api_key', 'my-secret');
     });
   });
 });
