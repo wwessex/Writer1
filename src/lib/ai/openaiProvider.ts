@@ -129,8 +129,11 @@ export class OpenAIProvider implements AIProvider {
     const text =
       data?.choices?.[0]?.message?.content ??
       data?.content?.[0]?.text ??
-      data?.response ??
-      JSON.stringify(data, null, 2);
+      data?.response;
+
+    if (text === undefined || text === null) {
+      throw new Error('Unexpected response format from API. Expected chat completion format with choices[0].message.content field.');
+    }
 
     return {
       text,

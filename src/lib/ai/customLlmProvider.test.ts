@@ -132,6 +132,27 @@ describe('CustomLlmProvider', () => {
       await expect(provider.execute(makeRequest())).rejects.toThrow('not configured');
     });
 
+    it('throws on malformed Ollama response missing message.content', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ unexpected: 'format' }),
+      } as Response);
+
+      const provider = new CustomLlmProvider(makeConfig());
+      await expect(provider.execute(makeRequest())).rejects.toThrow('Unexpected response format from Ollama');
+    });
+
+    it('throws on malformed OpenAI-compatible response missing choices', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ unexpected: 'format' }),
+      } as Response);
+
+      const config = makeConfig({ backend: 'vllm', baseUrl: 'http://localhost:8000' });
+      const provider = new CustomLlmProvider(config);
+      await expect(provider.execute(makeRequest())).rejects.toThrow('Unexpected response format from vLLM');
+    });
+
     it('throws on non-ok response', async () => {
       mockFetch.mockResolvedValue({
         ok: false,

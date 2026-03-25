@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { EditorAdapter } from '@/lib/editor';
 import { useApp } from '@/context/AppContext';
 import { editorToPlainText, generateId } from '@/lib/utils';
@@ -63,10 +63,21 @@ export function AISuggestionsPanel({ open, onClose, editor }: AISuggestionsPanel
   });
   const abortRef = useRef<AbortController | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const [configVersion, setConfigVersion] = useState(0);
 
-  const config: AIProviderConfig = loadAIConfig();
-  const provider = createProvider(config);
-  const isConfigured = provider.isAvailable();
+  // Reload AI config each time the panel opens
+  useEffect(() => {
+    if (open) setConfigVersion(v => v + 1);
+  }, [open]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- configVersion is an invalidation counter
+  const config: AIProviderConfig = useMemo(() => loadAIConfig(), [configVersion]);
+  const isConfigured = useMemo(() => {
+    const provider = createProvider(config);
+    const available = provider.isAvailable();
+    provider.destroy();
+    return available;
+  }, [config]);
 
   const selectedText = editor?.getSelectedText() || '';
 

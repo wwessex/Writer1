@@ -151,7 +151,10 @@ export class ServerProxyProvider implements AIProvider {
     }
 
     const data = await res.json();
-    const text = data?.choices?.[0]?.message?.content ?? JSON.stringify(data, null, 2);
+    const text = data?.choices?.[0]?.message?.content;
+    if (text === undefined || text === null) {
+      throw new Error(`Unexpected response format from ${SERVER_PROXY_LABELS[serverProvider]}. Expected chat completion format with choices[0].message.content field.`);
+    }
 
     return {
       text,
@@ -191,8 +194,10 @@ export class ServerProxyProvider implements AIProvider {
     }
 
     const data = await res.json();
-    const text =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ?? JSON.stringify(data, null, 2);
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (text === undefined || text === null) {
+      throw new Error('Unexpected response format from Gemini. Expected candidates[0].content.parts[0].text field.');
+    }
 
     return {
       text,

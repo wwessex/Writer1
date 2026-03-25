@@ -87,8 +87,14 @@ export class ChromeAIProvider implements AIProvider {
         default:
           text = await this.usePromptAPI(req);
       }
-    } catch {
-      // Fallback: if the specialised API fails, try the Prompt API
+    } catch (err: unknown) {
+      // Only fall back to Prompt API for API-unavailability errors.
+      // Rethrow abort, auth, quota, and other actionable errors.
+      if (err instanceof DOMException && err.name === 'AbortError') throw err;
+      const isUnavailable =
+        err instanceof TypeError ||
+        (err instanceof DOMException && err.name === 'NotSupportedError');
+      if (!isUnavailable) throw err;
       text = await this.usePromptAPI(req);
     }
 
