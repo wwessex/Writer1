@@ -225,16 +225,58 @@ export async function fetchOllamaModels(baseUrl: string): Promise<string[]> {
   }
 }
 
+function isNetworkError(msg: string): boolean {
+  const lower = msg.toLowerCase();
+  return ['load failed', 'failed to fetch', 'networkerror', 'network request failed', 'fetch failed'].some(p => lower.includes(p));
+}
+
+function isLocalhostUrl(url: string): boolean {
+  try {
+    const { hostname } = new URL(url);
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+  } catch {
+    return false;
+  }
+}
+
+function isAbortError(err: unknown): boolean {
+  if (err instanceof DOMException && err.name === 'AbortError') return true;
+  const msg = err instanceof Error ? err.message : '';
+  return msg.includes('abort');
+}
+
 /**
  * Test connectivity to a custom LLM backend.
  * Sends a minimal request and checks for a valid response.
+ * For Ollama, a lightweight pre-check to /api/tags distinguishes
+ * "server not running" from "model not available".
  */
 export async function testCustomLlmConnection(
   config: { backend: CustomLlmBackend; baseUrl: string; model: string; apiKey?: string },
 ): Promise<{ ok: boolean; message: string }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
+  const base = config.baseUrl.replace(/\/+$/, '');
+  let ollamaReachable = false;
+
   try {
+    // For Ollama, do a lightweight connectivity pre-check via GET /api/tags
+    if (config.backend === 'ollama') {
+      try {
+        const tagsRes = await fetch(`${base}/api/tags`, { signal: controller.signal });
+        ollamaReachable = tagsRes.ok;
+      } catch (preErr) {
+        if (isAbortError(preErr)) {
+          return { ok: false, message: 'Connection timed out after 15 seconds.' };
+        }
+        let message = `Could not reach Ollama at ${base}. Make sure Ollama is running (run \`ollama serve\` in your terminal).`;
+        if (!isLocalhostUrl(base)) {
+          message += ' If Ollama is on another machine, set the OLLAMA_ORIGINS environment variable to allow cross-origin requests.';
+        }
+        return { ok: false, message };
+      }
+    }
+
     const endpoint = resolveEndpoint(config.backend, config.baseUrl);
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (config.apiKey?.trim()) {
@@ -267,15 +309,32 @@ export async function testCustomLlmConnection(
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
+      if (config.backend === 'ollama' && ollamaReachable && (res.status === 404 || errText.toLowerCase().includes('not found'))) {
+        return { ok: false, message: `Ollama is running but the model '${config.model}' was not found. Run \`ollama pull ${config.model}\` to download it.` };
+      }
       return { ok: false, message: `Server returned ${res.status}: ${errText || res.statusText}` };
     }
 
     return { ok: true, message: `Connected to ${CUSTOM_LLM_BACKEND_LABELS[config.backend]} successfully.` };
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
-    if (msg.includes('abort')) {
+    if (isAbortError(err)) {
       return { ok: false, message: 'Connection timed out after 15 seconds.' };
     }
+
+    if (config.backend === 'ollama' && ollamaReachable && isNetworkError(msg)) {
+      return { ok: false, message: `Ollama is running but the model '${config.model}' may not be available. Run \`ollama pull ${config.model}\` to download it.` };
+    }
+
+    if (isNetworkError(msg)) {
+      const label = CUSTOM_LLM_BACKEND_LABELS[config.backend];
+      let message = `Could not reach ${label} at ${base}. Check that the server is running and accessible.`;
+      if (!isLocalhostUrl(base)) {
+        message += ' If the server is on another machine, ensure CORS is configured to allow requests from this origin.';
+      }
+      return { ok: false, message };
+    }
+
     return { ok: false, message: `Connection failed: ${msg}` };
   } finally {
     clearTimeout(timeout);
