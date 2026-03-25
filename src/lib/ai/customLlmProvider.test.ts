@@ -320,11 +320,10 @@ describe('testCustomLlmConnection', () => {
     vi.restoreAllMocks();
   });
 
-  it('returns ok on successful response', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ message: { content: 'Hi' } }),
-    } as Response);
+  it('returns ok on successful Ollama response', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ models: [] }) } as Response) // pre-check
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ message: { content: 'Hi' } }) } as Response); // chat
 
     const result = await testCustomLlmConnection({
       backend: 'ollama',
@@ -335,13 +334,13 @@ describe('testCustomLlmConnection', () => {
     expect(result.message).toContain('Connected');
   });
 
-  it('returns error on non-ok response', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-      statusText: 'Not Found',
-      text: async () => 'model not found',
-    } as unknown as Response);
+  it('returns model-not-found error when Ollama returns 404', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ models: [] }) } as Response) // pre-check
+      .mockResolvedValueOnce({
+        ok: false, status: 404, statusText: 'Not Found',
+        text: async () => 'model not found',
+      } as unknown as Response); // chat
 
     const result = await testCustomLlmConnection({
       backend: 'ollama',
@@ -349,10 +348,10 @@ describe('testCustomLlmConnection', () => {
       model: 'missing',
     });
     expect(result.ok).toBe(false);
-    expect(result.message).toContain('404');
+    expect(result.message).toContain('ollama pull missing');
   });
 
-  it('returns error on connection failure', async () => {
+  it('returns error on non-Ollama connection failure', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Connection refused'));
 
     const result = await testCustomLlmConnection({
@@ -362,5 +361,101 @@ describe('testCustomLlmConnection', () => {
     });
     expect(result.ok).toBe(false);
     expect(result.message).toContain('Connection failed');
+  });
+
+  it('returns actionable error when Ollama is unreachable', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Load failed'));
+
+    const result = await testCustomLlmConnection({
+      backend: 'ollama',
+      baseUrl: 'http://localhost:11434',
+      model: 'test',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('ollama serve');
+    expect(result.message).toContain('Could not reach Ollama');
+    expect(result.message).not.toContain('OLLAMA_ORIGINS');
+  });
+
+  it('suggests OLLAMA_ORIGINS for non-localhost Ollama URLs', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Failed to fetch'));
+
+    const result = await testCustomLlmConnection({
+      backend: 'ollama',
+      baseUrl: 'http://192.168.1.100:11434',
+      model: 'test',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('OLLAMA_ORIGINS');
+  });
+
+  it('suggests ollama pull when server is reachable but chat fails', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ models: [] }) } as Response)
+      .mockRejectedValueOnce(new Error('Load failed'));
+
+    const result = await testCustomLlmConnection({
+      backend: 'ollama',
+      baseUrl: 'http://localhost:11434',
+      model: 'narratryx:latest',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('ollama pull narratryx:latest');
+  });
+
+  it('returns actionable error for non-Ollama network failure', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Failed to fetch'));
+
+    const result = await testCustomLlmConnection({
+      backend: 'llama-cpp',
+      baseUrl: 'http://localhost:8080',
+      model: 'default',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('llama.cpp');
+    expect(result.message).toContain('Check that the server is running');
+  });
+
+  it('returns timeout message when pre-check is aborted', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new DOMException('The operation was aborted', 'AbortError'));
+
+    const result = await testCustomLlmConnection({
+      backend: 'ollama',
+      baseUrl: 'http://localhost:11434',
+      model: 'test',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('timed out');
+  });
+
+  it('passes through non-network errors with original message', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ models: [] }) } as Response)
+      .mockRejectedValueOnce(new Error('Unexpected JSON parsing error'));
+
+    const result = await testCustomLlmConnection({
+      backend: 'ollama',
+      baseUrl: 'http://localhost:11434',
+      model: 'test',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.message).toBe('Connection failed: Unexpected JSON parsing error');
+  });
+
+  it('includes api key header when provided', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ models: [] }) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) } as Response);
+
+    await testCustomLlmConnection({
+      backend: 'ollama',
+      baseUrl: 'http://localhost:11434',
+      model: 'test',
+      apiKey: 'sk-test',
+    });
+    // Second call (chat POST) should have the auth header
+    const chatCall = fetchSpy.mock.calls[1];
+    const headers = chatCall[1]?.headers as Record<string, string>;
+    expect(headers['Authorization']).toBe('Bearer sk-test');
   });
 });
