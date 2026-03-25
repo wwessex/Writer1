@@ -93,8 +93,8 @@ const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
  * These are public identifiers (not secrets) used with the PKCE flow,
  * so it's safe and standard to bundle them in client-side code.
  */
-export const DEFAULT_GOOGLE_CLIENT_ID = '847291436274-draftharbour.apps.googleusercontent.com';
-export const DEFAULT_DROPBOX_APP_KEY = 'draftharbour2024appkey';
+export const DEFAULT_GOOGLE_CLIENT_ID = '';
+export const DEFAULT_DROPBOX_APP_KEY = '';
 
 function buildDropboxAuthUrl(appKey: string, redirectUri: string, codeChallenge: string): string {
   const params = new URLSearchParams({

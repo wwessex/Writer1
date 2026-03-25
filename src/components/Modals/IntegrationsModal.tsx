@@ -13,8 +13,6 @@ import {
   connectProvider,
   disconnectProvider,
   refreshProviderConnection,
-  DEFAULT_GOOGLE_CLIENT_ID,
-  DEFAULT_DROPBOX_APP_KEY,
   type ProviderConnectionMetadata,
 } from '@/lib/integrations/api';
 import type { AppState, Chapter, ConflictInfo, ConflictResolutionOption, IntegrationConfig, IntegrationType, PersistedIntegrationConfig } from '@/types';
@@ -550,11 +548,10 @@ function GoogleDriveCard({ config, appState, onToggle, onUpdate, onApplyPull }: 
   const status = getConnectionStatus(config);
   const [operationState, setOperationState] = useState<OperationState>('idle');
   const [operationMessage, setOperationMessage] = useState('Click Connect to sign in with your Google account.');
-  const [showAdvanced, setShowAdvanced] = useState(Boolean(config.clientId && config.clientId !== DEFAULT_GOOGLE_CLIENT_ID));
-  const [customClientId, setCustomClientId] = useState(config.clientId && config.clientId !== DEFAULT_GOOGLE_CLIENT_ID ? config.clientId : '');
+  const [customClientId, setCustomClientId] = useState(config.clientId || '');
   const expired = isTokenExpired(config);
 
-  const effectiveClientId = showAdvanced && customClientId.trim() ? customClientId.trim() : DEFAULT_GOOGLE_CLIENT_ID;
+  const effectiveClientId = customClientId.trim();
 
   const run = useCallback(async (task: () => Promise<string>) => {
     setOperationState('loading');
@@ -584,7 +581,7 @@ function GoogleDriveCard({ config, appState, onToggle, onUpdate, onApplyPull }: 
     >
       <div className={styles.integrationCard__section}>
         <p className={styles.integrationCard__hint}>
-          Sign in with your Google account to sync chapters to Google Drive. No developer setup required.
+          Sync chapters to Google Drive. Enter your Google OAuth Client ID to connect.
         </p>
 
         {config.providerUserId && (
@@ -594,7 +591,7 @@ function GoogleDriveCard({ config, appState, onToggle, onUpdate, onApplyPull }: 
         )}
 
         <div className={styles.integrationCard__actions}>
-          <Button variant="primary" disabled={operationState === 'loading'} onClick={() => run(async () => {
+          <Button variant="primary" disabled={operationState === 'loading' || !effectiveClientId} onClick={() => run(async () => {
             onUpdate({ status: 'pending' });
             try {
               const result = await connectProvider('google-drive', effectiveClientId);
@@ -648,35 +645,22 @@ function GoogleDriveCard({ config, appState, onToggle, onUpdate, onApplyPull }: 
           </Button>
         </div>
 
-        <button
-          className={styles.integrationCard__advancedToggle}
-          onClick={() => setShowAdvanced(prev => !prev)}
-          type="button"
-        >
-          <span className="material-symbols-rounded">
-            {showAdvanced ? 'expand_less' : 'expand_more'}
-          </span>
-          Use your own OAuth credentials
-        </button>
-
-        {showAdvanced && (
-          <div className={styles.integrationCard__field}>
-            <label className={styles.integrationCard__label}>Custom OAuth Client ID</label>
-            <Input
-              value={customClientId}
-              onChange={(e) => {
-                setCustomClientId(e.target.value);
-                if (e.target.value.trim()) {
-                  onUpdate({ clientId: e.target.value.trim() });
-                }
-              }}
-              placeholder="your-app.apps.googleusercontent.com"
-            />
-            <p className={styles.integrationCard__fieldHint}>
-              Optional. Create your own client ID at console.cloud.google.com if you prefer to use your own GCP project.
-            </p>
-          </div>
-        )}
+        <div className={styles.integrationCard__field}>
+          <label className={styles.integrationCard__label}>Google OAuth Client ID</label>
+          <Input
+            value={customClientId}
+            onChange={(e) => {
+              setCustomClientId(e.target.value);
+              if (e.target.value.trim()) {
+                onUpdate({ clientId: e.target.value.trim() });
+              }
+            }}
+            placeholder="your-app.apps.googleusercontent.com"
+          />
+          <p className={styles.integrationCard__fieldHint}>
+            Create a client ID at console.cloud.google.com (APIs &amp; Services &gt; Credentials &gt; OAuth 2.0 Client ID). Select &quot;Web application&quot; and add your app URL as an authorized redirect URI.
+          </p>
+        </div>
 
         <OperationFeedback state={operationState} message={operationMessage} />
       </div>
@@ -688,13 +672,12 @@ function GoogleDriveCard({ config, appState, onToggle, onUpdate, onApplyPull }: 
 function DropboxCard({ config, appState, onToggle, onUpdate, onApplyPull }: IntegrationCardBaseProps) {
   const status = getConnectionStatus(config);
   const [folder, setFolder] = useState(config.folderId || '/DraftHarbour');
-  const [showAdvanced, setShowAdvanced] = useState(Boolean(config.clientId && config.clientId !== DEFAULT_DROPBOX_APP_KEY));
-  const [customAppKey, setCustomAppKey] = useState(config.clientId && config.clientId !== DEFAULT_DROPBOX_APP_KEY ? config.clientId : '');
+  const [customAppKey, setCustomAppKey] = useState(config.clientId || '');
   const [operationState, setOperationState] = useState<OperationState>('idle');
-  const [operationMessage, setOperationMessage] = useState('Click Connect to sign in with your Dropbox account.');
+  const [operationMessage, setOperationMessage] = useState('Enter your Dropbox App Key and click Connect.');
   const expired = isTokenExpired(config);
 
-  const effectiveAppKey = showAdvanced && customAppKey.trim() ? customAppKey.trim() : DEFAULT_DROPBOX_APP_KEY;
+  const effectiveAppKey = customAppKey.trim();
 
   const run = useCallback(async (task: (cardConfig: IntegrationConfig) => Promise<string>) => {
     setOperationState('loading');
@@ -729,7 +712,7 @@ function DropboxCard({ config, appState, onToggle, onUpdate, onApplyPull }: Inte
     >
       <div className={styles.integrationCard__section}>
         <p className={styles.integrationCard__hint}>
-          Sign in with your Dropbox account to sync novel backups. No developer setup required.
+          Sync novel backups to Dropbox. Enter your Dropbox App Key to connect.
         </p>
 
         <div className={styles.integrationCard__field}>
@@ -751,7 +734,7 @@ function DropboxCard({ config, appState, onToggle, onUpdate, onApplyPull }: Inte
         )}
 
         <div className={styles.integrationCard__actions}>
-          <Button variant="primary" disabled={operationState === 'loading'} onClick={() => run(async (cardConfig) => {
+          <Button variant="primary" disabled={operationState === 'loading' || !effectiveAppKey} onClick={() => run(async (cardConfig) => {
             onUpdate({ status: 'pending' });
             try {
               const result = await connectProvider('dropbox', effectiveAppKey);
@@ -804,35 +787,22 @@ function DropboxCard({ config, appState, onToggle, onUpdate, onApplyPull }: Inte
           </Button>
         </div>
 
-        <button
-          className={styles.integrationCard__advancedToggle}
-          onClick={() => setShowAdvanced(prev => !prev)}
-          type="button"
-        >
-          <span className="material-symbols-rounded">
-            {showAdvanced ? 'expand_less' : 'expand_more'}
-          </span>
-          Use your own Dropbox app credentials
-        </button>
-
-        {showAdvanced && (
-          <div className={styles.integrationCard__field}>
-            <label className={styles.integrationCard__label}>Custom App Key</label>
-            <Input
-              value={customAppKey}
-              onChange={(e) => {
-                setCustomAppKey(e.target.value);
-                if (e.target.value.trim()) {
-                  onUpdate({ clientId: e.target.value.trim() });
-                }
-              }}
-              placeholder="your-dropbox-app-key"
-            />
-            <p className={styles.integrationCard__fieldHint}>
-              Optional. Create your own app at dropbox.com/developers if you prefer to use your own Dropbox app.
-            </p>
-          </div>
-        )}
+        <div className={styles.integrationCard__field}>
+          <label className={styles.integrationCard__label}>Dropbox App Key</label>
+          <Input
+            value={customAppKey}
+            onChange={(e) => {
+              setCustomAppKey(e.target.value);
+              if (e.target.value.trim()) {
+                onUpdate({ clientId: e.target.value.trim() });
+              }
+            }}
+            placeholder="your-dropbox-app-key"
+          />
+          <p className={styles.integrationCard__fieldHint}>
+            Create an app at dropbox.com/developers/apps (App type: Scoped access, Full Dropbox). Copy the App Key from the Settings tab.
+          </p>
+        </div>
 
         <OperationFeedback state={operationState} message={operationMessage} />
       </div>

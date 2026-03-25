@@ -13,7 +13,11 @@ class BrokerError extends Error {
 }
 
 const GOOGLE_API = 'https://www.googleapis.com/drive/v3';
+const GOOGLE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
 const DROPBOX_API = 'https://api.dropboxapi.com/2';
+const DROPBOX_CONTENT = 'https://content.dropboxapi.com/2';
+const APP_FOLDER_NAME = 'DraftHarbour';
+const MANIFEST_NAME = '_manifest.json';
 
 function brokerError(status: number, message: string, code?: ProviderErrorCode): BrokerError {
   const mapped = mapStatusToProviderError(status, message);
@@ -43,6 +47,128 @@ async function mustOk(provider: string, response: Response): Promise<Response> {
   return response;
 }
 
+// ── Google Drive helpers ──
+
+interface DriveFile { id: string; name: string; mimeType: string; modifiedTime?: string; }
+interface DriveFileList { files: DriveFile[]; nextPageToken?: string; }
+
+async function googleFindOrCreateFolder(token: string): Promise<string> {
+  const query = `name='${APP_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  const searchUrl = `${GOOGLE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name)&spaces=drive`;
+  const searchResp = await mustOk('Google Drive', await fetchWithPolicy(searchUrl, { headers: { Authorization: `Bearer ${token}` } }, DEFAULT_RETRY_POLICY));
+  const searchData = await searchResp.json() as DriveFileList;
+  if (searchData.files.length > 0) return searchData.files[0].id;
+
+  const createResp = await mustOk('Google Drive', await fetchWithPolicy(`${GOOGLE_API}/files`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: APP_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' }),
+  }, DEFAULT_RETRY_POLICY));
+  const created = await createResp.json() as DriveFile;
+  return created.id;
+}
+
+async function googleFindFile(token: string, folderId: string, fileName: string): Promise<DriveFile | null> {
+  const query = `'${folderId}' in parents and name='${fileName}' and trashed=false`;
+  const url = `${GOOGLE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)`;
+  const resp = await mustOk('Google Drive', await fetchWithPolicy(url, { headers: { Authorization: `Bearer ${token}` } }, DEFAULT_RETRY_POLICY));
+  const data = await resp.json() as DriveFileList;
+  return data.files[0] || null;
+}
+
+async function googleUpsertFile(token: string, folderId: string, name: string, content: string): Promise<void> {
+  const existing = await googleFindFile(token, folderId, name);
+  if (existing) {
+    await mustOk('Google Drive', await fetchWithPolicy(`${GOOGLE_UPLOAD_API}/files/${existing.id}?uploadType=media`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: content,
+    }, DEFAULT_RETRY_POLICY));
+  } else {
+    const boundary = `broker_${Date.now()}`;
+    const body = [
+      `--${boundary}`, 'Content-Type: application/json; charset=UTF-8', '',
+      JSON.stringify({ name, parents: [folderId], mimeType: 'application/json' }),
+      `--${boundary}`, 'Content-Type: application/json', '',
+      content, `--${boundary}--`,
+    ].join('\r\n');
+    await mustOk('Google Drive', await fetchWithPolicy(`${GOOGLE_UPLOAD_API}/files?uploadType=multipart`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body,
+    }, DEFAULT_RETRY_POLICY));
+  }
+}
+
+async function googleListFiles(token: string, folderId: string): Promise<DriveFile[]> {
+  const allFiles: DriveFile[] = [];
+  let pageToken: string | undefined;
+  do {
+    const query = `'${folderId}' in parents and trashed=false and mimeType='application/json'`;
+    let url = `${GOOGLE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime,mimeType)&spaces=drive&pageSize=100`;
+    if (pageToken) url += `&pageToken=${pageToken}`;
+    const resp = await mustOk('Google Drive', await fetchWithPolicy(url, { headers: { Authorization: `Bearer ${token}` } }, DEFAULT_RETRY_POLICY));
+    const data = await resp.json() as DriveFileList;
+    allFiles.push(...data.files);
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+  return allFiles;
+}
+
+async function googleDownloadFile(token: string, fileId: string): Promise<string | null> {
+  try {
+    const resp = await mustOk('Google Drive', await fetchWithPolicy(`${GOOGLE_API}/files/${fileId}?alt=media`, { headers: { Authorization: `Bearer ${token}` } }, DEFAULT_RETRY_POLICY));
+    return resp.text();
+  } catch { return null; }
+}
+
+// ── Simplified merge for broker pull ──
+
+function simpleMergePull(
+  localChapters: Chapter[],
+  remoteDocs: Array<{ id: string; title: string; body: string; order: number; updatedAt: number }>,
+  revisionPrefix: string,
+): { chapterUpdates: Chapter[]; remoteRevision: string; conflicts: never[] } {
+  const localMap = new Map(localChapters.map(c => [c.id, c]));
+  const merged: Chapter[] = [...localChapters];
+
+  for (const doc of remoteDocs) {
+    const local = localMap.get(doc.id);
+    if (local) {
+      if (doc.updatedAt > local.updatedAt) {
+        const idx = merged.findIndex(c => c.id === doc.id);
+        if (idx >= 0) {
+          merged[idx] = { ...local, content: doc.body, title: doc.title, order: doc.order, updatedAt: doc.updatedAt };
+        }
+      }
+    } else {
+      merged.push({
+        id: doc.id,
+        novelId: '',
+        title: doc.title,
+        content: doc.body,
+        order: doc.order,
+        updatedAt: doc.updatedAt,
+        summary: '',
+        pov: '',
+        status: 'draft',
+        tags: [],
+        wordGoal: 0,
+        scenes: [],
+      });
+    }
+  }
+
+  const latestRemote = remoteDocs.reduce((max, d) => d.updatedAt > max ? d.updatedAt : max, 0);
+  return {
+    chapterUpdates: merged,
+    remoteRevision: `${revisionPrefix}-${latestRemote || Date.now()}`,
+    conflicts: [],
+  };
+}
+
+// ── Google Drive operations ──
+
 async function googleConnect(config: IntegrationConfig) {
   const token = ensureToken(config);
   await mustOk('Google Drive', await fetchWithPolicy(`${GOOGLE_API}/about?fields=user`, { headers: { Authorization: `Bearer ${token}` } }, DEFAULT_RETRY_POLICY));
@@ -50,19 +176,129 @@ async function googleConnect(config: IntegrationConfig) {
 }
 
 async function googlePush(config: IntegrationConfig, payload: ProviderPayload) {
-  ensureToken(config);
-  return { message: `Broker acknowledged Google Drive push (${payload.chapters.length} chapters).`, syncedAt: Date.now() };
+  const token = ensureToken(config);
+  const folderId = await googleFindOrCreateFolder(token);
+
+  for (const chapter of payload.chapters) {
+    await googleUpsertFile(token, folderId, `${chapter.id}.json`, JSON.stringify(chapter, null, 2));
+  }
+
+  const manifest = {
+    novelId: payload.novelId,
+    projectType: payload.projectType,
+    chapterIds: payload.chapters.map(c => c.id),
+    syncedAt: Date.now(),
+  };
+  await googleUpsertFile(token, folderId, MANIFEST_NAME, JSON.stringify(manifest, null, 2));
+
+  return { message: `Pushed ${payload.chapters.length} chapter(s) to Google Drive via broker.`, syncedAt: Date.now() };
 }
 
 async function googlePull(config: IntegrationConfig, localChapters: Chapter[]) {
-  ensureToken(config);
-  return { chapterUpdates: localChapters, remoteRevision: `google-drive-broker-${Date.now()}`, conflicts: [] };
+  const token = ensureToken(config);
+  const folderId = await googleFindOrCreateFolder(token);
+  const files = await googleListFiles(token, folderId);
+
+  const remoteDocs: Array<{ id: string; title: string; body: string; order: number; updatedAt: number }> = [];
+  for (const file of files) {
+    if (file.name === MANIFEST_NAME) continue;
+    const content = await googleDownloadFile(token, file.id);
+    if (!content) continue;
+    try {
+      const doc = JSON.parse(content) as { id: string; title: string; body: string; order: number; updatedAt: number };
+      remoteDocs.push(doc);
+    } catch { /* skip malformed */ }
+  }
+
+  if (remoteDocs.length === 0) {
+    return { chapterUpdates: localChapters, remoteRevision: `gdrive-broker-empty-${Date.now()}`, conflicts: [] as never[] };
+  }
+
+  return simpleMergePull(localChapters, remoteDocs, 'gdrive-broker');
 }
+
+// ── Dropbox helpers ──
 
 function dropboxFolder(config: IntegrationConfig): string {
   const folder = config.folderId || '/DraftHarbour';
   return folder.startsWith('/') ? folder : `/${folder}`;
 }
+
+async function dropboxEnsureFolder(token: string, folderPath: string): Promise<void> {
+  try {
+    await fetchWithPolicy(`${DROPBOX_API}/files/create_folder_v2`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: folderPath, autorename: false }),
+    }, DEFAULT_RETRY_POLICY);
+  } catch {
+    // Folder may already exist — verify it
+    try {
+      await mustOk('Dropbox', await fetchWithPolicy(`${DROPBOX_API}/files/get_metadata`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: folderPath }),
+      }, DEFAULT_RETRY_POLICY));
+    } catch {
+      throw brokerError(404, `Could not access or create folder: ${folderPath}`, 'NOT_FOUND');
+    }
+  }
+}
+
+async function dropboxUploadFile(token: string, path: string, content: string): Promise<void> {
+  await fetchWithPolicy(`${DROPBOX_CONTENT}/files/upload`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/octet-stream',
+      'Dropbox-API-Arg': JSON.stringify({ path, mode: 'overwrite', autorename: false, mute: true }),
+    },
+    body: content,
+  }, DEFAULT_RETRY_POLICY);
+}
+
+interface DropboxEntry { '.tag': string; name: string; path_display: string; path_lower: string; server_modified?: string; rev?: string; }
+interface DropboxListResponse { entries: DropboxEntry[]; cursor: string; has_more: boolean; }
+
+async function dropboxListFiles(token: string, folderPath: string): Promise<DropboxEntry[]> {
+  const allEntries: DropboxEntry[] = [];
+  const resp = await mustOk('Dropbox', await fetchWithPolicy(`${DROPBOX_API}/files/list_folder`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: folderPath, recursive: false }),
+  }, DEFAULT_RETRY_POLICY));
+  const data = await resp.json() as DropboxListResponse;
+  allEntries.push(...data.entries);
+
+  let cursor = data.cursor;
+  let hasMore = data.has_more;
+  while (hasMore) {
+    const contResp = await mustOk('Dropbox', await fetchWithPolicy(`${DROPBOX_API}/files/list_folder/continue`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cursor }),
+    }, DEFAULT_RETRY_POLICY));
+    const contData = await contResp.json() as DropboxListResponse;
+    allEntries.push(...contData.entries);
+    cursor = contData.cursor;
+    hasMore = contData.has_more;
+  }
+
+  return allEntries.filter(e => e['.tag'] === 'file');
+}
+
+async function dropboxDownloadFile(token: string, path: string): Promise<string | null> {
+  try {
+    const resp = await fetchWithPolicy(`${DROPBOX_CONTENT}/files/download`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Dropbox-API-Arg': JSON.stringify({ path }) },
+    }, DEFAULT_RETRY_POLICY);
+    if (!resp.ok) return null;
+    return resp.text();
+  } catch { return null; }
+}
+
+// ── Dropbox operations ──
 
 async function dropboxConnect(config: IntegrationConfig) {
   const token = ensureToken(config);
@@ -74,15 +310,52 @@ async function dropboxConnect(config: IntegrationConfig) {
 
 async function dropboxPush(config: IntegrationConfig, payload: ProviderPayload) {
   const token = ensureToken(config);
-  await mustOk('Dropbox', await fetchWithPolicy(`${DROPBOX_API}/users/get_current_account`, {
-    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: 'null',
-  }, DEFAULT_RETRY_POLICY));
-  return { message: `Broker acknowledged Dropbox push (${payload.chapters.length} chapters).`, syncedAt: Date.now() };
+  const folderPath = dropboxFolder(config);
+
+  await dropboxEnsureFolder(token, folderPath);
+
+  for (const chapter of payload.chapters) {
+    await dropboxUploadFile(token, `${folderPath}/${chapter.id}.json`, JSON.stringify(chapter, null, 2));
+  }
+
+  const manifest = {
+    novelId: payload.novelId,
+    projectType: payload.projectType,
+    chapterIds: payload.chapters.map(c => c.id),
+    syncedAt: Date.now(),
+  };
+  await dropboxUploadFile(token, `${folderPath}/${MANIFEST_NAME}`, JSON.stringify(manifest, null, 2));
+
+  return { message: `Pushed ${payload.chapters.length} chapter(s) to Dropbox via broker (${folderPath}).`, syncedAt: Date.now() };
 }
 
 async function dropboxPull(config: IntegrationConfig, localChapters: Chapter[]) {
-  ensureToken(config);
-  return { chapterUpdates: localChapters, remoteRevision: `dropbox-broker-${Date.now()}`, conflicts: [] };
+  const token = ensureToken(config);
+  const folderPath = dropboxFolder(config);
+
+  let entries: DropboxEntry[];
+  try {
+    entries = await dropboxListFiles(token, folderPath);
+  } catch {
+    return { chapterUpdates: localChapters, remoteRevision: `dropbox-broker-empty-${Date.now()}`, conflicts: [] as never[] };
+  }
+
+  const remoteDocs: Array<{ id: string; title: string; body: string; order: number; updatedAt: number }> = [];
+  for (const entry of entries) {
+    if (entry.name === MANIFEST_NAME || !entry.name.endsWith('.json')) continue;
+    const content = await dropboxDownloadFile(token, entry.path_display || entry.path_lower);
+    if (!content) continue;
+    try {
+      const doc = JSON.parse(content) as { id: string; title: string; body: string; order: number; updatedAt: number };
+      remoteDocs.push(doc);
+    } catch { /* skip malformed */ }
+  }
+
+  if (remoteDocs.length === 0) {
+    return { chapterUpdates: localChapters, remoteRevision: `dropbox-broker-empty-${Date.now()}`, conflicts: [] as never[] };
+  }
+
+  return simpleMergePull(localChapters, remoteDocs, 'dropbox-broker');
 }
 
 async function generateAI(body: Record<string, unknown>) {
