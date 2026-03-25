@@ -175,6 +175,47 @@ describe('CustomLlmProvider', () => {
       expect(body.options.num_predict).toBe(4096);
     });
 
+    it('uses grammar-aware system prompt for grammar actions', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ message: { content: 'corrected text' } }),
+      } as Response);
+
+      const provider = new CustomLlmProvider(makeConfig());
+      await provider.execute(makeRequest({ action: 'grammar' }));
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1]!.body as string);
+      expect(body.messages[0].content).toContain('proofreader');
+      expect(body.messages[0].content).toContain('grammar');
+    });
+
+    it('uses grammar-aware system prompt for pipeline-grammar action', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ message: { content: 'corrected text' } }),
+      } as Response);
+
+      const provider = new CustomLlmProvider(makeConfig());
+      await provider.execute(makeRequest({ action: 'pipeline-grammar' }));
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1]!.body as string);
+      expect(body.messages[0].content).toContain('proofreader');
+    });
+
+    it('uses default system prompt for non-grammar actions', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ message: { content: 'ok' } }),
+      } as Response);
+
+      const provider = new CustomLlmProvider(makeConfig());
+      await provider.execute(makeRequest({ action: 'continue' }));
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1]!.body as string);
+      expect(body.messages[0].content).toContain('creative writing assistant');
+      expect(body.messages[0].content).not.toContain('proofreader');
+    });
+
     it('includes story bible context in prompt', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
