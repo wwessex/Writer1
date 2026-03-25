@@ -917,7 +917,7 @@ describe('AIWritingModal', () => {
 
   /* --- Send error when not configured --- */
 
-  it('shows config error when sending prompt with missing API key', async () => {
+  it('disables preset buttons when API key is missing', async () => {
     currentAIConfig = {
       provider: 'openai-compatible' as const,
       endpoint: 'https://api.openai.com/v1/chat/completions',
@@ -933,22 +933,14 @@ describe('AIWritingModal', () => {
       root.render(<AIWritingModal open={true} onClose={onCloseMock} />);
     });
 
-    // Click a preset to trigger sendPrompt
     const buttons = Array.from(container.querySelectorAll('button'));
     const continueBtn = buttons.find(b => b.textContent?.includes('Continue Writing'));
 
-    await act(async () => {
-      continueBtn!.click();
-    });
-    await act(async () => {
-      await new Promise(r => setTimeout(r, 10));
-    });
-
-    const text = container.textContent || '';
-    expect(text).toContain('API key is missing');
+    expect(continueBtn).toBeTruthy();
+    expect(continueBtn!.disabled).toBe(true);
   });
 
-  it('shows generic config error when sending prompt without any config', async () => {
+  it('disables preset buttons when AI is not configured', async () => {
     currentAIConfig = {
       provider: 'openai-compatible' as const,
       endpoint: '',
@@ -967,20 +959,13 @@ describe('AIWritingModal', () => {
     const buttons = Array.from(container.querySelectorAll('button'));
     const continueBtn = buttons.find(b => b.textContent?.includes('Continue Writing'));
 
-    await act(async () => {
-      continueBtn!.click();
-    });
-    await act(async () => {
-      await new Promise(r => setTimeout(r, 10));
-    });
-
-    const text = container.textContent || '';
-    expect(text).toContain('AI is not configured yet');
+    expect(continueBtn).toBeTruthy();
+    expect(continueBtn!.disabled).toBe(true);
   });
 
   /* --- Pipeline error when not configured --- */
 
-  it('shows error when running pipeline without config', async () => {
+  it('disables pipeline button when AI is not configured', async () => {
     currentAIConfig = {
       provider: 'openai-compatible' as const,
       endpoint: '',
@@ -999,15 +984,8 @@ describe('AIWritingModal', () => {
     const buttons = Array.from(container.querySelectorAll('button'));
     const pipelineBtn = buttons.find(b => b.textContent?.includes('Run Pipeline'));
 
-    await act(async () => {
-      pipelineBtn!.click();
-    });
-    await act(async () => {
-      await new Promise(r => setTimeout(r, 10));
-    });
-
-    const text = container.textContent || '';
-    expect(text).toContain('Configure AI first');
+    expect(pipelineBtn).toBeTruthy();
+    expect(pipelineBtn!.disabled).toBe(true);
   });
 
   /* --- Server proxy unconfigured error --- */
