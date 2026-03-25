@@ -282,6 +282,261 @@ describe('IntegrationsModal', () => {
     expect(text).toContain('3h ago');
   });
 
+  it('connects Google Drive when Connect is clicked with client ID', async () => {
+    // Pre-load config with clientId so the component initializes with it
+    localStorage.setItem('draftharbour_integrations', JSON.stringify({
+      scrivener: { type: 'scrivener', enabled: false },
+      'google-drive': { type: 'google-drive', enabled: true, status: 'disconnected', clientId: 'test-client-id' },
+      dropbox: { type: 'dropbox', enabled: false },
+    }));
+
+    act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
+
+    const buttons = container.querySelectorAll('button');
+    const connectBtn = Array.from(buttons).find(b => b.textContent?.includes('Connect'));
+    expect(connectBtn).toBeDefined();
+    expect(connectBtn?.disabled).toBe(false);
+
+    await act(async () => { connectBtn!.click(); });
+
+    expect(mocks.connectProviderMock).toHaveBeenCalledWith('google-drive', 'test-client-id');
+  });
+
+  it('disconnects Google Drive when Disconnect is clicked', async () => {
+    localStorage.setItem('draftharbour_integrations', JSON.stringify({
+      scrivener: { type: 'scrivener', enabled: false },
+      'google-drive': { type: 'google-drive', enabled: true, status: 'connected', connectionId: 'conn-g1', sessionToken: 'tok-g1', clientId: 'cid-1' },
+      dropbox: { type: 'dropbox', enabled: false },
+    }));
+
+    act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
+
+    const buttons = container.querySelectorAll('button');
+    const disconnectBtn = Array.from(buttons).find(b => b.textContent?.includes('Disconnect'));
+    expect(disconnectBtn).toBeDefined();
+
+    await act(async () => { disconnectBtn!.click(); });
+
+    expect(mocks.disconnectProviderMock).toHaveBeenCalledWith('google-drive', 'conn-g1', 'tok-g1');
+  });
+
+  it('syncs Google Drive when Sync now is clicked', async () => {
+    localStorage.setItem('draftharbour_integrations', JSON.stringify({
+      scrivener: { type: 'scrivener', enabled: false },
+      'google-drive': { type: 'google-drive', enabled: true, status: 'connected', connectionId: 'conn-g1', sessionToken: 'tok-g1', clientId: 'cid-1' },
+      dropbox: { type: 'dropbox', enabled: false },
+    }));
+
+    act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
+
+    const buttons = container.querySelectorAll('button');
+    const syncBtn = Array.from(buttons).find(b => b.textContent?.includes('Sync now'));
+    expect(syncBtn).toBeDefined();
+
+    await act(async () => { syncBtn!.click(); });
+
+    expect(mocks.pushMock).toHaveBeenCalled();
+    expect(mocks.pullMock).toHaveBeenCalled();
+  });
+
+  it('lists Google Drive revisions', async () => {
+    localStorage.setItem('draftharbour_integrations', JSON.stringify({
+      scrivener: { type: 'scrivener', enabled: false },
+      'google-drive': { type: 'google-drive', enabled: true, status: 'connected', connectionId: 'conn-g1', sessionToken: 'tok-g1', clientId: 'cid-1' },
+      dropbox: { type: 'dropbox', enabled: false },
+    }));
+
+    act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
+
+    const buttons = container.querySelectorAll('button');
+    const revisionsBtn = Array.from(buttons).find(b => b.textContent?.includes('Revisions'));
+    expect(revisionsBtn).toBeDefined();
+
+    await act(async () => { revisionsBtn!.click(); });
+
+    expect(mocks.listRevisionsMock).toHaveBeenCalledWith('google-drive', expect.objectContaining({ connectionId: 'conn-g1' }));
+  });
+
+  it('connects Dropbox when Connect is clicked with app key', async () => {
+    localStorage.setItem('draftharbour_integrations', JSON.stringify({
+      scrivener: { type: 'scrivener', enabled: false },
+      'google-drive': { type: 'google-drive', enabled: false },
+      dropbox: { type: 'dropbox', enabled: true, status: 'disconnected', clientId: 'test-app-key' },
+    }));
+
+    act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
+
+    const buttons = container.querySelectorAll('button');
+    const connectBtn = Array.from(buttons).find(b => b.textContent?.includes('Connect'));
+    expect(connectBtn?.disabled).toBe(false);
+
+    await act(async () => { connectBtn!.click(); });
+
+    expect(mocks.connectProviderMock).toHaveBeenCalledWith('dropbox', 'test-app-key');
+  });
+
+  it('disconnects Dropbox when Disconnect is clicked', async () => {
+    localStorage.setItem('draftharbour_integrations', JSON.stringify({
+      scrivener: { type: 'scrivener', enabled: false },
+      'google-drive': { type: 'google-drive', enabled: false },
+      dropbox: { type: 'dropbox', enabled: true, status: 'connected', connectionId: 'conn-d1', sessionToken: 'tok-d1', clientId: 'key-1' },
+    }));
+
+    act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
+
+    const buttons = container.querySelectorAll('button');
+    const disconnectBtn = Array.from(buttons).find(b => b.textContent?.includes('Disconnect'));
+
+    await act(async () => { disconnectBtn!.click(); });
+
+    expect(mocks.disconnectProviderMock).toHaveBeenCalledWith('dropbox', 'conn-d1', 'tok-d1');
+  });
+
+  it('syncs Dropbox when Sync now is clicked', async () => {
+    localStorage.setItem('draftharbour_integrations', JSON.stringify({
+      scrivener: { type: 'scrivener', enabled: false },
+      'google-drive': { type: 'google-drive', enabled: false },
+      dropbox: { type: 'dropbox', enabled: true, status: 'connected', connectionId: 'conn-d1', sessionToken: 'tok-d1', clientId: 'key-1' },
+    }));
+
+    act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
+
+    const buttons = container.querySelectorAll('button');
+    const syncBtn = Array.from(buttons).find(b => b.textContent?.includes('Sync now'));
+
+    await act(async () => { syncBtn!.click(); });
+
+    expect(mocks.pushMock).toHaveBeenCalled();
+    expect(mocks.pullMock).toHaveBeenCalled();
+  });
+
+  it('lists Dropbox revisions', async () => {
+    localStorage.setItem('draftharbour_integrations', JSON.stringify({
+      scrivener: { type: 'scrivener', enabled: false },
+      'google-drive': { type: 'google-drive', enabled: false },
+      dropbox: { type: 'dropbox', enabled: true, status: 'connected', connectionId: 'conn-d1', sessionToken: 'tok-d1', clientId: 'key-1' },
+    }));
+
+    act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
+
+    const buttons = container.querySelectorAll('button');
+    const revisionsBtn = Array.from(buttons).find(b => b.textContent?.includes('Revisions'));
+
+    await act(async () => { revisionsBtn!.click(); });
+
+    expect(mocks.listRevisionsMock).toHaveBeenCalled();
+  });
+
+  it('shows Reconnect label when token is expired', async () => {
+    localStorage.setItem('draftharbour_integrations', JSON.stringify({
+      scrivener: { type: 'scrivener', enabled: false },
+      'google-drive': { type: 'google-drive', enabled: true, status: 'connected', connectionId: 'conn-g1', sessionToken: 'tok-g1', clientId: 'cid-1', expiresAt: Date.now() - 60_000 },
+      dropbox: { type: 'dropbox', enabled: false },
+    }));
+
+    act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
+
+    const text = container.textContent || '';
+    expect(text).toContain('Reconnect');
+  });
+
+  it('shows operation error state on connect failure', async () => {
+    mocks.connectProviderMock.mockRejectedValueOnce(new Error('OAuth popup closed'));
+
+    localStorage.setItem('draftharbour_integrations', JSON.stringify({
+      scrivener: { type: 'scrivener', enabled: false },
+      'google-drive': { type: 'google-drive', enabled: true, status: 'disconnected', clientId: 'cid-1' },
+      dropbox: { type: 'dropbox', enabled: false },
+    }));
+
+    act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
+
+    const buttons = container.querySelectorAll('button');
+    const connectBtn = Array.from(buttons).find(b => b.textContent?.includes('Connect'));
+
+    await act(async () => { connectBtn!.click(); });
+
+    const text = container.textContent || '';
+    expect(text).toContain('Failed');
+    expect(text).toContain('OAuth popup closed');
+  });
+
+  it('runs Scrivener import when Import .scriv is clicked', async () => {
+    localStorage.setItem('draftharbour_integrations', JSON.stringify({
+      scrivener: { type: 'scrivener', enabled: true },
+      'google-drive': { type: 'google-drive', enabled: false },
+      dropbox: { type: 'dropbox', enabled: false },
+    }));
+
+    act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
+
+    const buttons = container.querySelectorAll('button');
+    const importBtn = Array.from(buttons).find(b => b.textContent?.includes('Import .scriv'));
+
+    await act(async () => { importBtn!.click(); });
+
+    expect(mocks.pullMock).toHaveBeenCalledWith('scrivener', expect.objectContaining({ type: 'scrivener' }), expect.any(Object));
+  });
+
+  it('runs Scrivener export when Export .scriv is clicked', async () => {
+    localStorage.setItem('draftharbour_integrations', JSON.stringify({
+      scrivener: { type: 'scrivener', enabled: true },
+      'google-drive': { type: 'google-drive', enabled: false },
+      dropbox: { type: 'dropbox', enabled: false },
+    }));
+
+    act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
+
+    const buttons = container.querySelectorAll('button');
+    const exportBtn = Array.from(buttons).find(b => b.textContent?.includes('Export .scriv'));
+
+    await act(async () => { exportBtn!.click(); });
+
+    expect(mocks.pushMock).toHaveBeenCalledWith('scrivener', expect.objectContaining({ type: 'scrivener' }), expect.any(Object));
+  });
+
+  it('shows providerUserId when connected', () => {
+    localStorage.setItem('draftharbour_integrations', JSON.stringify({
+      scrivener: { type: 'scrivener', enabled: false },
+      'google-drive': { type: 'google-drive', enabled: true, status: 'connected', connectionId: 'c1', providerUserId: 'user@gmail.com', sessionToken: 't', clientId: 'c' },
+      dropbox: { type: 'dropbox', enabled: false },
+    }));
+
+    act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
+
+    const text = container.textContent || '';
+    expect(text).toContain('Account: user@gmail.com');
+  });
+
+  it('shows date format for old sync times', () => {
+    const oldDate = Date.now() - 48 * 3600_000; // 2 days ago
+
+    localStorage.setItem('draftharbour_integrations', JSON.stringify({
+      scrivener: { type: 'scrivener', enabled: true, lastSyncAt: oldDate },
+      'google-drive': { type: 'google-drive', enabled: false },
+      dropbox: { type: 'dropbox', enabled: false },
+    }));
+
+    act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
+
+    // Should show a formatted date, not hours
+    const text = container.textContent || '';
+    expect(text).not.toContain('48h ago');
+    // It should contain a month abbreviation
+    expect(text).toMatch(/\w{3}\s+\d/);
+  });
+
+  it('handles corrupt localStorage gracefully', () => {
+    localStorage.setItem('draftharbour_integrations', 'not-json{{{');
+
+    act(() => { root.render(<IntegrationsModal open onClose={vi.fn()} />); });
+
+    // Should render with defaults (no crash)
+    const text = container.textContent || '';
+    expect(text).toContain('Scrivener');
+    expect(text).toContain('Disconnected');
+  });
+
   it('scrubs legacy accessToken/apiKey fields on load', () => {
     localStorage.setItem('draftharbour_integrations', JSON.stringify({
       scrivener: { type: 'scrivener', enabled: false },
