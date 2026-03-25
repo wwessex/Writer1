@@ -184,15 +184,22 @@ function extractNonStreamResponse(
 ): { text: string; usage?: { promptTokens?: number; completionTokens?: number } } {
   if (backend === 'ollama') {
     const msg = data as { message?: { content?: string }; prompt_eval_count?: number; eval_count?: number };
+    const text = msg.message?.content;
+    if (text === undefined || text === null) {
+      throw new Error(`Unexpected response format from ${CUSTOM_LLM_BACKEND_LABELS[backend]}. Expected Ollama chat completion format with message.content field.`);
+    }
     return {
-      text: msg.message?.content ?? JSON.stringify(data, null, 2),
+      text,
       usage: msg.eval_count ? { promptTokens: msg.prompt_eval_count, completionTokens: msg.eval_count } : undefined,
     };
   }
 
   // OpenAI-compatible format
   const choices = data as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
-  const text = choices.choices?.[0]?.message?.content ?? JSON.stringify(data, null, 2);
+  const text = choices.choices?.[0]?.message?.content;
+  if (text === undefined || text === null) {
+    throw new Error(`Unexpected response format from ${CUSTOM_LLM_BACKEND_LABELS[backend]}. Expected OpenAI-compatible chat completion format with choices[0].message.content field.`);
+  }
   const usage = choices.usage
     ? { promptTokens: choices.usage.prompt_tokens, completionTokens: choices.usage.completion_tokens }
     : undefined;

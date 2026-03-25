@@ -79,7 +79,7 @@ vi.mock('@/context/AppContext', () => ({
 }));
 
 // AI modules
-const mockExecute = vi.fn().mockResolvedValue({ text: 'AI response text' });
+const mockExecute = vi.fn().mockResolvedValue({ text: 'AI response text', provider: 'openai-compatible' });
 const mockDestroy = vi.fn();
 
 const defaultAIConfig: Record<string, any> = {
@@ -170,6 +170,9 @@ vi.mock('@/lib/utils', () => ({
   editorToPlainText: vi.fn(() => 'Hello world'),
 }));
 
+import { editorToPlainText } from '@/lib/utils';
+const mockEditorToPlainText = vi.mocked(editorToPlainText);
+
 vi.mock('@/lib/continuityMemory', () => ({
   formatContinuityContext: vi.fn(() => ''),
   getContinuityMemorySnapshot: vi.fn(() => ({})),
@@ -213,7 +216,7 @@ describe('AIWritingModal', () => {
     document.body.appendChild(container);
     root = createRoot(container);
     onCloseMock = vi.fn();
-    mockExecute.mockReset().mockResolvedValue({ text: 'AI response text' });
+    mockExecute.mockReset().mockResolvedValue({ text: 'AI response text', provider: 'openai-compatible' });
     mockDestroy.mockReset();
     currentAIConfig = { ...defaultAIConfig };
     mockState.projectType = 'book';
@@ -634,6 +637,30 @@ describe('AIWritingModal', () => {
     expect(mockExecute).toHaveBeenCalledTimes(2); // 2 non-optional stages
     const text = container.textContent || '';
     expect(text).toContain('Response');
+  });
+
+  /* --- Pipeline empty-chapter guard --- */
+
+  it('shows error when pipeline is run on empty chapter', async () => {
+    mockEditorToPlainText.mockReturnValueOnce('');
+    act(() => {
+      root.render(<AIWritingModal open={true} onClose={onCloseMock} />);
+    });
+
+    const buttons = Array.from(container.querySelectorAll('button'));
+    const pipelineBtn = buttons.find(b => b.textContent?.includes('Run Pipeline'));
+
+    await act(async () => {
+      pipelineBtn!.click();
+    });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    const text = container.textContent || '';
+    expect(text).toContain('Write some content');
+    expect(mockExecute).not.toHaveBeenCalled();
   });
 
   /* --- Screenplay-specific prompt placeholder --- */
