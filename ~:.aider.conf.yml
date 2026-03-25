@@ -1,0 +1,12 @@
+model: qwen2.5-coder
+
+openai-api-base: http://127.0.0.1:1234/v1
+openai-api-key: lm-studio
+
+edit-format: diff
+
+show-model-warnings: false
+check-model-accepts-settings: false
+
+detect-urls: false
+browser: false

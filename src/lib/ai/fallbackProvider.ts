@@ -107,10 +107,15 @@ export function buildFallbackChain(primaryConfig: AIProviderConfig): FallbackCon
   const fallbackType = primaryConfig.customLlm?.fallbackProvider;
   if (!fallbackType) return null;
 
+  const { fallbackProvider, ...customLlmWithoutFallback } = primaryConfig.customLlm;
+  const primaryWithoutFallback: AIProviderConfig = {
+    ...primaryConfig,
+    customLlm: customLlmWithoutFallback,
+  };
   const fallbackConfig: AIProviderConfig = { provider: fallbackType };
 
   return {
-    chain: [primaryConfig, fallbackConfig],
+    chain: [primaryWithoutFallback, fallbackConfig],
     maxRetriesPerProvider: 2,
     retryBaseDelayMs: 1000,
   };
