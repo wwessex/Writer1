@@ -8,8 +8,15 @@
 
 echo "🧬 Initialising AI Agent..."
 
-export OPENAI_API_KEY="lm-studio"
-export OPENAI_API_BASE="http://localhost:1234/v1"
+if [ -f ".env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . ./.env
+  set +a
+fi
+
+: "${OPENAI_API_KEY:?Set OPENAI_API_KEY in the environment or .env before running .ai_agent.sh}"
+: "${OPENAI_API_BASE:?Set OPENAI_API_BASE in the environment or .env before running .ai_agent.sh}"
 
 MEMORY_FILE=".ai_memory.log"
 TASK_FILE=".ai_tasks.txt"
@@ -18,6 +25,14 @@ touch "$MEMORY_FILE"
 touch "$TASK_FILE"
 
 echo "📁 Working dir: $(pwd)"
+
+get_mtime() {
+  if stat --version >/dev/null 2>&1; then
+    stat -c "%Y" "$1"
+  else
+    stat -f "%m" "$1"
+  fi
+}
 
 # ✅ ensure git exists
 if [ ! -d ".git" ]; then
@@ -29,8 +44,16 @@ fi
 # 🧠 STEP 1 — SMART FILE DETECTION
 # =========================
 
-TARGET_FILE=$(find src -type f \( -name "*.ts" -o -name "*.tsx" \) \
-  -print0 | xargs -0 stat -f "%m %N" | sort -rn | head -n 1 | cut -d' ' -f2-)
+TARGET_FILE=""
+LATEST_MTIME=""
+
+while IFS= read -r -d '' file; do
+  mtime=$(get_mtime "$file") || continue
+  if [[ -z "$LATEST_MTIME" || "$mtime" -gt "$LATEST_MTIME" ]]; then
+    LATEST_MTIME="$mtime"
+    TARGET_FILE="$file"
+  fi
+done < <(find src -type f \( -name "*.ts" -o -name "*.tsx" \) -print0)
 
 FILES=()
 
