@@ -53,6 +53,8 @@ interface PresetPrompt {
   prompt: string;
 }
 
+const AI_ADVANCED_SETTINGS_EXPANDED_KEY = 'draftharbour_ai_advanced_settings_expanded';
+
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
@@ -194,6 +196,10 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionResult, setConnectionResult] = useState<{ type: 'success' | 'error' | 'warning'; message: string } | null>(null);
+  const [advancedSettingsExpanded, setAdvancedSettingsExpanded] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem(AI_ADVANCED_SETTINGS_EXPANDED_KEY) === '1';
+  });
 
   // Chrome AI availability
   const [chromeAIAvailable, setChromeAIAvailable] = useState(false);
@@ -299,6 +305,11 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       abortRef.current?.abort();
     }
   }, [open]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(AI_ADVANCED_SETTINGS_EXPANDED_KEY, advancedSettingsExpanded ? '1' : '0');
+  }, [advancedSettingsExpanded]);
 
 
   useEffect(() => {
@@ -880,7 +891,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
           <div className={styles.aiProviderSelector}>
             <h5>Server AI Providers</h5>
             <p className={styles.aiSettingsHint}>
-              Enter your API key to connect directly, or leave blank to use the server proxy if available.
+              <strong>Quick setup (required to start):</strong> choose a provider, pick a model (or keep the default), add API key only if needed, then test connection.
             </p>
             <div className={styles.aiProviderOptions}>
               {(['groq', 'openrouter', 'gemini'] as const).map(sp => (
@@ -977,21 +988,64 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
 
           <div className={styles.aiProviderSelector}>
             <h5>Custom LLM (Local / Self-hosted)</h5>
-            <AIConfigPanel
-              mode="embedded"
-              config={config}
-              onConfigChange={updateConfig}
-              onCustomLlmConfigChange={updates => updateCustomLlmConfig(updates)}
-              onTestEndpoint={handleTestConnection}
-              onTestLocalLlm={handleTestCustomLlm}
-              endpointTesting={testingConnection}
-              localLlmTesting={testingConnection}
-              endpointTestResult={connectionResult ? { ok: connectionResult.type === 'success', message: connectionResult.message } : null}
-              localLlmTestResult={connectionResult ? { ok: connectionResult.type === 'success', message: connectionResult.message } : null}
-              showProviderFields
-              showLocalFields
-            />
+            <p className={styles.aiSettingsHint}>
+              <strong>Quick setup (required to start):</strong> pick a provider, confirm model, add API key only if required, then test the connection.
+            </p>
             {config.provider === 'custom-llm' && config.customLlm && (
+              <div className={styles.aiSettingsFields}>
+                <label className={styles.aiLabel}>
+                  Model
+                  <Input
+                    placeholder={CUSTOM_LLM_DEFAULTS[config.customLlm.backend].model}
+                    value={config.customLlm.model}
+                    onChange={e => updateConfig({
+                      customLlm: { ...config.customLlm!, model: e.target.value },
+                    })}
+                  />
+                </label>
+                <label className={styles.aiLabel}>
+                  API Key (if needed)
+                  <Input
+                    type="password"
+                    placeholder="Optional"
+                    value={config.customLlm.apiKey ?? ''}
+                    onChange={e => updateConfig({
+                      customLlm: { ...config.customLlm!, apiKey: e.target.value },
+                    })}
+                  />
+                </label>
+              </div>
+            )}
+
+            <button
+              type="button"
+              className={styles.aiAdvancedToggle}
+              aria-expanded={advancedSettingsExpanded}
+              onClick={() => setAdvancedSettingsExpanded(prev => !prev)}
+            >
+              <span className="material-symbols-rounded">{advancedSettingsExpanded ? 'expand_less' : 'expand_more'}</span>
+              Advanced settings (optional tuning)
+            </button>
+            {advancedSettingsExpanded && (
+              <div className={styles.aiAdvancedContent}>
+                <AIConfigPanel
+                  mode="embedded"
+                  config={config}
+                  onConfigChange={updateConfig}
+                  onCustomLlmConfigChange={updates => updateCustomLlmConfig(updates)}
+                  onTestEndpoint={handleTestConnection}
+                  onTestLocalLlm={handleTestCustomLlm}
+                  endpointTesting={testingConnection}
+                  localLlmTesting={testingConnection}
+                  endpointTestResult={connectionResult ? { ok: connectionResult.type === 'success', message: connectionResult.message } : null}
+                  localLlmTestResult={connectionResult ? { ok: connectionResult.type === 'success', message: connectionResult.message } : null}
+                  showProviderFields
+                  showLocalFields
+                />
+              </div>
+            )}
+
+            {advancedSettingsExpanded && config.provider === 'custom-llm' && config.customLlm && (
               <div className={styles.aiSettingsFields}>
                 <label className={styles.aiLabel}>
                   <input

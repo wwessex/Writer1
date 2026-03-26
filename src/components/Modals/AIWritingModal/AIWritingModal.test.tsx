@@ -1090,8 +1090,8 @@ describe('AIWritingModal', () => {
     act(() => { settingsBtn!.click(); });
 
     const text = container.textContent || '';
-    expect(text).toContain('Pick a provider below, then paste your API key to enable AI writing tools.');
-    expect(text).toContain('Connect to a local or self-hosted LLM server');
+    expect(text).toContain('Quick setup (required to start): choose a provider');
+    expect(text).toContain('Advanced settings (optional tuning)');
   });
 
   /* --- Managed cloud privacy note in settings --- */
@@ -1286,6 +1286,6 @@ describe('AIWritingModal', () => {
     act(() => { settingsBtn!.click(); });
 
     const text = container.textContent || '';
-    expect(text).toContain('Enter your API key to connect directly');
+    expect(text).toContain('add API key only if needed');
   });
 });
