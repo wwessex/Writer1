@@ -90,6 +90,9 @@ const SETTINGS_SECTIONS = [
   {
     id: 'typography',
     title: 'Typography',
+    group: 'general',
+    difficulty: 'beginner',
+    recommended: true,
     keywords: ['font', 'text', 'line height', 'readability'],
     fields: [
       { id: 'fontFamily', label: 'Font Family', keywords: ['typeface'] },
@@ -100,6 +103,9 @@ const SETTINGS_SECTIONS = [
   {
     id: 'sync',
     title: 'Online Sync',
+    group: 'privacy-sync',
+    difficulty: 'intermediate',
+    recommended: false,
     keywords: ['cloud', 'backup', 'server'],
     fields: [
       { id: 'novelId', label: 'Novel ID', keywords: ['identifier', 'sync key'] },
@@ -110,6 +116,9 @@ const SETTINGS_SECTIONS = [
   {
     id: 'ai',
     title: 'AI Provider',
+    group: 'ai',
+    difficulty: 'intermediate',
+    recommended: false,
     keywords: ['ai', 'openai', 'api key', 'llm', 'model', 'endpoint', 'gpt', 'claude'],
     fields: [
       { id: 'aiEndpoint', label: 'API Endpoint', keywords: ['url', 'server', 'openai'] },
@@ -120,6 +129,9 @@ const SETTINGS_SECTIONS = [
   {
     id: 'localai',
     title: 'Local AI (Custom LLM)',
+    group: 'ai',
+    difficulty: 'advanced',
+    recommended: true,
     keywords: ['ollama', 'vllm', 'llama', 'local', 'custom', 'self-hosted', 'narratryx'],
     fields: [
       { id: 'localaiBackend', label: 'Backend', keywords: ['ollama', 'vllm', 'llama.cpp'] },
@@ -131,6 +143,9 @@ const SETTINGS_SECTIONS = [
   {
     id: 'assist',
     title: 'Writing Assistance',
+    group: 'writing',
+    difficulty: 'beginner',
+    recommended: true,
     keywords: ['grammar', 'spelling', 'language tool'],
     fields: [
       { id: 'languageToolEnabled', label: 'Enable LanguageTool', keywords: ['toggle', 'grammar check'] },
@@ -141,6 +156,9 @@ const SETTINGS_SECTIONS = [
   {
     id: 'updates',
     title: 'Updates',
+    group: 'advanced',
+    difficulty: 'intermediate',
+    recommended: true,
     keywords: ['release', 'channel', 'stable', 'beta', 'nightly', 'updater'],
     fields: [
       { id: 'releaseChannel', label: 'Release Channel', keywords: ['stable', 'beta', 'nightly'] },
@@ -150,6 +168,9 @@ const SETTINGS_SECTIONS = [
   {
     id: 'app',
     title: 'Application',
+    group: 'general',
+    difficulty: 'beginner',
+    recommended: true,
     keywords: ['app', 'behaviour', 'productivity'],
     fields: [
       { id: 'autosaveMs', label: 'Autosave (ms)', keywords: ['autosave', 'save delay'] },
@@ -161,6 +182,9 @@ const SETTINGS_SECTIONS = [
   {
     id: 'privacy',
     title: 'Privacy & Data Sync',
+    group: 'privacy-sync',
+    difficulty: 'beginner',
+    recommended: true,
     keywords: ['privacy', 'telemetry', 'security', 'local storage'],
     fields: [
       { id: 'cloudSync', label: 'Cloud Sync', keywords: ['sync', 'remote'] },
@@ -171,12 +195,25 @@ const SETTINGS_SECTIONS = [
   {
     id: 'data',
     title: 'Data Management',
+    group: 'advanced',
+    difficulty: 'advanced',
+    recommended: false,
     keywords: ['reset', 'delete', 'storage'],
     fields: [
       { id: 'resetAllData', label: 'Reset All Data', keywords: ['clear', 'remove'] }
     ]
   }
 ] as const;
+
+const SETTINGS_GROUPS = [
+  { id: 'general', title: 'General' },
+  { id: 'writing', title: 'Writing' },
+  { id: 'ai', title: 'AI' },
+  { id: 'privacy-sync', title: 'Privacy & Sync' },
+  { id: 'advanced', title: 'Advanced' },
+] as const;
+
+type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
 export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   const { state, updateSettings } = useApp();
@@ -371,6 +408,25 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   }, [hasSearchQuery, normalizedSearchQuery]);
 
   const visibleSections = SETTINGS_SECTIONS.filter(section => isSectionVisible(section.id));
+  const sortedVisibleSections = useMemo(() => {
+    const difficultyOrder = { beginner: 0, intermediate: 1, advanced: 2 } as const;
+    return [...visibleSections].sort((a, b) => {
+      const groupDiff =
+        SETTINGS_GROUPS.findIndex(group => group.id === a.group) -
+        SETTINGS_GROUPS.findIndex(group => group.id === b.group);
+      if (groupDiff !== 0) return groupDiff;
+      const difficultyDiff = difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty];
+      if (difficultyDiff !== 0) return difficultyDiff;
+      return a.title.localeCompare(b.title);
+    });
+  }, [visibleSections]);
+  const sectionsByGroup = useMemo(() => {
+    const byGroup: Record<string, SettingsSection[]> = {};
+    SETTINGS_GROUPS.forEach(group => {
+      byGroup[group.id] = sortedVisibleSections.filter(section => section.group === group.id);
+    });
+    return byGroup;
+  }, [sortedVisibleSections]);
 
   useEffect(() => {
     setReleaseChannel(releaseChannel);
@@ -514,6 +570,53 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
     sectionRefs.current[sectionId]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  const applyRecommendedDefaults = useCallback((groupId: string) => {
+    if (groupId === 'general') {
+      updateSettings({
+        typography: { ...state.settings.typography, fontFamily: 'system', fontSize: 16, lineHeight: 1.625 },
+        autosaveMs: 800,
+      });
+      return;
+    }
+    if (groupId === 'writing') {
+      updateSettings({
+        assist: {
+          ...state.settings.assist,
+          languageToolEnabled: true,
+          languageToolUrl: 'https://api.languagetool.org/v2/check',
+          languageToolLanguage: 'en-US',
+        },
+      });
+      return;
+    }
+    if (groupId === 'ai') {
+      updateAIConfig({
+        endpoint: '',
+        sessionToken: '',
+        provider: 'custom-llm',
+        customLlm: {
+          backend: 'ollama',
+          baseUrl: CUSTOM_LLM_DEFAULTS.ollama.baseUrl,
+          model: CUSTOM_LLM_DEFAULTS.ollama.model,
+          apiKey: '',
+        },
+      });
+      return;
+    }
+    if (groupId === 'privacy-sync') {
+      updateSettings({
+        sync: { ...state.settings.sync, url: '', auth: '' },
+      });
+      setTelemetryEnabled(false);
+      setTelemetryOptIn(false);
+      return;
+    }
+    if (groupId === 'advanced') {
+      setReleaseChannelState('stable');
+      return;
+    }
+  }, [setReleaseChannelState, state.settings.assist, state.settings.sync, state.settings.typography, updateAIConfig, updateSettings]);
+
   if (!open) return null;
 
   return (
@@ -548,15 +651,44 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
             />
           </div>
 
-          {!isMobile && visibleSections.length > 0 && (
+          {!isMobile && sortedVisibleSections.length > 0 && (
             <nav className={styles.settingsToc} aria-label="Settings sections">
-              {visibleSections.map(section => (
+              {sortedVisibleSections.map(section => (
                 <button key={section.id} type="button" className={styles.settingsTocLink} onClick={() => jumpToSection(section.id)}>
                   {highlightMatch(section.title)}
                 </button>
               ))}
             </nav>
           )}
+
+          <div className={styles.settingsGroups}>
+            {SETTINGS_GROUPS.map(group => {
+              const groupSections = sectionsByGroup[group.id] ?? [];
+              if (groupSections.length === 0) return null;
+              const recommendedSections = groupSections.filter(section => section.recommended);
+              return (
+                <section key={group.id} className={styles.settingsGroupCard}>
+                  <div className={styles.settingsGroupHeader}>
+                    <h4>{group.title}</h4>
+                    <span>{groupSections.length} section{groupSections.length === 1 ? '' : 's'}</span>
+                  </div>
+                  <div className={styles.recommendedPanel}>
+                    <div className={styles.recommendedPanel__title}>Recommended defaults</div>
+                    <Button size="small" variant="ghost" onClick={() => applyRecommendedDefaults(group.id)}>
+                      Apply {group.title} defaults
+                    </Button>
+                  </div>
+                  <div className={styles.settingsGroupChips}>
+                    {recommendedSections.map(section => (
+                      <button key={section.id} type="button" className={styles.settingsTocLink} onClick={() => jumpToSection(section.id)}>
+                        {section.title}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
 
           {/* Typography Section */}
           {isSectionVisible('typography') && (
