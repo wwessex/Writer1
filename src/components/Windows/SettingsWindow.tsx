@@ -3,9 +3,10 @@ import { useApp } from '@/context/AppContext';
 import { Input, Button } from '@/components/UI';
 import { HelpTooltip } from '@/components/UI/Tooltip';
 import { Select } from '@/components/UI/Select';
+import { AIConfigPanel } from '@/components/AI/AIConfigPanel';
 import { clearAllData } from '@/lib/storage';
 import { isTelemetryOptedIn, setTelemetryOptIn, clearTelemetryData } from '@/lib/telemetry';
-import { loadAIConfig, saveAIConfig, CUSTOM_LLM_DEFAULTS, CUSTOM_LLM_BACKEND_LABELS, fetchOllamaModels, testCustomLlmConnection } from '@/lib/ai';
+import { loadAIConfig, saveAIConfig, CUSTOM_LLM_DEFAULTS, CUSTOM_LLM_BACKEND_LABELS, testCustomLlmConnection } from '@/lib/ai';
 import type { AIProviderConfig, CustomLlmBackend, CustomLlmConfig } from '@/lib/ai';
 import { useWindowResize } from '@/hooks/useResizable';
 import { getManagedPolicy } from '@/lib/policy';
@@ -57,34 +58,6 @@ const LINE_HEIGHT_OPTIONS = [
   { value: '2', label: 'Spacious (2.0)' },
   { value: '2.25', label: 'Wide (2.25)' }
 ];
-
-/* ------------------------------------------------------------------ */
-/*  Well-known AI endpoint presets                                      */
-/* ------------------------------------------------------------------ */
-
-interface AIEndpointPreset {
-  id: string;
-  label: string;
-  endpoint: string;
-  defaultModel: string;
-  keyPlaceholder: string;
-  signupUrl: string;
-}
-
-const AI_ENDPOINT_PRESETS: AIEndpointPreset[] = [
-  { id: 'openai', label: 'OpenAI', endpoint: 'https://api.openai.com/v1/chat/completions', defaultModel: 'gpt-4o', keyPlaceholder: 'sk-...', signupUrl: 'platform.openai.com' },
-  { id: 'groq', label: 'Groq', endpoint: 'https://api.groq.com/openai/v1/chat/completions', defaultModel: 'llama-3.3-70b-versatile', keyPlaceholder: 'gsk_...', signupUrl: 'console.groq.com' },
-  { id: 'openrouter', label: 'OpenRouter', endpoint: 'https://openrouter.ai/api/v1/chat/completions', defaultModel: 'google/gemini-2.0-flash-exp:free', keyPlaceholder: 'sk-or-...', signupUrl: 'openrouter.ai' },
-  { id: 'mistral', label: 'Mistral', endpoint: 'https://api.mistral.ai/v1/chat/completions', defaultModel: 'mistral-large-latest', keyPlaceholder: 'api key', signupUrl: 'console.mistral.ai' },
-  { id: 'deepseek', label: 'DeepSeek', endpoint: 'https://api.deepseek.com/v1/chat/completions', defaultModel: 'deepseek-chat', keyPlaceholder: 'sk-...', signupUrl: 'platform.deepseek.com' },
-  { id: 'together', label: 'Together AI', endpoint: 'https://api.together.xyz/v1/chat/completions', defaultModel: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', keyPlaceholder: 'api key', signupUrl: 'api.together.ai' },
-];
-
-function matchAIPresetId(endpoint?: string): string {
-  if (!endpoint?.trim()) return '';
-  const normalized = endpoint.trim().replace(/\/$/, '');
-  return AI_ENDPOINT_PRESETS.find(p => p.endpoint === normalized)?.id ?? '';
-}
 
 const SETTINGS_SECTIONS = [
   {
@@ -249,8 +222,6 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   const [aiConfig, setAIConfig] = useState<AIProviderConfig>(loadAIConfig);
   const [localLlmTestResult, setLocalLlmTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [localLlmTesting, setLocalLlmTesting] = useState(false);
-  const [ollamaModels, setOllamaModels] = useState<string[]>([]);
-  const [ollamaModelsFetching, setOllamaModelsFetching] = useState(false);
 
   const updateAIConfig = useCallback((updates: Partial<AIProviderConfig>) => {
     setAIConfig(prev => {
@@ -293,31 +264,9 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
     }
   }, [aiConfig.customLlm]);
 
-  // Fetch Ollama models when backend is ollama
   const customLlm = aiConfig.customLlm;
   const customLlmBackend = customLlm?.backend;
   const customLlmBaseUrl = customLlm?.baseUrl;
-  useEffect(() => {
-    if (customLlmBackend === 'ollama' && customLlmBaseUrl?.trim()) {
-      setOllamaModelsFetching(true);
-      fetchOllamaModels(customLlmBaseUrl)
-        .then(models => {
-          setOllamaModels(models);
-          if (models.length === 0 && aiConfig.provider === 'custom-llm') {
-            setLocalLlmTestResult({ ok: false, message: 'Could not fetch models from Ollama. Is it running?' });
-          }
-        })
-        .catch(() => {
-          setOllamaModels([]);
-          if (aiConfig.provider === 'custom-llm') {
-            setLocalLlmTestResult({ ok: false, message: 'Could not connect to Ollama server.' });
-          }
-        })
-        .finally(() => setOllamaModelsFetching(false));
-    } else {
-      setOllamaModels([]);
-    }
-  }, [customLlmBackend, customLlmBaseUrl, aiConfig.provider]);
 
   // Probe non-Ollama backends for connectivity when selected
   useEffect(() => {
@@ -758,82 +707,17 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
             </button>
             {!isSectionCollapsed('ai') && (
               <div className={styles.sectionContent}>
-                <div className={styles.privacyNotice}>
-                  <span className="material-symbols-rounded">info</span>
-                  <div>
-                    <p className={styles.privacyNotice__text}>
-                      Pick a provider below, then paste your API key to enable AI writing tools.
-                      Your key is stored locally in your browser and only sent to the endpoint you specify.
-                    </p>
-                  </div>
-                </div>
-                {isFieldVisible('ai', 'aiEndpoint') && <>
-                  <div className={styles.field}>
-                    <label>{highlightMatch('Provider')}</label>
-                    <div className={styles.aiEndpointPresets}>
-                      {AI_ENDPOINT_PRESETS.map(preset => {
-                        const isActive = matchAIPresetId(aiConfig.endpoint) === preset.id;
-                        return (
-                          <button
-                            key={preset.id}
-                            className={`${styles.aiEndpointPreset} ${isActive ? styles['aiEndpointPreset--active'] : ''}`}
-                            onClick={() => updateAIConfig({
-                              endpoint: preset.endpoint,
-                              model: aiConfig.model?.trim() ? aiConfig.model : preset.defaultModel,
-                            })}
-                          >
-                            <strong>{preset.label}</strong>
-                            <small>{preset.signupUrl}</small>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className={styles.field}>
-                    <label>
-                      {highlightMatch('API Endpoint')}
-                      <HelpTooltip text="OpenAI-compatible chat completions endpoint (e.g. https://api.openai.com/v1/chat/completions)" />
-                    </label>
-                    <Input
-                      placeholder="https://api.openai.com/v1/chat/completions"
-                      value={aiConfig.endpoint || ''}
-                      onChange={e => updateAIConfig({ endpoint: e.target.value })}
-                    />
-                  </div>
-                </>}
-                {isFieldVisible('ai', 'aiApiKey') && <div className={styles.field}>
-                  <label>
-                    {highlightMatch('API Key')}
-                    <HelpTooltip text="Your API key from OpenAI or any compatible provider" />
-                  </label>
-                  <Input
-                    type="password"
-                    placeholder={AI_ENDPOINT_PRESETS.find(p => p.id === matchAIPresetId(aiConfig.endpoint))?.keyPlaceholder ?? 'sk-...'}
-                    value={aiConfig.sessionToken || ''}
-                    onChange={e => updateAIConfig({ sessionToken: e.target.value })}
-                  />
-                </div>}
-                {isFieldVisible('ai', 'aiModel') && <div className={styles.field}>
-                  <label>
-                    {highlightMatch('Model')}
-                    <HelpTooltip text="Model identifier sent with requests (e.g. gpt-4o, gpt-4o-mini, gpt-3.5-turbo)" />
-                  </label>
-                  <Input
-                    placeholder={AI_ENDPOINT_PRESETS.find(p => p.id === matchAIPresetId(aiConfig.endpoint))?.defaultModel ?? 'gpt-4o'}
-                    value={aiConfig.model || ''}
-                    onChange={e => updateAIConfig({ model: e.target.value })}
-                  />
-                </div>}
-                {aiConfig.endpoint?.trim() && aiConfig.sessionToken?.trim() && (
-                  <div className={styles.privacyNotice}>
-                    <span className="material-symbols-rounded" style={{ color: 'var(--success, #22c55e)' }}>check_circle</span>
-                    <div>
-                      <p className={styles.privacyNotice__text}>
-                        AI provider configured. Open <strong>AI Writing Tools</strong> from the menu to start using AI assistance.
-                      </p>
-                    </div>
-                  </div>
-                )}
+                <AIConfigPanel
+                  mode="full"
+                  config={aiConfig}
+                  onConfigChange={updateAIConfig}
+                  onCustomLlmConfigChange={updateCustomLlmConfig}
+                  onTestLocalLlm={handleLocalLlmTest}
+                  localLlmTestResult={localLlmTestResult}
+                  localLlmTesting={localLlmTesting}
+                  showProviderFields
+                  showLocalFields={false}
+                />
               </div>
             )}
           </section>
@@ -853,110 +737,17 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
             </button>
             {!isSectionCollapsed('localai') && (
               <div className={styles.sectionContent}>
-                <div className={styles.privacyNotice}>
-                  <span className="material-symbols-rounded">info</span>
-                  <div>
-                    <p className={styles.privacyNotice__text}>
-                      Connect to a local or self-hosted LLM server (Ollama, vLLM, llama.cpp).
-                      All data stays on your machine.
-                    </p>
-                  </div>
-                </div>
-                {isFieldVisible('localai', 'localaiBackend') && <div className={styles.field}>
-                  <label>{highlightMatch('Backend')}</label>
-                  <div className={styles.aiEndpointPresets}>
-                    {(Object.keys(CUSTOM_LLM_DEFAULTS) as CustomLlmBackend[]).map(backend => {
-                      const isActive = aiConfig.provider === 'custom-llm' && aiConfig.customLlm?.backend === backend;
-                      return (
-                        <button
-                          key={backend}
-                          className={`${styles.aiEndpointPreset} ${isActive ? styles['aiEndpointPreset--active'] : ''}`}
-                          onClick={() => updateCustomLlmConfig({
-                            backend,
-                            baseUrl: CUSTOM_LLM_DEFAULTS[backend].baseUrl,
-                            model: CUSTOM_LLM_DEFAULTS[backend].model,
-                          })}
-                        >
-                          <strong>{CUSTOM_LLM_BACKEND_LABELS[backend]}</strong>
-                          <small>{CUSTOM_LLM_DEFAULTS[backend].baseUrl}</small>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>}
-                {isFieldVisible('localai', 'localaiBaseUrl') && <div className={styles.field}>
-                  <label>
-                    {highlightMatch('Base URL')}
-                    <HelpTooltip text="The base URL of your inference server" />
-                  </label>
-                  <Input
-                    placeholder={CUSTOM_LLM_DEFAULTS[aiConfig.customLlm?.backend ?? 'ollama'].baseUrl}
-                    value={aiConfig.customLlm?.baseUrl ?? ''}
-                    onChange={e => updateCustomLlmConfig({ baseUrl: e.target.value })}
-                  />
-                </div>}
-                {isFieldVisible('localai', 'localaiModel') && <div className={styles.field}>
-                  <label>
-                    {highlightMatch('Model')}
-                    <HelpTooltip text="Model name or tag (e.g. narratryx:latest)" />
-                  </label>
-                  {ollamaModelsFetching ? (
-                    <Input placeholder="Fetching models..." disabled />
-                  ) : ollamaModels.length > 0 ? (
-                    <Select
-                      options={[
-                        ...ollamaModels.map(m => ({ value: m, label: m })),
-                        { value: '__custom__', label: 'Custom...' },
-                      ]}
-                      value={ollamaModels.includes(aiConfig.customLlm?.model ?? '') ? (aiConfig.customLlm?.model ?? '') : '__custom__'}
-                      onChange={e => {
-                        if (e.target.value !== '__custom__') {
-                          updateCustomLlmConfig({ model: e.target.value });
-                        }
-                      }}
-                    />
-                  ) : (
-                    <Input
-                      placeholder={CUSTOM_LLM_DEFAULTS[aiConfig.customLlm?.backend ?? 'ollama'].model}
-                      value={aiConfig.customLlm?.model ?? ''}
-                      onChange={e => updateCustomLlmConfig({ model: e.target.value })}
-                    />
-                  )}
-                </div>}
-                {isFieldVisible('localai', 'localaiApiKey') && <div className={styles.field}>
-                  <label>
-                    {highlightMatch('API Key')}
-                    <HelpTooltip text="Optional API key for authenticated endpoints" />
-                  </label>
-                  <Input
-                    type="password"
-                    placeholder="Optional"
-                    value={aiConfig.customLlm?.apiKey ?? ''}
-                    onChange={e => updateCustomLlmConfig({ apiKey: e.target.value })}
-                  />
-                </div>}
-                <div className={styles.field}>
-                  <Button
-                    onClick={handleLocalLlmTest}
-                    disabled={localLlmTesting || !aiConfig.customLlm?.baseUrl?.trim() || !aiConfig.customLlm?.model?.trim()}
-                    size="small"
-                  >
-                    {localLlmTesting ? 'Testing...' : 'Test Connection'}
-                  </Button>
-                </div>
-                {localLlmTestResult && (
-                  <div className={styles.privacyNotice}>
-                    <span
-                      className="material-symbols-rounded"
-                      style={{ color: localLlmTestResult.ok ? 'var(--success, #22c55e)' : 'var(--error, #ef4444)' }}
-                    >
-                      {localLlmTestResult.ok ? 'check_circle' : 'error'}
-                    </span>
-                    <div>
-                      <p className={styles.privacyNotice__text}>{localLlmTestResult.message}</p>
-                    </div>
-                  </div>
-                )}
+                <AIConfigPanel
+                  mode="embedded"
+                  config={aiConfig}
+                  onConfigChange={updateAIConfig}
+                  onCustomLlmConfigChange={updateCustomLlmConfig}
+                  onTestLocalLlm={handleLocalLlmTest}
+                  localLlmTestResult={localLlmTestResult}
+                  localLlmTesting={localLlmTesting}
+                  showProviderFields={false}
+                  showLocalFields
+                />
               </div>
             )}
           </section>

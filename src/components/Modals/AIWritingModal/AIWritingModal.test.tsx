@@ -131,6 +131,7 @@ vi.mock('@/lib/ai', () => ({
     'llama-cpp': 'llama.cpp',
     'generic-openai': 'Custom Endpoint',
   },
+  fetchOllamaModels: vi.fn().mockResolvedValue([]),
   assembleStoryBibleContext: vi.fn(() => ({ entities: [], recentSceneSummaries: [], styleNotes: '' })),
   formatStoryBibleForPrompt: vi.fn(() => ''),
   runEvalSuite: vi.fn().mockResolvedValue({
@@ -1075,9 +1076,9 @@ describe('AIWritingModal', () => {
     expect(text).toContain('Generating response...');
   });
 
-  /* --- Endpoint presets shown in custom provider details --- */
+  /* --- Shared config panel content --- */
 
-  it('shows endpoint presets in custom provider section', () => {
+  it('shows shared provider setup content in settings panel', () => {
     act(() => {
       root.render(<AIWritingModal open={true} onClose={onCloseMock} />);
     });
@@ -1088,9 +1089,8 @@ describe('AIWritingModal', () => {
     act(() => { settingsBtn!.click(); });
 
     const text = container.textContent || '';
-    // The custom provider details section shows endpoint presets
-    expect(text).toContain('Custom provider (advanced)');
-    expect(text).toContain('Quick setup:');
+    expect(text).toContain('Pick a provider below, then paste your API key to enable AI writing tools.');
+    expect(text).toContain('Connect to a local or self-hosted LLM server');
   });
 
   /* --- Managed cloud privacy note in settings --- */

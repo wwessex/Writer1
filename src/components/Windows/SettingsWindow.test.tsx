@@ -155,21 +155,15 @@ describe('SettingsWindow', () => {
 
   it('expands Local AI section and shows backend buttons', async () => {
     const rendered = renderSettingsWindow();
-
-    // Find the section toggle button (inside a <section> element, not the TOC)
-    const sections = Array.from(rendered.container.querySelectorAll('section'));
-    const localAiSection = sections.find(s => s.textContent?.includes('Local AI'));
-    expect(localAiSection).toBeDefined();
-
-    const sectionToggle = localAiSection!.querySelector('button');
+    const sectionToggle = Array.from(rendered.container.querySelectorAll('button'))
+      .find(btn => btn.textContent?.includes('Local AI (Custom LLM)expand_more'));
     expect(sectionToggle).not.toBeNull();
 
     await act(async () => {
       sectionToggle!.click();
     });
 
-    // After expanding, the section should show configuration fields
-    const text = localAiSection!.textContent ?? '';
+    const text = rendered.container.textContent ?? '';
     expect(text).toContain('Connect to a local or self-hosted LLM server');
     expect(text).toContain('Base URL');
     expect(text).toContain('Test Connection');
@@ -196,6 +190,22 @@ describe('SettingsWindow', () => {
     expect(text).toContain('AI Provider');
     expect(text).toContain('OpenAI');
     expect(text).toContain('Groq');
+    expect(text).toContain('Pick a provider below, then paste your API key to enable AI writing tools.');
+    rendered.unmount();
+  });
+
+  it('renders shared local LLM fields from config panel', async () => {
+    const rendered = renderSettingsWindow();
+    const sectionToggle = Array.from(rendered.container.querySelectorAll('button'))
+      .find(btn => btn.textContent?.includes('Local AI (Custom LLM)expand_more'));
+    await act(async () => {
+      sectionToggle!.click();
+    });
+    const text = rendered.container.textContent ?? '';
+    expect(text).toContain('Connect to a local or self-hosted LLM server');
+    expect(text).toContain('Backend');
+    expect(text).toContain('Base URL');
+    expect(text).toContain('Test Connection');
     rendered.unmount();
   });
 
@@ -271,14 +281,11 @@ describe('SettingsWindow', () => {
 
   it('expands Writing Assistance section on click', async () => {
     const rendered = renderSettingsWindow();
-    const sections = Array.from(rendered.container.querySelectorAll('section'));
-    const assistSection = sections.find(s => s.textContent?.includes('Writing Assistance'));
-    expect(assistSection).toBeDefined();
-
-    const toggle = assistSection!.querySelector('button');
+    const toggle = Array.from(rendered.container.querySelectorAll('button'))
+      .find(btn => btn.textContent?.includes('Writing Assistanceexpand_more'));
     await act(async () => { toggle!.click(); });
 
-    const text = assistSection!.textContent ?? '';
+    const text = rendered.container.textContent ?? '';
     expect(text).toContain('Enable LanguageTool');
     rendered.unmount();
   });
@@ -299,14 +306,11 @@ describe('SettingsWindow', () => {
 
   it('expands Privacy section on click', async () => {
     const rendered = renderSettingsWindow();
-    const sections = Array.from(rendered.container.querySelectorAll('section'));
-    const privacySection = sections.find(s => s.textContent?.includes('Privacy'));
-    expect(privacySection).toBeDefined();
-
-    const toggle = privacySection!.querySelector('button');
+    const toggle = Array.from(rendered.container.querySelectorAll('button'))
+      .find(btn => btn.textContent?.includes('Privacy & Data Syncexpand_more'));
     await act(async () => { toggle!.click(); });
 
-    const text = privacySection!.textContent ?? '';
+    const text = rendered.container.textContent ?? '';
     expect(text).toContain('AI Usage Telemetry');
     rendered.unmount();
   });
@@ -349,13 +353,12 @@ describe('SettingsWindow', () => {
     const rendered = renderSettingsWindow();
 
     // Expand the Local AI section
-    const sections = Array.from(rendered.container.querySelectorAll('section'));
-    const localAiSection = sections.find(s => s.textContent?.includes('Local AI'));
-    const toggle = localAiSection!.querySelector('button');
+    const toggle = Array.from(rendered.container.querySelectorAll('button'))
+      .find(btn => btn.textContent?.includes('Local AI (Custom LLM)expand_more'));
     await act(async () => { toggle!.click(); });
 
     // Find all backend preset buttons inside the section
-    const buttons = Array.from(localAiSection!.querySelectorAll('button'));
+    const buttons = Array.from(rendered.container.querySelectorAll('button'));
     // The active class should not be applied to any backend button
     const activeButtons = buttons.filter(b =>
       b.className.includes('active') && (
@@ -373,13 +376,12 @@ describe('SettingsWindow', () => {
     const rendered = renderSettingsWindow();
 
     // Expand Local AI section
-    const sections = Array.from(rendered.container.querySelectorAll('section'));
-    const localAiSection = sections.find(s => s.textContent?.includes('Local AI'));
-    const toggle = localAiSection!.querySelector('button');
+    const toggle = Array.from(rendered.container.querySelectorAll('button'))
+      .find(btn => btn.textContent?.includes('Local AI (Custom LLM)expand_more'));
     await act(async () => { toggle!.click(); });
 
     // Click the Ollama backend button
-    const buttons = Array.from(localAiSection!.querySelectorAll('button'));
+    const buttons = Array.from(rendered.container.querySelectorAll('button'));
     const ollamaBtn = buttons.find(b => b.textContent?.includes('Ollama') && b.textContent?.includes('localhost:11434'));
     expect(ollamaBtn).toBeDefined();
 
@@ -406,17 +408,16 @@ describe('SettingsWindow', () => {
     const rendered = renderSettingsWindow();
 
     // Expand and click Ollama
-    const sections = Array.from(rendered.container.querySelectorAll('section'));
-    const localAiSection = sections.find(s => s.textContent?.includes('Local AI'));
-    const toggle = localAiSection!.querySelector('button');
+    const toggle = Array.from(rendered.container.querySelectorAll('button'))
+      .find(btn => btn.textContent?.includes('Local AI (Custom LLM)expand_more'));
     await act(async () => { toggle!.click(); });
 
-    const buttons = Array.from(localAiSection!.querySelectorAll('button'));
+    const buttons = Array.from(rendered.container.querySelectorAll('button'));
     const ollamaBtn = buttons.find(b => b.textContent?.includes('Ollama') && b.textContent?.includes('localhost:11434'));
     await act(async () => { ollamaBtn!.click(); });
 
     // Should show fetching placeholder
-    const inputs = Array.from(localAiSection!.querySelectorAll('input'));
+    const inputs = Array.from(rendered.container.querySelectorAll('input'));
     const fetchingInput = inputs.find(i => i.placeholder === 'Fetching models...');
     expect(fetchingInput).toBeDefined();
     expect(fetchingInput!.disabled).toBe(true);
