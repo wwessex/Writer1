@@ -8,7 +8,7 @@ import { clearAllData } from '@/lib/storage';
 import { isTelemetryOptedIn, setTelemetryOptIn, clearTelemetryData } from '@/lib/telemetry';
 import { loadAIConfig, saveAIConfig, CUSTOM_LLM_DEFAULTS, CUSTOM_LLM_BACKEND_LABELS, testCustomLlmConnection } from '@/lib/ai';
 import type { AIProviderConfig, CustomLlmBackend, CustomLlmConfig } from '@/lib/ai';
-import { AI_MODE_HELP_TEXT, AI_MODE_LABELS, resolveAIConfigMode, type AIConfigMode } from '@/lib/ai/configUi';
+import { AI_MODE_DATA_DESTINATION_TEXT, AI_MODE_HELP_TEXT, AI_MODE_LABELS, resolveAIConfigMode, type AIConfigMode } from '@/lib/ai/configUi';
 import { useWindowResize } from '@/hooks/useResizable';
 import { getManagedPolicy } from '@/lib/policy';
 import { validateAiEndpointUrl, validateAuthorizationHeader, validateLocalLlmConfig, validateSyncServerUrl } from '@/lib/validation/settingsValidation';
@@ -744,6 +744,7 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                     ))}
                   </div>
                   <p className={styles.aiModeHelp}>{AI_MODE_HELP_TEXT[currentAIMode]}</p>
+                  <p className={styles.aiModeHelp}>{AI_MODE_DATA_DESTINATION_TEXT[currentAIMode]}</p>
                   {aiConfig.endpoint?.trim() && aiConfig.sessionToken?.trim() && currentAIMode !== 'custom-endpoint' && (
                     <div className={styles.aiModeBanner}>
                       Endpoint + API key detected. Switch to <strong>Custom Endpoint</strong> mode to send requests directly to that endpoint.

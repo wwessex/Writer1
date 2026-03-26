@@ -26,7 +26,7 @@ import {
 import { getContinuityMemorySnapshot as getContinuitySnapshot } from '@/lib/continuityMemory';
 import { getBrokerBaseUrl, getBrokerEndpoint } from '@/lib/featureFlags';
 import { recordAIRevision } from '@/lib/aiRevisionLog';
-import { AI_MODE_HELP_TEXT, AI_MODE_LABELS, resolveAIConfigMode } from '@/lib/ai/configUi';
+import { AI_MODE_DATA_DESTINATION_TEXT, AI_MODE_HELP_TEXT, AI_MODE_LABELS, resolveAIConfigMode } from '@/lib/ai/configUi';
 import {
   AI_WRITING_PIPELINE_STAGES,
   applyInsertionMode,
@@ -850,6 +850,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         <div>
           <strong>Current AI Mode: {AI_MODE_LABELS[currentAIMode]}</strong>
           <p>{AI_MODE_HELP_TEXT[currentAIMode]}</p>
+          <p>{AI_MODE_DATA_DESTINATION_TEXT[currentAIMode]}</p>
         </div>
       </div>
 
@@ -872,7 +873,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
                     : `Using ${SERVER_PROXY_LABELS[config.serverProxy?.serverProvider ?? 'groq']}. Requests are routed through the DraftHarbour server proxy.`
                   : config.provider === 'openai-compatible'
                     ? 'Using a custom OpenAI-compatible provider. Requests are sent directly to your configured API endpoint.'
-                    : 'Using cloud AI. Requests are routed through the managed DraftHarbour cloud endpoint.'}
+                    : 'Using a hosted provider. Requests are routed through the managed DraftHarbour cloud endpoint.'}
             </span>
           </div>
 
@@ -1089,11 +1090,11 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
                     className={styles.aiSelect}
                   >
                     <option value="">None</option>
-                    <option value="managed-cloud">Cloud AI</option>
+                    <option value="managed-cloud">Hosted Provider</option>
                     <option value="chrome-ai">Chrome AI</option>
                     <option value="openai-compatible">Custom Provider</option>
                     <option value="server-proxy">Server Proxy</option>
-                    <option value="custom-llm">Custom LLM</option>
+                    <option value="custom-llm">Local Model</option>
                   </select>
                 </label>
               </div>
