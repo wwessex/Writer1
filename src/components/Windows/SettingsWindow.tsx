@@ -11,6 +11,7 @@ import type { AIProviderConfig, CustomLlmBackend, CustomLlmConfig } from '@/lib/
 import { AI_MODE_HELP_TEXT, AI_MODE_LABELS, resolveAIConfigMode, type AIConfigMode } from '@/lib/ai/configUi';
 import { useWindowResize } from '@/hooks/useResizable';
 import { getManagedPolicy } from '@/lib/policy';
+import { validateAiEndpointUrl, validateAuthorizationHeader, validateLocalLlmConfig, validateSyncServerUrl } from '@/lib/validation/settingsValidation';
 import { applyUpdateAndRestart, checkForUpdate, deferUpdate, getDeferredUpdateVersion, getLaunchFallbackMessage, getReleaseChannel, setReleaseChannel, type UpdaterSummary } from '@/lib/desktopUpdater';
 import type { ReleaseChannel } from '@/lib/updaterGuardrails';
 import styles from './Windows.module.css';
@@ -265,6 +266,18 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   const customLlmBackend = customLlm?.backend;
   const customLlmBaseUrl = customLlm?.baseUrl;
   const currentAIMode = resolveAIConfigMode(aiConfig);
+  const syncUrlValidation = validateSyncServerUrl(state.settings.sync.url);
+  const syncAuthValidation = validateAuthorizationHeader(state.settings.sync.auth);
+  const endpointValidation = validateAiEndpointUrl(aiConfig.endpoint ?? '');
+  const localLlmValidation = validateLocalLlmConfig({
+    baseUrl: aiConfig.customLlm?.baseUrl ?? '',
+    model: aiConfig.customLlm?.model ?? '',
+  });
+  const endpointTestDisabledReason = !aiConfig.sessionToken?.trim()
+    ? 'API key is required before testing.'
+    : !endpointValidation.valid
+      ? endpointValidation.error
+      : undefined;
 
   // Probe non-Ollama backends for connectivity when selected
   useEffect(() => {
@@ -747,6 +760,11 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                   localLlmTesting={localLlmTesting}
                   showProviderFields
                   showLocalFields={false}
+                  providerValidation={{
+                    endpointError: aiConfig.endpoint?.trim() ? endpointValidation.error : undefined,
+                    modelError: aiConfig.endpoint?.trim() && !aiConfig.model?.trim() ? 'Model is required for endpoint testing.' : undefined,
+                    testDisabledReason: endpointTestDisabledReason,
+                  }}
                 />
               </div>
             )}
@@ -777,6 +795,11 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                   localLlmTesting={localLlmTesting}
                   showProviderFields={false}
                   showLocalFields
+                  localValidation={{
+                    baseUrlError: aiConfig.customLlm?.baseUrl?.trim() ? localLlmValidation.baseUrl.error : undefined,
+                    modelError: aiConfig.customLlm?.baseUrl?.trim() || aiConfig.customLlm?.model?.trim() ? localLlmValidation.model.error : undefined,
+                    testDisabledReason: localLlmValidation.disabledReason,
+                  }}
                 />
               </div>
             )}
@@ -821,7 +844,9 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                       sync: { ...state.settings.sync, url: e.target.value }
                     })}
                     placeholder="https://your-server.com/sync"
+                    aria-invalid={Boolean(syncUrlValidation.error)}
                   />
+                  {syncUrlValidation.error && <p className={styles.fieldError}>{syncUrlValidation.error}</p>}
                 </div>}
                 {isFieldVisible('sync', 'authHeader') && <div className={styles.field}>
                   <label>
@@ -835,8 +860,13 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                       sync: { ...state.settings.sync, auth: e.target.value }
                     })}
                     placeholder="Bearer your-token"
+                    aria-invalid={Boolean(syncAuthValidation.error)}
                   />
+                  {syncAuthValidation.error && <p className={styles.fieldError}>{syncAuthValidation.error}</p>}
                 </div>}
+                {(syncUrlValidation.error || syncAuthValidation.error) && (
+                  <p className={styles.fieldHelper}>Fix sync field errors before enabling cloud sync.</p>
+                )}
               </div>
             )}
           </section>
