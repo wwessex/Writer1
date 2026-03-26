@@ -1681,6 +1681,31 @@
   line-height: 1.5;
 }
 
+.aiAdvancedToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.625rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.aiAdvancedToggle .material-symbols-rounded {
+  font-size: 1rem;
+}
+
+.aiAdvancedContent {
+  margin-top: 0.625rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
 .aiSetupGuide {
   display: flex;
   align-items: flex-start;
