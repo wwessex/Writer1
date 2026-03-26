@@ -2065,6 +2065,34 @@
   font-size: 0.875rem;
 }
 
+.aiHeaderModeStatus {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--btn-bg);
+}
+
+.aiHeaderModeStatus .material-symbols-rounded {
+  font-size: 1rem;
+  color: var(--accent);
+}
+
+.aiHeaderModeStatus strong {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text);
+}
+
+.aiHeaderModeStatus p {
+  margin: 0.125rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 .aiSelect {
   width: 100%;
   padding: 0.5rem 0.75rem;

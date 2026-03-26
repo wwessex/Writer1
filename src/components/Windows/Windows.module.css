@@ -248,6 +248,48 @@
   animation: sectionExpand 0.2s ease-out;
 }
 
+.aiModeCard {
+  margin-bottom: 0.875rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--btn-bg);
+}
+
+.aiModeStatus {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.aiModeOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+}
+
+.aiModeOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.aiModeHelp {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.aiModeBanner {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text);
+  font-size: 0.75rem;
+}
+
 @keyframes sectionExpand {
   from {
     opacity: 0;
