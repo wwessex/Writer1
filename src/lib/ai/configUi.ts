@@ -1,4 +1,6 @@
 import type { AIProviderConfig } from './types';
+import type { AIConfigMode } from './copy';
+export { AI_MODE_HELP_TEXT, AI_MODE_LABELS, AI_MODE_DATA_DESTINATION_TEXT } from './copy';
 
 export interface AIEndpointPreset {
   id: string;
@@ -27,28 +29,12 @@ export const AI_CONFIG_TEXT = {
   localValidation: 'Enter a base URL and model to test this local setup.',
 } as const;
 
-export type AIConfigMode = 'automatic' | 'server-provider' | 'custom-endpoint' | 'local-llm';
-
 export function resolveAIConfigMode(config: AIProviderConfig): AIConfigMode {
   if (config.provider === 'server-proxy') return 'server-provider';
   if (config.provider === 'openai-compatible') return 'custom-endpoint';
   if (config.provider === 'custom-llm') return 'local-llm';
   return 'automatic';
 }
-
-export const AI_MODE_LABELS: Record<AIConfigMode, string> = {
-  automatic: 'Automatic',
-  'server-provider': 'Server Provider',
-  'custom-endpoint': 'Custom Endpoint',
-  'local-llm': 'Local LLM',
-};
-
-export const AI_MODE_HELP_TEXT: Record<AIConfigMode, string> = {
-  automatic: 'Requests use the app-selected default route (local/browser model when available, otherwise managed cloud).',
-  'server-provider': 'Requests go to the server provider you select (direct with your API key, or via proxy when no key is provided).',
-  'custom-endpoint': 'Requests go directly to your OpenAI-compatible endpoint using the API key entered here.',
-  'local-llm': 'Requests stay on your local/self-hosted LLM endpoint and use your local endpoint credentials if configured.',
-};
 
 export function matchAIPresetId(endpoint?: string): string {
   if (!endpoint?.trim()) return '';

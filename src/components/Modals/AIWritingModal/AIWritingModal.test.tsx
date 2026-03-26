@@ -1118,7 +1118,7 @@ describe('AIWritingModal', () => {
     act(() => { settingsBtn!.click(); });
 
     const text = container.textContent || '';
-    expect(text).toContain('Using cloud AI. Requests are routed through the managed DraftHarbour cloud endpoint');
+    expect(text).toContain('Using a hosted provider. Requests are routed through the managed DraftHarbour cloud endpoint');
   });
 
   /* --- Settings stored locally hint --- */
