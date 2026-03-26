@@ -14,6 +14,7 @@
  */
 
 import { fetchWithPolicy } from '@/lib/integrations/providerClient';
+import { mapAIConnectionFailureMessage } from '@/lib/validation/settingsValidation';
 import type { AIProvider, AIProviderConfig, AIRequest, AIResponse, CustomLlmBackend } from './types';
 
 /* ------------------------------------------------------------------ */
@@ -274,16 +275,21 @@ export async function testCustomLlmConnection(
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      return { ok: false, message: `Server returned ${res.status}: ${errText || res.statusText}` };
+      const remediated = mapAIConnectionFailureMessage({
+        status: res.status,
+        errorText: errText || res.statusText,
+      });
+      return { ok: false, message: `${remediated} (HTTP ${res.status})` };
     }
 
     return { ok: true, message: `Connected to ${CUSTOM_LLM_BACKEND_LABELS[config.backend]} successfully.` };
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
+    const remediated = mapAIConnectionFailureMessage({ errorMessage: msg });
     if (msg.includes('abort')) {
-      return { ok: false, message: 'Connection timed out after 15 seconds.' };
+      return { ok: false, message: `${remediated} (timed out after 15 seconds)` };
     }
-    return { ok: false, message: `Connection failed: ${msg}` };
+    return { ok: false, message: remediated };
   } finally {
     clearTimeout(timeout);
   }

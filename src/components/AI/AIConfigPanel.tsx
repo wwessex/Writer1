@@ -11,6 +11,13 @@ interface TestResult {
   message: string;
 }
 
+interface ValidationState {
+  endpointError?: string;
+  modelError?: string;
+  baseUrlError?: string;
+  testDisabledReason?: string;
+}
+
 interface AIConfigPanelProps {
   mode: 'compact' | 'full' | 'embedded';
   config: AIProviderConfig;
@@ -24,6 +31,8 @@ interface AIConfigPanelProps {
   localLlmTesting?: boolean;
   showProviderFields?: boolean;
   showLocalFields?: boolean;
+  providerValidation?: ValidationState;
+  localValidation?: ValidationState;
 }
 
 export function AIConfigPanel({
@@ -39,6 +48,8 @@ export function AIConfigPanel({
   localLlmTesting = false,
   showProviderFields = true,
   showLocalFields = true,
+  providerValidation,
+  localValidation,
 }: AIConfigPanelProps) {
   const [ollamaModels, setOllamaModels] = useState<string[]>([]);
   const [ollamaModelsFetching, setOllamaModelsFetching] = useState(false);
@@ -60,6 +71,18 @@ export function AIConfigPanel({
 
   const matchedPresetId = useMemo(() => matchAIPresetId(config.endpoint), [config.endpoint]);
   const isCompact = mode === 'compact';
+  const providerDisabledReason = providerValidation?.testDisabledReason
+    ?? (!config.endpoint?.trim()
+      ? 'Endpoint URL is required before testing.'
+      : !config.sessionToken?.trim()
+        ? 'API key is required before testing.'
+        : undefined);
+  const localDisabledReason = localValidation?.testDisabledReason
+    ?? (!config.customLlm?.baseUrl?.trim()
+      ? 'Base URL is required before testing.'
+      : !config.customLlm?.model?.trim()
+        ? 'Model is required before testing.'
+        : undefined);
 
   return (
     <div>
@@ -99,7 +122,9 @@ export function AIConfigPanel({
               placeholder="https://api.openai.com/v1/chat/completions"
               value={config.endpoint || ''}
               onChange={e => onConfigChange({ endpoint: e.target.value })}
+              aria-invalid={Boolean(providerValidation?.endpointError)}
             />
+            {providerValidation?.endpointError && <p role="alert">{providerValidation.endpointError}</p>}
           </div>
           <div>
             <label>
@@ -122,17 +147,21 @@ export function AIConfigPanel({
               placeholder={AI_ENDPOINT_PRESETS.find(p => p.id === matchedPresetId)?.defaultModel ?? 'gpt-4o'}
               value={config.model || ''}
               onChange={e => onConfigChange({ model: e.target.value })}
+              aria-invalid={Boolean(providerValidation?.modelError)}
             />
+            {providerValidation?.modelError && <p role="alert">{providerValidation.modelError}</p>}
           </div>
           {!isCompact && onTestEndpoint && (
             <div>
               <Button
                 onClick={onTestEndpoint}
                 size="small"
-                disabled={endpointTesting || !config.endpoint?.trim() || !config.sessionToken?.trim()}
+                disabled={endpointTesting || Boolean(providerDisabledReason)}
+                title={providerDisabledReason}
               >
                 {endpointTesting ? 'Testing...' : 'Test Connection'}
               </Button>
+              {providerDisabledReason && <p>{providerDisabledReason}</p>}
             </div>
           )}
           {endpointTestResult && <p>{endpointTestResult.message}</p>}
@@ -184,7 +213,9 @@ export function AIConfigPanel({
               placeholder={CUSTOM_LLM_DEFAULTS[config.customLlm?.backend ?? 'ollama'].baseUrl}
               value={config.customLlm?.baseUrl ?? ''}
               onChange={e => onCustomLlmConfigChange({ baseUrl: e.target.value })}
+              aria-invalid={Boolean(localValidation?.baseUrlError)}
             />
+            {localValidation?.baseUrlError && <p role="alert">{localValidation.baseUrlError}</p>}
           </div>
           <div>
             <label>
@@ -211,8 +242,10 @@ export function AIConfigPanel({
                 placeholder={CUSTOM_LLM_DEFAULTS[config.customLlm?.backend ?? 'ollama'].model}
                 value={config.customLlm?.model ?? ''}
                 onChange={e => onCustomLlmConfigChange({ model: e.target.value })}
+                aria-invalid={Boolean(localValidation?.modelError)}
               />
             )}
+            {localValidation?.modelError && <p role="alert">{localValidation.modelError}</p>}
           </div>
           <div>
             <label>
@@ -231,10 +264,12 @@ export function AIConfigPanel({
               <Button
                 onClick={onTestLocalLlm}
                 size="small"
-                disabled={localLlmTesting || !config.customLlm?.baseUrl?.trim() || !config.customLlm?.model?.trim()}
+                disabled={localLlmTesting || Boolean(localDisabledReason)}
+                title={localDisabledReason}
               >
                 {localLlmTesting ? 'Testing...' : 'Test Connection'}
               </Button>
+              {localDisabledReason && <p>{localDisabledReason}</p>}
             </div>
           )}
           {localLlmTestResult && <p>{localLlmTestResult.message}</p>}

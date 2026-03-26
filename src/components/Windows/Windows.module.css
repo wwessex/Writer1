@@ -193,6 +193,18 @@
   color: var(--text-muted);
 }
 
+.fieldError {
+  margin: 0.375rem 0 0;
+  font-size: 0.75rem;
+  color: #d14343;
+}
+
+.fieldHelper {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 .fieldRow {
   display: flex;
   gap: 0.75rem;
