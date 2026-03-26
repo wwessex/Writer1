@@ -302,6 +302,7 @@ describe('AIWritingModal', () => {
       root.render(<AIWritingModal open={true} onClose={onCloseMock} />);
     });
     const text = container.textContent || '';
+    expect(text).toContain('Current AI Mode: Custom Endpoint');
     expect(text).toContain('AI ready');
     expect(text).toContain('Using custom provider');
   });

@@ -78,6 +78,7 @@ export function AIConfigPanel({
                     key={preset.id}
                     aria-pressed={isActive}
                     onClick={() => onConfigChange({
+                      provider: 'openai-compatible',
                       endpoint: preset.endpoint,
                       model: config.model?.trim() ? config.model : preset.defaultModel,
                     })}
@@ -135,6 +136,14 @@ export function AIConfigPanel({
             </div>
           )}
           {endpointTestResult && <p>{endpointTestResult.message}</p>}
+          {config.endpoint?.trim() && config.sessionToken?.trim() && config.provider !== 'openai-compatible' && (
+            <p>
+              Endpoint and API key are set, but mode is not Custom Endpoint.
+              <button onClick={() => onConfigChange({ provider: 'openai-compatible' })}>
+                Switch to Custom Endpoint mode
+              </button>
+            </p>
+          )}
           {config.endpoint?.trim() && config.sessionToken?.trim() && <p>{AI_CONFIG_TEXT.configuredCta}</p>}
         </>
       )}

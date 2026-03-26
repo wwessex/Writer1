@@ -188,6 +188,8 @@ describe('SettingsWindow', () => {
     const rendered = renderSettingsWindow();
     const text = rendered.container.textContent ?? '';
     expect(text).toContain('AI Provider');
+    expect(text).toContain('Current AI Mode:');
+    expect(text).toContain('Automatic');
     expect(text).toContain('OpenAI');
     expect(text).toContain('Groq');
     expect(text).toContain('Pick a provider below, then paste your API key to enable AI writing tools.');

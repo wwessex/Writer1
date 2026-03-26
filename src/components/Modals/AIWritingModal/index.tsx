@@ -26,6 +26,7 @@ import {
 import { getContinuityMemorySnapshot as getContinuitySnapshot } from '@/lib/continuityMemory';
 import { getBrokerBaseUrl, getBrokerEndpoint } from '@/lib/featureFlags';
 import { recordAIRevision } from '@/lib/aiRevisionLog';
+import { AI_MODE_HELP_TEXT, AI_MODE_LABELS, resolveAIConfigMode } from '@/lib/ai/configUi';
 import {
   AI_WRITING_PIPELINE_STAGES,
   applyInsertionMode,
@@ -228,10 +229,6 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   const updateConfig = useCallback((updates: Partial<AIProviderConfig>) => {
     setConfig(prev => {
       const next = { ...prev, ...updates };
-      // Auto-switch to openai-compatible when both endpoint and key are provided
-      if (next.endpoint?.trim() && next.sessionToken?.trim() && next.provider !== 'server-proxy') {
-        next.provider = 'openai-compatible';
-      }
       saveAIConfig(next);
       return next;
     });
@@ -774,6 +771,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
           ? 'Using custom provider'
           : 'Using cloud AI';
   const providerLabel = `AI ready · ${providerModeLabel}`;
+  const currentAIMode = resolveAIConfigMode(config);
   const providerIcon =
     config.provider === 'chrome-ai' ? 'memory'
     : config.provider === 'custom-llm' ? 'smart_toy'
@@ -836,6 +834,14 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         </div>
       }
     >
+      <div className={styles.aiHeaderModeStatus}>
+        <span className="material-symbols-rounded">{providerIcon}</span>
+        <div>
+          <strong>Current AI Mode: {AI_MODE_LABELS[currentAIMode]}</strong>
+          <p>{AI_MODE_HELP_TEXT[currentAIMode]}</p>
+        </div>
+      </div>
+
       {/* Settings panel (collapsible) */}
       {showSettings && (
         <div className={styles.aiSettings}>

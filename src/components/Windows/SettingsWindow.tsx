@@ -8,6 +8,7 @@ import { clearAllData } from '@/lib/storage';
 import { isTelemetryOptedIn, setTelemetryOptIn, clearTelemetryData } from '@/lib/telemetry';
 import { loadAIConfig, saveAIConfig, CUSTOM_LLM_DEFAULTS, CUSTOM_LLM_BACKEND_LABELS, testCustomLlmConnection } from '@/lib/ai';
 import type { AIProviderConfig, CustomLlmBackend, CustomLlmConfig } from '@/lib/ai';
+import { AI_MODE_HELP_TEXT, AI_MODE_LABELS, resolveAIConfigMode, type AIConfigMode } from '@/lib/ai/configUi';
 import { useWindowResize } from '@/hooks/useResizable';
 import { getManagedPolicy } from '@/lib/policy';
 import { applyUpdateAndRestart, checkForUpdate, deferUpdate, getDeferredUpdateVersion, getLaunchFallbackMessage, getReleaseChannel, setReleaseChannel, type UpdaterSummary } from '@/lib/desktopUpdater';
@@ -226,10 +227,6 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   const updateAIConfig = useCallback((updates: Partial<AIProviderConfig>) => {
     setAIConfig(prev => {
       const next = { ...prev, ...updates };
-      // Auto-switch to openai-compatible when both endpoint and key are provided
-      if (next.endpoint?.trim() && next.sessionToken?.trim() && next.provider !== 'server-proxy') {
-        next.provider = 'openai-compatible';
-      }
       saveAIConfig(next);
       return next;
     });
@@ -267,6 +264,7 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   const customLlm = aiConfig.customLlm;
   const customLlmBackend = customLlm?.backend;
   const customLlmBaseUrl = customLlm?.baseUrl;
+  const currentAIMode = resolveAIConfigMode(aiConfig);
 
   // Probe non-Ollama backends for connectivity when selected
   useEffect(() => {
@@ -707,6 +705,38 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
             </button>
             {!isSectionCollapsed('ai') && (
               <div className={styles.sectionContent}>
+                <div className={styles.aiModeCard}>
+                  <p className={styles.aiModeStatus}>
+                    <strong>Current AI Mode:</strong> {AI_MODE_LABELS[currentAIMode]}
+                  </p>
+                  <div className={styles.aiModeOptions} role="radiogroup" aria-label="Current AI mode">
+                    {(['automatic', 'server-provider', 'custom-endpoint', 'local-llm'] as const).map(mode => (
+                      <label key={mode} className={styles.aiModeOption}>
+                        <input
+                          type="radio"
+                          name="settings-ai-mode"
+                          checked={currentAIMode === mode}
+                          onChange={() => {
+                            const providerByMode: Record<AIConfigMode, AIProviderConfig['provider']> = {
+                              automatic: 'managed-cloud',
+                              'server-provider': 'server-proxy',
+                              'custom-endpoint': 'openai-compatible',
+                              'local-llm': 'custom-llm',
+                            };
+                            updateAIConfig({ provider: providerByMode[mode] });
+                          }}
+                        />
+                        {AI_MODE_LABELS[mode]}
+                      </label>
+                    ))}
+                  </div>
+                  <p className={styles.aiModeHelp}>{AI_MODE_HELP_TEXT[currentAIMode]}</p>
+                  {aiConfig.endpoint?.trim() && aiConfig.sessionToken?.trim() && currentAIMode !== 'custom-endpoint' && (
+                    <div className={styles.aiModeBanner}>
+                      Endpoint + API key detected. Switch to <strong>Custom Endpoint</strong> mode to send requests directly to that endpoint.
+                    </div>
+                  )}
+                </div>
                 <AIConfigPanel
                   mode="full"
                   config={aiConfig}
