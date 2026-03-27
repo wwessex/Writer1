@@ -67,27 +67,10 @@ function buildSystemPrompt(projectType: 'book' | 'screenplay', sectionTitle?: st
 function buildFullPrompt(request: AIRequest): string {
   const parts: string[] = [];
 
-  // Inject story bible context if available
-  if (request.storyBibleContext) {
-    const { entities, recentSceneSummaries, styleNotes } = request.storyBibleContext;
-    if (entities.length > 0) {
-      const entityLines = entities
-        .slice(0, 12)
-        .map(e => `- ${e.name} (${e.type}): ${e.description}`)
-        .join('\n');
-      parts.push(`Story Bible Entities:\n${entityLines}`);
-    }
-    if (recentSceneSummaries.length > 0) {
-      parts.push(`Recent scenes:\n${recentSceneSummaries.slice(-5).map(s => `- ${s}`).join('\n')}`);
-    }
-    if (styleNotes) {
-      parts.push(`Style notes: ${styleNotes}`);
-    }
-  }
-
+  // Context (includes story bible, continuity, blueprint, and chapter text)
   if (request.context) {
     const label = request.projectType === 'screenplay' ? 'scene' : 'chapter';
-    parts.push(`Here is the current ${label} text for context:\n\n---\n${request.context}\n---`);
+    parts.push(`Here is the current ${label} text and context:\n\n---\n${request.context}\n---`);
   }
 
   parts.push(request.prompt);

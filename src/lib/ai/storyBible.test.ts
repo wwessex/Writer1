@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   assembleStoryBibleContext,
   formatStoryBibleForPrompt,
+  loadCharacterBibleEntities,
   loadStoryBible,
   saveStoryBible,
 } from './storyBible';
@@ -184,6 +185,97 @@ describe('storyBible', () => {
       });
 
       expect(text).toBe('');
+    });
+  });
+
+  describe('loadCharacterBibleEntities', () => {
+    it('returns empty array when no data stored', () => {
+      expect(loadCharacterBibleEntities('novel-1')).toEqual([]);
+    });
+
+    it('loads characters and maps to StoryBibleEntity format', () => {
+      mockStorage.set('draftharbour_characters', JSON.stringify([
+        {
+          id: 'char-1', novelId: 'novel-1', name: 'Elena', aliases: ['Lena'],
+          description: 'A brave detective', role: 'protagonist', traits: ['courageous', 'clever'],
+          notes: '', relationships: [], createdAt: 1, updatedAt: 1,
+        },
+      ]));
+
+      const entities = loadCharacterBibleEntities('novel-1');
+
+      expect(entities).toHaveLength(1);
+      expect(entities[0].name).toBe('Elena');
+      expect(entities[0].type).toBe('character');
+      expect(entities[0].description).toContain('brave detective');
+      expect(entities[0].description).toContain('protagonist');
+      expect(entities[0].description).toContain('courageous');
+      expect(entities[0].triggerKeywords).toContain('elena');
+      expect(entities[0].triggerKeywords).toContain('lena');
+    });
+
+    it('loads world entries and maps to StoryBibleEntity format', () => {
+      mockStorage.set('draftharbour_world', JSON.stringify([
+        {
+          id: 'world-1', novelId: 'novel-1', category: 'location', name: 'The Castle',
+          description: 'An ancient fortress', tags: ['medieval', 'stone'],
+          linkedCharacters: [], notes: '', createdAt: 1, updatedAt: 1,
+        },
+      ]));
+
+      const entities = loadCharacterBibleEntities('novel-1');
+
+      expect(entities).toHaveLength(1);
+      expect(entities[0].name).toBe('The Castle');
+      expect(entities[0].type).toBe('location');
+      expect(entities[0].triggerKeywords).toContain('the castle');
+      expect(entities[0].triggerKeywords).toContain('medieval');
+    });
+
+    it('filters by novelId', () => {
+      mockStorage.set('draftharbour_characters', JSON.stringify([
+        { id: 'c1', novelId: 'novel-1', name: 'A', aliases: [], description: '', role: 'other', traits: [], notes: '', relationships: [], createdAt: 1, updatedAt: 1 },
+        { id: 'c2', novelId: 'novel-2', name: 'B', aliases: [], description: '', role: 'other', traits: [], notes: '', relationships: [], createdAt: 1, updatedAt: 1 },
+      ]));
+
+      const entities = loadCharacterBibleEntities('novel-1');
+      expect(entities).toHaveLength(1);
+      expect(entities[0].name).toBe('A');
+    });
+  });
+
+  describe('assembleStoryBibleContext with Character Bible', () => {
+    it('includes Character Bible entities in assembled context', () => {
+      mockStorage.set('draftharbour_characters', JSON.stringify([
+        {
+          id: 'char-1', novelId: 'novel-1', name: 'Elena', aliases: [],
+          description: 'Protagonist', role: 'protagonist', traits: [],
+          notes: '', relationships: [], createdAt: 1, updatedAt: 1,
+        },
+      ]));
+
+      const chapters = [makeChapter()];
+      const context = assembleStoryBibleContext('novel-1', chapters, 'ch-1', null);
+
+      const names = context.entities.map(e => e.name);
+      expect(names).toContain('Elena');
+    });
+
+    it('deduplicates Character Bible entities with continuity entities', () => {
+      mockStorage.set('draftharbour_characters', JSON.stringify([
+        {
+          id: 'char-1', novelId: 'novel-1', name: 'Sarah', aliases: [],
+          description: 'Protagonist', role: 'protagonist', traits: [],
+          notes: '', relationships: [], createdAt: 1, updatedAt: 1,
+        },
+      ]));
+
+      const chapters = [makeChapter()];
+      const snapshot = makeContinuitySnapshot(); // Also has Sarah
+      const context = assembleStoryBibleContext('novel-1', chapters, 'ch-1', snapshot);
+
+      const sarahEntities = context.entities.filter(e => e.name.toLowerCase() === 'sarah');
+      expect(sarahEntities).toHaveLength(1);
     });
   });
 });

@@ -56,6 +56,8 @@ vi.mock('@/lib/ai', () => ({
     'generic-openai': 'Custom Endpoint',
   },
   fetchOllamaModels: vi.fn(async () => []),
+  assembleStoryBibleContext: vi.fn(() => ({ entities: [], recentSceneSummaries: [], styleNotes: '' })),
+  formatStoryBibleForPrompt: vi.fn(() => ''),
 }));
 
 vi.mock('@/lib/featureFlags', () => ({

@@ -10,7 +10,7 @@
  * pipeline's Story Bible concept (llm/Narratryx/docs/architecture.md).
  */
 
-import type { Chapter } from '@/types';
+import type { Chapter, CharacterEntity, WorldEntry } from '@/types';
 import { editorToPlainText } from '@/lib/utils';
 import type { ContinuityMemorySnapshot } from '@/lib/continuityMemory';
 import type { StoryBibleContext, StoryBibleEntity } from './types';
@@ -49,6 +49,64 @@ export function loadStoryBible(novelId: string): StoredStoryBible | null {
 export function saveStoryBible(bible: StoredStoryBible): void {
   if (!bible.novelId) return;
   localStorage.setItem(`${STORY_BIBLE_STORAGE_KEY}_${bible.novelId}`, JSON.stringify(bible));
+}
+
+/* ------------------------------------------------------------------ */
+/*  Character & World Bible bridge                                     */
+/* ------------------------------------------------------------------ */
+
+const CHARACTERS_STORAGE_KEY = 'draftharbour_characters';
+const WORLD_ENTRIES_STORAGE_KEY = 'draftharbour_world';
+
+const WORLD_CATEGORY_TO_ENTITY_TYPE: Record<WorldEntry['category'], StoryBibleEntity['type']> = {
+  location: 'location',
+  item: 'item',
+  lore: 'concept',
+  event: 'concept',
+  organisation: 'concept',
+  other: 'concept',
+};
+
+export function loadCharacterBibleEntities(novelId: string): StoryBibleEntity[] {
+  const entities: StoryBibleEntity[] = [];
+
+  try {
+    const rawChars = localStorage.getItem(CHARACTERS_STORAGE_KEY);
+    if (rawChars) {
+      const characters = (JSON.parse(rawChars) as CharacterEntity[])
+        .filter(c => c.novelId === novelId);
+      for (const c of characters) {
+        const keywords = [c.name.toLowerCase(), ...c.aliases.map(a => a.toLowerCase())];
+        const descParts = [c.description, c.role !== 'other' ? c.role : ''].filter(Boolean);
+        if (c.traits.length > 0) descParts.push(`traits: ${c.traits.join(', ')}`);
+        entities.push({
+          name: c.name,
+          type: 'character',
+          description: descParts.join('. ') || 'Character in the story',
+          triggerKeywords: keywords,
+        });
+      }
+    }
+  } catch { /* ignore malformed data */ }
+
+  try {
+    const rawWorld = localStorage.getItem(WORLD_ENTRIES_STORAGE_KEY);
+    if (rawWorld) {
+      const worldEntries = (JSON.parse(rawWorld) as WorldEntry[])
+        .filter(w => w.novelId === novelId);
+      for (const w of worldEntries) {
+        const keywords = [w.name.toLowerCase(), ...w.tags.map(t => t.toLowerCase())];
+        entities.push({
+          name: w.name,
+          type: WORLD_CATEGORY_TO_ENTITY_TYPE[w.category] ?? 'concept',
+          description: w.description || `${w.category} in the story`,
+          triggerKeywords: keywords,
+        });
+      }
+    }
+  } catch { /* ignore malformed data */ }
+
+  return entities;
 }
 
 /* ------------------------------------------------------------------ */
@@ -138,14 +196,18 @@ export function assembleStoryBibleContext(
     .join(' ')
     .slice(0, 10000);
 
-  // Merge entities: stored bible entities + auto-extracted from continuity
-  let allEntities: StoryBibleEntity[] = stored?.entities ?? [];
+  // Merge entities: Character Bible + stored bible + auto-extracted from continuity
+  // Character Bible entries take priority as they are user-curated
+  const characterBibleEntities = loadCharacterBibleEntities(novelId);
+  let allEntities: StoryBibleEntity[] = [...characterBibleEntities, ...(stored?.entities ?? [])];
+  const existingNames = new Set(allEntities.map(e => e.name.toLowerCase()));
+
   if (continuitySnapshot) {
     const continuityEntities = extractEntitiesFromContinuity(continuitySnapshot);
-    const existingNames = new Set(allEntities.map(e => e.name.toLowerCase()));
     for (const ce of continuityEntities) {
       if (!existingNames.has(ce.name.toLowerCase())) {
         allEntities.push(ce);
+        existingNames.add(ce.name.toLowerCase());
       }
     }
   }

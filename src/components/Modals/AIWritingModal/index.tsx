@@ -20,10 +20,10 @@ import {
   CUSTOM_LLM_DEFAULTS,
   CUSTOM_LLM_BACKEND_LABELS,
   assembleStoryBibleContext,
+  formatStoryBibleForPrompt,
   runEvalSuite,
   saveEvalResult,
 } from '@/lib/ai';
-import { getContinuityMemorySnapshot as getContinuitySnapshot } from '@/lib/continuityMemory';
 import { getBrokerBaseUrl, getBrokerEndpoint } from '@/lib/featureFlags';
 import { recordAIRevision } from '@/lib/aiRevisionLog';
 import { AI_MODE_DATA_DESTINATION_TEXT, AI_MODE_HELP_TEXT, AI_MODE_LABELS, resolveAIConfigMode } from '@/lib/ai/configUi';
@@ -374,17 +374,16 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       const continuitySnapshot = getContinuityMemorySnapshot(state.novelId, state.chapters);
       const continuityContext = formatContinuityContext(continuitySnapshot);
       const blueprintContext = formatStoryBlueprintContext(state.storyBlueprint);
-      const enrichedContext = [blueprintContext, continuityContext, chapterText].filter(Boolean).join('\n\n');
 
-      // Build Story Bible context for custom LLM
-      const storyBibleContext = config.provider === 'custom-llm'
-        ? assembleStoryBibleContext(
-            state.novelId,
-            state.chapters,
-            state.activeChapterId,
-            getContinuitySnapshot(state.novelId, state.chapters),
-          )
-        : undefined;
+      // Build Story Bible context for all providers
+      const storyBibleContext = assembleStoryBibleContext(
+        state.novelId,
+        state.chapters,
+        state.activeChapterId,
+        continuitySnapshot,
+      );
+      const storyBibleText = formatStoryBibleForPrompt(storyBibleContext);
+      const enrichedContext = [blueprintContext, continuityContext, storyBibleText, chapterText].filter(Boolean).join('\n\n');
 
       // Abort any previous request
       abortRef.current?.abort();
@@ -408,7 +407,6 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
           projectType: state.projectType,
           sectionTitle: activeChapter?.title,
           signal: controller.signal,
-          storyBibleContext,
           onStreamChunk: useStreaming
             ? (_chunk, accumulated) => {
                 setIsStreaming(true);

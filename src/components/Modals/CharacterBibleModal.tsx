@@ -147,6 +147,10 @@ export function CharacterBibleModal({ open, onClose }: CharacterBibleModalProps)
 
   return (
     <Dialog open={open} onClose={onClose} title="Character & World Bible" size="large">
+      <p className={styles.bibleAiNote}>
+        <span className="material-symbols-rounded" style={{ fontSize: 16, verticalAlign: 'middle' }}>auto_awesome</span>
+        {' '}Entries here are automatically included as context in AI writing prompts.
+      </p>
       <div className={styles.bibleLayout}>
         {/* Sidebar */}
         <div className={styles.bibleSidebar}>

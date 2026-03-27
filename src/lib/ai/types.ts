@@ -82,8 +82,6 @@ export interface AIRequest {
   signal?: AbortSignal;
   /** Callback for streaming token chunks (if provider supports it) */
   onStreamChunk?: (chunk: string, accumulated: string) => void;
-  /** Story Bible context for long-document awareness */
-  storyBibleContext?: StoryBibleContext;
 }
 
 export interface AIResponse {
