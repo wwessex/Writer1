@@ -237,7 +237,7 @@ describe('CustomLlmProvider', () => {
       expect(body.messages[0].content).not.toContain('proofreader');
     });
 
-    it('includes story bible context in prompt', async () => {
+    it('includes enriched context in prompt', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({ message: { content: 'ok' } }),
@@ -245,13 +245,7 @@ describe('CustomLlmProvider', () => {
 
       const provider = new CustomLlmProvider(makeConfig());
       await provider.execute(makeRequest({
-        storyBibleContext: {
-          entities: [
-            { name: 'Sarah', type: 'character', description: 'Protagonist, age 30', triggerKeywords: ['sarah'] },
-          ],
-          recentSceneSummaries: ['Sarah discovers the letter'],
-          styleNotes: 'Gothic tone',
-        },
+        context: 'Story Bible:\n- Sarah (character): Protagonist, age 30\n\nRecent scenes:\n- Sarah discovers the letter\n\nStyle guide: Gothic tone\n\nChapter text here',
       }));
 
       const body = JSON.parse(mockFetch.mock.calls[0][1]!.body as string);

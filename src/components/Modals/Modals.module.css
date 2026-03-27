@@ -2459,6 +2459,15 @@
 }
 
 /* ===== Character & World Bible ===== */
+.bibleAiNote {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  background: var(--surface-secondary);
+  border-radius: 6px;
+}
+
 .bibleLayout {
   display: grid;
   grid-template-columns: 240px 1fr;

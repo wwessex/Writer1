@@ -45,6 +45,7 @@ export type { LocalLlmDetection } from './availability';
 export {
   assembleStoryBibleContext,
   formatStoryBibleForPrompt,
+  loadCharacterBibleEntities,
   loadStoryBible,
   saveStoryBible,
 } from './storyBible';
