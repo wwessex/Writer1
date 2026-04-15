@@ -304,7 +304,7 @@ export function Inspector({ open, onClose, voiceAlerts = [] }: InspectorProps) {
                       />
                     ) : (
                       <Input
-                        value={activeChapter.pov}
+                        value={activeChapter.pov || ''}
                         onChange={e => handleFieldChange('pov', e.target.value)}
                         placeholder="Point of view character"
                       />

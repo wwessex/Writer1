@@ -1,5 +1,6 @@
 import type { AIProviderConfig } from './types';
 import type { AIConfigMode } from './copy';
+export type { AIConfigMode } from './copy';
 export { AI_MODE_HELP_TEXT, AI_MODE_LABELS, AI_MODE_DATA_DESTINATION_TEXT } from './copy';
 
 export interface AIEndpointPreset {
