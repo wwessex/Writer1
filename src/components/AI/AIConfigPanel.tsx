@@ -99,6 +99,7 @@ export function AIConfigPanel({
                 return (
                   <button
                     key={preset.id}
+                    type="button"
                     aria-pressed={isActive}
                     onClick={() => onConfigChange({
                       provider: 'openai-compatible',
@@ -190,6 +191,7 @@ export function AIConfigPanel({
                 return (
                   <button
                     key={backend}
+                    type="button"
                     aria-pressed={isActive}
                     onClick={() => onCustomLlmConfigChange({
                       backend,
@@ -223,7 +225,7 @@ export function AIConfigPanel({
               <HelpTooltip text="Model name or tag" />
             </label>
             {ollamaModelsFetching ? (
-              <Input placeholder="Fetching models..." disabled />
+              <Input value="" placeholder="Fetching models..." disabled readOnly />
             ) : ollamaModels.length > 0 ? (
               <Select
                 options={[
