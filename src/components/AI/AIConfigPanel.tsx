@@ -169,7 +169,7 @@ export function AIConfigPanel({
           {config.endpoint?.trim() && config.sessionToken?.trim() && config.provider !== 'openai-compatible' && (
             <p>
               Endpoint and API key are set, but mode is not Custom Endpoint.
-              <button onClick={() => onConfigChange({ provider: 'openai-compatible' })}>
+              <button type="button" onClick={() => onConfigChange({ provider: 'openai-compatible' })}>
                 Switch to Custom Endpoint mode
               </button>
             </p>
