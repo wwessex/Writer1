@@ -450,3 +450,34 @@ body.focus-mode:hover .focus-mode-hint { opacity: 1; }
   body { background: white; color: black; }
   .no-print { display: none !important; }
 }
+/* Native macOS desktop refinements — liquid glass shell */
+html[data-runtime='desktop'][data-platform='macos'] {
+  --glass-bg: color-mix(in srgb, var(--panel) 66%, transparent);
+  --glass-border: color-mix(in srgb, var(--border) 45%, white 55%);
+}
+
+html[data-runtime='desktop'][data-platform='macos'] body {
+  background:
+    radial-gradient(circle at 12% -12%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 34%),
+    radial-gradient(circle at 88% 108%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 42%),
+    var(--bg);
+}
+
+html[data-runtime='desktop'][data-platform='macos'] .mac-liquid-root {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 78%, transparent), transparent 84%);
+}
+
+html[data-runtime='desktop'][data-platform='macos'] .app-chrome {
+  background: color-mix(in srgb, var(--glass-bg) 88%, transparent);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  border-color: var(--glass-border);
+}
+
+html[data-runtime='desktop'][data-platform='macos'] .app-chrome--top {
+  border-bottom-width: 1px;
+}
+
+html[data-runtime='desktop'][data-platform='macos'] .app-chrome--bottom {
+  border-top-width: 1px;
+}

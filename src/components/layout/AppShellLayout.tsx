@@ -8,6 +8,7 @@ import { useResizable } from '@/hooks/useResizable';
 import { useResponsivePanels } from '@/hooks/useResponsivePanels';
 import { useApp } from '@/context/AppContext';
 import { countWords, editorToPlainText } from '@/lib/utils';
+import { isMacDesktopRuntime } from '@/lib/runtimePlatform';
 
 /**
  * Standalone layout shell that wraps the Tailwind 3-panel layout.
@@ -15,6 +16,7 @@ import { countWords, editorToPlainText } from '@/lib/utils';
  */
 export function AppShellLayout() {
   const { state, activeChapter } = useApp();
+  const macDesktopRuntime = isMacDesktopRuntime();
   const [focusMode, setFocusMode] = useState(false);
   const { shouldCollapseSidebar, shouldCollapseInspector } = useResponsivePanels();
   const [sidebarCollapsed] = useState(false);
@@ -79,8 +81,12 @@ export function AppShellLayout() {
   };
 
   return (
-    <div className="h-[100dvh] min-w-0 bg-[var(--bg)] text-[var(--text)] flex flex-col overflow-x-hidden">
+    <div className={[
+      'h-[100dvh] min-w-0 bg-[var(--bg)] text-[var(--text)] flex flex-col overflow-x-hidden',
+      macDesktopRuntime ? 'mac-liquid-root' : '',
+    ].join(' ')}>
       <TopBar
+        macLiquid={macDesktopRuntime}
         focusMode={focusMode}
         onFocusMode={() => setFocusMode((mode) => !mode)}
         onSearch={handleSearch}
@@ -109,6 +115,7 @@ export function AppShellLayout() {
       </div>
 
       <StatusBar
+        macLiquid={macDesktopRuntime}
         wordCount={wordCount}
         sessionWords={sessionWords}
         goalPercent={goalPercent}
