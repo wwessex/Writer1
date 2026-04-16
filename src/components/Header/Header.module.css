@@ -25,6 +25,16 @@
   gap: clamp(8px, 2vw, 16px);
 }
 
+
+:global(html[data-runtime='desktop'][data-platform='macos']) .topbar {
+  padding-top: 30px;
+  padding-left: max(84px, clamp(8px, 2vw, 16px));
+}
+
+:global(html[data-runtime='desktop'][data-platform='macos']) .topbar__brand {
+  min-height: 30px;
+}
+
 .topbar__brand {
   display: flex;
   align-items: center;
