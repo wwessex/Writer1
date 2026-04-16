@@ -1,0 +1,12 @@
+─────────────────────────────────────────────────────────────────────────────────────────────
+Aider v0.86.2
+Model: openai/qwen/qwen2.5-coder-14b with diff edit format
+Git repo: .git with 283 files
+Repo-map: using 1024 tokens, auto refresh
+Added src/App.tsx to the chat.
+
+To change get_factorial() to use math.factorial, I need to know the full file path of the    
+Python file containing this function. Please add the relevant file to the chat so I can      
+proceed with the changes.                                                                    
+
+Tokens: 7.7k sent, 46 received.

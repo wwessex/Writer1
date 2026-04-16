@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Dialog, Button, Input, Textarea } from '@/components/UI';
 import { useToast } from '@/components/UI';
+import { AIConfigPanel } from '@/components/AI/AIConfigPanel';
 import { useApp } from '@/context/AppContext';
 import { editorToPlainText } from '@/lib/utils';
 import { formatContinuityContext, getContinuityMemorySnapshot } from '@/lib/continuityMemory';
@@ -11,6 +12,7 @@ import {
   isChromeAIAvailable,
   checkChromeAIAvailability,
   detectBestProvider,
+  detectLocalLlmConfig,
   isChromeBrowser,
   SERVER_PROXY_ENDPOINTS,
   SERVER_PROXY_MODELS,
@@ -18,19 +20,20 @@ import {
   CUSTOM_LLM_DEFAULTS,
   CUSTOM_LLM_BACKEND_LABELS,
   assembleStoryBibleContext,
+  formatStoryBibleForPrompt,
   runEvalSuite,
   saveEvalResult,
 } from '@/lib/ai';
-import { getContinuityMemorySnapshot as getContinuitySnapshot } from '@/lib/continuityMemory';
 import { getBrokerBaseUrl, getBrokerEndpoint } from '@/lib/featureFlags';
 import { recordAIRevision } from '@/lib/aiRevisionLog';
+import { AI_MODE_DATA_DESTINATION_TEXT, AI_MODE_HELP_TEXT, AI_MODE_LABELS, resolveAIConfigMode } from '@/lib/ai/configUi';
 import {
   AI_WRITING_PIPELINE_STAGES,
   applyInsertionMode,
   renderPipelinePrompt,
   type PipelineInsertionMode,
 } from '@/lib/ai/pipelines';
-import type { AIProviderConfig, AvailabilityStatus, EvalSuiteResult } from '@/lib/ai';
+import type { AIProviderConfig, AvailabilityStatus, CustomLlmConfig, EvalSuiteResult } from '@/lib/ai';
 import type { ProjectType, StoryBlueprint } from '@/types';
 import styles from '../Modals.module.css';
 
@@ -49,6 +52,8 @@ interface PresetPrompt {
   icon: string;
   prompt: string;
 }
+
+const AI_ADVANCED_SETTINGS_EXPANDED_KEY = 'draftharbour_ai_advanced_settings_expanded';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -88,7 +93,7 @@ const BOOK_PRESET_PROMPTS: PresetPrompt[] = [
     label: 'Fix Grammar',
     icon: 'spellcheck',
     prompt:
-      'Review the text for grammar, spelling, and punctuation errors. List each issue found with the original text, the correction, and a brief explanation.'
+      'Proofread and correct every grammar, spelling, and punctuation error in the text. Fix homophones (their/there/they\'re, its/it\'s, your/you\'re), subject-verb agreement, missing or incorrect apostrophes, and run-on sentences. List each correction as: "[original] \u2192 [corrected] (reason)". Do not change meaning or style.'
   }
 ];
 
@@ -129,77 +134,6 @@ const SCREENPLAY_PRESET_PROMPTS: PresetPrompt[] = [
       'Punch up this scene with stronger subtext and sharper turns while preserving story intent and character objectives.'
   }
 ];
-
-/* ------------------------------------------------------------------ */
-/*  Well-known OpenAI-compatible endpoint presets                       */
-/* ------------------------------------------------------------------ */
-
-interface EndpointPreset {
-  id: string;
-  label: string;
-  endpoint: string;
-  defaultModel: string;
-  keyPlaceholder: string;
-  signupUrl: string;
-}
-
-const ENDPOINT_PRESETS: EndpointPreset[] = [
-  {
-    id: 'openai',
-    label: 'OpenAI',
-    endpoint: 'https://api.openai.com/v1/chat/completions',
-    defaultModel: 'gpt-4o',
-    keyPlaceholder: 'sk-...',
-    signupUrl: 'platform.openai.com',
-  },
-  {
-    id: 'groq',
-    label: 'Groq',
-    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
-    defaultModel: 'llama-3.3-70b-versatile',
-    keyPlaceholder: 'gsk_...',
-    signupUrl: 'console.groq.com',
-  },
-  {
-    id: 'openrouter',
-    label: 'OpenRouter',
-    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    defaultModel: 'google/gemini-2.0-flash-exp:free',
-    keyPlaceholder: 'sk-or-...',
-    signupUrl: 'openrouter.ai',
-  },
-  {
-    id: 'mistral',
-    label: 'Mistral',
-    endpoint: 'https://api.mistral.ai/v1/chat/completions',
-    defaultModel: 'mistral-large-latest',
-    keyPlaceholder: 'api key',
-    signupUrl: 'console.mistral.ai',
-  },
-  {
-    id: 'deepseek',
-    label: 'DeepSeek',
-    endpoint: 'https://api.deepseek.com/v1/chat/completions',
-    defaultModel: 'deepseek-chat',
-    keyPlaceholder: 'sk-...',
-    signupUrl: 'platform.deepseek.com',
-  },
-  {
-    id: 'together',
-    label: 'Together AI',
-    endpoint: 'https://api.together.xyz/v1/chat/completions',
-    defaultModel: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
-    keyPlaceholder: 'api key',
-    signupUrl: 'api.together.ai',
-  },
-];
-
-/** Match a config endpoint to a known preset (or return empty string). */
-function matchPresetId(endpoint?: string): string {
-  if (!endpoint?.trim()) return '';
-  const normalized = endpoint.trim().replace(/\/$/, '');
-  return ENDPOINT_PRESETS.find(p => p.endpoint === normalized)?.id ?? '';
-}
 
 const BOOK_CHAPTER_TEMPLATE = `# Chapter Title
 
@@ -262,7 +196,10 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionResult, setConnectionResult] = useState<{ type: 'success' | 'error' | 'warning'; message: string } | null>(null);
-  const [showCustomProvider, setShowCustomProvider] = useState(false);
+  const [advancedSettingsExpanded, setAdvancedSettingsExpanded] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem(AI_ADVANCED_SETTINGS_EXPANDED_KEY) === '1';
+  });
 
   // Chrome AI availability
   const [chromeAIAvailable, setChromeAIAvailable] = useState(false);
@@ -298,15 +235,28 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
   const updateConfig = useCallback((updates: Partial<AIProviderConfig>) => {
     setConfig(prev => {
       const next = { ...prev, ...updates };
-      // Auto-switch to openai-compatible when both endpoint and key are provided
-      if (next.endpoint?.trim() && next.sessionToken?.trim() && next.provider !== 'server-proxy') {
-        next.provider = 'openai-compatible';
-      }
       saveAIConfig(next);
       return next;
     });
     setConnectionResult(null);
   }, []);
+
+  const updateCustomLlmConfig = useCallback((updates: Partial<CustomLlmConfig>) => {
+    updateConfig({
+      provider: 'custom-llm',
+      customLlm: {
+        backend: config.customLlm?.backend ?? 'ollama',
+        baseUrl: config.customLlm?.baseUrl ?? CUSTOM_LLM_DEFAULTS.ollama.baseUrl,
+        model: config.customLlm?.model ?? CUSTOM_LLM_DEFAULTS.ollama.model,
+        apiKey: config.customLlm?.apiKey ?? '',
+        streaming: config.customLlm?.streaming ?? true,
+        maxTokens: config.customLlm?.maxTokens ?? 2048,
+        temperature: config.customLlm?.temperature ?? 0.7,
+        fallbackProvider: config.customLlm?.fallbackProvider,
+        ...updates,
+      },
+    });
+  }, [config.customLlm, updateConfig]);
 
   // Detect Chrome AI availability on mount
   useEffect(() => {
@@ -356,18 +306,39 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
     }
   }, [open]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(AI_ADVANCED_SETTINGS_EXPANDED_KEY, advancedSettingsExpanded ? '1' : '0');
+  }, [advancedSettingsExpanded]);
+
 
   useEffect(() => {
     if (config.provider === 'openai-compatible' || config.provider === 'server-proxy') {
       return;
     }
 
-    detectBestProvider().then(bestProvider => {
+    detectBestProvider().then(async bestProvider => {
+      // When a local LLM is detected, also fetch its full config (baseUrl, model)
+      // so that isConfigured evaluates to true and buttons actually work.
+      const localConfig = bestProvider === 'custom-llm'
+        ? await detectLocalLlmConfig()
+        : null;
+
       setConfig(prev => {
         if (prev.provider === 'openai-compatible' || prev.provider === 'server-proxy' || prev.provider === bestProvider) {
+          // Even if provider already matches, populate customLlm if it's missing
+          if (bestProvider === 'custom-llm' && localConfig?.customLlm && !prev.customLlm?.baseUrl?.trim()) {
+            const next = { ...prev, customLlm: localConfig.customLlm };
+            saveAIConfig(next);
+            return next;
+          }
           return prev;
         }
-        const next = { ...prev, provider: bestProvider };
+        const next: AIProviderConfig = {
+          ...prev,
+          provider: bestProvider,
+          ...(localConfig?.customLlm ? { customLlm: localConfig.customLlm } : {}),
+        };
         saveAIConfig(next);
         return next;
       });
@@ -403,17 +374,16 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
       const continuitySnapshot = getContinuityMemorySnapshot(state.novelId, state.chapters);
       const continuityContext = formatContinuityContext(continuitySnapshot);
       const blueprintContext = formatStoryBlueprintContext(state.storyBlueprint);
-      const enrichedContext = [blueprintContext, continuityContext, chapterText].filter(Boolean).join('\n\n');
 
-      // Build Story Bible context for custom LLM
-      const storyBibleContext = config.provider === 'custom-llm'
-        ? assembleStoryBibleContext(
-            state.novelId,
-            state.chapters,
-            state.activeChapterId,
-            getContinuitySnapshot(state.novelId, state.chapters),
-          )
-        : undefined;
+      // Build Story Bible context for all providers
+      const storyBibleContext = assembleStoryBibleContext(
+        state.novelId,
+        state.chapters,
+        state.activeChapterId,
+        continuitySnapshot,
+      );
+      const storyBibleText = formatStoryBibleForPrompt(storyBibleContext);
+      const enrichedContext = [blueprintContext, continuityContext, storyBibleText, chapterText].filter(Boolean).join('\n\n');
 
       // Abort any previous request
       abortRef.current?.abort();
@@ -437,7 +407,6 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
           projectType: state.projectType,
           sectionTitle: activeChapter?.title,
           signal: controller.signal,
-          storyBibleContext,
           onStreamChunk: useStreaming
             ? (_chunk, accumulated) => {
                 setIsStreaming(true);
@@ -448,7 +417,12 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
 
         setIsStreaming(false);
         setStreamingText('');
-        setResponse(result.text);
+
+        let responseText = result.text;
+        if (result.provider !== config.provider) {
+          responseText += `\n\n(Note: Response generated by ${result.provider} — configured provider was unavailable)`;
+        }
+        setResponse(responseText);
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === 'AbortError') {
           return;
@@ -473,6 +447,12 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
     }
 
     const chapterText = activeChapter ? editorToPlainText(activeChapter.content) : '';
+
+    if (!chapterText.trim()) {
+      setError('Write some content in the chapter before running the pipeline.');
+      return;
+    }
+
     const continuitySnapshot = getContinuityMemorySnapshot(state.novelId, state.chapters);
     const continuityContext = formatContinuityContext(continuitySnapshot);
     const blueprintContext = formatStoryBlueprintContext(state.storyBlueprint);
@@ -800,6 +780,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
           ? 'Using custom provider'
           : 'Using cloud AI';
   const providerLabel = `AI ready · ${providerModeLabel}`;
+  const currentAIMode = resolveAIConfigMode(config);
   const providerIcon =
     config.provider === 'chrome-ai' ? 'memory'
     : config.provider === 'custom-llm' ? 'smart_toy'
@@ -845,7 +826,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
             <Button
               variant="default"
               onClick={handleRunPipeline}
-              disabled={loading}
+              disabled={loading || !isConfigured}
             >
               <span className="material-symbols-rounded">pipeline</span>
               {loading ? 'Running pipeline...' : 'Run Pipeline'}
@@ -862,6 +843,15 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
         </div>
       }
     >
+      <div className={styles.aiHeaderModeStatus}>
+        <span className="material-symbols-rounded">{providerIcon}</span>
+        <div>
+          <strong>Current AI Mode: {AI_MODE_LABELS[currentAIMode]}</strong>
+          <p>{AI_MODE_HELP_TEXT[currentAIMode]}</p>
+          <p>{AI_MODE_DATA_DESTINATION_TEXT[currentAIMode]}</p>
+        </div>
+      </div>
+
       {/* Settings panel (collapsible) */}
       {showSettings && (
         <div className={styles.aiSettings}>
@@ -881,7 +871,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
                     : `Using ${SERVER_PROXY_LABELS[config.serverProxy?.serverProvider ?? 'groq']}. Requests are routed through the DraftHarbour server proxy.`
                   : config.provider === 'openai-compatible'
                     ? 'Using a custom OpenAI-compatible provider. Requests are sent directly to your configured API endpoint.'
-                    : 'Using cloud AI. Requests are routed through the managed DraftHarbour cloud endpoint.'}
+                    : 'Using a hosted provider. Requests are routed through the managed DraftHarbour cloud endpoint.'}
             </span>
           </div>
 
@@ -900,7 +890,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
           <div className={styles.aiProviderSelector}>
             <h5>Server AI Providers</h5>
             <p className={styles.aiSettingsHint}>
-              Enter your API key to connect directly, or leave blank to use the server proxy if available.
+              <strong>Quick setup (required to start):</strong> choose a provider, pick a model (or keep the default), add API key only if needed, then test connection.
             </p>
             <div className={styles.aiProviderOptions}>
               {(['groq', 'openrouter', 'gemini'] as const).map(sp => (
@@ -995,83 +985,67 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
             )}
           </div>
 
-          {/* Custom LLM (Ollama / vLLM / llama.cpp) */}
           <div className={styles.aiProviderSelector}>
             <h5>Custom LLM (Local / Self-hosted)</h5>
             <p className={styles.aiSettingsHint}>
-              Connect to your own model running via Ollama, vLLM, llama.cpp, or any OpenAI-compatible server.
+              <strong>Quick setup (required to start):</strong> pick a provider, confirm model, add API key only if required, then test the connection.
             </p>
-            <div className={styles.aiProviderOptions}>
-              {(['ollama', 'vllm', 'llama-cpp', 'generic-openai'] as const).map(backend => (
-                <button
-                  key={backend}
-                  className={`${styles.aiProviderOption} ${
-                    config.provider === 'custom-llm' && config.customLlm?.backend === backend
-                      ? styles['aiProviderOption--active'] : ''
-                  }`}
-                  onClick={() => {
-                    const defaults = CUSTOM_LLM_DEFAULTS[backend];
-                    updateConfig({
-                      provider: 'custom-llm',
-                      customLlm: {
-                        backend,
-                        baseUrl: config.customLlm?.backend === backend
-                          ? (config.customLlm.baseUrl || defaults.baseUrl)
-                          : defaults.baseUrl,
-                        model: config.customLlm?.backend === backend
-                          ? (config.customLlm.model || defaults.model)
-                          : defaults.model,
-                        apiKey: config.customLlm?.apiKey,
-                        streaming: config.customLlm?.streaming ?? true,
-                        maxTokens: config.customLlm?.maxTokens ?? 2048,
-                        temperature: config.customLlm?.temperature ?? 0.7,
-                        fallbackProvider: config.customLlm?.fallbackProvider,
-                      },
-                    });
-                  }}
-                >
-                  <span className="material-symbols-rounded">smart_toy</span>
-                  <div className={styles.aiProviderOptionText}>
-                    <strong>{CUSTOM_LLM_BACKEND_LABELS[backend]}</strong>
-                    <small>{CUSTOM_LLM_DEFAULTS[backend].baseUrl}</small>
-                  </div>
-                </button>
-              ))}
-            </div>
-
             {config.provider === 'custom-llm' && config.customLlm && (
               <div className={styles.aiSettingsFields}>
-                <label className={styles.aiLabel}>
-                  Base URL
-                  <Input
-                    placeholder={CUSTOM_LLM_DEFAULTS[config.customLlm.backend].baseUrl}
-                    value={config.customLlm.baseUrl || ''}
-                    onChange={e => updateConfig({
-                      customLlm: { ...config.customLlm!, baseUrl: e.target.value },
-                    })}
-                  />
-                </label>
                 <label className={styles.aiLabel}>
                   Model
                   <Input
                     placeholder={CUSTOM_LLM_DEFAULTS[config.customLlm.backend].model}
-                    value={config.customLlm.model || ''}
+                    value={config.customLlm.model}
                     onChange={e => updateConfig({
                       customLlm: { ...config.customLlm!, model: e.target.value },
                     })}
                   />
                 </label>
                 <label className={styles.aiLabel}>
-                  API Key (optional)
+                  API Key (if needed)
                   <Input
                     type="password"
-                    placeholder="Leave blank if not required"
-                    value={config.customLlm.apiKey || ''}
+                    placeholder="Optional"
+                    value={config.customLlm.apiKey ?? ''}
                     onChange={e => updateConfig({
                       customLlm: { ...config.customLlm!, apiKey: e.target.value },
                     })}
                   />
                 </label>
+              </div>
+            )}
+
+            <button
+              type="button"
+              className={styles.aiAdvancedToggle}
+              aria-expanded={advancedSettingsExpanded}
+              onClick={() => setAdvancedSettingsExpanded(prev => !prev)}
+            >
+              <span className="material-symbols-rounded">{advancedSettingsExpanded ? 'expand_less' : 'expand_more'}</span>
+              Advanced settings (optional tuning)
+            </button>
+            {advancedSettingsExpanded && (
+              <div className={styles.aiAdvancedContent}>
+                <AIConfigPanel
+                  mode="embedded"
+                  config={config}
+                  onConfigChange={updateConfig}
+                  onCustomLlmConfigChange={updates => updateCustomLlmConfig(updates)}
+                  onTestEndpoint={handleTestConnection}
+                  onTestLocalLlm={handleTestCustomLlm}
+                  endpointTesting={testingConnection}
+                  localLlmTesting={testingConnection}
+                  endpointTestResult={connectionResult ? { ok: connectionResult.type === 'success', message: connectionResult.message } : null}
+                  localLlmTestResult={connectionResult ? { ok: connectionResult.type === 'success', message: connectionResult.message } : null}
+                  showProviderFields
+                  showLocalFields
+                />
+              </div>
+            )}
+
+            {advancedSettingsExpanded && config.provider === 'custom-llm' && config.customLlm && (
+              <div className={styles.aiSettingsFields}>
                 <label className={styles.aiLabel}>
                   <input
                     type="checkbox"
@@ -1114,10 +1088,11 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
                     className={styles.aiSelect}
                   >
                     <option value="">None</option>
-                    <option value="managed-cloud">Cloud AI</option>
+                    <option value="managed-cloud">Hosted Provider</option>
                     <option value="chrome-ai">Chrome AI</option>
                     <option value="openai-compatible">Custom Provider</option>
                     <option value="server-proxy">Server Proxy</option>
+                    <option value="custom-llm">Local Model</option>
                   </select>
                 </label>
               </div>
@@ -1181,94 +1156,6 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
             )}
           </div>
 
-          <details open={showCustomProvider} onToggle={e => setShowCustomProvider((e.target as HTMLDetailsElement).open)}>
-            <summary className={styles.aiNoticeLink}>Custom provider (advanced)</summary>
-
-            <div className={styles.aiSetupGuide}>
-              <span className="material-symbols-rounded">help_outline</span>
-              <div>
-                <strong>Quick setup:</strong> Pick a provider below, paste your API key, and you&apos;re ready to go.
-                <p className={styles.aiSetupNote}>Your API key is stored locally in your browser and is never sent anywhere except the endpoint you specify.</p>
-              </div>
-            </div>
-
-            {/* Endpoint presets */}
-            <div className={styles.aiEndpointPresets}>
-              {ENDPOINT_PRESETS.map(preset => {
-                const isActive = matchPresetId(config.endpoint) === preset.id;
-                return (
-                  <button
-                    key={preset.id}
-                    className={`${styles.aiEndpointPreset} ${isActive ? styles['aiEndpointPreset--active'] : ''}`}
-                    onClick={() => {
-                      updateConfig({
-                        endpoint: preset.endpoint,
-                        model: config.model?.trim() ? config.model : preset.defaultModel,
-                      });
-                    }}
-                  >
-                    <strong>{preset.label}</strong>
-                    <small>{preset.signupUrl}</small>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className={styles.aiSettingsFields}>
-              <label className={styles.aiLabel}>
-                API Endpoint
-                <Input
-                  placeholder="https://api.openai.com/v1/chat/completions"
-                  value={config.endpoint || ''}
-                  onChange={e => updateConfig({ endpoint: e.target.value })}
-                />
-              </label>
-              <label className={styles.aiLabel}>
-                API Key
-                <Input
-                  type="password"
-                  placeholder={ENDPOINT_PRESETS.find(p => p.id === matchPresetId(config.endpoint))?.keyPlaceholder ?? 'sk-...'}
-                  value={config.sessionToken || ''}
-                  onChange={e => updateConfig({ sessionToken: e.target.value })}
-                />
-              </label>
-              <label className={styles.aiLabel}>
-                Model
-                <Input
-                  placeholder={ENDPOINT_PRESETS.find(p => p.id === matchPresetId(config.endpoint))?.defaultModel ?? 'gpt-4o'}
-                  value={config.model || ''}
-                  onChange={e => updateConfig({ model: e.target.value })}
-                />
-              </label>
-            </div>
-            <div className={styles.aiSettingsActions}>
-              <Button
-                variant="default"
-                size="small"
-                onClick={handleTestConnection}
-                disabled={testingConnection || !config.endpoint?.trim() || !config.sessionToken?.trim()}
-              >
-                <span className="material-symbols-rounded">wifi_tethering</span>
-                {testingConnection ? 'Testing...' : 'Test Connection'}
-              </Button>
-              <Button
-                variant="ghost"
-                size="small"
-                onClick={() => updateConfig({ provider: chromeAIAvailable ? 'chrome-ai' : 'managed-cloud' })}
-              >
-                Use Automatic Mode
-              </Button>
-            </div>
-            {connectionResult && (
-              <div className={`${styles.aiConnectionResult} ${styles[`aiConnectionResult--${connectionResult.type}`]}`}>
-                <span className="material-symbols-rounded" style={{ fontSize: '1rem' }}>
-                  {connectionResult.type === 'success' ? 'check_circle' : connectionResult.type === 'error' ? 'error' : 'warning'}
-                </span>
-                {connectionResult.message}
-              </div>
-            )}
-          </details>
-
           <p className={styles.aiSettingsHint}>
             Settings are stored locally in your browser.
           </p>
@@ -1281,7 +1168,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
           <span className="material-symbols-rounded">info</span>
           <div>
             <strong>AI is not configured yet.</strong> Click{' '}
-            <button className={styles.aiNoticeLink} onClick={() => { setShowSettings(true); setShowCustomProvider(true); }}>
+            <button className={styles.aiNoticeLink} onClick={() => { setShowSettings(true); }}>
               Settings
             </button>{' '}
             below, pick a provider (e.g. OpenAI, Groq, OpenRouter), and paste your API key.
@@ -1298,7 +1185,7 @@ export function AIWritingModal({ open, onClose }: AIWritingModalProps) {
             key={preset.id}
             className={styles.aiPresetBtn}
             onClick={() => handlePreset(preset)}
-            disabled={loading}
+            disabled={loading || !isConfigured}
           >
             <span className="material-symbols-rounded">{preset.icon}</span>
             {preset.label}

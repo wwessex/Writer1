@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CustomLlmProvider, CUSTOM_LLM_DEFAULTS, CUSTOM_LLM_BACKEND_LABELS } from './customLlmProvider';
+import { CustomLlmProvider, CUSTOM_LLM_DEFAULTS, CUSTOM_LLM_BACKEND_LABELS, fetchOllamaModels, testCustomLlmConnection } from './customLlmProvider';
 import type { AIProviderConfig, AIRequest } from './types';
 
 // Mock fetchWithPolicy
@@ -132,6 +132,27 @@ describe('CustomLlmProvider', () => {
       await expect(provider.execute(makeRequest())).rejects.toThrow('not configured');
     });
 
+    it('throws on malformed Ollama response missing message.content', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ unexpected: 'format' }),
+      } as Response);
+
+      const provider = new CustomLlmProvider(makeConfig());
+      await expect(provider.execute(makeRequest())).rejects.toThrow('Unexpected response format from Ollama');
+    });
+
+    it('throws on malformed OpenAI-compatible response missing choices', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ unexpected: 'format' }),
+      } as Response);
+
+      const config = makeConfig({ backend: 'vllm', baseUrl: 'http://localhost:8000' });
+      const provider = new CustomLlmProvider(config);
+      await expect(provider.execute(makeRequest())).rejects.toThrow('Unexpected response format from vLLM');
+    });
+
     it('throws on non-ok response', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
@@ -175,7 +196,48 @@ describe('CustomLlmProvider', () => {
       expect(body.options.num_predict).toBe(4096);
     });
 
-    it('includes story bible context in prompt', async () => {
+    it('uses grammar-aware system prompt for grammar actions', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ message: { content: 'corrected text' } }),
+      } as Response);
+
+      const provider = new CustomLlmProvider(makeConfig());
+      await provider.execute(makeRequest({ action: 'grammar' }));
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1]!.body as string);
+      expect(body.messages[0].content).toContain('proofreader');
+      expect(body.messages[0].content).toContain('grammar');
+    });
+
+    it('uses grammar-aware system prompt for pipeline-grammar action', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ message: { content: 'corrected text' } }),
+      } as Response);
+
+      const provider = new CustomLlmProvider(makeConfig());
+      await provider.execute(makeRequest({ action: 'pipeline-grammar' }));
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1]!.body as string);
+      expect(body.messages[0].content).toContain('proofreader');
+    });
+
+    it('uses default system prompt for non-grammar actions', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ message: { content: 'ok' } }),
+      } as Response);
+
+      const provider = new CustomLlmProvider(makeConfig());
+      await provider.execute(makeRequest({ action: 'continue' }));
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1]!.body as string);
+      expect(body.messages[0].content).toContain('creative writing assistant');
+      expect(body.messages[0].content).not.toContain('proofreader');
+    });
+
+    it('includes enriched context in prompt', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({ message: { content: 'ok' } }),
@@ -183,13 +245,7 @@ describe('CustomLlmProvider', () => {
 
       const provider = new CustomLlmProvider(makeConfig());
       await provider.execute(makeRequest({
-        storyBibleContext: {
-          entities: [
-            { name: 'Sarah', type: 'character', description: 'Protagonist, age 30', triggerKeywords: ['sarah'] },
-          ],
-          recentSceneSummaries: ['Sarah discovers the letter'],
-          styleNotes: 'Gothic tone',
-        },
+        context: 'Story Bible:\n- Sarah (character): Protagonist, age 30\n\nRecent scenes:\n- Sarah discovers the letter\n\nStyle guide: Gothic tone\n\nChapter text here',
       }));
 
       const body = JSON.parse(mockFetch.mock.calls[0][1]!.body as string);
@@ -229,5 +285,97 @@ describe('CUSTOM_LLM_DEFAULTS', () => {
   it('has labels for all backends', () => {
     expect(CUSTOM_LLM_BACKEND_LABELS.ollama).toBe('Ollama');
     expect(CUSTOM_LLM_BACKEND_LABELS.vllm).toBe('vLLM');
+  });
+});
+
+describe('fetchOllamaModels', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returns model names from a successful response', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ models: [{ name: 'narratryx:latest' }, { name: 'llama3:8b' }] }),
+    } as Response);
+
+    const models = await fetchOllamaModels('http://localhost:11434');
+    expect(models).toEqual(['narratryx:latest', 'llama3:8b']);
+  });
+
+  it('returns empty array on fetch failure', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Connection refused'));
+
+    const models = await fetchOllamaModels('http://localhost:11434');
+    expect(models).toEqual([]);
+  });
+
+  it('returns empty array on non-ok response', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: false,
+    } as Response);
+
+    const models = await fetchOllamaModels('http://localhost:11434');
+    expect(models).toEqual([]);
+  });
+
+  it('returns empty array when models is not an array', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ models: 'not-an-array' }),
+    } as Response);
+
+    const models = await fetchOllamaModels('http://localhost:11434');
+    expect(models).toEqual([]);
+  });
+});
+
+describe('testCustomLlmConnection', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returns ok on successful response', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ message: { content: 'Hi' } }),
+    } as Response);
+
+    const result = await testCustomLlmConnection({
+      backend: 'ollama',
+      baseUrl: 'http://localhost:11434',
+      model: 'test',
+    });
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain('Connected');
+  });
+
+  it('returns error on non-ok response', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      text: async () => 'model not found',
+    } as unknown as Response);
+
+    const result = await testCustomLlmConnection({
+      backend: 'ollama',
+      baseUrl: 'http://localhost:11434',
+      model: 'missing',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('404');
+  });
+
+  it('returns error on connection failure', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Connection refused'));
+
+    const result = await testCustomLlmConnection({
+      backend: 'vllm',
+      baseUrl: 'http://localhost:8000',
+      model: 'test',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('Connection failed');
   });
 });

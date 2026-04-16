@@ -86,6 +86,59 @@
   border-color: var(--accent);
 }
 
+.settingsGroups {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.settingsGroupCard {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.625rem;
+  background: color-mix(in srgb, var(--panel) 88%, var(--btn-bg) 12%);
+}
+
+.settingsGroupHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.settingsGroupHeader h4 {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.settingsGroupHeader span {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.recommendedPanel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  margin-bottom: 0.45rem;
+}
+
+.recommendedPanel__title {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.settingsGroupChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
 .searchHighlight {
   background: var(--accent-alpha, rgba(96, 165, 250, 0.3));
   color: inherit;
@@ -137,6 +190,18 @@
   margin-bottom: 0.375rem;
   font-size: 0.75rem;
   font-weight: 500;
+  color: var(--text-muted);
+}
+
+.fieldError {
+  margin: 0.375rem 0 0;
+  font-size: 0.75rem;
+  color: #d14343;
+}
+
+.fieldHelper {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
@@ -193,6 +258,48 @@
 .sectionContent {
   padding-top: 0.5rem;
   animation: sectionExpand 0.2s ease-out;
+}
+
+.aiModeCard {
+  margin-bottom: 0.875rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--btn-bg);
+}
+
+.aiModeStatus {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.aiModeOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+}
+
+.aiModeOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.aiModeHelp {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.aiModeBanner {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text);
+  font-size: 0.75rem;
 }
 
 @keyframes sectionExpand {

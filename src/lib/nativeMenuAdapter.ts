@@ -1,4 +1,5 @@
 import { APP_MENUS, type AppMenuConfig } from '@/lib/menuConfig';
+import { detectRuntimePlatform } from '@/lib/runtimePlatform';
 import { COMMAND_IDS, COMMAND_METADATA, isCommandEnabled, type CommandId } from '@/lib/commands';
 
 export type DesktopPlatform = 'macos' | 'windows' | 'linux';
@@ -32,13 +33,7 @@ const ROLE_BY_COMMAND: Partial<Record<CommandId, NativeMenuItemTemplate['role']>
   [COMMAND_IDS.SELECT_ALL]: 'selectAll',
 };
 
-export const getCurrentPlatform = (): DesktopPlatform => {
-  const platform = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform || navigator.platform || '';
-  const normalized = platform.toLowerCase();
-  if (normalized.includes('mac')) return 'macos';
-  if (normalized.includes('win')) return 'windows';
-  return 'linux';
-};
+export const getCurrentPlatform = (): DesktopPlatform => detectRuntimePlatform();
 
 const REDO_SHORTCUT_BY_PLATFORM: Record<DesktopPlatform, string> = {
   macos: 'Cmd+Shift+Z',

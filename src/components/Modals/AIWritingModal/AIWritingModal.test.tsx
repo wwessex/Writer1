@@ -79,7 +79,7 @@ vi.mock('@/context/AppContext', () => ({
 }));
 
 // AI modules
-const mockExecute = vi.fn().mockResolvedValue({ text: 'AI response text' });
+const mockExecute = vi.fn().mockResolvedValue({ text: 'AI response text', provider: 'openai-compatible' });
 const mockDestroy = vi.fn();
 
 const defaultAIConfig: Record<string, any> = {
@@ -131,6 +131,7 @@ vi.mock('@/lib/ai', () => ({
     'llama-cpp': 'llama.cpp',
     'generic-openai': 'Custom Endpoint',
   },
+  fetchOllamaModels: vi.fn().mockResolvedValue([]),
   assembleStoryBibleContext: vi.fn(() => ({ entities: [], recentSceneSummaries: [], styleNotes: '' })),
   formatStoryBibleForPrompt: vi.fn(() => ''),
   runEvalSuite: vi.fn().mockResolvedValue({
@@ -169,6 +170,9 @@ vi.mock('@/lib/ai/pipelines', () => ({
 vi.mock('@/lib/utils', () => ({
   editorToPlainText: vi.fn(() => 'Hello world'),
 }));
+
+import { editorToPlainText } from '@/lib/utils';
+const mockEditorToPlainText = vi.mocked(editorToPlainText);
 
 vi.mock('@/lib/continuityMemory', () => ({
   formatContinuityContext: vi.fn(() => ''),
@@ -213,7 +217,7 @@ describe('AIWritingModal', () => {
     document.body.appendChild(container);
     root = createRoot(container);
     onCloseMock = vi.fn();
-    mockExecute.mockReset().mockResolvedValue({ text: 'AI response text' });
+    mockExecute.mockReset().mockResolvedValue({ text: 'AI response text', provider: 'openai-compatible' });
     mockDestroy.mockReset();
     currentAIConfig = { ...defaultAIConfig };
     mockState.projectType = 'book';
@@ -298,6 +302,7 @@ describe('AIWritingModal', () => {
       root.render(<AIWritingModal open={true} onClose={onCloseMock} />);
     });
     const text = container.textContent || '';
+    expect(text).toContain('Current AI Mode: Custom Endpoint');
     expect(text).toContain('AI ready');
     expect(text).toContain('Using custom provider');
   });
@@ -636,6 +641,30 @@ describe('AIWritingModal', () => {
     expect(text).toContain('Response');
   });
 
+  /* --- Pipeline empty-chapter guard --- */
+
+  it('shows error when pipeline is run on empty chapter', async () => {
+    mockEditorToPlainText.mockReturnValueOnce('');
+    act(() => {
+      root.render(<AIWritingModal open={true} onClose={onCloseMock} />);
+    });
+
+    const buttons = Array.from(container.querySelectorAll('button'));
+    const pipelineBtn = buttons.find(b => b.textContent?.includes('Run Pipeline'));
+
+    await act(async () => {
+      pipelineBtn!.click();
+    });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    const text = container.textContent || '';
+    expect(text).toContain('Write some content');
+    expect(mockExecute).not.toHaveBeenCalled();
+  });
+
   /* --- Screenplay-specific prompt placeholder --- */
 
   it('shows screenplay-specific textarea placeholder', () => {
@@ -917,7 +946,7 @@ describe('AIWritingModal', () => {
 
   /* --- Send error when not configured --- */
 
-  it('shows config error when sending prompt with missing API key', async () => {
+  it('disables preset buttons when API key is missing', async () => {
     currentAIConfig = {
       provider: 'openai-compatible' as const,
       endpoint: 'https://api.openai.com/v1/chat/completions',
@@ -933,22 +962,14 @@ describe('AIWritingModal', () => {
       root.render(<AIWritingModal open={true} onClose={onCloseMock} />);
     });
 
-    // Click a preset to trigger sendPrompt
     const buttons = Array.from(container.querySelectorAll('button'));
     const continueBtn = buttons.find(b => b.textContent?.includes('Continue Writing'));
 
-    await act(async () => {
-      continueBtn!.click();
-    });
-    await act(async () => {
-      await new Promise(r => setTimeout(r, 10));
-    });
-
-    const text = container.textContent || '';
-    expect(text).toContain('API key is missing');
+    expect(continueBtn).toBeTruthy();
+    expect(continueBtn!.disabled).toBe(true);
   });
 
-  it('shows generic config error when sending prompt without any config', async () => {
+  it('disables preset buttons when AI is not configured', async () => {
     currentAIConfig = {
       provider: 'openai-compatible' as const,
       endpoint: '',
@@ -967,20 +988,13 @@ describe('AIWritingModal', () => {
     const buttons = Array.from(container.querySelectorAll('button'));
     const continueBtn = buttons.find(b => b.textContent?.includes('Continue Writing'));
 
-    await act(async () => {
-      continueBtn!.click();
-    });
-    await act(async () => {
-      await new Promise(r => setTimeout(r, 10));
-    });
-
-    const text = container.textContent || '';
-    expect(text).toContain('AI is not configured yet');
+    expect(continueBtn).toBeTruthy();
+    expect(continueBtn!.disabled).toBe(true);
   });
 
   /* --- Pipeline error when not configured --- */
 
-  it('shows error when running pipeline without config', async () => {
+  it('disables pipeline button when AI is not configured', async () => {
     currentAIConfig = {
       provider: 'openai-compatible' as const,
       endpoint: '',
@@ -999,15 +1013,8 @@ describe('AIWritingModal', () => {
     const buttons = Array.from(container.querySelectorAll('button'));
     const pipelineBtn = buttons.find(b => b.textContent?.includes('Run Pipeline'));
 
-    await act(async () => {
-      pipelineBtn!.click();
-    });
-    await act(async () => {
-      await new Promise(r => setTimeout(r, 10));
-    });
-
-    const text = container.textContent || '';
-    expect(text).toContain('Configure AI first');
+    expect(pipelineBtn).toBeTruthy();
+    expect(pipelineBtn!.disabled).toBe(true);
   });
 
   /* --- Server proxy unconfigured error --- */
@@ -1070,9 +1077,9 @@ describe('AIWritingModal', () => {
     expect(text).toContain('Generating response...');
   });
 
-  /* --- Endpoint presets shown in custom provider details --- */
+  /* --- Shared config panel content --- */
 
-  it('shows endpoint presets in custom provider section', () => {
+  it('shows shared provider setup content in settings panel', () => {
     act(() => {
       root.render(<AIWritingModal open={true} onClose={onCloseMock} />);
     });
@@ -1083,9 +1090,8 @@ describe('AIWritingModal', () => {
     act(() => { settingsBtn!.click(); });
 
     const text = container.textContent || '';
-    // The custom provider details section shows endpoint presets
-    expect(text).toContain('Custom provider (advanced)');
-    expect(text).toContain('Quick setup:');
+    expect(text).toContain('Quick setup (required to start): choose a provider');
+    expect(text).toContain('Advanced settings (optional tuning)');
   });
 
   /* --- Managed cloud privacy note in settings --- */
@@ -1112,7 +1118,7 @@ describe('AIWritingModal', () => {
     act(() => { settingsBtn!.click(); });
 
     const text = container.textContent || '';
-    expect(text).toContain('Using cloud AI. Requests are routed through the managed DraftHarbour cloud endpoint');
+    expect(text).toContain('Using a hosted provider. Requests are routed through the managed DraftHarbour cloud endpoint');
   });
 
   /* --- Settings stored locally hint --- */
@@ -1280,6 +1286,6 @@ describe('AIWritingModal', () => {
     act(() => { settingsBtn!.click(); });
 
     const text = container.textContent || '';
-    expect(text).toContain('Enter your API key to connect directly');
+    expect(text).toContain('add API key only if needed');
   });
 });

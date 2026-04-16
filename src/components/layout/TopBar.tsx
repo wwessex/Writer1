@@ -15,6 +15,7 @@ interface TopBarProps {
   onSettings?: () => void;
   onProjectSelect?: () => void;
   onThemeToggle?: () => void;
+  macLiquid?: boolean;
 }
 
 const SAVE_STATUS_STYLES: Record<SaveStatus, { className: string; label: string }> = {
@@ -48,6 +49,7 @@ export function TopBar({
   onSettings,
   onProjectSelect,
   onThemeToggle,
+  macLiquid = false,
 }: TopBarProps) {
   const statusStyle = SAVE_STATUS_STYLES[saveStatus];
 
@@ -56,6 +58,7 @@ export function TopBar({
       className={[
         'border-b border-[var(--border)] bg-[var(--panel)] backdrop-blur px-3 sm:px-4 flex items-center justify-between gap-2 sm:gap-3 shrink-0 transition-[height] duration-150',
         focusMode ? 'h-10' : 'h-14',
+        macLiquid ? 'app-chrome app-chrome--top' : '',
       ].join(' ')}
     >
       {/* Left */}

@@ -241,6 +241,10 @@ describe('FallbackProvider', () => {
 });
 
 describe('buildFallbackChain', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('returns null when no fallback configured', () => {
     const config: AIProviderConfig = {
       provider: 'custom-llm',
@@ -264,7 +268,41 @@ describe('buildFallbackChain', () => {
     expect(chain).not.toBeNull();
     expect(chain!.chain).toHaveLength(2);
     expect(chain!.chain[0].provider).toBe('custom-llm');
-    expect(chain!.chain[1].provider).toBe('managed-cloud');
+    expect(chain!.chain[0].customLlm?.fallbackProvider).toBeUndefined();
+    expect(chain!.chain[1]).toEqual({ provider: 'managed-cloud' });
     expect(chain!.maxRetriesPerProvider).toBe(2);
+    expect(config.customLlm?.fallbackProvider).toBe('managed-cloud');
+  });
+
+  it('creates a non-wrapping primary provider entry for configured fallback', () => {
+    const config: AIProviderConfig = {
+      provider: 'custom-llm',
+      customLlm: {
+        backend: 'ollama',
+        baseUrl: 'http://localhost:11434',
+        model: 'test',
+        fallbackProvider: 'managed-cloud',
+      },
+    };
+
+    const chain = buildFallbackChain(config);
+    expect(chain).not.toBeNull();
+
+    mockCreateProvider
+      .mockReturnValueOnce(makeMockProvider({ type: 'custom-llm' }))
+      .mockReturnValueOnce(makeMockProvider({ type: 'managed-cloud' }));
+
+    new FallbackProvider(chain!);
+
+    expect(mockCreateProvider).toHaveBeenCalledTimes(2);
+    expect(mockCreateProvider).toHaveBeenNthCalledWith(1, {
+      provider: 'custom-llm',
+      customLlm: {
+        backend: 'ollama',
+        baseUrl: 'http://localhost:11434',
+        model: 'test',
+      },
+    });
+    expect(mockCreateProvider).toHaveBeenNthCalledWith(2, { provider: 'managed-cloud' });
   });
 });

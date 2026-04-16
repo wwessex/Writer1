@@ -1,0 +1,57 @@
+# Narratryx Docker Compose — vLLM + FastAPI Gateway
+#
+# Usage:
+#   docker compose -f configs/deploy/docker-compose.vllm.yaml up
+#
+# Prerequisites:
+#   - NVIDIA Container Toolkit installed
+#   - Model checkpoint at ./artifacts/checkpoints/qwen25-7b-dpo/
+#
+# The gateway listens on port 8080, proxying to the vLLM backend on port 8000.
+
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ../../artifacts/checkpoints/qwen25-7b-dpo:/model:ro
+    command:
+      - "--model"
+      - "/model"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8000"
+      - "--max-model-len"
+      - "4096"
+      - "--gpu-memory-utilization"
+      - "0.90"
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  gateway:
+    build:
+      context: ../../
+      dockerfile: configs/deploy/Dockerfile.gateway
+    depends_on:
+      vllm:
+        condition: service_healthy
+    environment:
+      NARRATRYX_VLLM_URL: "http://vllm:8000"
+      NARRATRYX_API_KEY: "${NARRATRYX_API_KEY:-}"
+      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-*}"
+    ports:
+      - "8080:8080"

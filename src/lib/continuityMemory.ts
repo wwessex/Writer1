@@ -64,6 +64,34 @@ function ensureCharacter(facts: Map<string, CharacterContinuityFact>, name: stri
   return created;
 }
 
+/** Compute a fingerprint from chapter timestamps so we can detect staleness. */
+function computeChaptersFingerprint(chapters: Chapter[]): number {
+  if (chapters.length === 0) return 0;
+  return Math.max(...chapters.map(c => c.updatedAt));
+}
+
+/** Broader proper noun pattern: handles "O'Brien", "Jean-Luc", "Li", multi-word names */
+const PROPER_NOUN_RE = /\b([A-Z][a-zA-Z''-]+(?:[- ][A-Z][a-zA-Z''-]*)*)\b/g;
+
+/** Common words that look like proper nouns but aren't */
+const COMMON_FALSE_POSITIVES = new Set([
+  'the', 'this', 'that', 'they', 'then', 'than', 'there', 'their', 'them',
+  'these', 'those', 'when', 'where', 'while', 'which', 'what', 'who', 'whom',
+  'will', 'would', 'could', 'should', 'shall', 'might', 'must', 'have', 'has',
+  'had', 'been', 'being', 'some', 'such', 'each', 'every', 'both', 'either',
+  'neither', 'after', 'before', 'since', 'until', 'from', 'into', 'with',
+  'about', 'between', 'through', 'during', 'because', 'also', 'just', 'only',
+  'very', 'still', 'already', 'always', 'never', 'often', 'once', 'here',
+  'now', 'how', 'why', 'not', 'but', 'and', 'for', 'yet', 'chapter',
+  'scene', 'act', 'part', 'book', 'story', 'page', 'note', 'section',
+  'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+  'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august',
+  'september', 'october', 'november', 'december',
+]);
+
+/** Min occurrences across all chapters for frequency-based character detection */
+const MIN_FREQUENCY_THRESHOLD = 3;
+
 export function buildContinuityMemory(novelId: string, chapters: Chapter[]): ContinuityMemorySnapshot {
   const characters = new Map<string, CharacterContinuityFact>();
   const timelineEvents: TimelineEventFact[] = [];
@@ -73,10 +101,14 @@ export function buildContinuityMemory(novelId: string, chapters: Chapter[]): Con
 
   const sorted = chapters.slice().sort((a, b) => a.order - b.order);
 
+  // Track proper noun frequency across chapters for frequency-based detection
+  const nounFrequency = new Map<string, { name: string; chapterIds: Set<string>; count: number }>();
+
   for (const chapter of sorted) {
     const chapterText = [chapter.title, chapter.summary, editorToPlainText(chapter.content)].filter(Boolean).join('\n');
 
-    for (const match of chapterText.matchAll(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+is\s+(\d{1,3})\s+years?\s+old\b/g)) {
+    // Broadened age regex to handle apostrophes and hyphens in names
+    for (const match of chapterText.matchAll(/\b([A-Z][a-zA-Z''-]+(?:[-\s][A-Z][a-zA-Z''-]*)*)\s+is\s+(\d{1,3})\s+years?\s+old\b/g)) {
       const character = ensureCharacter(characters, match[1], chapter.id);
       const priorAge = character.attributes.age;
       const newAge = match[2];
@@ -92,7 +124,8 @@ export function buildContinuityMemory(novelId: string, chapters: Chapter[]): Con
       character.attributes.age = newAge;
     }
 
-    for (const match of chapterText.matchAll(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(?:is|was)\s+the\s+([a-z\s-]+?)\s+of\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b/g)) {
+    // Broadened relationship regex
+    for (const match of chapterText.matchAll(/\b([A-Z][a-zA-Z''-]+(?:[-\s][A-Z][a-zA-Z''-]*)*)\s+(?:is|was)\s+the\s+([a-z\s-]+?)\s+of\s+([A-Z][a-zA-Z''-]+(?:[-\s][A-Z][a-zA-Z''-]*)*)\b/g)) {
       const source = ensureCharacter(characters, match[1], chapter.id);
       const relation = `${normalizeToken(match[2])} of ${titleCase(normalizeToken(match[3]))}`;
       if (!source.relationships.includes(relation)) {
@@ -123,11 +156,42 @@ export function buildContinuityMemory(novelId: string, chapters: Chapter[]): Con
         unresolvedThreads.add(thread);
       }
     }
+
+    // Frequency-based proper noun detection
+    for (const match of chapterText.matchAll(PROPER_NOUN_RE)) {
+      const name = match[1];
+      if (COMMON_FALSE_POSITIVES.has(name.toLowerCase())) continue;
+      // Skip very short single words (likely not names) unless part of multi-word
+      if (name.length < 2) continue;
+
+      const key = normalizeToken(name);
+      const existing = nounFrequency.get(key);
+      if (existing) {
+        existing.count++;
+        existing.chapterIds.add(chapter.id);
+      } else {
+        nounFrequency.set(key, { name, chapterIds: new Set([chapter.id]), count: 1 });
+      }
+    }
+  }
+
+  // Register frequently-mentioned proper nouns as characters (if not already detected)
+  for (const [key, entry] of nounFrequency) {
+    if (entry.count >= MIN_FREQUENCY_THRESHOLD && !characters.has(key)) {
+      const created: CharacterContinuityFact = {
+        key,
+        canonicalName: entry.name,
+        attributes: {},
+        relationships: [],
+        seenChapterIds: [...entry.chapterIds],
+      };
+      characters.set(key, created);
+    }
   }
 
   return {
     novelId,
-    updatedAt: Date.now(),
+    updatedAt: computeChaptersFingerprint(sorted),
     characters: [...characters.values()].sort((a, b) => a.canonicalName.localeCompare(b.canonicalName)),
     timelineEvents,
     worldRules: [...worldRules],
@@ -155,13 +219,17 @@ export function saveContinuityMemory(snapshot: ContinuityMemorySnapshot) {
 }
 
 export function getContinuityMemorySnapshot(novelId: string, chapters: Chapter[]): ContinuityMemorySnapshot {
-  const fresh = buildContinuityMemory(novelId, chapters);
   const cached = loadContinuityMemory(novelId);
-  if (!cached || cached.updatedAt <= fresh.updatedAt) {
-    saveContinuityMemory(fresh);
-    return fresh;
+  const fingerprint = computeChaptersFingerprint(chapters);
+
+  // Return cached snapshot if chapters haven't changed since last build
+  if (cached && cached.updatedAt >= fingerprint) {
+    return cached;
   }
-  return cached;
+
+  const fresh = buildContinuityMemory(novelId, chapters);
+  saveContinuityMemory(fresh);
+  return fresh;
 }
 
 export function formatContinuityContext(snapshot: ContinuityMemorySnapshot): string {

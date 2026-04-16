@@ -1,0 +1,11 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir fastapi uvicorn httpx pydantic
+COPY runtime/cloud/api.py runtime/cloud/api.py
+COPY runtime/__init__.py runtime/__init__.py
+COPY runtime/cloud/__init__.py runtime/cloud/__init__.py
+
+EXPOSE 8080
+CMD ["uvicorn", "runtime.cloud.api:app", "--host", "0.0.0.0", "--port", "8080"]

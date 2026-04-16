@@ -20,14 +20,16 @@ export type {
 export { ChromeAIProvider } from './chromeAI';
 export { OpenAIProvider } from './openaiProvider';
 export { ServerProxyProvider, SERVER_PROXY_ENDPOINTS, SERVER_PROXY_MODELS, SERVER_PROXY_LABELS } from './serverProxyProvider';
-export { CustomLlmProvider, CUSTOM_LLM_DEFAULTS, CUSTOM_LLM_BACKEND_LABELS } from './customLlmProvider';
+export { CustomLlmProvider, CUSTOM_LLM_DEFAULTS, CUSTOM_LLM_BACKEND_LABELS, fetchOllamaModels, testCustomLlmConnection } from './customLlmProvider';
 export { FallbackProvider, buildFallbackChain } from './fallbackProvider';
 
 export {
   loadAIConfig,
   saveAIConfig,
+  hydrateDesktopSecrets,
   createProvider,
   detectBestProvider,
+  detectLocalLlmConfig,
   isChromeWithoutAI,
 } from './providerManager';
 
@@ -35,11 +37,15 @@ export {
   checkChromeAIAvailability,
   isChromeAIAvailable,
   isChromeBrowser,
+  detectLocalLlmServer,
 } from './availability';
+
+export type { LocalLlmDetection } from './availability';
 
 export {
   assembleStoryBibleContext,
   formatStoryBibleForPrompt,
+  loadCharacterBibleEntities,
   loadStoryBible,
   saveStoryBible,
 } from './storyBible';

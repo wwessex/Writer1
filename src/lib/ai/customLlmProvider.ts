@@ -14,6 +14,7 @@
  */
 
 import { fetchWithPolicy } from '@/lib/integrations/providerClient';
+import { mapAIConnectionFailureMessage } from '@/lib/validation/settingsValidation';
 import type { AIProvider, AIProviderConfig, AIRequest, AIResponse, CustomLlmBackend } from './types';
 
 /* ------------------------------------------------------------------ */
@@ -51,10 +52,14 @@ function resolveEndpoint(backend: CustomLlmBackend, baseUrl: string): string {
   }
 }
 
-function buildSystemPrompt(projectType: 'book' | 'screenplay', sectionTitle?: string): string {
+function buildSystemPrompt(projectType: 'book' | 'screenplay', sectionTitle?: string, action?: string): string {
   const docType = projectType === 'screenplay' ? 'screenplay' : 'novel';
   const sectionLabel = projectType === 'screenplay' ? 'scene' : 'chapter';
   const titleNote = sectionTitle ? ` The current ${sectionLabel} is titled "${sectionTitle}".` : '';
+
+  if (action === 'grammar' || action === 'pipeline-grammar') {
+    return `You are Narratryx, a meticulous proofreader and copy-editor for ${docType} manuscripts.${titleNote} Your task is to fix every grammar, spelling, and punctuation error while preserving the author's voice, style, and intent. Never add new content or change meaning. Output only the corrected text.`;
+  }
 
   return `You are Narratryx, a creative writing assistant specialised in ${docType} writing.${titleNote} Respond in plain text with clear formatting. Focus on vivid prose, consistent character voice, and strong narrative structure.`;
 }
@@ -62,27 +67,10 @@ function buildSystemPrompt(projectType: 'book' | 'screenplay', sectionTitle?: st
 function buildFullPrompt(request: AIRequest): string {
   const parts: string[] = [];
 
-  // Inject story bible context if available
-  if (request.storyBibleContext) {
-    const { entities, recentSceneSummaries, styleNotes } = request.storyBibleContext;
-    if (entities.length > 0) {
-      const entityLines = entities
-        .slice(0, 12)
-        .map(e => `- ${e.name} (${e.type}): ${e.description}`)
-        .join('\n');
-      parts.push(`Story Bible Entities:\n${entityLines}`);
-    }
-    if (recentSceneSummaries.length > 0) {
-      parts.push(`Recent scenes:\n${recentSceneSummaries.slice(-5).map(s => `- ${s}`).join('\n')}`);
-    }
-    if (styleNotes) {
-      parts.push(`Style notes: ${styleNotes}`);
-    }
-  }
-
+  // Context (includes story bible, continuity, blueprint, and chapter text)
   if (request.context) {
     const label = request.projectType === 'screenplay' ? 'scene' : 'chapter';
-    parts.push(`Here is the current ${label} text for context:\n\n---\n${request.context}\n---`);
+    parts.push(`Here is the current ${label} text and context:\n\n---\n${request.context}\n---`);
   }
 
   parts.push(request.prompt);
@@ -180,19 +168,114 @@ function extractNonStreamResponse(
 ): { text: string; usage?: { promptTokens?: number; completionTokens?: number } } {
   if (backend === 'ollama') {
     const msg = data as { message?: { content?: string }; prompt_eval_count?: number; eval_count?: number };
+    const text = msg.message?.content;
+    if (text === undefined || text === null) {
+      throw new Error(`Unexpected response format from ${CUSTOM_LLM_BACKEND_LABELS[backend]}. Expected Ollama chat completion format with message.content field.`);
+    }
     return {
-      text: msg.message?.content ?? JSON.stringify(data, null, 2),
+      text,
       usage: msg.eval_count ? { promptTokens: msg.prompt_eval_count, completionTokens: msg.eval_count } : undefined,
     };
   }
 
   // OpenAI-compatible format
   const choices = data as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
-  const text = choices.choices?.[0]?.message?.content ?? JSON.stringify(data, null, 2);
+  const text = choices.choices?.[0]?.message?.content;
+  if (text === undefined || text === null) {
+    throw new Error(`Unexpected response format from ${CUSTOM_LLM_BACKEND_LABELS[backend]}. Expected OpenAI-compatible chat completion format with choices[0].message.content field.`);
+  }
   const usage = choices.usage
     ? { promptTokens: choices.usage.prompt_tokens, completionTokens: choices.usage.completion_tokens }
     : undefined;
   return { text, usage };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Utilities                                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Fetch the list of available models from an Ollama server.
+ * Returns an empty array on failure.
+ */
+export async function fetchOllamaModels(baseUrl: string): Promise<string[]> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000);
+  try {
+    const url = `${baseUrl.replace(/\/+$/, '')}/api/tags`;
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const models = data?.models;
+    if (!Array.isArray(models)) return [];
+    return models.map((m: { name?: string }) => m.name).filter(Boolean) as string[];
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * Test connectivity to a custom LLM backend.
+ * Sends a minimal request and checks for a valid response.
+ */
+export async function testCustomLlmConnection(
+  config: { backend: CustomLlmBackend; baseUrl: string; model: string; apiKey?: string },
+): Promise<{ ok: boolean; message: string }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const endpoint = resolveEndpoint(config.backend, config.baseUrl);
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (config.apiKey?.trim()) {
+      headers['Authorization'] = `Bearer ${config.apiKey.trim()}`;
+    }
+
+    let body: string;
+    if (config.backend === 'ollama') {
+      body = JSON.stringify({
+        model: config.model,
+        messages: [{ role: 'user', content: 'Hello' }],
+        stream: false,
+        options: { num_predict: 4 },
+      });
+    } else {
+      body = JSON.stringify({
+        model: config.model,
+        messages: [{ role: 'user', content: 'Hello' }],
+        max_tokens: 4,
+        stream: false,
+      });
+    }
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body,
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      const remediated = mapAIConnectionFailureMessage({
+        status: res.status,
+        errorText: errText || res.statusText,
+      });
+      return { ok: false, message: `${remediated} (HTTP ${res.status})` };
+    }
+
+    return { ok: true, message: `Connected to ${CUSTOM_LLM_BACKEND_LABELS[config.backend]} successfully.` };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    const remediated = mapAIConnectionFailureMessage({ errorMessage: msg });
+    if (msg.includes('abort')) {
+      return { ok: false, message: `${remediated} (timed out after 15 seconds)` };
+    }
+    return { ok: false, message: remediated };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -217,7 +300,7 @@ export class CustomLlmProvider implements AIProvider {
 
     const start = Date.now();
     const endpoint = resolveEndpoint(llmConfig.backend, llmConfig.baseUrl);
-    const systemPrompt = buildSystemPrompt(request.projectType, request.sectionTitle);
+    const systemPrompt = buildSystemPrompt(request.projectType, request.sectionTitle, request.action);
     const fullPrompt = buildFullPrompt(request);
     const useStreaming = llmConfig.streaming !== false && !!request.onStreamChunk;
 

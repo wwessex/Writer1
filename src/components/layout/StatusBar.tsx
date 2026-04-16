@@ -6,6 +6,7 @@ interface StatusBarProps {
   online: boolean;
   chapterCount?: number;
   compact?: boolean;
+  macLiquid?: boolean;
 }
 
 export function StatusBar({
@@ -16,12 +17,14 @@ export function StatusBar({
   online,
   chapterCount,
   compact = false,
+  macLiquid = false,
 }: StatusBarProps) {
   return (
     <footer
       className={[
         'border-t border-[var(--border)] bg-[var(--panel)] px-3 flex items-center justify-between text-[12px] text-[var(--text-secondary)] shrink-0 transition-[height,opacity] duration-150',
         compact ? 'h-6 opacity-60' : 'h-7',
+        macLiquid ? 'app-chrome app-chrome--bottom' : '',
       ].join(' ')}
     >
       <div className="flex items-center gap-3">

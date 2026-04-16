@@ -3,12 +3,15 @@ import { useApp } from '@/context/AppContext';
 import { Input, Button } from '@/components/UI';
 import { HelpTooltip } from '@/components/UI/Tooltip';
 import { Select } from '@/components/UI/Select';
+import { AIConfigPanel } from '@/components/AI/AIConfigPanel';
 import { clearAllData } from '@/lib/storage';
 import { isTelemetryOptedIn, setTelemetryOptIn, clearTelemetryData } from '@/lib/telemetry';
-import { loadAIConfig, saveAIConfig } from '@/lib/ai';
-import type { AIProviderConfig } from '@/lib/ai';
+import { loadAIConfig, saveAIConfig, CUSTOM_LLM_DEFAULTS, CUSTOM_LLM_BACKEND_LABELS, testCustomLlmConnection } from '@/lib/ai';
+import type { AIProviderConfig, CustomLlmBackend, CustomLlmConfig } from '@/lib/ai';
+import { AI_MODE_DATA_DESTINATION_TEXT, AI_MODE_HELP_TEXT, AI_MODE_LABELS, resolveAIConfigMode, type AIConfigMode } from '@/lib/ai/configUi';
 import { useWindowResize } from '@/hooks/useResizable';
 import { getManagedPolicy } from '@/lib/policy';
+import { validateAiEndpointUrl, validateAuthorizationHeader, validateLocalLlmConfig, validateSyncServerUrl } from '@/lib/validation/settingsValidation';
 import { applyUpdateAndRestart, checkForUpdate, deferUpdate, getDeferredUpdateVersion, getLaunchFallbackMessage, getReleaseChannel, setReleaseChannel, type UpdaterSummary } from '@/lib/desktopUpdater';
 import type { ReleaseChannel } from '@/lib/updaterGuardrails';
 import styles from './Windows.module.css';
@@ -58,38 +61,13 @@ const LINE_HEIGHT_OPTIONS = [
   { value: '2.25', label: 'Wide (2.25)' }
 ];
 
-/* ------------------------------------------------------------------ */
-/*  Well-known AI endpoint presets                                      */
-/* ------------------------------------------------------------------ */
-
-interface AIEndpointPreset {
-  id: string;
-  label: string;
-  endpoint: string;
-  defaultModel: string;
-  keyPlaceholder: string;
-  signupUrl: string;
-}
-
-const AI_ENDPOINT_PRESETS: AIEndpointPreset[] = [
-  { id: 'openai', label: 'OpenAI', endpoint: 'https://api.openai.com/v1/chat/completions', defaultModel: 'gpt-4o', keyPlaceholder: 'sk-...', signupUrl: 'platform.openai.com' },
-  { id: 'groq', label: 'Groq', endpoint: 'https://api.groq.com/openai/v1/chat/completions', defaultModel: 'llama-3.3-70b-versatile', keyPlaceholder: 'gsk_...', signupUrl: 'console.groq.com' },
-  { id: 'openrouter', label: 'OpenRouter', endpoint: 'https://openrouter.ai/api/v1/chat/completions', defaultModel: 'google/gemini-2.0-flash-exp:free', keyPlaceholder: 'sk-or-...', signupUrl: 'openrouter.ai' },
-  { id: 'mistral', label: 'Mistral', endpoint: 'https://api.mistral.ai/v1/chat/completions', defaultModel: 'mistral-large-latest', keyPlaceholder: 'api key', signupUrl: 'console.mistral.ai' },
-  { id: 'deepseek', label: 'DeepSeek', endpoint: 'https://api.deepseek.com/v1/chat/completions', defaultModel: 'deepseek-chat', keyPlaceholder: 'sk-...', signupUrl: 'platform.deepseek.com' },
-  { id: 'together', label: 'Together AI', endpoint: 'https://api.together.xyz/v1/chat/completions', defaultModel: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', keyPlaceholder: 'api key', signupUrl: 'api.together.ai' },
-];
-
-function matchAIPresetId(endpoint?: string): string {
-  if (!endpoint?.trim()) return '';
-  const normalized = endpoint.trim().replace(/\/$/, '');
-  return AI_ENDPOINT_PRESETS.find(p => p.endpoint === normalized)?.id ?? '';
-}
-
 const SETTINGS_SECTIONS = [
   {
     id: 'typography',
     title: 'Typography',
+    group: 'general',
+    difficulty: 'beginner',
+    recommended: true,
     keywords: ['font', 'text', 'line height', 'readability'],
     fields: [
       { id: 'fontFamily', label: 'Font Family', keywords: ['typeface'] },
@@ -100,6 +78,9 @@ const SETTINGS_SECTIONS = [
   {
     id: 'sync',
     title: 'Online Sync',
+    group: 'privacy-sync',
+    difficulty: 'intermediate',
+    recommended: false,
     keywords: ['cloud', 'backup', 'server'],
     fields: [
       { id: 'novelId', label: 'Novel ID', keywords: ['identifier', 'sync key'] },
@@ -110,6 +91,9 @@ const SETTINGS_SECTIONS = [
   {
     id: 'ai',
     title: 'AI Provider',
+    group: 'ai',
+    difficulty: 'intermediate',
+    recommended: false,
     keywords: ['ai', 'openai', 'api key', 'llm', 'model', 'endpoint', 'gpt', 'claude'],
     fields: [
       { id: 'aiEndpoint', label: 'API Endpoint', keywords: ['url', 'server', 'openai'] },
@@ -118,8 +102,25 @@ const SETTINGS_SECTIONS = [
     ]
   },
   {
+    id: 'localai',
+    title: 'Local AI (Custom LLM)',
+    group: 'ai',
+    difficulty: 'advanced',
+    recommended: true,
+    keywords: ['ollama', 'vllm', 'llama', 'local', 'custom', 'self-hosted', 'narratryx'],
+    fields: [
+      { id: 'localaiBackend', label: 'Backend', keywords: ['ollama', 'vllm', 'llama.cpp'] },
+      { id: 'localaiBaseUrl', label: 'Base URL', keywords: ['endpoint', 'url', 'localhost'] },
+      { id: 'localaiModel', label: 'Model', keywords: ['model name', 'narratryx'] },
+      { id: 'localaiApiKey', label: 'API Key', keywords: ['token', 'secret'] },
+    ]
+  },
+  {
     id: 'assist',
     title: 'Writing Assistance',
+    group: 'writing',
+    difficulty: 'beginner',
+    recommended: true,
     keywords: ['grammar', 'spelling', 'language tool'],
     fields: [
       { id: 'languageToolEnabled', label: 'Enable LanguageTool', keywords: ['toggle', 'grammar check'] },
@@ -130,6 +131,9 @@ const SETTINGS_SECTIONS = [
   {
     id: 'updates',
     title: 'Updates',
+    group: 'advanced',
+    difficulty: 'intermediate',
+    recommended: true,
     keywords: ['release', 'channel', 'stable', 'beta', 'nightly', 'updater'],
     fields: [
       { id: 'releaseChannel', label: 'Release Channel', keywords: ['stable', 'beta', 'nightly'] },
@@ -139,6 +143,9 @@ const SETTINGS_SECTIONS = [
   {
     id: 'app',
     title: 'Application',
+    group: 'general',
+    difficulty: 'beginner',
+    recommended: true,
     keywords: ['app', 'behaviour', 'productivity'],
     fields: [
       { id: 'autosaveMs', label: 'Autosave (ms)', keywords: ['autosave', 'save delay'] },
@@ -150,6 +157,9 @@ const SETTINGS_SECTIONS = [
   {
     id: 'privacy',
     title: 'Privacy & Data Sync',
+    group: 'privacy-sync',
+    difficulty: 'beginner',
+    recommended: true,
     keywords: ['privacy', 'telemetry', 'security', 'local storage'],
     fields: [
       { id: 'cloudSync', label: 'Cloud Sync', keywords: ['sync', 'remote'] },
@@ -160,12 +170,25 @@ const SETTINGS_SECTIONS = [
   {
     id: 'data',
     title: 'Data Management',
+    group: 'advanced',
+    difficulty: 'advanced',
+    recommended: false,
     keywords: ['reset', 'delete', 'storage'],
     fields: [
       { id: 'resetAllData', label: 'Reset All Data', keywords: ['clear', 'remove'] }
     ]
   }
 ] as const;
+
+const SETTINGS_GROUPS = [
+  { id: 'general', title: 'General' },
+  { id: 'writing', title: 'Writing' },
+  { id: 'ai', title: 'AI' },
+  { id: 'privacy-sync', title: 'Privacy & Sync' },
+  { id: 'advanced', title: 'Advanced' },
+] as const;
+
+type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
 export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   const { state, updateSettings } = useApp();
@@ -185,6 +208,7 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     typography: false,
     ai: false,
+    localai: true,
     sync: true,
     assist: true,
     updates: false,
@@ -198,18 +222,83 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   const [updateSummary, setUpdateSummary] = useState<UpdaterSummary | null>(null);
   const [updateBusy, setUpdateBusy] = useState(false);
   const [aiConfig, setAIConfig] = useState<AIProviderConfig>(loadAIConfig);
+  const [localLlmTestResult, setLocalLlmTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [localLlmTesting, setLocalLlmTesting] = useState(false);
 
   const updateAIConfig = useCallback((updates: Partial<AIProviderConfig>) => {
     setAIConfig(prev => {
       const next = { ...prev, ...updates };
-      // Auto-switch to openai-compatible when both endpoint and key are provided
-      if (next.endpoint?.trim() && next.sessionToken?.trim() && next.provider !== 'server-proxy') {
-        next.provider = 'openai-compatible';
-      }
       saveAIConfig(next);
       return next;
     });
   }, []);
+
+  const updateCustomLlmConfig = useCallback((updates: Partial<CustomLlmConfig>) => {
+    setAIConfig(prev => {
+      const currentLlm = prev.customLlm ?? { backend: 'ollama' as CustomLlmBackend, baseUrl: CUSTOM_LLM_DEFAULTS.ollama.baseUrl, model: CUSTOM_LLM_DEFAULTS.ollama.model };
+      const next: AIProviderConfig = {
+        ...prev,
+        provider: 'custom-llm',
+        customLlm: { ...currentLlm, ...updates },
+      };
+      saveAIConfig(next);
+      return next;
+    });
+    setLocalLlmTestResult(null);
+  }, []);
+
+  const handleLocalLlmTest = useCallback(async () => {
+    const llm = aiConfig.customLlm;
+    if (!llm?.baseUrl?.trim() || !llm?.model?.trim()) return;
+    setLocalLlmTesting(true);
+    setLocalLlmTestResult(null);
+    try {
+      const result = await testCustomLlmConnection(llm);
+      setLocalLlmTestResult(result);
+    } catch {
+      setLocalLlmTestResult({ ok: false, message: 'Test failed unexpectedly.' });
+    } finally {
+      setLocalLlmTesting(false);
+    }
+  }, [aiConfig.customLlm]);
+
+  const customLlm = aiConfig.customLlm;
+  const customLlmBackend = customLlm?.backend;
+  const customLlmBaseUrl = customLlm?.baseUrl;
+  const currentAIMode = resolveAIConfigMode(aiConfig);
+  const syncUrlValidation = validateSyncServerUrl(state.settings.sync.url);
+  const syncAuthValidation = validateAuthorizationHeader(state.settings.sync.auth);
+  const endpointValidation = validateAiEndpointUrl(aiConfig.endpoint ?? '');
+  const localLlmValidation = validateLocalLlmConfig({
+    baseUrl: aiConfig.customLlm?.baseUrl ?? '',
+    model: aiConfig.customLlm?.model ?? '',
+  });
+  const endpointTestDisabledReason = !aiConfig.sessionToken?.trim()
+    ? 'API key is required before testing.'
+    : !endpointValidation.valid
+      ? endpointValidation.error
+      : undefined;
+
+  // Probe non-Ollama backends for connectivity when selected
+  useEffect(() => {
+    if (aiConfig.provider !== 'custom-llm' || !customLlmBackend || !customLlmBaseUrl?.trim()) return;
+    if (customLlmBackend === 'ollama') return;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    fetch(`${customLlmBaseUrl.replace(/\/+$/, '')}/v1/models`, { signal: controller.signal })
+      .then(res => {
+        if (!res.ok) {
+          setLocalLlmTestResult({ ok: false, message: `Server returned ${res.status}. Check your configuration.` });
+        } else {
+          setLocalLlmTestResult({ ok: true, message: `Connected to ${CUSTOM_LLM_BACKEND_LABELS[customLlmBackend]} successfully.` });
+        }
+      })
+      .catch(() => {
+        setLocalLlmTestResult({ ok: false, message: `Could not reach ${CUSTOM_LLM_BACKEND_LABELS[customLlmBackend]} at ${customLlmBaseUrl}.` });
+      })
+      .finally(() => clearTimeout(timeout));
+    return () => { controller.abort(); clearTimeout(timeout); };
+  }, [customLlmBackend, customLlmBaseUrl, aiConfig.provider]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -279,6 +368,25 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   }, [hasSearchQuery, normalizedSearchQuery]);
 
   const visibleSections = SETTINGS_SECTIONS.filter(section => isSectionVisible(section.id));
+  const sortedVisibleSections = useMemo(() => {
+    const difficultyOrder = { beginner: 0, intermediate: 1, advanced: 2 } as const;
+    return [...visibleSections].sort((a, b) => {
+      const groupDiff =
+        SETTINGS_GROUPS.findIndex(group => group.id === a.group) -
+        SETTINGS_GROUPS.findIndex(group => group.id === b.group);
+      if (groupDiff !== 0) return groupDiff;
+      const difficultyDiff = difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty];
+      if (difficultyDiff !== 0) return difficultyDiff;
+      return a.title.localeCompare(b.title);
+    });
+  }, [visibleSections]);
+  const sectionsByGroup = useMemo(() => {
+    const byGroup: Record<string, SettingsSection[]> = {};
+    SETTINGS_GROUPS.forEach(group => {
+      byGroup[group.id] = sortedVisibleSections.filter(section => section.group === group.id);
+    });
+    return byGroup;
+  }, [sortedVisibleSections]);
 
   useEffect(() => {
     setReleaseChannel(releaseChannel);
@@ -422,6 +530,53 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
     sectionRefs.current[sectionId]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  const applyRecommendedDefaults = useCallback((groupId: string) => {
+    if (groupId === 'general') {
+      updateSettings({
+        typography: { ...state.settings.typography, fontFamily: 'system', fontSize: 16, lineHeight: 1.625 },
+        autosaveMs: 800,
+      });
+      return;
+    }
+    if (groupId === 'writing') {
+      updateSettings({
+        assist: {
+          ...state.settings.assist,
+          languageToolEnabled: true,
+          languageToolUrl: 'https://api.languagetool.org/v2/check',
+          languageToolLanguage: 'en-US',
+        },
+      });
+      return;
+    }
+    if (groupId === 'ai') {
+      updateAIConfig({
+        endpoint: '',
+        sessionToken: '',
+        provider: 'custom-llm',
+        customLlm: {
+          backend: 'ollama',
+          baseUrl: CUSTOM_LLM_DEFAULTS.ollama.baseUrl,
+          model: CUSTOM_LLM_DEFAULTS.ollama.model,
+          apiKey: '',
+        },
+      });
+      return;
+    }
+    if (groupId === 'privacy-sync') {
+      updateSettings({
+        sync: { ...state.settings.sync, url: '', auth: '' },
+      });
+      setTelemetryEnabled(false);
+      setTelemetryOptIn(false);
+      return;
+    }
+    if (groupId === 'advanced') {
+      setReleaseChannelState('stable');
+      return;
+    }
+  }, [setReleaseChannelState, state.settings.assist, state.settings.sync, state.settings.typography, updateAIConfig, updateSettings]);
+
   if (!open) return null;
 
   return (
@@ -456,15 +611,44 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
             />
           </div>
 
-          {!isMobile && visibleSections.length > 0 && (
+          {!isMobile && sortedVisibleSections.length > 0 && (
             <nav className={styles.settingsToc} aria-label="Settings sections">
-              {visibleSections.map(section => (
+              {sortedVisibleSections.map(section => (
                 <button key={section.id} type="button" className={styles.settingsTocLink} onClick={() => jumpToSection(section.id)}>
                   {highlightMatch(section.title)}
                 </button>
               ))}
             </nav>
           )}
+
+          <div className={styles.settingsGroups}>
+            {SETTINGS_GROUPS.map(group => {
+              const groupSections = sectionsByGroup[group.id] ?? [];
+              if (groupSections.length === 0) return null;
+              const recommendedSections = groupSections.filter(section => section.recommended);
+              return (
+                <section key={group.id} className={styles.settingsGroupCard}>
+                  <div className={styles.settingsGroupHeader}>
+                    <h4>{group.title}</h4>
+                    <span>{groupSections.length} section{groupSections.length === 1 ? '' : 's'}</span>
+                  </div>
+                  <div className={styles.recommendedPanel}>
+                    <div className={styles.recommendedPanel__title}>Recommended defaults</div>
+                    <Button size="small" variant="ghost" onClick={() => applyRecommendedDefaults(group.id)}>
+                      Apply {group.title} defaults
+                    </Button>
+                  </div>
+                  <div className={styles.settingsGroupChips}>
+                    {recommendedSections.map(section => (
+                      <button key={section.id} type="button" className={styles.settingsTocLink} onClick={() => jumpToSection(section.id)}>
+                        {section.title}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
 
           {/* Typography Section */}
           {isSectionVisible('typography') && (
@@ -534,82 +718,90 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
             </button>
             {!isSectionCollapsed('ai') && (
               <div className={styles.sectionContent}>
-                <div className={styles.privacyNotice}>
-                  <span className="material-symbols-rounded">info</span>
-                  <div>
-                    <p className={styles.privacyNotice__text}>
-                      Pick a provider below, then paste your API key to enable AI writing tools.
-                      Your key is stored locally in your browser and only sent to the endpoint you specify.
-                    </p>
+                <div className={styles.aiModeCard}>
+                  <p className={styles.aiModeStatus}>
+                    <strong>Current AI Mode:</strong> {AI_MODE_LABELS[currentAIMode]}
+                  </p>
+                  <div className={styles.aiModeOptions} role="radiogroup" aria-label="Current AI mode">
+                    {(['automatic', 'server-provider', 'custom-endpoint', 'local-llm'] as const).map(mode => (
+                      <label key={mode} className={styles.aiModeOption}>
+                        <input
+                          type="radio"
+                          name="settings-ai-mode"
+                          checked={currentAIMode === mode}
+                          onChange={() => {
+                            const providerByMode: Record<AIConfigMode, AIProviderConfig['provider']> = {
+                              automatic: 'managed-cloud',
+                              'server-provider': 'server-proxy',
+                              'custom-endpoint': 'openai-compatible',
+                              'local-llm': 'custom-llm',
+                            };
+                            updateAIConfig({ provider: providerByMode[mode] });
+                          }}
+                        />
+                        {AI_MODE_LABELS[mode]}
+                      </label>
+                    ))}
                   </div>
+                  <p className={styles.aiModeHelp}>{AI_MODE_HELP_TEXT[currentAIMode]}</p>
+                  <p className={styles.aiModeHelp}>{AI_MODE_DATA_DESTINATION_TEXT[currentAIMode]}</p>
+                  {aiConfig.endpoint?.trim() && aiConfig.sessionToken?.trim() && currentAIMode !== 'custom-endpoint' && (
+                    <div className={styles.aiModeBanner}>
+                      Endpoint + API key detected. Switch to <strong>Custom Endpoint</strong> mode to send requests directly to that endpoint.
+                    </div>
+                  )}
                 </div>
-                {isFieldVisible('ai', 'aiEndpoint') && <>
-                  <div className={styles.field}>
-                    <label>{highlightMatch('Provider')}</label>
-                    <div className={styles.aiEndpointPresets}>
-                      {AI_ENDPOINT_PRESETS.map(preset => {
-                        const isActive = matchAIPresetId(aiConfig.endpoint) === preset.id;
-                        return (
-                          <button
-                            key={preset.id}
-                            className={`${styles.aiEndpointPreset} ${isActive ? styles['aiEndpointPreset--active'] : ''}`}
-                            onClick={() => updateAIConfig({
-                              endpoint: preset.endpoint,
-                              model: aiConfig.model?.trim() ? aiConfig.model : preset.defaultModel,
-                            })}
-                          >
-                            <strong>{preset.label}</strong>
-                            <small>{preset.signupUrl}</small>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className={styles.field}>
-                    <label>
-                      {highlightMatch('API Endpoint')}
-                      <HelpTooltip text="OpenAI-compatible chat completions endpoint (e.g. https://api.openai.com/v1/chat/completions)" />
-                    </label>
-                    <Input
-                      placeholder="https://api.openai.com/v1/chat/completions"
-                      value={aiConfig.endpoint || ''}
-                      onChange={e => updateAIConfig({ endpoint: e.target.value })}
-                    />
-                  </div>
-                </>}
-                {isFieldVisible('ai', 'aiApiKey') && <div className={styles.field}>
-                  <label>
-                    {highlightMatch('API Key')}
-                    <HelpTooltip text="Your API key from OpenAI or any compatible provider" />
-                  </label>
-                  <Input
-                    type="password"
-                    placeholder={AI_ENDPOINT_PRESETS.find(p => p.id === matchAIPresetId(aiConfig.endpoint))?.keyPlaceholder ?? 'sk-...'}
-                    value={aiConfig.sessionToken || ''}
-                    onChange={e => updateAIConfig({ sessionToken: e.target.value })}
-                  />
-                </div>}
-                {isFieldVisible('ai', 'aiModel') && <div className={styles.field}>
-                  <label>
-                    {highlightMatch('Model')}
-                    <HelpTooltip text="Model identifier sent with requests (e.g. gpt-4o, gpt-4o-mini, gpt-3.5-turbo)" />
-                  </label>
-                  <Input
-                    placeholder={AI_ENDPOINT_PRESETS.find(p => p.id === matchAIPresetId(aiConfig.endpoint))?.defaultModel ?? 'gpt-4o'}
-                    value={aiConfig.model || ''}
-                    onChange={e => updateAIConfig({ model: e.target.value })}
-                  />
-                </div>}
-                {aiConfig.endpoint?.trim() && aiConfig.sessionToken?.trim() && (
-                  <div className={styles.privacyNotice}>
-                    <span className="material-symbols-rounded" style={{ color: 'var(--success, #22c55e)' }}>check_circle</span>
-                    <div>
-                      <p className={styles.privacyNotice__text}>
-                        AI provider configured. Open <strong>AI Writing Tools</strong> from the menu to start using AI assistance.
-                      </p>
-                    </div>
-                  </div>
-                )}
+                <AIConfigPanel
+                  mode="full"
+                  config={aiConfig}
+                  onConfigChange={updateAIConfig}
+                  onCustomLlmConfigChange={updateCustomLlmConfig}
+                  onTestLocalLlm={handleLocalLlmTest}
+                  localLlmTestResult={localLlmTestResult}
+                  localLlmTesting={localLlmTesting}
+                  showProviderFields
+                  showLocalFields={false}
+                  providerValidation={{
+                    endpointError: aiConfig.endpoint?.trim() ? endpointValidation.error : undefined,
+                    modelError: aiConfig.endpoint?.trim() && !aiConfig.model?.trim() ? 'Model is required for endpoint testing.' : undefined,
+                    testDisabledReason: endpointTestDisabledReason,
+                  }}
+                />
+              </div>
+            )}
+          </section>
+          )}
+
+          {/* Local AI (Custom LLM) Section */}
+          {isSectionVisible('localai') && (
+          <section className={styles.section} ref={el => { sectionRefs.current.localai = el; }}>
+            <button className={styles.sectionToggle} onClick={() => toggleSection('localai')}>
+              <h4>
+                <span className="material-symbols-rounded">memory</span>
+                {highlightMatch('Local AI (Custom LLM)')}
+              </h4>
+              <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
+                {isSectionCollapsed('localai') ? 'expand_more' : 'expand_less'}
+              </span>
+            </button>
+            {!isSectionCollapsed('localai') && (
+              <div className={styles.sectionContent}>
+                <AIConfigPanel
+                  mode="embedded"
+                  config={aiConfig}
+                  onConfigChange={updateAIConfig}
+                  onCustomLlmConfigChange={updateCustomLlmConfig}
+                  onTestLocalLlm={handleLocalLlmTest}
+                  localLlmTestResult={localLlmTestResult}
+                  localLlmTesting={localLlmTesting}
+                  showProviderFields={false}
+                  showLocalFields
+                  localValidation={{
+                    baseUrlError: aiConfig.customLlm?.baseUrl?.trim() ? localLlmValidation.baseUrl.error : undefined,
+                    modelError: aiConfig.customLlm?.baseUrl?.trim() || aiConfig.customLlm?.model?.trim() ? localLlmValidation.model.error : undefined,
+                    testDisabledReason: localLlmValidation.disabledReason,
+                  }}
+                />
               </div>
             )}
           </section>
@@ -653,7 +845,9 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                       sync: { ...state.settings.sync, url: e.target.value }
                     })}
                     placeholder="https://your-server.com/sync"
+                    aria-invalid={Boolean(syncUrlValidation.error)}
                   />
+                  {syncUrlValidation.error && <p className={styles.fieldError}>{syncUrlValidation.error}</p>}
                 </div>}
                 {isFieldVisible('sync', 'authHeader') && <div className={styles.field}>
                   <label>
@@ -667,8 +861,13 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
                       sync: { ...state.settings.sync, auth: e.target.value }
                     })}
                     placeholder="Bearer your-token"
+                    aria-invalid={Boolean(syncAuthValidation.error)}
                   />
+                  {syncAuthValidation.error && <p className={styles.fieldError}>{syncAuthValidation.error}</p>}
                 </div>}
+                {(syncUrlValidation.error || syncAuthValidation.error) && (
+                  <p className={styles.fieldHelper}>Fix sync field errors before enabling cloud sync.</p>
+                )}
               </div>
             )}
           </section>
