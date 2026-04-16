@@ -26,10 +26,11 @@
     "desktop:dev": "npm --prefix desktop run dev",
     "desktop:build": "npm --prefix desktop run build",
     "desktop:build:debug": "npm --prefix desktop run build:debug",
-    "desktop:build:mac": "npm --prefix desktop run build -- --target universal-apple-darwin",
+    "desktop:build:mac": "npm --prefix desktop run build:mac",
     "desktop:build:win": "npm --prefix desktop run build -- --target x86_64-pc-windows-msvc",
     "desktop:build:linux": "npm --prefix desktop run build -- --target x86_64-unknown-linux-gnu",
-    "release:verify-artifacts": "node scripts/verify-release-artifacts.mjs"
+    "release:verify-artifacts": "node scripts/verify-release-artifacts.mjs",
+    "desktop:build:mac:debug": "npm --prefix desktop run build:mac:debug"
   },
   "dependencies": {
     "@capacitor/core": "^8.1.0",

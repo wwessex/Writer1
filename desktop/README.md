@@ -6,6 +6,8 @@ This package wraps the Vite frontend in a Tauri shell.
 - `npm run dev` - desktop dev mode (spawns root Vite dev command from tauri config)
 - `npm run build` - production bundles for configured targets
 - `npm run build:debug` - debug desktop bundle
+- `npm run build:mac` - macOS universal build with native titlebar treatment
+- `npm run build:mac:debug` - debug macOS universal build
 
 ## Runtime responsibilities
 - Enforce single-instance behavior
@@ -15,3 +17,7 @@ This package wraps the Vite frontend in a Tauri shell.
 
 ## Packaging targets
 See `src-tauri/tauri.conf.json` for bundle targets and signing/notarization env variables.
+
+## macOS polish
+- Uses an overlay title bar + transparent window treatment for a liquid-glass shell.
+- Frontend applies macOS-only glass chrome styles when running in the Tauri runtime.

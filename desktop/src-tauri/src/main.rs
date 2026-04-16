@@ -64,10 +64,18 @@ fn open_project_window(app: AppHandle, novel_id: String) -> Result<(), String> {
     }
 
     let url = format!("/?project={}", novel_id);
-    tauri::WebviewWindowBuilder::new(&app, label, tauri::WebviewUrl::App(url.into()))
-        .title("DraftHarbour Studio")
-        .build()
-        .map_err(|err| err.to_string())?;
+    let mut window_builder = tauri::WebviewWindowBuilder::new(&app, label, tauri::WebviewUrl::App(url.into()))
+        .title("DraftHarbour Studio");
+
+    #[cfg(target_os = "macos")]
+    {
+        window_builder = window_builder
+            .title_bar_style(tauri::TitleBarStyle::Overlay)
+            .hidden_title(true)
+            .transparent(true);
+    }
+
+    window_builder.build().map_err(|err| err.to_string())?;
 
     Ok(())
 }
