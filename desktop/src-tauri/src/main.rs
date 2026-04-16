@@ -71,8 +71,7 @@ fn open_project_window(app: AppHandle, novel_id: String) -> Result<(), String> {
     {
         window_builder = window_builder
             .title_bar_style(tauri::TitleBarStyle::Overlay)
-            .hidden_title(true)
-            .transparent(true);
+            .hidden_title(true);
     }
 
     window_builder.build().map_err(|err| err.to_string())?;
@@ -105,16 +104,21 @@ fn delete_secure_secret(key: String) -> Result<(), String> {
     }
 }
 
-fn apply_native_role(role: &str) -> Option<PredefinedMenuItem> {
-    match role {
-        "undo" => Some(PredefinedMenuItem::undo(None)),
-        "redo" => Some(PredefinedMenuItem::redo(None)),
-        "cut" => Some(PredefinedMenuItem::cut(None)),
-        "copy" => Some(PredefinedMenuItem::copy(None)),
-        "paste" => Some(PredefinedMenuItem::paste(None)),
-        "selectAll" => Some(PredefinedMenuItem::select_all(None)),
+fn apply_native_role<R: tauri::Runtime, M: Manager<R>>(
+    manager: &M,
+    role: &str,
+) -> Result<Option<PredefinedMenuItem<R>>, String> {
+    let item = match role {
+        "undo" => Some(PredefinedMenuItem::undo(manager, None)),
+        "redo" => Some(PredefinedMenuItem::redo(manager, None)),
+        "cut" => Some(PredefinedMenuItem::cut(manager, None)),
+        "copy" => Some(PredefinedMenuItem::copy(manager, None)),
+        "paste" => Some(PredefinedMenuItem::paste(manager, None)),
+        "selectAll" => Some(PredefinedMenuItem::select_all(manager, None)),
         _ => None,
-    }
+    };
+
+    item.transpose().map_err(|err| err.to_string())
 }
 
 #[tauri::command]
@@ -131,7 +135,7 @@ fn set_native_menu(app: AppHandle, menu: Vec<NativeMenuTemplate>, _platform: Str
             }
 
             if let Some(role) = item.role.as_deref() {
-                if let Some(predefined) = apply_native_role(role) {
+                if let Some(predefined) = apply_native_role(&app, role)? {
                     submenu_builder = submenu_builder.item(&predefined);
                     continue;
                 }
@@ -171,7 +175,15 @@ fn set_native_menu_command_state(app: AppHandle, command_states: Vec<CommandStat
     if let Some(menu) = app.menu() {
         for (command_id, enabled) in command_state_map {
             if let Some(item) = menu.get(&command_id) {
-                let _ = item.set_enabled(enabled);
+                if let Some(menu_item) = item.as_menuitem() {
+                    let _ = menu_item.set_enabled(enabled);
+                } else if let Some(check_item) = item.as_check_menuitem() {
+                    let _ = check_item.set_enabled(enabled);
+                } else if let Some(icon_item) = item.as_icon_menuitem() {
+                    let _ = icon_item.set_enabled(enabled);
+                } else if let Some(submenu) = item.as_submenu() {
+                    let _ = submenu.set_enabled(enabled);
+                }
             }
         }
     }

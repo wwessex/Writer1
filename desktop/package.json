@@ -7,8 +7,9 @@
     "dev": "tauri dev",
     "build": "tauri build",
     "build:debug": "tauri build --debug",
-    "build:mac": "tauri build --target universal-apple-darwin",
-    "build:mac:debug": "tauri build --debug --target universal-apple-darwin"
+    "build:mac": "sh -c 'if [ -n \"$APPLE_SIGNING_IDENTITY\" ]; then exec tauri build --target universal-apple-darwin; else exec tauri build --target universal-apple-darwin --no-sign; fi'",
+    "build:mac:debug": "sh -c 'if [ -n \"$APPLE_SIGNING_IDENTITY\" ]; then exec tauri build --debug --target universal-apple-darwin; else exec tauri build --debug --target universal-apple-darwin --no-sign; fi'",
+    "build:mac:signed": "tauri build --target universal-apple-darwin"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.2.3"
