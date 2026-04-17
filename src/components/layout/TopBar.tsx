@@ -56,11 +56,13 @@ export function TopBar({
   return (
     <header
       className={[
-        'border-b border-[var(--border)] bg-[var(--panel)] backdrop-blur px-3 sm:px-4 flex items-center justify-between gap-2 sm:gap-3 shrink-0 transition-[height] duration-150',
+        'relative border-b border-[var(--border)] bg-[var(--panel)] backdrop-blur px-3 sm:px-4 flex items-center justify-between gap-2 sm:gap-3 shrink-0 transition-[height] duration-150',
         focusMode ? 'h-10' : 'h-14',
         macLiquid ? 'app-chrome app-chrome--top' : '',
       ].join(' ')}
     >
+      {macLiquid && <div className="absolute inset-x-0 top-0 h-3" data-tauri-drag-region aria-hidden="true" />}
+
       {/* Left */}
       <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 md:flex-none">
         <button
