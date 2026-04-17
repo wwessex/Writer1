@@ -61,10 +61,10 @@ export function TopBar({
         macLiquid ? 'app-chrome app-chrome--top' : '',
       ].join(' ')}
     >
-      {macLiquid && <div className="absolute inset-x-0 top-0 h-3" data-tauri-drag-region aria-hidden="true" />}
+      {macLiquid && <div className="absolute inset-0 z-0" data-tauri-drag-region aria-hidden="true" />}
 
       {/* Left */}
-      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 md:flex-none">
+      <div className="relative z-10 flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 md:flex-none">
         <button
           className="h-9 w-9 rounded-xl hover:bg-[var(--btn-bg)] flex items-center justify-center transition-colors"
           aria-label="Writer1 Home"
@@ -95,7 +95,7 @@ export function TopBar({
 
       {/* Center — search */}
       {!focusMode && (
-        <div className="hidden md:block flex-1 max-w-[520px] min-w-[220px]">
+        <div className="relative z-10 hidden md:block flex-1 max-w-[520px] min-w-[220px]">
           <button
             className="w-full h-9 rounded-xl border border-[var(--border)] bg-[var(--btn-bg)] hover:bg-[var(--btn-hover)] px-3 flex items-center justify-between text-left transition-colors"
             onClick={onSearch}
@@ -110,7 +110,7 @@ export function TopBar({
       )}
 
       {/* Right */}
-      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+      <div className="relative z-10 flex items-center gap-1 sm:gap-2 shrink-0">
         <div
           className={[
             'hidden sm:flex h-8 rounded-lg px-2.5 text-xs items-center gap-1.5 border transition-all duration-200',
