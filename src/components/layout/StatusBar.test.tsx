@@ -12,11 +12,12 @@ describe('StatusBar', () => {
     const root = createRoot(container);
     act(() => {
       root.render(
-        <StatusBar wordCount={2843} sessionWords={612} goalPercent={61} saved={true} online={true} />
+        <StatusBar wordCount={2843} sessionWords={612} goalPercent={61} saved={true} online={true} readingTime="12 min read" />
       );
     });
 
     expect(container.textContent).toContain('Words: 2,843');
+    expect(container.textContent).toContain('12 min read');
     expect(container.textContent).toContain('Session: +612');
     expect(container.textContent).toContain('Goal: 61%');
     expect(container.textContent).toContain('Saved');
@@ -38,6 +39,27 @@ describe('StatusBar', () => {
     expect(container.textContent).toContain('Goal: 50%');
     expect(container.textContent).toContain('Saving\u2026');
     expect(container.textContent).toContain('Offline');
+    act(() => root.unmount());
+  });
+
+  it('hides reading time in compact mode', () => {
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    act(() => {
+      root.render(
+        <StatusBar
+          wordCount={1000}
+          sessionWords={0}
+          goalPercent={0}
+          saved={true}
+          online={true}
+          readingTime="4 min read"
+          compact
+        />
+      );
+    });
+
+    expect(container.textContent).not.toContain('4 min read');
     act(() => root.unmount());
   });
 });

@@ -1,6 +1,6 @@
 import { useMemo, useCallback, type ReactNode } from 'react';
 import { useApp } from '@/context/AppContext';
-import { countWords, editorToPlainText } from '@/lib/utils';
+import { countWords, editorToPlainText, formatReadingTime } from '@/lib/utils';
 import type { ChapterStatus } from '@/types';
 
 interface EditorPaneProps {
@@ -24,11 +24,6 @@ function formatRelativeTime(timestamp: number): string {
   if (hours < 24) return `Edited ${hours} hour${hours === 1 ? '' : 's'} ago`;
   const days = Math.floor(hours / 24);
   return `Edited ${days} day${days === 1 ? '' : 's'} ago`;
-}
-
-function estimateReadingTime(wordCount: number): string {
-  const minutes = Math.max(1, Math.ceil(wordCount / 250));
-  return `${minutes} min read`;
 }
 
 export function EditorPane({ children }: EditorPaneProps) {
@@ -80,7 +75,7 @@ export function EditorPane({ children }: EditorPaneProps) {
           <span className="text-[var(--border)]">&bull;</span>
           <span>{wordCount.toLocaleString()} words</span>
           <span className="text-[var(--border)]">&bull;</span>
-          <span>{estimateReadingTime(wordCount)}</span>
+          <span>{formatReadingTime(wordCount)}</span>
         </div>
       </div>
 

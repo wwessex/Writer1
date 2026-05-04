@@ -10,6 +10,7 @@ const useAppMock = vi.fn();
 const useResponsivePanelsMock = vi.fn();
 const editorToPlainTextMock = vi.fn();
 const countWordsMock = vi.fn();
+const formatReadingTimeMock = vi.fn();
 const statusBarMock = vi.fn((props: { compact?: boolean }) => <div>StatusBar:{props.compact ? 'compact' : 'normal'}</div>);
 
 vi.mock('@/context/AppContext', () => ({
@@ -23,6 +24,7 @@ vi.mock('@/hooks/useResponsivePanels', () => ({
 vi.mock('@/lib/utils', () => ({
   editorToPlainText: (content: unknown) => editorToPlainTextMock(content),
   countWords: (text: string) => countWordsMock(text),
+  formatReadingTime: (wordCount: number) => formatReadingTimeMock(wordCount),
 }));
 
 vi.mock('./TopBar', () => ({
@@ -42,6 +44,7 @@ vi.mock('./StatusBar', () => ({
     goalPercent?: number;
     saved?: boolean;
     online?: boolean;
+    readingTime?: string;
     chapterCount?: number;
   }) => statusBarMock(props),
 }));
@@ -79,6 +82,7 @@ describe('AppShellLayout', () => {
     });
 
     countWordsMock.mockImplementation((text: string) => text.split(/\s+/).filter(Boolean).length);
+    formatReadingTimeMock.mockImplementation((wordCount: number) => `${Math.max(1, Math.ceil(wordCount / 250))} min read`);
     statusBarMock.mockClear();
   });
 
@@ -98,6 +102,7 @@ describe('AppShellLayout', () => {
       goalPercent: 0,
       saved: true,
       online: true,
+      readingTime: '1 min read',
       chapterCount: 2,
       compact: false,
     }));

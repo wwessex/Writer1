@@ -7,6 +7,8 @@ import {
   findLongSentences,
   analyzeText,
   editorToPlainText,
+  estimateReadingMinutes,
+  formatReadingTime,
   formatRelativeTime,
   clamp,
   generateId,
@@ -31,6 +33,27 @@ describe('countWords', () => {
 
   it('handles newlines as word separators', () => {
     expect(countWords('one\ntwo\nthree')).toBe(3);
+  });
+});
+
+describe('estimateReadingMinutes', () => {
+  it('returns at least one minute for empty drafts', () => {
+    expect(estimateReadingMinutes(0)).toBe(1);
+  });
+
+  it('rounds up partial minutes at the default reading pace', () => {
+    expect(estimateReadingMinutes(250)).toBe(1);
+    expect(estimateReadingMinutes(251)).toBe(2);
+  });
+
+  it('accepts a custom reading pace', () => {
+    expect(estimateReadingMinutes(450, 150)).toBe(3);
+  });
+});
+
+describe('formatReadingTime', () => {
+  it('formats the reading estimate for UI labels', () => {
+    expect(formatReadingTime(251)).toBe('2 min read');
   });
 });
 
