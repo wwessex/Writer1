@@ -1,6 +1,6 @@
 # Native macOS Parity Matrix
 
-This matrix tracks implemented web/Tauri behavior that must exist in the SwiftUI/AppKit macOS app before it becomes the primary Mac application. The web, Tauri, and Capacitor paths remain reference implementations and fallback builds until this table is complete.
+This matrix tracks implemented web/Tauri behavior that exists in the SwiftUI/AppKit macOS app now that the native app is the preferred Mac application. The web, Tauri, and Capacitor paths remain fallback builds and compatibility references.
 
 ## Baseline
 
@@ -23,8 +23,8 @@ This matrix tracks implemented web/Tauri behavior that must exist in the SwiftUI
 | Quick switcher/search | Implemented | Searches sections, commands, story bible entries. |
 | Snapshots | Implemented | Create, rename, restore, delete, auto snapshot support. |
 | Comments | Implemented | Add, reply, resolve, delete, anchor metadata. |
-| Story cards and corkboard | Partial | Native views surface cards; drag/reorder polish remains. |
-| Recent files/session recovery | Partial | AppStorage/UserDefaults hooks exist; full crash recovery remains. |
+| Story cards and corkboard | Implemented | Native card sizing, status counts, selection, search/filter/expand, and drag reorder mode. |
+| Recent files/session recovery | Implemented | Active section, recent project URLs, and newer-than-file recovery envelope. |
 
 ## Import And Export
 
@@ -57,7 +57,7 @@ This matrix tracks implemented web/Tauri behavior that must exist in the SwiftUI
 | Capability | Native status | Notes |
 | --- | --- | --- |
 | Generic REST sync | Implemented | Push/pull/list via `URLSession`. |
-| Dropbox/Google Drive provider shell | Partial | Uses same sync contract when configured with base URL/token; provider-native OAuth UI remains. |
+| Dropbox/Google Drive provider shell | Deferred | Provider-native OAuth is out of scope for this pass; Generic REST is the primary native sync UI. |
 | Scrivener bridge | Implemented | Plain-text package import/export bridge. |
 | Three-way conflict detection | Implemented | Shared native merge primitive. |
 | Keychain token storage | Implemented | Existing `KeychainClient`; mockable protocol added. |

@@ -39,6 +39,16 @@ public final class ProjectStore {
     activeSectionID = id
   }
 
+  public func replaceEnvelope(_ envelope: DhprojEnvelope, activeSectionID: String? = nil) {
+    self.envelope = DhprojCodec.normalize(envelope)
+    if let activeSectionID, self.envelope.sections.contains(where: { $0.id == activeSectionID }) {
+      self.activeSectionID = activeSectionID
+    } else {
+      self.activeSectionID = self.envelope.sections.first?.id
+    }
+    markChanged()
+  }
+
   public func updateProjectTitle(_ title: String) {
     envelope.project.title = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Untitled Project" : title
     markChanged()
@@ -52,6 +62,28 @@ public final class ProjectStore {
   public func updateStoryBlueprint(_ blueprint: StoryBlueprint?) {
     envelope.storyBlueprint = blueprint
     markChanged()
+  }
+
+  @discardableResult
+  public func importSections(_ sections: [Section], selectFirst: Bool = true) -> [String] {
+    guard !sections.isEmpty else { return [] }
+    let startIndex = envelope.sections.count
+    let imported = sections.enumerated().map { offset, section in
+      var copy = section
+      copy.novelId = envelope.project.id
+      copy.order = startIndex + offset
+      if copy.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        copy.title = "\(projectType == .screenplay ? "Scene" : "Chapter") \(copy.order + 1)"
+      }
+      return copy
+    }
+    envelope.sections.append(contentsOf: imported)
+    renumberSections()
+    if selectFirst {
+      activeSectionID = imported.first?.id
+    }
+    markChanged()
+    return imported.map(\.id)
   }
 
   @discardableResult
@@ -349,14 +381,20 @@ public final class ProjectStore {
     }
   }
 
-  public func addCharacter(name: String) {
-    envelope.characters.append(CharacterEntity(novelId: envelope.project.id, name: name))
+  @discardableResult
+  public func addCharacter(name: String) -> CharacterEntity {
+    let character = CharacterEntity(novelId: envelope.project.id, name: name)
+    envelope.characters.append(character)
     markChanged()
+    return character
   }
 
-  public func addWorldEntry(name: String, category: String = "other") {
-    envelope.worldEntries.append(WorldEntry(novelId: envelope.project.id, category: category, name: name))
+  @discardableResult
+  public func addWorldEntry(name: String, category: String = "other") -> WorldEntry {
+    let entry = WorldEntry(novelId: envelope.project.id, category: category, name: name)
+    envelope.worldEntries.append(entry)
     markChanged()
+    return entry
   }
 
   public func updateCharacter(id: String, update: (inout CharacterEntity) -> Void) {
@@ -370,6 +408,78 @@ public final class ProjectStore {
     guard let index = envelope.worldEntries.firstIndex(where: { $0.id == id }) else { return }
     update(&envelope.worldEntries[index])
     envelope.worldEntries[index].updatedAt = currentTimeMilliseconds()
+    markChanged()
+  }
+
+  public func deleteCharacter(id: String) {
+    envelope.characters.removeAll { $0.id == id }
+    for index in envelope.worldEntries.indices {
+      envelope.worldEntries[index].linkedCharacters.removeAll { $0 == id }
+    }
+    markChanged()
+  }
+
+  public func deleteWorldEntry(id: String) {
+    envelope.worldEntries.removeAll { $0.id == id }
+    markChanged()
+  }
+
+  public func updateIntegration(_ config: IntegrationConfig) {
+    var integrations = envelope.integrations ?? [:]
+    integrations[config.type] = config
+    envelope.integrations = integrations
+    markChanged()
+  }
+
+  public func integrationConfig(for type: IntegrationType) -> IntegrationConfig {
+    envelope.integrations?[type] ?? IntegrationConfig(type: type)
+  }
+
+  public func applySyncResult(_ result: IntegrationResult) {
+    if let pulledEnvelope = result.pulledEnvelope {
+      envelope = DhprojCodec.normalize(pulledEnvelope)
+      activeSectionID = envelope.sections.first(where: { $0.id == activeSectionID })?.id ?? envelope.sections.first?.id
+    }
+    var config = integrationConfig(for: result.provider)
+    config.status = result.conflicts.isEmpty ? result.message : "\(result.conflicts.count) conflict(s)"
+    config.lastSyncAt = currentTimeMilliseconds()
+    updateIntegration(config)
+  }
+
+  public func resolveConflict(_ conflict: ConflictInfo, option: ConflictResolutionOption) {
+    guard let index = envelope.sections.firstIndex(where: { $0.id == conflict.chapterId }) else { return }
+    let resolved = SyncMergeEngine.resolve(conflict, option: option, localSection: envelope.sections[index])
+    envelope.sections.remove(at: index)
+    envelope.sections.insert(contentsOf: resolved, at: index)
+    renumberSections()
+    activeSectionID = resolved.first?.id ?? activeSectionID
+    markChanged()
+  }
+
+  public func updateProgress(wordsWritten: Int, date: String? = nil) {
+    let date = date ?? ProjectStore.todayString()
+    var progress = envelope.progress ?? ProgressData()
+    let currentWords = metrics.totalWords
+    if let index = progress.dailyHistory.firstIndex(where: { $0.date == date }) {
+      progress.dailyHistory[index].wordsWritten = max(0, wordsWritten)
+      progress.dailyHistory[index].wordsAtStart = max(0, currentWords - wordsWritten)
+      progress.dailyHistory[index].goalMet = wordsWritten >= (envelope.settings.dailyWordGoal ?? envelope.settings.goalConfiguration?.dailyWordTarget ?? 0)
+      progress.dailyHistory[index].sessions += 1
+    } else {
+      progress.dailyHistory.append(
+        DailyProgress(
+          date: date,
+          wordsWritten: max(0, wordsWritten),
+          wordsAtStart: max(0, currentWords - wordsWritten),
+          goalMet: wordsWritten >= (envelope.settings.dailyWordGoal ?? envelope.settings.goalConfiguration?.dailyWordTarget ?? 0),
+          sessions: 1
+        )
+      )
+    }
+    progress.totalSessions += 1
+    progress.totalWordsAllTime = max(progress.totalWordsAllTime, currentWords)
+    progress.streak = WritingStreak(current: progress.streak.current + 1, longest: max(progress.streak.longest, progress.streak.current + 1), lastActiveDate: date)
+    envelope.progress = progress
     markChanged()
   }
 
@@ -395,6 +505,15 @@ public final class ProjectStore {
     markChanged()
   }
 
+  public func upsertAIProvider(_ config: AIProviderConfig) {
+    if let index = envelope.aiProviders.firstIndex(where: { $0.id == config.id || $0.label == config.label }) {
+      envelope.aiProviders[index] = config
+    } else {
+      envelope.aiProviders.append(config)
+    }
+    markChanged()
+  }
+
   public func diagnosticsSummary() -> [String: JSONValue] {
     [
       "projectId": .string(envelope.project.id),
@@ -404,6 +523,14 @@ public final class ProjectStore {
       "commentThreadCount": .number(Double(envelope.commentThreads.count)),
       "totalWords": .number(Double(metrics.totalWords))
     ]
+  }
+
+  public static func todayString(date: Date = Date()) -> String {
+    let formatter = DateFormatter()
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter.string(from: date)
   }
 
   private func updateSection(id: String, update: (inout Section) -> Void) {

@@ -8,7 +8,7 @@ struct DraftHarbourNativeApp: App {
 
   var body: some SwiftUI.Scene {
     DocumentGroup(newDocument: DraftHarbourDocument()) { file in
-      NativeDocumentView(document: file.$document)
+      NativeDocumentView(document: file.$document, fileURL: file.fileURL)
     }
     .commands {
       DraftHarbourCommands()

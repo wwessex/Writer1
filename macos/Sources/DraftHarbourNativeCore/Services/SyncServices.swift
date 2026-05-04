@@ -113,7 +113,7 @@ public struct GenericRESTSyncProvider: IntegrationProvider {
   public var type: IntegrationType
   public var session: URLSession
 
-  public init(type: IntegrationType = .scrivener, session: URLSession = .shared) {
+  public init(type: IntegrationType = .genericREST, session: URLSession = .shared) {
     self.type = type
     self.session = session
   }
@@ -148,8 +148,13 @@ public struct GenericRESTSyncProvider: IntegrationProvider {
     let (data, response) = try await session.data(for: request)
     try validate(response)
     let remote = try JSONDecoder().decode(ProviderPayload.self, from: data)
-    let conflicts = merge(remote: remote, into: payload.envelope).conflicts
-    return IntegrationResult(provider: type, message: "Pulled \(remote.documents.count) remote sections.", conflicts: conflicts)
+    let pullResult = merge(remote: remote, into: payload.envelope)
+    return IntegrationResult(
+      provider: type,
+      message: "Pulled \(remote.documents.count) remote sections.",
+      conflicts: pullResult.conflicts,
+      pulledEnvelope: pullResult.envelope
+    )
   }
 
   public func listRevisions(config: IntegrationConfig) async throws -> [RemoteRevision] {
