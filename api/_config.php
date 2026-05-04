@@ -35,8 +35,14 @@ return [
 
     // ── Safety controls ──────────────────────────────────────────────
     'max_input_chars'    => 12000,
+    'max_request_bytes'  => 65536,
     'max_output_tokens'  => 4096,
     'default_temperature' => 0.7,
+
+    // Server-funded proxy calls require an auth token outside local/dev.
+    // Clients may provide it as Authorization: Bearer <token> or X-DraftHarbour-API-Key.
+    'require_server_key_auth' => !$isDev,
+    'server_key_auth_token'   => getenv('APP_SERVER_KEY_AUTH_TOKEN') ?: '',
 
     // ── Rate limiting (per IP) ───────────────────────────────────────
     'rate_limit'                => 20,   // max requests …
@@ -54,4 +60,26 @@ return [
     // When true, clients may pass "userApiKey" in the request body and
     // the server will use that key instead of the server-side key.
     'allow_byok' => $isDev,
+
+    // Models allowed when the server's own provider keys are used.
+    // BYOK requests still rely on the user's provider account permissions.
+    'allowed_models' => [
+        'groq' => [
+            'llama-3.3-70b-versatile',
+            'llama-3.1-8b-instant',
+            'mixtral-8x7b-32768',
+            'gemma2-9b-it',
+        ],
+        'openrouter' => [
+            'google/gemini-2.0-flash-exp:free',
+            'meta-llama/llama-3.3-70b-instruct:free',
+            'anthropic/claude-3.5-sonnet',
+            'openai/gpt-4o',
+        ],
+        'gemini' => [
+            'gemini-2.0-flash',
+            'gemini-1.5-flash',
+            'gemini-1.5-pro',
+        ],
+    ],
 ];

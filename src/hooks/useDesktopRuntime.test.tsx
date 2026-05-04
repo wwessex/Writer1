@@ -63,7 +63,7 @@ describe('useDesktopRuntime', () => {
       return () => listeners.delete(name);
     });
     invokeMock.mockImplementation(async (name: string) => {
-      if (name === 'read_text_file') {
+      if (name === 'read_project_file') {
         return '{"manifest":{"format":"dhproj","version":1,"appVersion":"2.0.0","createdAt":"2026-01-01"},"project":{"id":"p1","title":"T"},"projectType":"book","sections":[],"snapshots":[],"commentThreads":[],"settings":{},"goalTrends":[]}';
       }
       return undefined;

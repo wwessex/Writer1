@@ -30,6 +30,18 @@ if ($isNonDev) {
     if (!empty($config['allow_byok'])) {
         $warnings[] = 'allow_byok is enabled in a non-dev environment. Disable unless explicitly required.';
     }
+
+    $hasServerKeys = false;
+    foreach (['groq', 'openrouter', 'gemini'] as $providerName) {
+        if (!empty($config[$providerName]['enabled']) && !empty($config[$providerName]['api_key'])) {
+            $hasServerKeys = true;
+            break;
+        }
+    }
+
+    if ($hasServerKeys && !empty($config['require_server_key_auth']) && empty($config['server_key_auth_token'])) {
+        $warnings[] = 'Server provider keys are configured but APP_SERVER_KEY_AUTH_TOKEN is missing. Server-funded /api/chat calls will fail closed.';
+    }
 }
 
 foreach ($warnings as $warning) {
@@ -50,7 +62,7 @@ if ($corsOrigin !== null) {
     header("Access-Control-Allow-Origin: $corsOrigin");
 }
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Accept');
+header('Access-Control-Allow-Headers: Content-Type, Accept, Authorization, X-DraftHarbour-API-Key');
 
 // Handle CORS preflight
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {

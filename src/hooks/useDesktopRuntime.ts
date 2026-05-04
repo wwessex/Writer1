@@ -78,7 +78,7 @@ export function useDesktopRuntime({ hasUnsavedEdits, onDeepLink, onMenuAction, m
 
       unlistenProject = await runtime.listen<string>('desktop://open-project', async (event: { payload: string }) => {
         try {
-          const fileContent = await runtime.invoke<string>('read_text_file', { path: event.payload });
+          const fileContent = await runtime.invoke<string>('read_project_file', { path: event.payload });
           const projectFile = new File([fileContent], 'opened.dhproj', { type: 'application/json' });
           await importDhproj(projectFile);
           showToast('Opened desktop project file. Reloading…', 'success');
