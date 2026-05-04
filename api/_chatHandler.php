@@ -41,10 +41,83 @@ function chatSuccessEnvelope(array $data): array
     return ['ok' => true, 'data' => $data];
 }
 
+function requestHeaderValue(string $name): string
+{
+    $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $name));
+    return trim((string) ($_SERVER[$serverKey] ?? ''));
+}
+
+function requestBearerToken(): string
+{
+    $authorization = requestHeaderValue('Authorization');
+    if (preg_match('/^Bearer\s+(.+)$/i', $authorization, $matches) === 1) {
+        return trim($matches[1]);
+    }
+
+    return requestHeaderValue('X-DraftHarbour-API-Key');
+}
+
+function isServerKeyAuthorized(array $config): bool
+{
+    if (empty($config['require_server_key_auth'])) {
+        return true;
+    }
+
+    $expected = trim((string) ($config['server_key_auth_token'] ?? ''));
+    if ($expected === '') {
+        return false;
+    }
+
+    $provided = requestBearerToken();
+    return $provided !== '' && hash_equals($expected, $provided);
+}
+
+function isAllowedServerModel(string $provider, string $model, array $config): bool
+{
+    $allowedModels = $config['allowed_models'][$provider] ?? [];
+    if (!is_array($allowedModels) || $allowedModels === []) {
+        return false;
+    }
+
+    return in_array($model, $allowedModels, true);
+}
+
+function readLimitedJsonBody(array $config): array
+{
+    $maxBytes = max(1024, (int) ($config['max_request_bytes'] ?? 65536));
+    $contentLength = $_SERVER['CONTENT_LENGTH'] ?? null;
+    if ($contentLength !== null && $contentLength !== '' && is_numeric($contentLength) && (int) $contentLength > $maxBytes) {
+        return [null, 413, "Request body exceeds maximum size of {$maxBytes} bytes."];
+    }
+
+    $stream = fopen('php://input', 'rb');
+    if ($stream === false) {
+        return [null, 400, 'Unable to read request body.'];
+    }
+
+    $raw = stream_get_contents($stream, $maxBytes + 1);
+    fclose($stream);
+
+    if ($raw === false) {
+        return [null, 400, 'Unable to read request body.'];
+    }
+
+    if (strlen($raw) > $maxBytes) {
+        return [null, 413, "Request body exceeds maximum size of {$maxBytes} bytes."];
+    }
+
+    $body = json_decode($raw, true);
+    return [$body, null, null];
+}
+
 function handleChat(array $config): void
 {
-    $raw  = file_get_contents('php://input');
-    $body = json_decode($raw, true);
+    [$body, $bodyErrorStatus, $bodyErrorMessage] = readLimitedJsonBody($config);
+    if ($bodyErrorStatus !== null) {
+        http_response_code($bodyErrorStatus);
+        echo json_encode(chatErrorEnvelope($bodyErrorStatus, $bodyErrorMessage, 'UNKNOWN', false, 'Review request input and try again.'));
+        return;
+    }
 
     if (!$body || empty($body['provider']) || empty($body['prompt']) || empty($body['model'])) {
         $status = 400;
@@ -93,6 +166,20 @@ function handleChat(array $config): void
     if (!empty($body['userApiKey']) && !empty($config['allow_byok'])) {
         $apiKey = $body['userApiKey'];
     } else {
+        if (!isServerKeyAuthorized($config)) {
+            $status = empty($config['server_key_auth_token']) ? 503 : 401;
+            http_response_code($status);
+            echo json_encode(chatErrorEnvelope($status, 'Server-funded AI proxy access is not authorized.', 'UNAUTHORIZED', false, 'Sign in or provide an authorized proxy token before retrying.'));
+            return;
+        }
+
+        if (!isAllowedServerModel($provider, $model, $config)) {
+            $status = 400;
+            http_response_code($status);
+            echo json_encode(chatErrorEnvelope($status, "Model '{$model}' is not allowed for provider '{$provider}'.", 'UNKNOWN', false, 'Choose an approved model and retry.'));
+            return;
+        }
+
         $apiKey = $config[$provider]['api_key'] ?? null;
     }
 
