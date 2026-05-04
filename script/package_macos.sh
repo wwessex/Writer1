@@ -14,6 +14,10 @@ ENTITLEMENTS="$ROOT_DIR/macos/DraftHarbourNative.entitlements"
 rm -rf "$RELEASE_DIR"
 mkdir -p "$RELEASE_DIR"
 cp -R "$STAGED_APP" "$RELEASE_APP"
+if command -v xattr >/dev/null 2>&1; then
+  xattr -cr "$RELEASE_APP"
+fi
+find "$RELEASE_APP" -name '._*' -delete
 
 if [[ -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then
   echo "Signing $RELEASE_APP with $APPLE_SIGNING_IDENTITY"

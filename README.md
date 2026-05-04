@@ -32,10 +32,28 @@ Right-click `index.html` → Open with Live Server.
 In Chrome/Edge/Safari (iOS): use "Add to Home Screen" / "Install App".
 
 
+## Native macOS App (Preferred)
 
-## Desktop App (Tauri)
+The preferred Mac app is the SwiftUI/AppKit document app in `macos/`. It opens and saves `.dhproj` v1 files directly, includes native import/export, AI workflow configuration, recovery metadata, and Generic REST sync.
 
-A native desktop runtime is available under `desktop/`, using Tauri with the existing Vite app as renderer.
+```bash
+swift test --package-path macos
+./script/build_and_run.sh
+```
+
+Build-only and packaging checks:
+
+```bash
+./script/build_and_run.sh --no-launch
+./script/build_and_run.sh --verify
+./script/package_macos.sh
+```
+
+Dropbox and Google Drive provider-native OAuth are deferred for this pass. Use Generic REST sync in the native app, or the web/Tauri builds below as fallbacks.
+
+## Desktop App (Tauri Fallback)
+
+A fallback desktop runtime is available under `desktop/`, using Tauri with the existing Vite app as renderer.
 
 ### Prerequisites
 - Rust toolchain (`rustup`, `cargo`)
@@ -77,6 +95,8 @@ npm run desktop:build:linux
 
 ### Release signing/notarization configuration
 The packaging config is in `desktop/src-tauri/tauri.conf.json` and is environment-driven:
+
+Local `npm run desktop:build:mac` runs unsigned by default unless `APPLE_SIGNING_IDENTITY` is set. Use the desktop package's `build:mac:signed` script for CI/release packaging when signing is required.
 
 - macOS signing + notarization:
   - `APPLE_SIGNING_IDENTITY`

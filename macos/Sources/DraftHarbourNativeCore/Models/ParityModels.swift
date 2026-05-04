@@ -51,6 +51,23 @@ public enum NativeCommandID: String, Codable, CaseIterable, Sendable {
   case formatParagraph
   case toggleTypewriterMode
   case storyCards
+
+  public var disposition: NativeCommandDisposition {
+    switch self {
+    case .undo, .redo, .cut, .copy, .paste, .selectAll:
+      return .responderChain
+    case .openProjectFile, .saveProjectFile, .openRecent, .settings, .about:
+      return .system
+    case .importDocument, .newSection, .export, .snapshots, .analysis, .wordCount, .dashboard, .onboarding, .characterBible, .aiWriting, .comments, .addComment, .advancedAnalytics, .integrations, .projects, .sceneTemplates, .exportHistory, .aiPanel, .translation, .corkboard, .inspector, .quickSwitcher, .findReplace, .toggleSidebar, .togglePageView, .toggleFocusMode, .themeDark, .themeLight, .themeHighContrast, .insertHorizontalRule, .insertBlockquote, .formatBold, .formatItalic, .formatUnderline, .formatHeading1, .formatHeading2, .formatParagraph, .toggleTypewriterMode, .storyCards:
+      return .native
+    }
+  }
+}
+
+public enum NativeCommandDisposition: String, Codable, Sendable {
+  case native
+  case responderChain
+  case system
 }
 
 public enum StoryStructurePreference: String, Codable, CaseIterable, Sendable {

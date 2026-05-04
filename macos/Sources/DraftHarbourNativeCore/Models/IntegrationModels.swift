@@ -1,9 +1,27 @@
 import Foundation
 
 public enum IntegrationType: String, Codable, CaseIterable, Sendable {
+  case genericREST = "generic-rest"
   case dropbox
   case googleDrive = "google-drive"
   case scrivener
+
+  public var displayName: String {
+    switch self {
+    case .genericREST:
+      return "Generic REST"
+    case .dropbox:
+      return "Dropbox"
+    case .googleDrive:
+      return "Google Drive"
+    case .scrivener:
+      return "Scrivener"
+    }
+  }
+
+  public var isProviderNativeOAuthDeferred: Bool {
+    self == .dropbox || self == .googleDrive
+  }
 }
 
 public struct IntegrationConfig: Codable, Equatable, Sendable {

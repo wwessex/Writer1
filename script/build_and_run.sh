@@ -9,6 +9,8 @@ APP_BUNDLE="$ROOT_DIR/dist/$APP_NAME.app"
 CONTENTS_DIR="$APP_BUNDLE/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
+ICON_SOURCE="$ROOT_DIR/src-tauri/icons/icon.icns"
+FALLBACK_ICON_SOURCE="$ROOT_DIR/desktop/src-tauri/icons/icon.icns"
 CONFIGURATION="debug"
 SHOULD_LAUNCH=1
 SHOULD_VERIFY=0
@@ -62,6 +64,12 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 cp "$BIN_PATH" "$MACOS_DIR/$PRODUCT"
 chmod +x "$MACOS_DIR/$PRODUCT"
 
+if [[ -f "$ICON_SOURCE" ]]; then
+  cp "$ICON_SOURCE" "$RESOURCES_DIR/DraftHarbour.icns"
+elif [[ -f "$FALLBACK_ICON_SOURCE" ]]; then
+  cp "$FALLBACK_ICON_SOURCE" "$RESOURCES_DIR/DraftHarbour.icns"
+fi
+
 cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -94,6 +102,8 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
   <string>DraftHarbourNative</string>
   <key>CFBundleIdentifier</key>
   <string>com.draftharbour.native</string>
+  <key>CFBundleIconFile</key>
+  <string>DraftHarbour</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
