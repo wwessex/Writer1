@@ -26,6 +26,18 @@ struct DraftHarbourCommands: Commands {
     }
 
     CommandMenu("Project") {
+      Button("Quick Switcher") {
+        NotificationCenter.default.post(name: .draftHarbourShowQuickSwitcher, object: nil)
+      }
+      .keyboardShortcut("k", modifiers: .command)
+
+      Button("Find And Replace") {
+        NotificationCenter.default.post(name: .draftHarbourShowFindReplace, object: nil)
+      }
+      .keyboardShortcut("f", modifiers: .command)
+
+      Divider()
+
       Button("Create Snapshot") {
         _ = try? store?.createSnapshot(label: "Manual")
       }
@@ -53,19 +65,44 @@ struct DraftHarbourCommands: Commands {
 
     CommandMenu("Format") {
       Button("Bold") {
-        NSApp.sendAction(Selector(("toggleBoldface:")), to: nil, from: nil)
+        post(.formatBold)
       }
       .keyboardShortcut("b", modifiers: .command)
 
       Button("Italic") {
-        NSApp.sendAction(Selector(("toggleItalics:")), to: nil, from: nil)
+        post(.formatItalic)
       }
       .keyboardShortcut("i", modifiers: .command)
 
       Button("Underline") {
-        NSApp.sendAction(Selector(("toggleUnderline:")), to: nil, from: nil)
+        post(.formatUnderline)
       }
       .keyboardShortcut("u", modifiers: .command)
+
+      Divider()
+
+      Button("Heading 1") {
+        post(.formatHeading1)
+      }
+      .keyboardShortcut("1", modifiers: [.command, .option])
+
+      Button("Heading 2") {
+        post(.formatHeading2)
+      }
+      .keyboardShortcut("2", modifiers: [.command, .option])
+
+      Button("Blockquote") {
+        post(.insertBlockquote)
+      }
+      .keyboardShortcut(">", modifiers: [.command, .option])
+
+      Button("Horizontal Rule") {
+        post(.insertHorizontalRule)
+      }
     }
+  }
+
+  private func post(_ command: NativeCommandID) {
+    NotificationCenter.default.post(name: .draftHarbourRunCommand, object: command.rawValue)
   }
 }

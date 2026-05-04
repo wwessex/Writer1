@@ -16,6 +16,12 @@ public struct IntegrationConfig: Codable, Equatable, Sendable {
   public var status: String?
   public var folderId: String?
   public var lastSyncAt: Int64?
+  public var accessToken: String?
+  public var refreshToken: String?
+  public var clientId: String?
+  public var baseUrl: String?
+  public var syncFolderPath: String?
+  public var version: Int?
 
   public init(
     type: IntegrationType,
@@ -26,7 +32,13 @@ public struct IntegrationConfig: Codable, Equatable, Sendable {
     expiresAt: Int64? = nil,
     status: String? = nil,
     folderId: String? = nil,
-    lastSyncAt: Int64? = nil
+    lastSyncAt: Int64? = nil,
+    accessToken: String? = nil,
+    refreshToken: String? = nil,
+    clientId: String? = nil,
+    baseUrl: String? = nil,
+    syncFolderPath: String? = nil,
+    version: Int? = 1
   ) {
     self.type = type
     self.enabled = enabled
@@ -37,6 +49,12 @@ public struct IntegrationConfig: Codable, Equatable, Sendable {
     self.status = status
     self.folderId = folderId
     self.lastSyncAt = lastSyncAt
+    self.accessToken = accessToken
+    self.refreshToken = refreshToken
+    self.clientId = clientId
+    self.baseUrl = baseUrl
+    self.syncFolderPath = syncFolderPath
+    self.version = version
   }
 }
 

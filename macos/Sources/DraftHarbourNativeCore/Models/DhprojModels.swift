@@ -388,6 +388,10 @@ public struct DhprojEnvelope: Codable, Equatable, Sendable {
   public var integrations: [IntegrationType: IntegrationConfig]?
   public var characters: [CharacterEntity]
   public var worldEntries: [WorldEntry]
+  public var storyBlueprint: StoryBlueprint?
+  public var exportHistory: [ExportHistoryRecord]
+  public var aiProviders: [AIProviderConfig]
+  public var aiRevisionLog: [AIRevisionRecord]
 
   enum CodingKeys: String, CodingKey {
     case manifest
@@ -402,6 +406,10 @@ public struct DhprojEnvelope: Codable, Equatable, Sendable {
     case integrations
     case characters
     case worldEntries
+    case storyBlueprint
+    case exportHistory
+    case aiProviders
+    case aiRevisionLog
   }
 
   public init(
@@ -416,7 +424,11 @@ public struct DhprojEnvelope: Codable, Equatable, Sendable {
     progress: ProgressData? = nil,
     integrations: [IntegrationType: IntegrationConfig]? = nil,
     characters: [CharacterEntity] = [],
-    worldEntries: [WorldEntry] = []
+    worldEntries: [WorldEntry] = [],
+    storyBlueprint: StoryBlueprint? = nil,
+    exportHistory: [ExportHistoryRecord] = [],
+    aiProviders: [AIProviderConfig] = [],
+    aiRevisionLog: [AIRevisionRecord] = []
   ) {
     self.manifest = manifest
     self.project = project
@@ -430,6 +442,10 @@ public struct DhprojEnvelope: Codable, Equatable, Sendable {
     self.integrations = integrations
     self.characters = characters
     self.worldEntries = worldEntries
+    self.storyBlueprint = storyBlueprint
+    self.exportHistory = exportHistory
+    self.aiProviders = aiProviders
+    self.aiRevisionLog = aiRevisionLog
   }
 
   public init(from decoder: Decoder) throws {
@@ -447,6 +463,10 @@ public struct DhprojEnvelope: Codable, Equatable, Sendable {
     integrations = try container.decodeIfPresent([IntegrationType: IntegrationConfig].self, forKey: .integrations)
     characters = try container.decodeIfPresent([CharacterEntity].self, forKey: .characters) ?? []
     worldEntries = try container.decodeIfPresent([WorldEntry].self, forKey: .worldEntries) ?? []
+    storyBlueprint = try container.decodeIfPresent(StoryBlueprint.self, forKey: .storyBlueprint)
+    exportHistory = try container.decodeIfPresent([ExportHistoryRecord].self, forKey: .exportHistory) ?? []
+    aiProviders = try container.decodeIfPresent([AIProviderConfig].self, forKey: .aiProviders) ?? []
+    aiRevisionLog = try container.decodeIfPresent([AIRevisionRecord].self, forKey: .aiRevisionLog) ?? []
     sections.sort { $0.order < $1.order }
   }
 }

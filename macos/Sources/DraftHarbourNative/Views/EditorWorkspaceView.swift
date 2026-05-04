@@ -5,12 +5,17 @@ import SwiftUI
 struct EditorWorkspaceView: View {
   @Bindable var store: ProjectStore
   @Binding var selectedRange: NSRange
+  @Binding var showingFindReplace: Bool
   @AppStorage("DraftHarbour.editor.fontSize") private var fontSize = 15.0
   @AppStorage("DraftHarbour.editor.typewriterMode") private var typewriterMode = false
   @State private var screenplayMode = false
 
   var body: some View {
     VStack(spacing: 0) {
+      if showingFindReplace {
+        FindReplaceBar(store: store, isPresented: $showingFindReplace)
+        Divider()
+      }
       if let section = store.activeSection {
         header(section: section)
         Divider()
@@ -47,6 +52,11 @@ struct EditorWorkspaceView: View {
 
         Spacer()
 
+        formattingButton("bold", command: .bold)
+        formattingButton("italic", command: .italic)
+        formattingButton("underline", command: .underline)
+        formattingButton("quote.bubble", command: .blockquote)
+
         Picker("Status", selection: Binding(get: {
           section.status
         }, set: { status in
@@ -76,5 +86,14 @@ struct EditorWorkspaceView: View {
       .lineLimit(1...3)
     }
     .padding(16)
+  }
+
+  private func formattingButton(_ image: String, command: MarkdownTextCommand) -> some View {
+    Button {
+      store.applyMarkdownCommand(command, range: selectedRange)
+    } label: {
+      Image(systemName: image)
+    }
+    .buttonStyle(.borderless)
   }
 }
