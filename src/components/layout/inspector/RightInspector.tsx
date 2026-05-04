@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Info, NotebookPen, Tags, Sparkles, History, X } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import { countWords, countCharacters, editorToPlainText } from '@/lib/utils';
+import { countWords, countCharacters, editorToPlainText, estimateReadingMinutes } from '@/lib/utils';
 import { getSnapshots } from '@/lib/storage';
 import type { Chapter, ChapterStatus, Snapshot } from '@/types';
 
@@ -135,7 +135,7 @@ function InfoTabContent({ chapter }: { chapter: Chapter }) {
   const chapterText = useMemo(() => editorToPlainText(chapter.content), [chapter.content]);
   const wordCount = useMemo(() => countWords(chapterText), [chapterText]);
   const charCount = useMemo(() => countCharacters(chapterText), [chapterText]);
-  const readingTime = Math.max(1, Math.ceil(wordCount / 250));
+  const readingTime = estimateReadingMinutes(wordCount);
 
   const goalPercent = chapter.wordGoal > 0
     ? Math.min(100, Math.round((wordCount / chapter.wordGoal) * 100))

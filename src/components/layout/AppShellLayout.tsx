@@ -7,7 +7,7 @@ import { RightInspector } from './inspector/RightInspector';
 import { useResizable } from '@/hooks/useResizable';
 import { useResponsivePanels } from '@/hooks/useResponsivePanels';
 import { useApp } from '@/context/AppContext';
-import { countWords, editorToPlainText } from '@/lib/utils';
+import { countWords, editorToPlainText, formatReadingTime } from '@/lib/utils';
 import { isMacDesktopRuntime } from '@/lib/runtimePlatform';
 
 /**
@@ -121,6 +121,7 @@ export function AppShellLayout() {
         goalPercent={goalPercent}
         saved={!state.isSaving}
         online={state.isOnline}
+        readingTime={formatReadingTime(wordCount)}
         chapterCount={state.chapters.length}
         compact={focusMode}
       />

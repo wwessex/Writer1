@@ -54,6 +54,27 @@ export function countCharacters(text: string): number {
   return text.replace(/\s/g, '').length;
 }
 
+const DEFAULT_READING_WORDS_PER_MINUTE = 250;
+
+/**
+ * Estimate reading time for a draft using a standard adult silent-reading pace.
+ */
+export function estimateReadingMinutes(
+  wordCount: number,
+  wordsPerMinute: number = DEFAULT_READING_WORDS_PER_MINUTE
+): number {
+  const safeWordCount = Math.max(0, Math.floor(wordCount));
+  const safeWordsPerMinute = wordsPerMinute > 0
+    ? wordsPerMinute
+    : DEFAULT_READING_WORDS_PER_MINUTE;
+
+  return Math.max(1, Math.ceil(safeWordCount / safeWordsPerMinute));
+}
+
+export function formatReadingTime(wordCount: number): string {
+  return `${estimateReadingMinutes(wordCount)} min read`;
+}
+
 /**
  * Calculate Flesch Reading Ease score
  * Higher scores = easier to read (60-70 is standard)

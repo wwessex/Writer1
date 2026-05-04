@@ -4,6 +4,7 @@ interface StatusBarProps {
   goalPercent: number;
   saved: boolean;
   online: boolean;
+  readingTime?: string;
   chapterCount?: number;
   compact?: boolean;
   macLiquid?: boolean;
@@ -15,6 +16,7 @@ export function StatusBar({
   goalPercent,
   saved,
   online,
+  readingTime,
   chapterCount,
   compact = false,
   macLiquid = false,
@@ -33,6 +35,12 @@ export function StatusBar({
           <>
             <span className="text-[var(--border)]">&bull;</span>
             <span>{chapterCount} chapters</span>
+          </>
+        )}
+        {!compact && readingTime && (
+          <>
+            <span className="text-[var(--border)]">&bull;</span>
+            <span>{readingTime}</span>
           </>
         )}
         <span className="text-[var(--border)]">&bull;</span>
