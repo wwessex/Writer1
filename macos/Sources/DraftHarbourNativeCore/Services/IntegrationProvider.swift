@@ -53,6 +53,51 @@ public struct PlannedIntegrationProvider: IntegrationProvider {
   }
 }
 
+public enum NativeIntegrationProviderRegistry {
+  public static func provider(for type: IntegrationType, config: IntegrationConfig? = nil) -> IntegrationProvider {
+    if config?.baseUrl != nil {
+      return GenericRESTSyncProvider(type: type)
+    }
+
+    switch type {
+    case .scrivener:
+      return ScrivenerIntegrationProvider()
+    case .dropbox, .googleDrive:
+      return GenericRESTSyncProvider(type: type)
+    }
+  }
+}
+
+public struct ScrivenerIntegrationProvider: IntegrationProvider {
+  public let type: IntegrationType = .scrivener
+
+  public init() {}
+
+  public func connect(config: IntegrationConfig) async throws -> IntegrationResult {
+    IntegrationResult(provider: type, message: "Scrivener package bridge is available for local import/export.")
+  }
+
+  public func push(config: IntegrationConfig, payload: IntegrationPayload) async throws -> IntegrationResult {
+    guard let path = config.syncFolderPath ?? config.folderId else {
+      throw DraftHarbourError.providerNotConfigured("Scrivener package path")
+    }
+    try ScrivenerPackageExporter().exportPlainTextFiles(payload.envelope, to: URL(fileURLWithPath: path))
+    return IntegrationResult(provider: type, message: "Exported \(payload.envelope.sections.count) sections to Scrivener-compatible text files.")
+  }
+
+  public func pull(config: IntegrationConfig, payload: IntegrationPayload) async throws -> IntegrationResult {
+    guard let path = config.syncFolderPath ?? config.folderId else {
+      throw DraftHarbourError.providerNotConfigured("Scrivener package path")
+    }
+    let imported = try ScrivenerPackageImporter().importPlainTextFiles(from: URL(fileURLWithPath: path), projectId: payload.envelope.project.id)
+    return IntegrationResult(provider: type, message: "Imported \(imported.count) Scrivener text files.")
+  }
+
+  public func listRevisions(config: IntegrationConfig) async throws -> [RemoteRevision] {
+    []
+  }
+}
+
 public struct ScrivenerPackageImporter {
   public init() {}
 

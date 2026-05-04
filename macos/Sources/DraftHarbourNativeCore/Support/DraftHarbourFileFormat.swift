@@ -10,6 +10,8 @@ public enum DraftHarbourError: LocalizedError, Equatable {
   case unsupportedVersion(Int)
   case missingProject
   case missingSection(String)
+  case missingSnapshot(String)
+  case missingCommentThread(String)
   case invalidSelection
   case featurePlanned(String)
   case providerNotConfigured(String)
@@ -25,6 +27,10 @@ public enum DraftHarbourError: LocalizedError, Equatable {
       return "The project file does not contain a project."
     case .missingSection(let id):
       return "Section not found: \(id)"
+    case .missingSnapshot(let id):
+      return "Snapshot not found: \(id)"
+    case .missingCommentThread(let id):
+      return "Comment thread not found: \(id)"
     case .invalidSelection:
       return "No section is selected."
     case .featurePlanned(let feature):

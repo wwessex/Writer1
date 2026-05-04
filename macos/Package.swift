@@ -17,9 +17,13 @@ let package = Package(
       targets: ["DraftHarbourNative"]
     )
   ],
+  dependencies: [
+    .package(url: "https://github.com/weichsel/ZIPFoundation.git", .upToNextMajor(from: "0.9.0"))
+  ],
   targets: [
     .target(
-      name: "DraftHarbourNativeCore"
+      name: "DraftHarbourNativeCore",
+      dependencies: ["ZIPFoundation"]
     ),
     .executableTarget(
       name: "DraftHarbourNative",

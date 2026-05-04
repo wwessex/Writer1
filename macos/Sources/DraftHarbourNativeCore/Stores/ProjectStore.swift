@@ -6,6 +6,8 @@ public final class ProjectStore {
   public var envelope: DhprojEnvelope
   public var activeSectionID: String?
   public private(set) var revision: Int = 0
+  private var sectionOrderUndoStack: [[String]] = []
+  private var sectionOrderRedoStack: [[String]] = []
 
   public init(envelope: DhprojEnvelope) {
     self.envelope = DhprojCodec.normalize(envelope)
@@ -25,8 +27,31 @@ public final class ProjectStore {
     AnalyticsEngine.metrics(for: envelope)
   }
 
+  public var canUndoSectionReorder: Bool {
+    !sectionOrderUndoStack.isEmpty
+  }
+
+  public var canRedoSectionReorder: Bool {
+    !sectionOrderRedoStack.isEmpty
+  }
+
   public func selectSection(_ id: String?) {
     activeSectionID = id
+  }
+
+  public func updateProjectTitle(_ title: String) {
+    envelope.project.title = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Untitled Project" : title
+    markChanged()
+  }
+
+  public func updateSettings(_ update: (inout AppSettings) -> Void) {
+    update(&envelope.settings)
+    markChanged()
+  }
+
+  public func updateStoryBlueprint(_ blueprint: StoryBlueprint?) {
+    envelope.storyBlueprint = blueprint
+    markChanged()
   }
 
   @discardableResult
@@ -64,6 +89,10 @@ public final class ProjectStore {
     envelope.sections.remove(at: index)
     envelope.snapshots.removeAll { $0.chapterId == id }
     envelope.commentThreads.removeAll { $0.chapterId == id }
+    if envelope.sections.isEmpty {
+      let titlePrefix = projectType == .screenplay ? "Scene" : "Chapter"
+      envelope.sections.append(Section(novelId: envelope.project.id, order: 0, title: "\(titlePrefix) 1", content: ""))
+    }
     renumberSections()
     activeSectionID = envelope.sections[min(index, max(0, envelope.sections.count - 1))].id
     markChanged()
@@ -97,7 +126,30 @@ public final class ProjectStore {
     }
   }
 
+  public func updateActiveSectionPOV(_ pov: String) {
+    guard let activeSectionID else { return }
+    updateSection(id: activeSectionID) { section in
+      section.pov = pov
+    }
+  }
+
+  public func updateActiveSectionWordGoal(_ wordGoal: Int) {
+    guard let activeSectionID else { return }
+    updateSection(id: activeSectionID) { section in
+      section.wordGoal = max(0, wordGoal)
+    }
+  }
+
+  public func updateActiveSectionTags(_ tags: [String]) {
+    guard let activeSectionID else { return }
+    updateSection(id: activeSectionID) { section in
+      section.tags = tags
+    }
+  }
+
   public func moveSections(from source: IndexSet, to destination: Int) {
+    sectionOrderUndoStack.append(envelope.sections.map(\.id))
+    sectionOrderRedoStack.removeAll()
     var moving = source.map { envelope.sections[$0] }
     envelope.sections.removeAll { section in
       moving.contains { $0.id == section.id }
@@ -109,6 +161,72 @@ public final class ProjectStore {
     markChanged()
   }
 
+  public func reorderSections(ids: [String]) {
+    let byId = Dictionary(uniqueKeysWithValues: envelope.sections.map { ($0.id, $0) })
+    let ordered = ids.compactMap { byId[$0] }
+    guard ordered.count == envelope.sections.count else { return }
+    sectionOrderUndoStack.append(envelope.sections.map(\.id))
+    sectionOrderRedoStack.removeAll()
+    envelope.sections = ordered
+    renumberSections()
+    markChanged()
+  }
+
+  public func undoSectionReorder() {
+    guard let previous = sectionOrderUndoStack.popLast() else { return }
+    sectionOrderRedoStack.append(envelope.sections.map(\.id))
+    applySectionOrder(previous)
+  }
+
+  public func redoSectionReorder() {
+    guard let next = sectionOrderRedoStack.popLast() else { return }
+    sectionOrderUndoStack.append(envelope.sections.map(\.id))
+    applySectionOrder(next)
+  }
+
+  @discardableResult
+  public func createScene(in sectionID: String? = nil, initialData: Scene? = nil) throws -> Scene {
+    let targetID = sectionID ?? activeSectionID
+    guard let targetID else { throw DraftHarbourError.invalidSelection }
+    let scene = initialData ?? Scene(
+      title: "Scene \(((envelope.sections.first { $0.id == targetID }?.scenes.count) ?? 0) + 1)",
+      status: projectType == .screenplay ? .draft : .planned,
+      tags: projectType == .screenplay ? ["slugLine", "action", "characterCue", "dialogue"] : [],
+      slugLine: projectType == .screenplay ? "" : nil,
+      location: projectType == .screenplay ? "" : nil,
+      interiorExterior: projectType == .screenplay ? "INT" : nil,
+      timeOfDay: projectType == .screenplay ? "DAY" : nil,
+      pageEstimate: projectType == .screenplay ? 1 : nil,
+      productionTags: projectType == .screenplay ? [] : nil
+    )
+    updateSection(id: targetID) { section in
+      section.scenes.append(scene)
+    }
+    return scene
+  }
+
+  public func updateScene(sectionID: String, sceneID: String, update: (inout Scene) -> Void) {
+    updateSection(id: sectionID) { section in
+      guard let index = section.scenes.firstIndex(where: { $0.id == sceneID }) else { return }
+      update(&section.scenes[index])
+    }
+  }
+
+  public func deleteScene(sectionID: String, sceneID: String) {
+    updateSection(id: sectionID) { section in
+      section.scenes.removeAll { $0.id == sceneID }
+    }
+  }
+
+  public func reorderScenes(sectionID: String, sceneIDs: [String]) {
+    updateSection(id: sectionID) { section in
+      let byId = Dictionary(uniqueKeysWithValues: section.scenes.map { ($0.id, $0) })
+      let ordered = sceneIDs.compactMap { byId[$0] }
+      guard ordered.count == section.scenes.count else { return }
+      section.scenes = ordered
+    }
+  }
+
   @discardableResult
   public func createSnapshot(label: String? = "Manual") throws -> Snapshot {
     guard let section = activeSection else { throw DraftHarbourError.invalidSelection }
@@ -116,6 +234,37 @@ public final class ProjectStore {
     envelope.snapshots.insert(snapshot, at: 0)
     markChanged()
     return snapshot
+  }
+
+  public func createAutoSnapshotForActiveSection() throws {
+    guard let section = activeSection, let content = section.content, !content.isEmpty else { return }
+    _ = try createSnapshot(label: "Auto")
+  }
+
+  public func restoreSnapshot(id: String) throws {
+    guard let snapshot = envelope.snapshots.first(where: { $0.id == id }) else {
+      throw DraftHarbourError.missingSnapshot(id)
+    }
+    updateSection(id: snapshot.chapterId) { section in
+      section.content = snapshot.doc
+    }
+    activeSectionID = snapshot.chapterId
+  }
+
+  public func updateSnapshotLabel(id: String, label: String) throws {
+    guard let index = envelope.snapshots.firstIndex(where: { $0.id == id }) else {
+      throw DraftHarbourError.missingSnapshot(id)
+    }
+    envelope.snapshots[index].label = label
+    markChanged()
+  }
+
+  public func deleteSnapshot(id: String) throws {
+    guard let index = envelope.snapshots.firstIndex(where: { $0.id == id }) else {
+      throw DraftHarbourError.missingSnapshot(id)
+    }
+    envelope.snapshots.remove(at: index)
+    markChanged()
   }
 
   @discardableResult
@@ -128,6 +277,78 @@ public final class ProjectStore {
     return thread
   }
 
+  public func addCommentReply(threadID: String, text: String, author: String = NSFullUserName()) throws {
+    guard let index = envelope.commentThreads.firstIndex(where: { $0.id == threadID }) else {
+      throw DraftHarbourError.missingCommentThread(threadID)
+    }
+    envelope.commentThreads[index].comments.append(Comment(text: text, author: author))
+    envelope.commentThreads[index].updatedAt = currentTimeMilliseconds()
+    markChanged()
+  }
+
+  public func resolveCommentThread(threadID: String, resolved: Bool) throws {
+    guard let index = envelope.commentThreads.firstIndex(where: { $0.id == threadID }) else {
+      throw DraftHarbourError.missingCommentThread(threadID)
+    }
+    envelope.commentThreads[index].resolved = resolved
+    envelope.commentThreads[index].updatedAt = currentTimeMilliseconds()
+    markChanged()
+  }
+
+  public func deleteCommentThread(threadID: String) throws {
+    guard let index = envelope.commentThreads.firstIndex(where: { $0.id == threadID }) else {
+      throw DraftHarbourError.missingCommentThread(threadID)
+    }
+    envelope.commentThreads.remove(at: index)
+    markChanged()
+  }
+
+  public func applyMarkdownWrap(prefix: String, suffix: String, range: NSRange) {
+    guard var content = activeSection?.content, let activeSectionID else { return }
+    let safeRange = boundedRange(range, in: content)
+    guard let stringRange = Range(safeRange, in: content) else { return }
+    content.replaceSubrange(stringRange, with: "\(prefix)\(content[stringRange])\(suffix)")
+    updateSection(id: activeSectionID) { section in
+      section.content = content
+    }
+  }
+
+  public func insertMarkdownLine(prefix: String, range: NSRange) {
+    guard var content = activeSection?.content, let activeSectionID else { return }
+    let safeRange = boundedRange(range, in: content)
+    guard let stringRange = Range(safeRange, in: content) else { return }
+    let lineStart = content[..<stringRange.lowerBound].lastIndex(of: "\n").map { content.index(after: $0) } ?? content.startIndex
+    content.insert(contentsOf: prefix, at: lineStart)
+    updateSection(id: activeSectionID) { section in
+      section.content = content
+    }
+  }
+
+  public func replaceInActiveSection(query: String, replacement: String, caseSensitive: Bool = false) -> Int {
+    guard var content = activeSection?.content, let activeSectionID, !query.isEmpty else { return 0 }
+    let options: String.CompareOptions = caseSensitive ? [] : [.caseInsensitive]
+    var count = 0
+    while let range = content.range(of: query, options: options) {
+      content.replaceSubrange(range, with: replacement)
+      count += 1
+    }
+    if count > 0 {
+      updateSection(id: activeSectionID) { section in
+        section.content = content
+      }
+    }
+    return count
+  }
+
+  public func applyMarkdownCommand(_ command: MarkdownTextCommand, range: NSRange) {
+    guard let content = activeSection?.content, let activeSectionID else { return }
+    let updated = TextWorkflowServices.apply(command, to: content, range: range)
+    guard updated != content else { return }
+    updateSection(id: activeSectionID) { section in
+      section.content = updated
+    }
+  }
+
   public func addCharacter(name: String) {
     envelope.characters.append(CharacterEntity(novelId: envelope.project.id, name: name))
     markChanged()
@@ -135,6 +356,42 @@ public final class ProjectStore {
 
   public func addWorldEntry(name: String, category: String = "other") {
     envelope.worldEntries.append(WorldEntry(novelId: envelope.project.id, category: category, name: name))
+    markChanged()
+  }
+
+  public func updateCharacter(id: String, update: (inout CharacterEntity) -> Void) {
+    guard let index = envelope.characters.firstIndex(where: { $0.id == id }) else { return }
+    update(&envelope.characters[index])
+    envelope.characters[index].updatedAt = currentTimeMilliseconds()
+    markChanged()
+  }
+
+  public func updateWorldEntry(id: String, update: (inout WorldEntry) -> Void) {
+    guard let index = envelope.worldEntries.firstIndex(where: { $0.id == id }) else { return }
+    update(&envelope.worldEntries[index])
+    envelope.worldEntries[index].updatedAt = currentTimeMilliseconds()
+    markChanged()
+  }
+
+  public func recordExport(_ exported: ExportedFile, format: ExportFormat, validationIssues: [ExportValidationIssue] = []) {
+    envelope.exportHistory.insert(
+      ExportHistoryRecord(
+        format: format,
+        filename: exported.filename,
+        sectionCount: envelope.sections.count,
+        wordCount: metrics.totalWords,
+        validationIssues: validationIssues
+      ),
+      at: 0
+    )
+    markChanged()
+  }
+
+  public func recordAIRevision(sectionID: String, providerId: String, prompt: String, before: String, after: String) {
+    envelope.aiRevisionLog.insert(
+      AIRevisionRecord(sectionId: sectionID, providerId: providerId, prompt: prompt, before: before, after: after),
+      at: 0
+    )
     markChanged()
   }
 
@@ -163,8 +420,24 @@ public final class ProjectStore {
     }
   }
 
+  private func applySectionOrder(_ ids: [String]) {
+    let byId = Dictionary(uniqueKeysWithValues: envelope.sections.map { ($0.id, $0) })
+    let ordered = ids.compactMap { byId[$0] }
+    guard ordered.count == envelope.sections.count else { return }
+    envelope.sections = ordered
+    renumberSections()
+    markChanged()
+  }
+
   private func markChanged() {
     envelope.project.updatedAt = currentTimeMilliseconds()
     revision += 1
+  }
+
+  private func boundedRange(_ range: NSRange, in text: String) -> NSRange {
+    let count = (text as NSString).length
+    let location = min(max(0, range.location), count)
+    let length = min(max(0, range.length), count - location)
+    return NSRange(location: location, length: length)
   }
 }

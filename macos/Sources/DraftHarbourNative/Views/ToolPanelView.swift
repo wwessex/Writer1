@@ -70,6 +70,10 @@ struct ToolPanelView: View {
         Button("PDF") { exportAction(.pdf) }
         Button("DOCX") { exportAction(.docx) }
       }
+      GridRow {
+        Button("Screenplay PDF") { exportAction(.screenplayPdf) }
+        Button("Publishing Bundle") { exportAction(.publishingBundle) }
+      }
     }
   }
 
@@ -77,11 +81,20 @@ struct ToolPanelView: View {
     VStack(alignment: .leading, spacing: 10) {
       Button("Create Snapshot") { _ = try? store.createSnapshot(label: "Manual") }
       ForEach(store.envelope.snapshots) { snapshot in
-        VStack(alignment: .leading) {
-          Text(snapshot.label ?? "Snapshot")
-          Text(Date(timeIntervalSince1970: Double(snapshot.createdAt) / 1000).formatted())
-            .font(.caption)
-            .foregroundStyle(.secondary)
+        HStack {
+          VStack(alignment: .leading) {
+            Text(snapshot.label ?? "Snapshot")
+            Text(Date(timeIntervalSince1970: Double(snapshot.createdAt) / 1000).formatted())
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+          Spacer()
+          Button("Restore") { try? store.restoreSnapshot(id: snapshot.id) }
+          Button(role: .destructive) {
+            try? store.deleteSnapshot(id: snapshot.id)
+          } label: {
+            Image(systemName: "trash")
+          }
         }
       }
     }
@@ -121,6 +134,17 @@ struct ToolPanelView: View {
         Text(thread.resolved ? "Resolved" : "Open")
           .font(.caption)
           .foregroundStyle(.secondary)
+        HStack {
+          Button(thread.resolved ? "Reopen" : "Resolve") {
+            try? store.resolveCommentThread(threadID: thread.id, resolved: !thread.resolved)
+          }
+          Button("Reply") {
+            try? store.addCommentReply(threadID: thread.id, text: "Reply")
+          }
+          Button("Delete", role: .destructive) {
+            try? store.deleteCommentThread(threadID: thread.id)
+          }
+        }
       }
     }
   }
@@ -181,12 +205,41 @@ struct ToolPanelView: View {
 
   private var diagnosticsContent: some View {
     let summary = store.diagnosticsSummary()
-    return VStack(alignment: .leading, spacing: 8) {
+    let advanced = AnalyticsEngine.advancedAnalytics(for: store.envelope)
+    let timeline = AnalysisServices.timelineFindings(for: store.envelope)
+    let continuity = AnalysisServices.continuityWarnings(for: store.envelope)
+    return VStack(alignment: .leading, spacing: 14) {
       ForEach(summary.keys.sorted(), id: \.self) { key in
         HStack {
           Text(key)
           Spacer()
           Text(String(describing: summary[key] ?? .null))
+            .foregroundStyle(.secondary)
+        }
+      }
+      Divider()
+      Text("Advanced Analytics")
+        .font(.headline)
+      LabeledContent("Vocabulary Richness", value: "\(Int(advanced.vocabularyRichness))%")
+      LabeledContent("Dialogue", value: "\(Int(advanced.dialoguePercentage))%")
+      LabeledContent("Average Sentence", value: String(format: "%.1f", advanced.averageSentenceLength))
+      LabeledContent("Timeline Findings", value: "\(timeline.count)")
+      if !continuity.isEmpty {
+        Text("Continuity")
+          .font(.headline)
+        ForEach(continuity, id: \.self) { warning in
+          Text(warning)
+            .foregroundStyle(.secondary)
+        }
+      }
+      Divider()
+      Text("Export History")
+        .font(.headline)
+      ForEach(store.envelope.exportHistory.prefix(8)) { record in
+        HStack {
+          Text(record.filename)
+          Spacer()
+          Text(record.format.rawValue)
             .foregroundStyle(.secondary)
         }
       }
