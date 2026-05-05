@@ -99,4 +99,62 @@ final class ImportExportParityTests: XCTestCase {
     XCTAssertEqual(payload["title"], .string("Bundle"))
     XCTAssertEqual(payload["projectType"], .string("book"))
   }
+
+  func testLongPDFExportsPaginateInsteadOfTruncating() throws {
+    var envelope = DhprojCodec.newProject(title: "Long PDF")
+    envelope.sections[0].title = "Chapter One"
+    envelope.sections[0].content = (0..<240)
+      .map { "Paragraph \($0). This is a long manuscript line that should flow onto later pages." }
+      .joined(separator: "\n\n")
+
+    let pdf = try PDFExporter().export(envelope)
+    let screenplay = try ScreenplayPDFExporter().export(screenplayEnvelope(paragraphCount: 180))
+
+    XCTAssertGreaterThan(pageCount(pdf.data), 1)
+    XCTAssertGreaterThan(pageCount(screenplay.data), 1)
+  }
+
+  func testLongFormattedExportsRoundTripUsableText() throws {
+    var envelope = DhprojCodec.newProject(title: "Long Round Trip")
+    envelope.sections[0].title = "Chapter One"
+    envelope.sections[0].content = (0..<80)
+      .map { "Long manuscript line \($0) with **bold** markers and export-safe text." }
+      .joined(separator: "\n\n")
+
+    let docx = try DOCXExporter().export(envelope)
+    let rtf = try RTFExporter().export(envelope)
+    let fountain = try FountainExporter().export(screenplayEnvelope(paragraphCount: 12))
+
+    let importedDocx = try DOCXImporter().importDocument(data: docx.data, filename: docx.filename, projectId: envelope.project.id, projectType: .book)
+    let importedRTF = try RTFImporter().importDocument(data: rtf.data, filename: rtf.filename, projectId: envelope.project.id, projectType: .book)
+    let fountainText = String(decoding: fountain.data, as: UTF8.self)
+
+    XCTAssertTrue(importedDocx.sections.map { $0.content ?? "" }.joined(separator: "\n").contains("Long manuscript line 79"))
+    XCTAssertTrue(importedRTF.sections.map { $0.content ?? "" }.joined(separator: "\n").contains("Long manuscript line 79"))
+    XCTAssertTrue(fountainText.contains("INT. ROOM 11 - DAY"))
+  }
+
+  private func pageCount(_ data: Data) -> Int {
+    guard let provider = CGDataProvider(data: data as CFData), let document = CGPDFDocument(provider) else {
+      return 0
+    }
+    return document.numberOfPages
+  }
+
+  private func screenplayEnvelope(paragraphCount: Int) -> DhprojEnvelope {
+    var envelope = DhprojCodec.newProject(title: "Long Screenplay", projectType: .screenplay)
+    envelope.sections[0].content = (0..<paragraphCount)
+      .map { index in
+        """
+        INT. ROOM \(index) - DAY
+
+        Action beat \(index) stretches across the page with production-friendly text.
+
+        @JULES
+        We keep moving.
+        """
+      }
+      .joined(separator: "\n\n")
+    return envelope
+  }
 }

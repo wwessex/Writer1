@@ -1,6 +1,7 @@
 {
   "channel": "beta",
   "branch": "release/beta",
-  "tauriEnv": "RELEASE_CHANNEL=beta",
+  "macosPackage": "./script/package_macos.sh",
+  "tauriEnv": "RELEASE_CHANNEL=beta for Windows/Linux",
   "promotionPolicy": "requires stable candidate verification and QA signoff"
 }

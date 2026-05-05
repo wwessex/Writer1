@@ -18,7 +18,7 @@
 
 ## Verification
 - CI verifies rollback artifacts and signatures.
-- Desktop smoke test on macOS/Windows/Linux.
+- Desktop smoke test native macOS from the Swift DMG and Windows/Linux from Tauri artifacts.
 - Confirm in-app updater no longer offers the bad version.
 
 ## Post-incident

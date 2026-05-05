@@ -63,6 +63,8 @@ struct NativeDocumentView: View {
   @State private var operationMessage: String?
   @State private var pendingRecovery: RecoverySnapshot?
   @State private var selectedRange = NSRange(location: 0, length: 0)
+  @State private var showingAddCommentPrompt = false
+  @State private var commentDraft = ""
   @AppStorage("DraftHarbour.editor.theme") private var theme = "system"
   @AppStorage("DraftHarbour.editor.pageView") private var pageView = false
   @AppStorage("DraftHarbour.editor.focusMode") private var focusMode = false
@@ -151,6 +153,17 @@ struct NativeDocumentView: View {
       Button("OK", role: .cancel) {}
     } message: {
       Text(operationMessage ?? "")
+    }
+    .alert("Add Comment", isPresented: $showingAddCommentPrompt) {
+      TextField("Comment", text: $commentDraft)
+      Button("Add") {
+        addCommentFromDraft()
+      }
+      Button("Cancel", role: .cancel) {
+        commentDraft = ""
+      }
+    } message: {
+      Text("Attach a comment to the current selection.")
     }
     .alert("Restore Unsaved Draft?", isPresented: Binding(get: { pendingRecovery != nil }, set: { if !$0 { pendingRecovery = nil } })) {
       Button("Restore") {
@@ -252,8 +265,120 @@ struct NativeDocumentView: View {
     }
   }
 
+  private func exportProjectBackup(copyOnly: Bool = false) {
+    do {
+      let data = try DhprojCodec.encode(store.envelope)
+      let panel = NSSavePanel()
+      panel.nameFieldStringValue = "\(store.envelope.project.title)-backup.dhproj"
+      panel.canCreateDirectories = true
+      panel.allowedContentTypes = [.dhproj]
+      panel.begin { response in
+        guard response == .OK, let url = panel.url else { return }
+        do {
+          try data.write(to: url, options: .atomic)
+          operationMessage = copyOnly ? "Saved project copy to \(url.lastPathComponent)." : "Exported backup to \(url.lastPathComponent)."
+        } catch {
+          exportError = error.localizedDescription
+        }
+      }
+    } catch {
+      exportError = error.localizedDescription
+    }
+  }
+
+  private func importProjectBackup() {
+    let panel = NSOpenPanel()
+    panel.canChooseFiles = true
+    panel.canChooseDirectories = false
+    panel.allowsMultipleSelection = false
+    panel.allowedContentTypes = [.dhproj]
+    panel.begin { response in
+      guard response == .OK, let url = panel.url else { return }
+      do {
+        let envelope = try DhprojCodec.decode(Data(contentsOf: url))
+        store.replaceEnvelope(envelope)
+        operationMessage = "Imported backup from \(url.lastPathComponent)."
+      } catch {
+        exportError = error.localizedDescription
+      }
+    }
+  }
+
+  private func reopenLastProject() {
+    guard let url = recoveryService.recentProjectURLs().first else {
+      operationMessage = "No recent DraftHarbour projects have been recorded yet."
+      return
+    }
+    NSDocumentController.shared.openDocument(withContentsOf: url, display: true) { _, _, error in
+      if let error {
+        operationMessage = error.localizedDescription
+      }
+    }
+  }
+
+  private func addCommentFromDraft() {
+    let text = commentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else { return }
+    _ = try? store.addComment(
+      text: text,
+      from: selectedRange.location,
+      to: selectedRange.location + selectedRange.length,
+      selectedText: store.activeSection?.content.flatMap { content in
+        let bounded = boundedRange(selectedRange, in: content)
+        guard let range = Range(bounded, in: content), !content[range].isEmpty else { return nil }
+        return String(content[range])
+      }
+    )
+    commentDraft = ""
+    showToolPanel(.comments)
+  }
+
+  private func insertSceneTemplate() {
+    do {
+      if store.projectType == .screenplay {
+        let scene = try store.createScene(initialData: Scene(
+          title: "Template Scene",
+          summary: "Scene goal, conflict, and turn.",
+          status: .planned,
+          tags: ["template", "slugLine", "action", "characterCue", "dialogue"],
+          slugLine: "INT. LOCATION - DAY",
+          location: "LOCATION",
+          interiorExterior: "INT",
+          timeOfDay: "DAY",
+          pageEstimate: 1,
+          productionTags: ["cast", "location"]
+        ))
+        store.updateActiveSectionContent([
+          scene.slugLine ?? "INT. LOCATION - DAY",
+          "",
+          "Action line.",
+          "",
+          "@CHARACTER",
+          "Dialogue."
+        ].joined(separator: "\n"))
+      } else {
+        _ = try store.createScene(initialData: Scene(
+          title: "Template Scene",
+          summary: "Goal, conflict, turn, and consequence.",
+          status: .planned,
+          tags: ["template"],
+          wordGoal: 1_000
+        ))
+      }
+      showToolPanel(.storyCards)
+    } catch {
+      exportError = error.localizedDescription
+    }
+  }
+
   private func sendResponderAction(_ selector: String) {
     NSApp.sendAction(Selector((selector)), to: nil, from: nil)
+  }
+
+  private func boundedRange(_ range: NSRange, in text: String) -> NSRange {
+    let length = (text as NSString).length
+    let location = min(max(0, range.location), length)
+    return NSRange(location: location, length: min(max(0, range.length), length - location))
   }
 
   private func showToolPanel(_ panel: ToolPanel) {
@@ -277,6 +402,14 @@ struct NativeDocumentView: View {
       operationMessage = recent.isEmpty
         ? "No recent DraftHarbour projects have been recorded yet."
         : recent.map(\.path).joined(separator: "\n")
+    case .reopenLastProject:
+      reopenLastProject()
+    case .exportBackup:
+      exportProjectBackup()
+    case .importBackup:
+      importProjectBackup()
+    case .saveProjectCopy:
+      exportProjectBackup(copyOnly: true)
     case .settings:
       sendResponderAction("showSettingsWindow:")
     case .about:
@@ -318,8 +451,8 @@ struct NativeDocumentView: View {
     case .comments:
       showToolPanel(.comments)
     case .addComment:
-      _ = try? store.addComment(text: "New comment", from: selectedRange.location, to: selectedRange.location + selectedRange.length)
-      showToolPanel(.comments)
+      commentDraft = ""
+      showingAddCommentPrompt = true
     case .dashboard:
       showToolPanel(.dashboard)
     case .wordCount:
@@ -337,9 +470,9 @@ struct NativeDocumentView: View {
     case .export:
       showToolPanel(.export)
     case .projects:
-      showToolPanel(.dashboard)
+      importProjectBackup()
     case .sceneTemplates:
-      showToolPanel(.diagnostics)
+      insertSceneTemplate()
     case .exportHistory:
       showToolPanel(.export)
     case .onboarding:

@@ -17,18 +17,13 @@
         "height": 900,
         "resizable": true,
         "minWidth": 900,
-        "minHeight": 620,
-        "transparent": true,
-        "hiddenTitle": true,
-        "titleBarStyle": "Overlay"
+        "minHeight": 620
       }
     ]
   },
   "bundle": {
     "active": true,
     "targets": [
-      "app",
-      "dmg",
       "msi",
       "nsis",
       "deb",
@@ -37,15 +32,8 @@
     ],
     "category": "Productivity",
     "shortDescription": "Offline-first writing studio",
-    "longDescription": "DraftHarbour Studio desktop runtime built with Tauri.",
+    "longDescription": "DraftHarbour Studio non-Mac desktop runtime built with Tauri. macOS uses the native SwiftUI/AppKit app in the repository macos package.",
     "createUpdaterArtifacts": true,
-    "macOS": {
-      "entitlements": "entitlements.plist",
-      "hardenedRuntime": true,
-      "minimumSystemVersion": "12.0",
-      "signingIdentity": "${APPLE_SIGNING_IDENTITY}",
-      "providerShortName": "${APPLE_TEAM_ID}"
-    },
     "windows": {
       "timestampUrl": "http://timestamp.digicert.com",
       "digestAlgorithm": "sha256",

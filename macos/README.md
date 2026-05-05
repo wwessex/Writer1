@@ -4,7 +4,7 @@ This is the real native macOS implementation of DraftHarbour Studio. It is a Swi
 
 ## Status
 
-This SwiftUI/AppKit app is now the preferred macOS application. The existing web and Tauri builds remain available as fallbacks, but Mac feature work should start here unless a fallback-specific issue is being fixed.
+This SwiftUI/AppKit app is now the supported macOS desktop application. The existing web app remains available as the PWA/iOS renderer, and Tauri is retained only for Windows/Linux desktop builds.
 
 - SwiftUI `DocumentGroup` app for `.dhproj` documents.
 - Swift `Codable` schema for the current `.dhproj` v1 format.
@@ -15,6 +15,8 @@ This SwiftUI/AppKit app is now the preferred macOS application. The existing web
 - Session recovery with active section and recent project metadata.
 - Native AI provider configuration with Keychain-backed tokens, workflow stages, translation, insertion modes, and revision logging.
 - Generic REST sync with connect/test, push, pull, revisions, conflict display, and keep-local/use-remote/keep-both resolution.
+- Scrivener local package bridge for plain-text package import/export.
+- Native menus for file, view, insert, format, tools, help, and project workflows.
 
 Dropbox and Google Drive provider-native OAuth are intentionally deferred for this pass. Use Generic REST sync for native cloud sync, or the Scrivener local package bridge for file-based workflows.
 
@@ -47,6 +49,8 @@ swift test --package-path macos
 
 ## Release Notes
 
-`script/build_and_run.sh` stages the preferred native app bundle and copies the app icon into `Contents/Resources`. `script/package_macos.sh` signs the staged app ad hoc by default for local validation, or uses `APPLE_SIGNING_IDENTITY` and `APPLE_NOTARY_KEYCHAIN_PROFILE` when release signing/notarization is configured.
+`script/build_and_run.sh` stages the native app bundle, copies the app icon from `macos/Resources`, and ad-hoc signs the local bundle. `script/package_macos.sh` signs the release copy ad hoc by default, creates and verifies `dist/release/DraftHarbour.dmg`, and writes `dist/release/checksums.txt`.
+
+Gatekeeper rejection is expected for ad-hoc local beta builds when `APPLE_SIGNING_IDENTITY` is not set. Developer ID signing and notarization remain environment-driven through `APPLE_SIGNING_IDENTITY` and `APPLE_NOTARY_KEYCHAIN_PROFILE`.
 
 `DraftHarbourNative.entitlements` defines the initial release entitlement policy. A notarized release pipeline should archive and sign the staged app bundle or an Xcode-managed archive with the same bundle identifier, document type, hardened runtime, and entitlements.

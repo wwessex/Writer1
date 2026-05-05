@@ -24,13 +24,16 @@
     "verify:vite-config": "node scripts/verify-vite-config.mjs",
     "ci": "npm run lint && npm run typecheck && npm run verify:vite-config && npm run test:coverage && npm run build && npm run bundle:check && npm run assets:check",
     "desktop:dev": "npm --prefix desktop run dev",
+    "macos:run": "./script/build_and_run.sh",
+    "macos:build": "./script/build_and_run.sh --no-launch",
+    "macos:package": "./script/package_macos.sh",
     "desktop:build": "npm --prefix desktop run build",
     "desktop:build:debug": "npm --prefix desktop run build:debug",
-    "desktop:build:mac": "npm --prefix desktop run build:mac",
+    "desktop:build:mac": "npm run macos:package",
     "desktop:build:win": "npm --prefix desktop run build -- --target x86_64-pc-windows-msvc",
     "desktop:build:linux": "npm --prefix desktop run build -- --target x86_64-unknown-linux-gnu",
     "release:verify-artifacts": "node scripts/verify-release-artifacts.mjs",
-    "desktop:build:mac:debug": "npm --prefix desktop run build:mac:debug"
+    "desktop:build:mac:debug": "npm run macos:build"
   },
   "dependencies": {
     "@capacitor/core": "^8.1.0",

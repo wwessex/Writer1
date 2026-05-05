@@ -13,7 +13,7 @@ struct EditorWorkspaceView: View {
   var body: some View {
     VStack(spacing: 0) {
       if showingFindReplace {
-        FindReplaceBar(store: store, isPresented: $showingFindReplace)
+        FindReplaceBar(store: store, isPresented: $showingFindReplace, selectedRange: $selectedRange)
         Divider()
       }
       if let section = store.activeSection {

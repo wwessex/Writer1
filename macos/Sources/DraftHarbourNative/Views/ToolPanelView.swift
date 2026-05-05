@@ -49,6 +49,7 @@ struct ToolPanelView: View {
   @State private var expandedStoryCardID: String?
   @State private var selectedCharacterID: String?
   @State private var selectedWorldEntryID: String?
+  @State private var replyDrafts: [String: String] = [:]
 
   @State private var syncBaseURL = ""
   @State private var syncToken = ""
@@ -56,6 +57,9 @@ struct ToolPanelView: View {
   @State private var syncConflicts: [ConflictInfo] = []
   @State private var remoteRevisions: [RemoteRevision] = []
   @State private var isSyncing = false
+  @State private var scrivenerPath = ""
+  @State private var scrivenerMessage: String?
+  @State private var isScrivenerSyncing = false
 
   @State private var aiEndpoint = UserDefaults.standard.string(forKey: "DraftHarbour.ai.endpoint") ?? "http://localhost:11434/v1/chat/completions"
   @State private var aiModel = UserDefaults.standard.string(forKey: "DraftHarbour.ai.model") ?? "llama3.1"
@@ -244,17 +248,43 @@ struct ToolPanelView: View {
         runCommand(.addComment)
       }
       List(store.envelope.commentThreads) { thread in
-        VStack(alignment: .leading) {
-          Text(thread.comments.first?.text ?? "Comment")
-          Text(thread.resolved ? "Resolved" : "Open")
-            .font(.caption)
-            .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 8) {
+          HStack {
+            Text(thread.resolved ? "Resolved" : "Open")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+            Spacer()
+            Text("\(thread.anchor.from)-\(thread.anchor.to)")
+              .font(.caption2)
+              .foregroundStyle(.secondary)
+          }
+
+          ForEach(thread.comments) { comment in
+            TextField("Comment", text: textBinding(
+              get: { comment.text },
+              set: { value in try? store.updateComment(threadID: thread.id, commentID: comment.id, text: value) }
+            ), axis: .vertical)
+            .textFieldStyle(.roundedBorder)
+          }
+
+          HStack {
+            TextField("Reply", text: textBinding(
+              get: { replyDrafts[thread.id] ?? "" },
+              set: { replyDrafts[thread.id] = $0 }
+            ))
+            .textFieldStyle(.roundedBorder)
+
+            Button("Add Reply") {
+              let text = (replyDrafts[thread.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+              guard !text.isEmpty else { return }
+              try? store.addCommentReply(threadID: thread.id, text: text)
+              replyDrafts[thread.id] = ""
+            }
+          }
+
           HStack {
             Button(thread.resolved ? "Reopen" : "Resolve") {
               try? store.resolveCommentThread(threadID: thread.id, resolved: !thread.resolved)
-            }
-            Button("Reply") {
-              try? store.addCommentReply(threadID: thread.id, text: "Reply")
             }
             Button("Delete", role: .destructive) {
               try? store.deleteCommentThread(threadID: thread.id)
@@ -595,6 +625,30 @@ struct ToolPanelView: View {
         .padding(.vertical, 4)
       }
 
+      GroupBox("Scrivener Package Bridge") {
+        VStack(alignment: .leading, spacing: 10) {
+          TextField("Package or folder path", text: $scrivenerPath)
+            .textFieldStyle(.roundedBorder)
+          HStack {
+            Button("Choose Folder") {
+              chooseScrivenerFolder()
+            }
+            Button("Export") {
+              Task { await runScrivener(.export) }
+            }
+            Button("Import") {
+              Task { await runScrivener(.import) }
+            }
+          }
+          .disabled(isScrivenerSyncing)
+          if let scrivenerMessage {
+            Text(scrivenerMessage)
+              .foregroundStyle(.secondary)
+          }
+        }
+        .padding(.vertical, 4)
+      }
+
       if !syncConflicts.isEmpty {
         GroupBox("Conflicts") {
           VStack(alignment: .leading, spacing: 10) {
@@ -865,6 +919,8 @@ struct ToolPanelView: View {
     let config = store.integrationConfig(for: .genericREST)
     syncBaseURL = config.baseUrl ?? UserDefaults.standard.string(forKey: "DraftHarbour.sync.baseUrl") ?? ""
     syncToken = config.accessToken ?? ""
+    let scrivenerConfig = store.integrationConfig(for: .scrivener)
+    scrivenerPath = scrivenerConfig.syncFolderPath ?? scrivenerConfig.folderId ?? UserDefaults.standard.string(forKey: "DraftHarbour.scrivener.path") ?? ""
     if let config = store.envelope.aiProviders.first {
       loadAIProvider(config)
     }
@@ -884,11 +940,43 @@ struct ToolPanelView: View {
     )
   }
 
+  private func saveScrivenerConfig(status: String? = nil) -> IntegrationConfig {
+    UserDefaults.standard.set(scrivenerPath, forKey: "DraftHarbour.scrivener.path")
+    let config = IntegrationConfig(
+      type: .scrivener,
+      enabled: !scrivenerPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+      status: status,
+      folderId: scrivenerPath.isEmpty ? nil : scrivenerPath,
+      lastSyncAt: store.integrationConfig(for: .scrivener).lastSyncAt,
+      syncFolderPath: scrivenerPath.isEmpty ? nil : scrivenerPath
+    )
+    store.updateIntegration(config)
+    return config
+  }
+
   private enum SyncAction {
     case connect
     case push
     case pull
     case revisions
+  }
+
+  private enum ScrivenerAction {
+    case export
+    case `import`
+  }
+
+  private func chooseScrivenerFolder() {
+    let panel = NSOpenPanel()
+    panel.canChooseFiles = false
+    panel.canChooseDirectories = true
+    panel.canCreateDirectories = true
+    panel.allowsMultipleSelection = false
+    panel.begin { response in
+      guard response == .OK, let url = panel.url else { return }
+      scrivenerPath = url.path
+      _ = saveScrivenerConfig(status: "Configured")
+    }
   }
 
   @MainActor
@@ -927,6 +1015,28 @@ struct ToolPanelView: View {
   private func resolve(_ conflict: ConflictInfo, _ option: ConflictResolutionOption) {
     store.resolveConflict(conflict, option: option)
     syncConflicts.removeAll { $0.chapterId == conflict.chapterId }
+  }
+
+  @MainActor
+  private func runScrivener(_ action: ScrivenerAction) async {
+    isScrivenerSyncing = true
+    scrivenerMessage = nil
+    let config = saveScrivenerConfig()
+    let provider = ScrivenerIntegrationProvider()
+    do {
+      let result: IntegrationResult
+      switch action {
+      case .export:
+        result = try await provider.push(config: config, payload: IntegrationPayload(envelope: store.envelope))
+      case .import:
+        result = try await provider.pull(config: config, payload: IntegrationPayload(envelope: store.envelope))
+      }
+      store.applySyncResult(result)
+      scrivenerMessage = result.message
+    } catch {
+      scrivenerMessage = error.localizedDescription
+    }
+    isScrivenerSyncing = false
   }
 
   private func aiProviderTypeTitle(_ type: AIProviderType) -> String {
