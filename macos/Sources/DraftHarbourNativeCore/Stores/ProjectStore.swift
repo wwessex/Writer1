@@ -318,6 +318,18 @@ public final class ProjectStore {
     markChanged()
   }
 
+  public func updateComment(threadID: String, commentID: String, text: String) throws {
+    guard let threadIndex = envelope.commentThreads.firstIndex(where: { $0.id == threadID }) else {
+      throw DraftHarbourError.missingCommentThread(threadID)
+    }
+    guard let commentIndex = envelope.commentThreads[threadIndex].comments.firstIndex(where: { $0.id == commentID }) else {
+      throw DraftHarbourError.missingCommentThread(commentID)
+    }
+    envelope.commentThreads[threadIndex].comments[commentIndex].text = text
+    envelope.commentThreads[threadIndex].updatedAt = currentTimeMilliseconds()
+    markChanged()
+  }
+
   public func resolveCommentThread(threadID: String, resolved: Bool) throws {
     guard let index = envelope.commentThreads.firstIndex(where: { $0.id == threadID }) else {
       throw DraftHarbourError.missingCommentThread(threadID)

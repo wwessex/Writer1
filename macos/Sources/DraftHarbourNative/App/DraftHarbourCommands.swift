@@ -19,27 +19,86 @@ struct DraftHarbourCommands: Commands {
   var body: some Commands {
     CommandGroup(after: .newItem) {
       Button(store?.projectType == .screenplay ? "New Scene" : "New Chapter") {
-        _ = store?.createSection(after: store?.activeSectionID)
+        post(.newSection)
       }
       .keyboardShortcut("n", modifiers: [.command, .shift])
+      .disabled(store == nil)
+
+      Divider()
+
+      Button("Open Project File...") {
+        post(.openProjectFile)
+      }
+      .keyboardShortcut("o", modifiers: .command)
+
+      Button("Open Recent Projects") {
+        post(.openRecent)
+      }
+
+      Button("Reopen Last Project") {
+        post(.reopenLastProject)
+      }
+
+      Divider()
+
+      Button("Save Project") {
+        post(.saveProjectFile)
+      }
+      .keyboardShortcut("s", modifiers: .command)
+      .disabled(store == nil)
+
+      Button("Save Project Copy...") {
+        post(.saveProjectCopy)
+      }
+      .keyboardShortcut("s", modifiers: [.command, .shift])
+      .disabled(store == nil)
+
+      Divider()
+
+      Button("Import Document...") {
+        post(.importDocument)
+      }
+      .disabled(store == nil)
+
+      Button("Export...") {
+        post(.export)
+      }
+      .keyboardShortcut("e", modifiers: [.command, .shift])
+      .disabled(store == nil)
+
+      Button("Export Backup...") {
+        post(.exportBackup)
+      }
+      .disabled(store == nil)
+
+      Button("Import Backup...") {
+        post(.importBackup)
+      }
       .disabled(store == nil)
     }
 
     CommandMenu("Project") {
+      Button("Project Dashboard") {
+        post(.dashboard)
+      }
+      .disabled(store == nil)
+
       Button("Quick Switcher") {
-        NotificationCenter.default.post(name: .draftHarbourShowQuickSwitcher, object: nil)
+        post(.quickSwitcher)
       }
       .keyboardShortcut("k", modifiers: .command)
+      .disabled(store == nil)
 
       Button("Find And Replace") {
-        NotificationCenter.default.post(name: .draftHarbourShowFindReplace, object: nil)
+        post(.findReplace)
       }
       .keyboardShortcut("f", modifiers: .command)
+      .disabled(store == nil)
 
       Divider()
 
       Button("Create Snapshot") {
-        _ = try? store?.createSnapshot(label: "Manual")
+        post(.snapshots)
       }
       .keyboardShortcut("s", modifiers: [.command, .option])
       .disabled(store?.activeSection == nil)
@@ -61,6 +120,77 @@ struct DraftHarbourCommands: Commands {
         store?.addWorldEntry(name: "New Entry")
       }
       .disabled(store == nil)
+    }
+
+    CommandMenu("View") {
+      Button("Toggle Sidebar") {
+        post(.toggleSidebar)
+      }
+      .keyboardShortcut("b", modifiers: [.command, .shift])
+      .disabled(store == nil)
+
+      Button("Toggle Inspector") {
+        post(.inspector)
+      }
+      .keyboardShortcut("i", modifiers: [.command, .shift])
+      .disabled(store == nil)
+
+      Button("Toggle Page View") {
+        post(.togglePageView)
+      }
+      .disabled(store == nil)
+
+      Button("Focus Mode") {
+        post(.toggleFocusMode)
+      }
+      .keyboardShortcut("f", modifiers: [.command, .shift])
+      .disabled(store == nil)
+
+      Button("Typewriter Mode") {
+        post(.toggleTypewriterMode)
+      }
+      .keyboardShortcut("t", modifiers: [.command, .shift])
+      .disabled(store == nil)
+
+      Divider()
+
+      Button("True Dark") {
+        post(.themeDark)
+      }
+
+      Button("Warm Light") {
+        post(.themeLight)
+      }
+
+      Button("High Contrast") {
+        post(.themeHighContrast)
+      }
+    }
+
+    CommandMenu("Insert") {
+      Button("Comment") {
+        post(.addComment)
+      }
+      .keyboardShortcut("m", modifiers: [.command, .shift])
+      .disabled(store?.activeSection == nil)
+
+      Button("Scene Template") {
+        post(.sceneTemplates)
+      }
+      .disabled(store?.activeSection == nil)
+
+      Divider()
+
+      Button("Blockquote") {
+        post(.insertBlockquote)
+      }
+      .keyboardShortcut(">", modifiers: [.command, .option])
+      .disabled(store?.activeSection == nil)
+
+      Button("Horizontal Rule") {
+        post(.insertHorizontalRule)
+      }
+      .disabled(store?.activeSection == nil)
     }
 
     CommandMenu("Format") {
@@ -98,6 +228,84 @@ struct DraftHarbourCommands: Commands {
 
       Button("Horizontal Rule") {
         post(.insertHorizontalRule)
+      }
+    }
+
+    CommandMenu("Tools") {
+      Button("Snapshots") {
+        post(.snapshots)
+      }
+      .disabled(store == nil)
+
+      Button("Word Count") {
+        post(.wordCount)
+      }
+      .disabled(store == nil)
+
+      Button("Writing Analysis") {
+        post(.analysis)
+      }
+      .disabled(store == nil)
+
+      Button("Advanced Analytics") {
+        post(.advancedAnalytics)
+      }
+      .disabled(store == nil)
+
+      Divider()
+
+      Button("Character And World Bible") {
+        post(.characterBible)
+      }
+      .disabled(store == nil)
+
+      Button("Story Cards And Corkboard") {
+        post(.storyCards)
+      }
+      .disabled(store == nil)
+
+      Button("Comments") {
+        post(.comments)
+      }
+      .disabled(store == nil)
+
+      Divider()
+
+      Button("AI Writing Tools") {
+        post(.aiWriting)
+      }
+      .disabled(store == nil)
+
+      Button("Translate") {
+        post(.translation)
+      }
+      .disabled(store == nil)
+
+      Button("Integrations") {
+        post(.integrations)
+      }
+      .disabled(store == nil)
+
+      Divider()
+
+      Button("Export History") {
+        post(.exportHistory)
+      }
+      .disabled(store == nil)
+
+      Button("Settings") {
+        post(.settings)
+      }
+    }
+
+    CommandGroup(replacing: .help) {
+      Button("Getting Started") {
+        post(.onboarding)
+      }
+      .disabled(store == nil)
+
+      Button("About DraftHarbour") {
+        post(.about)
       }
     }
   }

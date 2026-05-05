@@ -32,9 +32,9 @@ Right-click `index.html` → Open with Live Server.
 In Chrome/Edge/Safari (iOS): use "Add to Home Screen" / "Install App".
 
 
-## Native macOS App (Preferred)
+## Native macOS App
 
-The preferred Mac app is the SwiftUI/AppKit document app in `macos/`. It opens and saves `.dhproj` v1 files directly, includes native import/export, AI workflow configuration, recovery metadata, and Generic REST sync.
+The macOS desktop app is the SwiftUI/AppKit document app in `macos/`. It opens and saves `.dhproj` v1 files directly, includes native import/export, AI workflow configuration, recovery metadata, Generic REST sync, and the Scrivener package bridge.
 
 ```bash
 swift test --package-path macos
@@ -49,15 +49,15 @@ Build-only and packaging checks:
 ./script/package_macos.sh
 ```
 
-Dropbox and Google Drive provider-native OAuth are deferred for this pass. Use Generic REST sync in the native app, or the web/Tauri builds below as fallbacks.
+`./script/package_macos.sh` creates `dist/release/DraftHarbour.dmg`, verifies the DMG, and writes `dist/release/checksums.txt`. Local beta builds are ad-hoc signed and may be rejected by Gatekeeper unless `APPLE_SIGNING_IDENTITY` is configured. Dropbox and Google Drive provider-native OAuth are deferred for this pass; use Generic REST sync or the Scrivener local package bridge in the native app.
 
-## Desktop App (Tauri Fallback)
+## Non-Mac Desktop App (Tauri)
 
-A fallback desktop runtime is available under `desktop/`, using Tauri with the existing Vite app as renderer.
+The Tauri runtime under `desktop/` is retained for Windows and Linux desktop builds. macOS desktop distribution is handled by the native Swift app above.
 
 ### Prerequisites
 - Rust toolchain (`rustup`, `cargo`)
-- Platform build dependencies for Tauri/WebKit2 (Linux) or Xcode (macOS) / Visual Studio Build Tools (Windows)
+- Platform build dependencies for Tauri/WebKit2 (Linux) or Visual Studio Build Tools (Windows)
 
 ### Install dependencies
 ```bash
@@ -79,7 +79,6 @@ npm run desktop:build
 
 Target-specific examples:
 ```bash
-npm run desktop:build:mac
 npm run desktop:build:win
 npm run desktop:build:linux
 ```
@@ -93,21 +92,16 @@ npm run desktop:build:linux
   - Opening `.dhproj` files routes payloads into the running app.
   - `draftharbour://...` deep links are delivered to the web layer.
 
-### Release signing/notarization configuration
-The packaging config is in `desktop/src-tauri/tauri.conf.json` and is environment-driven:
+### Release signing configuration
+The non-Mac packaging config is in `desktop/src-tauri/tauri.conf.json` and is environment-driven:
 
-Local `npm run desktop:build:mac` runs unsigned by default unless `APPLE_SIGNING_IDENTITY` is set. Use the desktop package's `build:mac:signed` script for CI/release packaging when signing is required.
-
-- macOS signing + notarization:
-  - `APPLE_SIGNING_IDENTITY`
-  - `APPLE_TEAM_ID`
 - Windows code-signing:
   - `WINDOWS_CERT_THUMBPRINT`
 
 Set these in your CI provider secrets before release jobs.
 
 Suggested CI matrix:
-- macOS: `aarch64-apple-darwin`, `x86_64-apple-darwin` (or universal)
+- macOS: native Swift package via `./script/package_macos.sh`
 - Windows: `x86_64-pc-windows-msvc`
 - Linux: `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu` (optional)
 

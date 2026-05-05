@@ -7,6 +7,10 @@ public enum NativeCommandID: String, Codable, CaseIterable, Sendable {
   case saveProjectFile
   case openProjectFile
   case openRecent
+  case reopenLastProject
+  case exportBackup
+  case importBackup
+  case saveProjectCopy
   case settings
   case snapshots
   case analysis
@@ -56,7 +60,7 @@ public enum NativeCommandID: String, Codable, CaseIterable, Sendable {
     switch self {
     case .undo, .redo, .cut, .copy, .paste, .selectAll:
       return .responderChain
-    case .openProjectFile, .saveProjectFile, .openRecent, .settings, .about:
+    case .openProjectFile, .saveProjectFile, .openRecent, .reopenLastProject, .exportBackup, .importBackup, .saveProjectCopy, .settings, .about:
       return .system
     case .importDocument, .newSection, .export, .snapshots, .analysis, .wordCount, .dashboard, .onboarding, .characterBible, .aiWriting, .comments, .addComment, .advancedAnalytics, .integrations, .projects, .sceneTemplates, .exportHistory, .aiPanel, .translation, .corkboard, .inspector, .quickSwitcher, .findReplace, .toggleSidebar, .togglePageView, .toggleFocusMode, .themeDark, .themeLight, .themeHighContrast, .insertHorizontalRule, .insertBlockquote, .formatBold, .formatItalic, .formatUnderline, .formatHeading1, .formatHeading2, .formatParagraph, .toggleTypewriterMode, .storyCards:
       return .native

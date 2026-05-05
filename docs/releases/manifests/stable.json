@@ -1,6 +1,7 @@
 {
   "channel": "stable",
   "branch": "main",
-  "tauriEnv": "RELEASE_CHANNEL=stable",
+  "macosPackage": "./script/package_macos.sh",
+  "tauriEnv": "RELEASE_CHANNEL=stable for Windows/Linux",
   "promotionPolicy": "requires signed artifact verification and checksum match"
 }

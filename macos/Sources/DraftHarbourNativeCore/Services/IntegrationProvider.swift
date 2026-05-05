@@ -94,7 +94,19 @@ public struct ScrivenerIntegrationProvider: IntegrationProvider {
       throw DraftHarbourError.providerNotConfigured("Scrivener package path")
     }
     let imported = try ScrivenerPackageImporter().importPlainTextFiles(from: URL(fileURLWithPath: path), projectId: payload.envelope.project.id)
-    return IntegrationResult(provider: type, message: "Imported \(imported.count) Scrivener text files.")
+    var envelope = payload.envelope
+    let startIndex = envelope.sections.count
+    envelope.sections.append(contentsOf: imported.enumerated().map { offset, section in
+      var copy = section
+      copy.novelId = envelope.project.id
+      copy.order = startIndex + offset
+      return copy
+    })
+    return IntegrationResult(
+      provider: type,
+      message: "Imported \(imported.count) Scrivener text files.",
+      pulledEnvelope: DhprojCodec.normalize(envelope)
+    )
   }
 
   public func listRevisions(config: IntegrationConfig) async throws -> [RemoteRevision] {

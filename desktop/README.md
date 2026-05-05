@@ -1,14 +1,11 @@
-# DraftHarbour Desktop Runtime
+# DraftHarbour Non-Mac Desktop Runtime
 
-This package wraps the Vite frontend in a Tauri shell.
+This package wraps the Vite frontend in a Tauri shell for Windows and Linux. macOS desktop builds use the native SwiftUI/AppKit app in `../macos`.
 
 ## Commands
 - `npm run dev` - desktop dev mode (spawns root Vite dev command from tauri config)
-- `npm run build` - production bundles for configured targets
+- `npm run build` - production bundles for configured Windows/Linux targets
 - `npm run build:debug` - debug desktop bundle
-- `npm run build:mac` - macOS universal build with native titlebar treatment; skips signing unless `APPLE_SIGNING_IDENTITY` is set
-- `npm run build:mac:debug` - debug macOS universal build; skips signing unless `APPLE_SIGNING_IDENTITY` is set
-- `npm run build:mac:signed` - macOS universal build that requires signing identity configuration
 
 ## Runtime responsibilities
 - Enforce single-instance behavior
@@ -17,9 +14,4 @@ This package wraps the Vite frontend in a Tauri shell.
 - Handle app close with unsaved-edit confirmation semantics
 
 ## Packaging targets
-See `src-tauri/tauri.conf.json` for bundle targets and signing/notarization env variables.
-Local macOS packaging defaults to `--no-sign` so the app can be built without release secrets; CI/release jobs should use `build:mac:signed` or set `APPLE_SIGNING_IDENTITY`.
-
-## macOS polish
-- Uses an overlay title bar + transparent window treatment for a liquid-glass shell.
-- Frontend applies macOS-only glass chrome styles when running in the Tauri runtime.
+See `src-tauri/tauri.conf.json` for Windows/Linux bundle targets and signing env variables. macOS local beta packaging is handled by `../script/package_macos.sh`.

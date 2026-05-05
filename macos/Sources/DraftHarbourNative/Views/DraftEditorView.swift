@@ -48,6 +48,12 @@ struct DraftEditorView: NSViewRepresentable {
     if textView.string != text {
       textView.string = text
     }
+    let safeSelection = boundedRange(selectedRange, in: textView.string)
+    if textView.selectedRange() != safeSelection {
+      textView.setSelectedRange(safeSelection)
+      textView.scrollRangeToVisible(safeSelection)
+      textView.window?.makeFirstResponder(textView)
+    }
     applyStyle(to: textView)
   }
 
@@ -92,5 +98,11 @@ struct DraftEditorView: NSViewRepresentable {
       guard let textView = notification.object as? NSTextView else { return }
       parent.selectedRange = textView.selectedRange()
     }
+  }
+
+  private func boundedRange(_ range: NSRange, in text: String) -> NSRange {
+    let length = (text as NSString).length
+    let location = min(max(0, range.location), length)
+    return NSRange(location: location, length: min(max(0, range.length), length - location))
   }
 }

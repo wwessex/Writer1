@@ -1,6 +1,7 @@
 {
   "channel": "nightly",
   "branch": "develop",
-  "tauriEnv": "RELEASE_CHANNEL=nightly",
+  "macosPackage": "./script/package_macos.sh",
+  "tauriEnv": "RELEASE_CHANNEL=nightly for Windows/Linux",
   "promotionPolicy": "auto-publish after CI verification"
 }

@@ -116,25 +116,17 @@ public struct PDFExporter: Exporter {
     let text = envelope.sections
       .map { "\($0.title)\n\n\(MarkdownTools.plainText(from: $0.content ?? ""))" }
       .joined(separator: "\n\n")
-    let data = NSMutableData()
-    var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
-    guard let consumer = CGDataConsumer(data: data), let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else {
-      throw DraftHarbourError.featurePlanned("PDF export")
-    }
-
-    context.beginPDFPage(nil)
-    NSGraphicsContext.saveGraphicsState()
-    NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
     let paragraph = NSMutableParagraphStyle()
     paragraph.lineSpacing = 4
-    let attributes: [NSAttributedString.Key: Any] = [
-      .font: NSFont.systemFont(ofSize: 12),
-      .paragraphStyle: paragraph
-    ]
-    (text as NSString).draw(in: CGRect(x: 54, y: 54, width: 504, height: 684), withAttributes: attributes)
-    NSGraphicsContext.restoreGraphicsState()
-    context.endPDFPage()
-    context.closePDF()
+    let data = try PDFTextRenderer.render(
+      text: text,
+      pageSize: CGSize(width: 612, height: 792),
+      margins: NSEdgeInsets(top: 54, left: 54, bottom: 54, right: 54),
+      attributes: [
+        .font: NSFont.systemFont(ofSize: 12),
+        .paragraphStyle: paragraph
+      ]
+    )
 
     return ExportedFile(
       filename: "\(safeFilename(envelope.project.title)).pdf",
@@ -162,31 +154,74 @@ public struct ScreenplayPDFExporter: Exporter {
       }
       .joined(separator: "\n")
 
-    let data = NSMutableData()
-    var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
-    guard let consumer = CGDataConsumer(data: data), let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else {
-      throw DraftHarbourError.featurePlanned("Screenplay PDF export")
-    }
-
-    context.beginPDFPage(nil)
-    NSGraphicsContext.saveGraphicsState()
-    NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
     let paragraph = NSMutableParagraphStyle()
     paragraph.lineSpacing = 2
-    let attributes: [NSAttributedString.Key: Any] = [
-      .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular),
-      .paragraphStyle: paragraph
-    ]
-    (text as NSString).draw(in: CGRect(x: 72, y: 54, width: 468, height: 684), withAttributes: attributes)
-    NSGraphicsContext.restoreGraphicsState()
-    context.endPDFPage()
-    context.closePDF()
+    let data = try PDFTextRenderer.render(
+      text: text,
+      pageSize: CGSize(width: 612, height: 792),
+      margins: NSEdgeInsets(top: 54, left: 72, bottom: 54, right: 72),
+      attributes: [
+        .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular),
+        .paragraphStyle: paragraph
+      ]
+    )
 
     return ExportedFile(
       filename: "\(safeFilename(envelope.project.title))-screenplay.pdf",
       contentType: "application/pdf",
       data: data as Data
     )
+  }
+}
+
+private enum PDFTextRenderer {
+  static func render(
+    text: String,
+    pageSize: CGSize,
+    margins: NSEdgeInsets,
+    attributes: [NSAttributedString.Key: Any]
+  ) throws -> Data {
+    let data = NSMutableData()
+    var mediaBox = CGRect(origin: .zero, size: pageSize)
+    guard let consumer = CGDataConsumer(data: data), let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else {
+      throw DraftHarbourError.featurePlanned("PDF export")
+    }
+
+    let contentSize = CGSize(
+      width: pageSize.width - margins.left - margins.right,
+      height: pageSize.height - margins.top - margins.bottom
+    )
+    let textStorage = NSTextStorage(attributedString: NSAttributedString(string: text.isEmpty ? " " : text, attributes: attributes))
+    let layoutManager = NSLayoutManager()
+    textStorage.addLayoutManager(layoutManager)
+
+    while layoutManager.numberOfGlyphs == 0 || layoutManager.textContainers.isEmpty || NSMaxRange(layoutManager.glyphRange(for: layoutManager.textContainers.last!)) < layoutManager.numberOfGlyphs {
+      let textContainer = NSTextContainer(size: contentSize)
+      textContainer.lineFragmentPadding = 0
+      layoutManager.addTextContainer(textContainer)
+      layoutManager.ensureLayout(for: textContainer)
+      let glyphRange = layoutManager.glyphRange(for: textContainer)
+      if glyphRange.length == 0, layoutManager.textContainers.count > 1 {
+        layoutManager.removeTextContainer(at: layoutManager.textContainers.count - 1)
+        break
+      }
+
+      context.beginPDFPage(nil)
+      NSGraphicsContext.saveGraphicsState()
+      NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+      let origin = CGPoint(x: margins.left, y: margins.bottom)
+      layoutManager.drawBackground(forGlyphRange: glyphRange, at: origin)
+      layoutManager.drawGlyphs(forGlyphRange: glyphRange, at: origin)
+      NSGraphicsContext.restoreGraphicsState()
+      context.endPDFPage()
+
+      if NSMaxRange(glyphRange) >= layoutManager.numberOfGlyphs {
+        break
+      }
+    }
+
+    context.closePDF()
+    return data as Data
   }
 }
 

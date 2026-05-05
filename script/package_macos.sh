@@ -7,39 +7,61 @@ STAGED_APP="$ROOT_DIR/dist/$APP_NAME.app"
 RELEASE_DIR="$ROOT_DIR/dist/release"
 RELEASE_APP="$RELEASE_DIR/$APP_NAME.app"
 DMG_PATH="$RELEASE_DIR/$APP_NAME.dmg"
+CHECKSUMS_PATH="$RELEASE_DIR/checksums.txt"
 ENTITLEMENTS="$ROOT_DIR/macos/DraftHarbourNative.entitlements"
+PACKAGE_WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/draftharbour-package.XXXXXX")"
+WORK_APP="$PACKAGE_WORK_DIR/$APP_NAME.app"
+
+cleanup() {
+  rm -rf "$PACKAGE_WORK_DIR"
+}
+trap cleanup EXIT
 
 "$ROOT_DIR/script/build_and_run.sh" --release --no-launch
 
 rm -rf "$RELEASE_DIR"
 mkdir -p "$RELEASE_DIR"
-cp -R "$STAGED_APP" "$RELEASE_APP"
+ditto --norsrc "$STAGED_APP" "$WORK_APP"
 if command -v xattr >/dev/null 2>&1; then
-  xattr -cr "$RELEASE_APP"
+  xattr -cr "$WORK_APP"
 fi
-find "$RELEASE_APP" -name '._*' -delete
+find "$WORK_APP" -name '._*' -delete
 
 if [[ -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then
-  echo "Signing $RELEASE_APP with $APPLE_SIGNING_IDENTITY"
+  echo "Signing $WORK_APP with $APPLE_SIGNING_IDENTITY"
   codesign \
     --force \
     --deep \
     --options runtime \
     --entitlements "$ENTITLEMENTS" \
     --sign "$APPLE_SIGNING_IDENTITY" \
-    "$RELEASE_APP"
+    "$WORK_APP"
 else
   echo "APPLE_SIGNING_IDENTITY is not set; applying ad hoc signature for local validation."
-  codesign --force --deep --sign - "$RELEASE_APP"
+  codesign --force --deep --sign - "$WORK_APP"
 fi
+
+echo "Code signature verification:"
+codesign --verify --deep --strict "$WORK_APP"
+
+ditto --norsrc "$WORK_APP" "$RELEASE_APP"
 
 echo "Creating $DMG_PATH"
 hdiutil create \
   -volname "$APP_NAME" \
-  -srcfolder "$RELEASE_APP" \
+  -srcfolder "$WORK_APP" \
   -ov \
   -format UDZO \
   "$DMG_PATH"
+
+echo "Verifying $DMG_PATH"
+hdiutil verify "$DMG_PATH"
+
+echo "Writing $CHECKSUMS_PATH"
+(
+  cd "$RELEASE_DIR"
+  shasum -a 256 "$APP_NAME.dmg" > "$CHECKSUMS_PATH"
+)
 
 if [[ -n "${APPLE_NOTARY_KEYCHAIN_PROFILE:-}" ]]; then
   echo "Submitting $DMG_PATH for notarization with keychain profile $APPLE_NOTARY_KEYCHAIN_PROFILE"
@@ -50,11 +72,19 @@ else
 fi
 
 echo "Signing details:"
-codesign -dvvv --entitlements :- "$RELEASE_APP" || true
+codesign -dvvv --entitlements :- "$WORK_APP" || true
 
 echo "Gatekeeper assessment:"
-spctl -a -vv "$RELEASE_APP" || true
+if spctl -a -vv "$WORK_APP"; then
+  echo "Gatekeeper accepted the sanitized package app."
+elif [[ -z "${APPLE_SIGNING_IDENTITY:-}" ]]; then
+  echo "Gatekeeper rejected the ad-hoc local beta build as expected because APPLE_SIGNING_IDENTITY is not set."
+else
+  echo "Gatekeeper rejected a Developer ID-signed build; inspect signing/notarization before release." >&2
+  exit 1
+fi
 
 echo "Release artifacts:"
 echo "$RELEASE_APP"
 echo "$DMG_PATH"
+echo "$CHECKSUMS_PATH"

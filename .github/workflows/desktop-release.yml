@@ -15,18 +15,24 @@ permissions:
 
 jobs:
   desktop-build:
-    name: Desktop build (${{ matrix.os }})
+    name: Desktop build (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: macos-latest
-            target: universal-apple-darwin
+            target: native-macos
+            kind: native-macos
+            artifact_dir: dist/release
           - os: windows-latest
             target: x86_64-pc-windows-msvc
+            kind: tauri
+            artifact_dir: desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+            kind: tauri
+            artifact_dir: desktop/src-tauri/target/x86_64-unknown-linux-gnu/release/bundle
     env:
       RELEASE_CHANNEL: ${{ inputs.channel }}
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -37,34 +43,45 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
+        if: ${{ matrix.kind == 'tauri' }}
         with:
           node-version: 20
           cache: npm
       - name: Install dependencies
+        if: ${{ matrix.kind == 'tauri' }}
         run: npm ci
-      - name: Build signed desktop artifact
+      - name: Build native macOS artifact
+        if: ${{ matrix.kind == 'native-macos' }}
+        run: ./script/package_macos.sh
+      - name: Build Tauri desktop artifact
+        if: ${{ matrix.kind == 'tauri' }}
         run: npm run desktop:build -- --target ${{ matrix.target }}
       - name: Generate checksums
         shell: bash
         run: |
-          cd desktop/src-tauri/target/${{ matrix.target }}/release/bundle
-          find . -type f \( -name '*.dmg' -o -name '*.msi' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' -o -name '*.exe' \) -exec sha256sum {} \; > checksums.txt
+          cd "${{ matrix.artifact_dir }}"
+          if command -v sha256sum >/dev/null 2>&1; then
+            HASH_CMD="sha256sum"
+          else
+            HASH_CMD="shasum -a 256"
+          fi
+          find . -type f \( -name '*.dmg' -o -name '*.msi' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' -o -name '*.exe' \) -exec $HASH_CMD {} \; > checksums.txt
       - name: Sign checksum manifest
         shell: bash
         run: |
-          cd desktop/src-tauri/target/${{ matrix.target }}/release/bundle
+          cd "${{ matrix.artifact_dir }}"
           echo "${{ secrets.RELEASE_SIGNING_KEY }}" > private_key.pem
           openssl dgst -sha256 -sign private_key.pem -out checksums.sig checksums.txt
       - name: Verify signed checksums
         shell: bash
         run: |
-          cd desktop/src-tauri/target/${{ matrix.target }}/release/bundle
+          cd "${{ matrix.artifact_dir }}"
           echo "${{ secrets.RELEASE_SIGNING_PUBKEY }}" > public_key.pem
           openssl dgst -sha256 -verify public_key.pem -signature checksums.sig checksums.txt
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.target }}-${{ inputs.channel }}
-          path: desktop/src-tauri/target/${{ matrix.target }}/release/bundle
+          path: ${{ matrix.artifact_dir }}
 
   promote-release:
     name: Verify artifacts before promotion
