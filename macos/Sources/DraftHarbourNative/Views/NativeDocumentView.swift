@@ -80,14 +80,8 @@ struct NativeDocumentView: View {
     NavigationSplitView(columnVisibility: $columnVisibility) {
       SidebarView(store: store)
         .navigationSplitViewColumnWidth(min: 220, ideal: 280, max: 360)
-    } content: {
-      EditorWorkspaceView(store: store, selectedRange: $selectedRange, showingFindReplace: $showingFindReplace)
-        .navigationSplitViewColumnWidth(min: 520, ideal: 820)
     } detail: {
-      if inspectorVisible {
-        InspectorView(store: store, selectedRange: selectedRange)
-          .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 420)
-      }
+      workspace
     }
     .focusedValue(\.projectStore, store)
     .navigationTitle(store.envelope.project.title)
@@ -212,6 +206,18 @@ struct NativeDocumentView: View {
     .onReceive(NotificationCenter.default.publisher(for: .draftHarbourRunCommand)) { notification in
       guard let raw = notification.object as? String, let command = NativeCommandID(rawValue: raw) else { return }
       runCommand(command)
+    }
+  }
+
+  private var workspace: some View {
+    HSplitView {
+      EditorWorkspaceView(store: store, selectedRange: $selectedRange, showingFindReplace: $showingFindReplace)
+        .frame(minWidth: 520, maxWidth: .infinity)
+
+      if inspectorVisible {
+        InspectorView(store: store, selectedRange: selectedRange)
+          .frame(minWidth: 260, idealWidth: 320, maxWidth: 420)
+      }
     }
   }
 
