@@ -57,9 +57,10 @@ This matrix tracks implemented web/Tauri behavior that exists in the SwiftUI/App
 | Capability | Native status | Notes |
 | --- | --- | --- |
 | Generic REST sync | Implemented | Push/pull/list via `URLSession`. |
-| Dropbox/Google Drive provider shell | Deferred | Provider-native OAuth is out of scope for this pass; Generic REST is the primary native sync UI. |
+| Dropbox sync | Implemented | Native PKCE OAuth, Keychain token storage, `/DraftHarbour` JSON section files, `_manifest.json`, revisions, refresh-on-401, and conflict-aware pulls. |
+| Google Drive sync | Implemented | Native desktop OAuth loopback flow, Drive `drive.file` scope, Keychain token storage, `DraftHarbour` app folder JSON section files, `_manifest.json`, revisions, refresh-on-401, and conflict-aware pulls. |
 | Scrivener bridge | Implemented | Plain-text package import/export bridge exposed in native integrations UI. |
 | Three-way conflict detection | Implemented | Shared native merge primitive. |
-| Keychain token storage | Implemented | Existing `KeychainClient`; mockable protocol added. |
+| Keychain token storage | Implemented | OAuth access/refresh tokens are excluded from `.dhproj`; project files keep only metadata and Keychain account IDs. |
 | Local beta package script | Implemented | Ad-hoc local signing, DMG verification, checksum output, and optional Developer ID/notary path. |
 | Native CI workflow | Implemented | PR check runs `swift test --package-path macos`; release workflow packages macOS through Swift and Windows/Linux through Tauri. |

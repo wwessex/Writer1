@@ -13,12 +13,20 @@ public struct IntegrationResult: Equatable, Sendable {
   public var message: String
   public var conflicts: [ConflictInfo]
   public var pulledEnvelope: DhprojEnvelope?
+  public var updatedConfig: IntegrationConfig?
 
-  public init(provider: IntegrationType, message: String, conflicts: [ConflictInfo] = [], pulledEnvelope: DhprojEnvelope? = nil) {
+  public init(
+    provider: IntegrationType,
+    message: String,
+    conflicts: [ConflictInfo] = [],
+    pulledEnvelope: DhprojEnvelope? = nil,
+    updatedConfig: IntegrationConfig? = nil
+  ) {
     self.provider = provider
     self.message = message
     self.conflicts = conflicts
     self.pulledEnvelope = pulledEnvelope
+    self.updatedConfig = updatedConfig
   }
 }
 
@@ -66,8 +74,10 @@ public enum NativeIntegrationProviderRegistry {
       return GenericRESTSyncProvider(type: type)
     case .scrivener:
       return ScrivenerIntegrationProvider()
-    case .dropbox, .googleDrive:
-      return PlannedIntegrationProvider(type: type)
+    case .dropbox:
+      return DropboxSyncProvider()
+    case .googleDrive:
+      return GoogleDriveSyncProvider()
     }
   }
 }

@@ -18,10 +18,6 @@ public enum IntegrationType: String, Codable, CaseIterable, Sendable {
       return "Scrivener"
     }
   }
-
-  public var isProviderNativeOAuthDeferred: Bool {
-    self == .dropbox || self == .googleDrive
-  }
 }
 
 public struct IntegrationConfig: Codable, Equatable, Sendable {
@@ -36,10 +32,32 @@ public struct IntegrationConfig: Codable, Equatable, Sendable {
   public var lastSyncAt: Int64?
   public var accessToken: String?
   public var refreshToken: String?
+  public var accessTokenKeychainAccount: String?
+  public var refreshTokenKeychainAccount: String?
   public var clientId: String?
   public var baseUrl: String?
   public var syncFolderPath: String?
   public var version: Int?
+
+  enum CodingKeys: String, CodingKey {
+    case type
+    case enabled
+    case connectionId
+    case providerUserId
+    case scopes
+    case expiresAt
+    case status
+    case folderId
+    case lastSyncAt
+    case accessToken
+    case refreshToken
+    case accessTokenKeychainAccount
+    case refreshTokenKeychainAccount
+    case clientId
+    case baseUrl
+    case syncFolderPath
+    case version
+  }
 
   public init(
     type: IntegrationType,
@@ -53,6 +71,8 @@ public struct IntegrationConfig: Codable, Equatable, Sendable {
     lastSyncAt: Int64? = nil,
     accessToken: String? = nil,
     refreshToken: String? = nil,
+    accessTokenKeychainAccount: String? = nil,
+    refreshTokenKeychainAccount: String? = nil,
     clientId: String? = nil,
     baseUrl: String? = nil,
     syncFolderPath: String? = nil,
@@ -69,10 +89,53 @@ public struct IntegrationConfig: Codable, Equatable, Sendable {
     self.lastSyncAt = lastSyncAt
     self.accessToken = accessToken
     self.refreshToken = refreshToken
+    self.accessTokenKeychainAccount = accessTokenKeychainAccount
+    self.refreshTokenKeychainAccount = refreshTokenKeychainAccount
     self.clientId = clientId
     self.baseUrl = baseUrl
     self.syncFolderPath = syncFolderPath
     self.version = version
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    type = try container.decode(IntegrationType.self, forKey: .type)
+    enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+    connectionId = try container.decodeIfPresent(String.self, forKey: .connectionId)
+    providerUserId = try container.decodeIfPresent(String.self, forKey: .providerUserId)
+    scopes = try container.decodeIfPresent([String].self, forKey: .scopes)
+    expiresAt = try container.decodeIfPresent(Int64.self, forKey: .expiresAt)
+    status = try container.decodeIfPresent(String.self, forKey: .status)
+    folderId = try container.decodeIfPresent(String.self, forKey: .folderId)
+    lastSyncAt = try container.decodeIfPresent(Int64.self, forKey: .lastSyncAt)
+    // Decode legacy project files, but do not re-encode raw OAuth tokens.
+    accessToken = try container.decodeIfPresent(String.self, forKey: .accessToken)
+    refreshToken = try container.decodeIfPresent(String.self, forKey: .refreshToken)
+    accessTokenKeychainAccount = try container.decodeIfPresent(String.self, forKey: .accessTokenKeychainAccount)
+    refreshTokenKeychainAccount = try container.decodeIfPresent(String.self, forKey: .refreshTokenKeychainAccount)
+    clientId = try container.decodeIfPresent(String.self, forKey: .clientId)
+    baseUrl = try container.decodeIfPresent(String.self, forKey: .baseUrl)
+    syncFolderPath = try container.decodeIfPresent(String.self, forKey: .syncFolderPath)
+    version = try container.decodeIfPresent(Int.self, forKey: .version)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(type, forKey: .type)
+    try container.encode(enabled, forKey: .enabled)
+    try container.encodeIfPresent(connectionId, forKey: .connectionId)
+    try container.encodeIfPresent(providerUserId, forKey: .providerUserId)
+    try container.encodeIfPresent(scopes, forKey: .scopes)
+    try container.encodeIfPresent(expiresAt, forKey: .expiresAt)
+    try container.encodeIfPresent(status, forKey: .status)
+    try container.encodeIfPresent(folderId, forKey: .folderId)
+    try container.encodeIfPresent(lastSyncAt, forKey: .lastSyncAt)
+    try container.encodeIfPresent(accessTokenKeychainAccount, forKey: .accessTokenKeychainAccount)
+    try container.encodeIfPresent(refreshTokenKeychainAccount, forKey: .refreshTokenKeychainAccount)
+    try container.encodeIfPresent(clientId, forKey: .clientId)
+    try container.encodeIfPresent(baseUrl, forKey: .baseUrl)
+    try container.encodeIfPresent(syncFolderPath, forKey: .syncFolderPath)
+    try container.encodeIfPresent(version, forKey: .version)
   }
 }
 

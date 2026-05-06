@@ -15,6 +15,7 @@ public enum DraftHarbourError: LocalizedError, Equatable {
   case invalidSelection
   case featurePlanned(String)
   case providerNotConfigured(String)
+  case oauthFailure(String)
   case keychainFailure(OSStatus)
 
   public var errorDescription: String? {
@@ -37,6 +38,8 @@ public enum DraftHarbourError: LocalizedError, Equatable {
       return "\(feature) is part of the native parity roadmap but is not implemented yet."
     case .providerNotConfigured(let provider):
       return "\(provider) is not configured."
+    case .oauthFailure(let message):
+      return message
     case .keychainFailure(let status):
       return "Keychain operation failed with status \(status)."
     }
