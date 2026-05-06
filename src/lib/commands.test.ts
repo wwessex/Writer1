@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { COMMAND_IDS, COMMAND_HANDLERS, isCommandEnabled, runCommand } from './commands';
+import { COMMAND_IDS, COMMAND_HANDLERS, COMMAND_METADATA, isCommandEnabled, runCommand } from './commands';
+import { APP_MENUS } from './menuConfig';
 
 function createEditorMock() {
   return {
@@ -74,5 +75,28 @@ describe('commands', () => {
     for (const id of definedIds) {
       expect(handledIds.has(id), `Missing handler for "${id}"`).toBe(true);
     }
+  });
+
+  it('exposes exactly auto, light, and dark appearance commands in the View menu', () => {
+    const themeCommandIds = Object.values(COMMAND_IDS).filter(commandId => commandId.startsWith('theme'));
+    expect(themeCommandIds).toEqual([
+      COMMAND_IDS.THEME_AUTO,
+      COMMAND_IDS.THEME_LIGHT,
+      COMMAND_IDS.THEME_DARK,
+    ]);
+
+    const viewMenu = APP_MENUS.find(menu => menu.label === 'View');
+    const viewThemeActions = viewMenu?.items
+      .map(item => item.action)
+      .filter((action): action is typeof themeCommandIds[number] => Boolean(action?.startsWith('theme')));
+
+    expect(viewThemeActions).toEqual([
+      COMMAND_IDS.THEME_AUTO,
+      COMMAND_IDS.THEME_LIGHT,
+      COMMAND_IDS.THEME_DARK,
+    ]);
+    expect(COMMAND_METADATA[COMMAND_IDS.THEME_AUTO].label).toContain('Auto');
+    expect(COMMAND_METADATA[COMMAND_IDS.THEME_LIGHT].label).toContain('Light');
+    expect(COMMAND_METADATA[COMMAND_IDS.THEME_DARK].label).toContain('Dark');
   });
 });

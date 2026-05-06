@@ -15,7 +15,7 @@ import { isMacDesktopRuntime } from '@/lib/runtimePlatform';
  * Requires AppProvider context to be present in the component tree.
  */
 export function AppShellLayout() {
-  const { state, activeChapter } = useApp();
+  const { state, activeChapter, updateSettings } = useApp();
   const macDesktopRuntime = isMacDesktopRuntime();
   const [focusMode, setFocusMode] = useState(false);
   const { shouldCollapseSidebar, shouldCollapseInspector } = useResponsivePanels();
@@ -88,9 +88,17 @@ export function AppShellLayout() {
       <TopBar
         macLiquid={macDesktopRuntime}
         focusMode={focusMode}
+        theme={state.settings.theme}
         onFocusMode={() => setFocusMode((mode) => !mode)}
         onSearch={handleSearch}
         onToggleInspector={() => setInspectorCollapsed((c) => !c)}
+        onThemeToggle={() => updateSettings({
+          theme: state.settings.theme === 'auto'
+            ? 'light'
+            : state.settings.theme === 'light'
+              ? 'dark'
+              : 'auto',
+        })}
       />
 
       {/*

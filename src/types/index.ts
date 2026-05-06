@@ -160,7 +160,7 @@ export interface AppSettings {
   novelDeadline: string;
   sync: SyncConfig;
   assist: AssistConfig;
-  theme: 'dark' | 'light' | 'high-contrast';
+  theme: 'auto' | 'dark' | 'light';
   sidebarHidden: boolean;
   pageView: boolean;
   focusMode: boolean;

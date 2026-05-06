@@ -55,4 +55,13 @@ describe('AppContext settings behavior', () => {
     expect(reloaded.goalConfiguration.weeklyWordTarget).toBe(5400);
     expect(reloaded.goalConfiguration.milestoneCheckpoints).toHaveLength(1);
   });
+
+  it('persists supported theme preferences and maps legacy high contrast to dark', () => {
+    const defaults = createDefaultSettings(false);
+
+    expect(loadSettingsFromStorage(JSON.stringify(createSettingsEnvelope({ ...defaults, theme: 'auto' })), defaults).theme).toBe('auto');
+    expect(loadSettingsFromStorage(JSON.stringify(createSettingsEnvelope({ ...defaults, theme: 'light' })), defaults).theme).toBe('light');
+    expect(loadSettingsFromStorage(JSON.stringify(createSettingsEnvelope({ ...defaults, theme: 'dark' })), defaults).theme).toBe('dark');
+    expect(loadSettingsFromStorage(JSON.stringify(createSettingsEnvelope({ ...defaults, theme: 'high-contrast' as never })), defaults).theme).toBe('dark');
+  });
 });

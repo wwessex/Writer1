@@ -1,7 +1,7 @@
 import type { EditorAdapter } from '@/lib/editor';
 import type { RefObject } from 'react';
 import type { ModalKey } from '@/hooks/useModalState';
-import type { ProjectType } from '@/types';
+import type { AppSettings, ProjectType } from '@/types';
 export const COMMAND_IDS = {
   NEW_CHAPTER: 'newChapter',
   EXPORT: 'export',
@@ -36,9 +36,9 @@ export const COMMAND_IDS = {
   TOGGLE_SIDEBAR: 'toggleSidebar',
   TOGGLE_PAGE_VIEW: 'togglePageView',
   TOGGLE_FOCUS_MODE: 'toggleFocusMode',
-  THEME_DARK: 'themeDark',
+  THEME_AUTO: 'themeAuto',
   THEME_LIGHT: 'themeLight',
-  THEME_HIGH_CONTRAST: 'themeHighContrast',
+  THEME_DARK: 'themeDark',
   UNDO: 'undo',
   REDO: 'redo',
   CUT: 'cut',
@@ -105,9 +105,9 @@ export const COMMAND_METADATA: Record<CommandId, CommandMetadata> = {
   [COMMAND_IDS.TOGGLE_SIDEBAR]: { id: COMMAND_IDS.TOGGLE_SIDEBAR, label: 'Toggle Sidebar', icon: 'side_navigation', shortcut: 'Ctrl+Shift+B', group: 'Views', includeInQuickSwitcher: true },
   [COMMAND_IDS.TOGGLE_PAGE_VIEW]: { id: COMMAND_IDS.TOGGLE_PAGE_VIEW, label: 'Toggle Page View', icon: 'article', group: 'Views', includeInQuickSwitcher: true },
   [COMMAND_IDS.TOGGLE_FOCUS_MODE]: { id: COMMAND_IDS.TOGGLE_FOCUS_MODE, label: 'Toggle Focus Mode', icon: 'center_focus_strong', shortcut: 'Ctrl+Shift+F', group: 'Views', includeInQuickSwitcher: true },
-  [COMMAND_IDS.THEME_DARK]: { id: COMMAND_IDS.THEME_DARK, label: 'True Dark', icon: 'dark_mode', group: 'Views', includeInQuickSwitcher: true },
-  [COMMAND_IDS.THEME_LIGHT]: { id: COMMAND_IDS.THEME_LIGHT, label: 'Warm Light', icon: 'light_mode', group: 'Views', includeInQuickSwitcher: true },
-  [COMMAND_IDS.THEME_HIGH_CONTRAST]: { id: COMMAND_IDS.THEME_HIGH_CONTRAST, label: 'High Contrast', icon: 'contrast', group: 'Views', includeInQuickSwitcher: true },
+  [COMMAND_IDS.THEME_AUTO]: { id: COMMAND_IDS.THEME_AUTO, label: 'Auto Appearance', icon: 'brightness_auto', group: 'Views', includeInQuickSwitcher: true },
+  [COMMAND_IDS.THEME_LIGHT]: { id: COMMAND_IDS.THEME_LIGHT, label: 'Light Appearance', icon: 'light_mode', group: 'Views', includeInQuickSwitcher: true },
+  [COMMAND_IDS.THEME_DARK]: { id: COMMAND_IDS.THEME_DARK, label: 'Dark Appearance', icon: 'dark_mode', group: 'Views', includeInQuickSwitcher: true },
   [COMMAND_IDS.UNDO]: { id: COMMAND_IDS.UNDO, label: 'Undo', icon: 'undo', shortcut: 'Ctrl+Z', group: 'Actions' },
   [COMMAND_IDS.REDO]: { id: COMMAND_IDS.REDO, label: 'Redo', icon: 'redo', shortcut: 'Ctrl+Y', group: 'Actions' },
   [COMMAND_IDS.CUT]: { id: COMMAND_IDS.CUT, label: 'Cut', icon: 'content_cut', shortcut: 'Ctrl+X', group: 'Actions' },
@@ -144,7 +144,7 @@ export interface CommandContext {
   togglePageView: () => void;
   toggleFocusMode: () => void;
   toggleTypewriterMode: () => void;
-  setTheme: (theme: 'dark' | 'light' | 'high-contrast') => void;
+  setTheme: (theme: AppSettings['theme']) => void;
   showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning', icon?: string) => void;
   createCommentFromSelection: () => void;
 }
@@ -188,9 +188,9 @@ export const COMMAND_HANDLERS: Record<CommandId, CommandHandler> = {
   [COMMAND_IDS.TOGGLE_SIDEBAR]: ({ toggleSidebar }) => toggleSidebar(),
   [COMMAND_IDS.TOGGLE_PAGE_VIEW]: ({ togglePageView }) => togglePageView(),
   [COMMAND_IDS.TOGGLE_FOCUS_MODE]: ({ toggleFocusMode }) => toggleFocusMode(),
-  [COMMAND_IDS.THEME_DARK]: ({ setTheme }) => setTheme('dark'),
+  [COMMAND_IDS.THEME_AUTO]: ({ setTheme }) => setTheme('auto'),
   [COMMAND_IDS.THEME_LIGHT]: ({ setTheme }) => setTheme('light'),
-  [COMMAND_IDS.THEME_HIGH_CONTRAST]: ({ setTheme }) => setTheme('high-contrast'),
+  [COMMAND_IDS.THEME_DARK]: ({ setTheme }) => setTheme('dark'),
   [COMMAND_IDS.UNDO]: ({ editor }) => { editor?.undo(); },
   [COMMAND_IDS.REDO]: ({ editor }) => { editor?.redo(); },
   [COMMAND_IDS.CUT]: ({ editor }) => {
@@ -227,9 +227,9 @@ export const LOCAL_MENU_COMMANDS: ReadonlySet<CommandId> = new Set([
   COMMAND_IDS.TOGGLE_SIDEBAR,
   COMMAND_IDS.TOGGLE_PAGE_VIEW,
   COMMAND_IDS.TOGGLE_FOCUS_MODE,
-  COMMAND_IDS.THEME_DARK,
+  COMMAND_IDS.THEME_AUTO,
   COMMAND_IDS.THEME_LIGHT,
-  COMMAND_IDS.THEME_HIGH_CONTRAST,
+  COMMAND_IDS.THEME_DARK,
 ]);
 
 interface CommandStateContext {

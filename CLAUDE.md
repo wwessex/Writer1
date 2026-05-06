@@ -93,7 +93,7 @@ import type { Chapter } from '@/types';
 - One component per directory: `ComponentName.tsx` + `ComponentName.module.css` + `index.ts` barrel
 - Styles via CSS Modules imported as `styles`: `<div className={styles.editor}>`
 - Tailwind available for utility classes; design tokens as CSS custom properties in `src/styles/index.css`
-- Three themes: `light`, `dark`, `high-contrast` via `data-theme` on `<html>`
+- Appearance preference supports `auto`, `light`, and `dark`; resolved `light`/`dark` is applied via `data-theme` on `<html>`
 
 ### State
 - App state via `useApp()` hook from `src/context/AppContext.tsx`

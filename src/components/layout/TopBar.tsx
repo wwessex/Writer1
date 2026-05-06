@@ -1,7 +1,7 @@
 import { Search, Moon, Sun, Monitor, MoreHorizontal, Maximize2, Minimize2, PanelRight, FilePlus } from 'lucide-react';
 
 type SaveStatus = 'saved' | 'saving' | 'offline' | 'error';
-type Theme = 'light' | 'dark' | 'high-contrast';
+type Theme = 'auto' | 'light' | 'dark';
 
 interface TopBarProps {
   projectTitle?: string;
@@ -134,7 +134,7 @@ export function TopBar({
               aria-label={`Theme: ${theme}`}
               onClick={onThemeToggle}
             >
-              {theme === 'dark' ? <Moon size={16} /> : theme === 'high-contrast' ? <Monitor size={16} /> : <Sun size={16} />}
+              {theme === 'dark' ? <Moon size={16} /> : theme === 'auto' ? <Monitor size={16} /> : <Sun size={16} />}
             </button>
 
             <button

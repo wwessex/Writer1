@@ -1,9 +1,10 @@
+import DraftHarbourNativeCore
 import SwiftUI
 
 struct SettingsView: View {
   @AppStorage("DraftHarbour.editor.fontSize") private var fontSize = 15.0
   @AppStorage("DraftHarbour.editor.typewriterMode") private var typewriterMode = false
-  @AppStorage("DraftHarbour.editor.theme") private var theme = "system"
+  @AppStorage("DraftHarbour.editor.theme") private var theme = "auto"
   @AppStorage("DraftHarbour.release.channel") private var releaseChannel = "stable"
   @AppStorage("DraftHarbour.ai.endpoint") private var aiEndpoint = "http://localhost:11434/v1/chat/completions"
   @AppStorage("DraftHarbour.ai.model") private var aiModel = "llama3.1"
@@ -21,11 +22,10 @@ struct SettingsView: View {
           Text("24")
         }
         Toggle("Typewriter Mode", isOn: $typewriterMode)
-        Picker("Theme", selection: $theme) {
-          Text("System").tag("system")
+        Picker("Theme", selection: themeSelection) {
+          Text("Auto").tag("auto")
           Text("Light").tag("light")
           Text("Dark").tag("dark")
-          Text("High Contrast").tag("high-contrast")
         }
       }
 
@@ -55,5 +55,16 @@ struct SettingsView: View {
     .formStyle(.grouped)
     .padding()
     .frame(width: 520)
+    .onAppear {
+      theme = ThemePreference.normalizedRawValue(theme)
+    }
+  }
+
+  private var themeSelection: Binding<String> {
+    Binding {
+      ThemePreference.normalizedRawValue(theme)
+    } set: { newValue in
+      theme = ThemePreference.normalizedRawValue(newValue)
+    }
   }
 }

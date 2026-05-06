@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '@/context/AppContext';
 import { useWindowResize } from '@/hooks/useResizable';
+import { useResolvedTheme } from '@/hooks/useResolvedTheme';
 import { createDiagnosticsReport } from '@/lib/errors';
 import styles from './Windows.module.css';
 
@@ -11,6 +12,7 @@ interface AboutWindowProps {
 
 export function AboutWindow({ open, onClose }: AboutWindowProps) {
   const { state } = useApp();
+  const resolvedTheme = useResolvedTheme(state.settings.theme);
   const windowRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -125,7 +127,7 @@ export function AboutWindow({ open, onClose }: AboutWindowProps) {
         <div className={styles.window__body}>
           <div className={styles.aboutLogo}>
             <img
-              src={`${import.meta.env.BASE_URL}assets/${state.settings.theme === 'light' ? 'logo-black.svg' : 'logo-blue.svg'}`}
+              src={`${import.meta.env.BASE_URL}assets/${resolvedTheme === 'light' ? 'logo-black.svg' : 'logo-blue.svg'}`}
               alt="DraftHarbour Studio"
               className={styles.brandLogo}
             />
@@ -169,7 +171,7 @@ export function AboutWindow({ open, onClose }: AboutWindowProps) {
             </li>
             <li>
               <span className="material-symbols-rounded">dark_mode</span>
-              Warm light, true dark, and high-contrast themes
+              Auto, light, and dark appearance modes
             </li>
           </ul>
 

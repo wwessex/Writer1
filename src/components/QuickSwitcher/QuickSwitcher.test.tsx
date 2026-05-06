@@ -30,7 +30,9 @@ vi.mock('@/lib/commands', () => ({
   COMMAND_METADATA: {
     export: { id: 'export', label: 'Export…', icon: 'download', shortcut: 'Ctrl+Shift+E', group: 'Project', includeInQuickSwitcher: true },
     settings: { id: 'settings', label: 'Settings', icon: 'settings', group: 'Navigation', includeInQuickSwitcher: true },
-    themeDark: { id: 'themeDark', label: 'True Dark', icon: 'dark_mode', group: 'Views', includeInQuickSwitcher: true },
+    themeAuto: { id: 'themeAuto', label: 'Auto Appearance', icon: 'brightness_auto', group: 'Views', includeInQuickSwitcher: true },
+    themeLight: { id: 'themeLight', label: 'Light Appearance', icon: 'light_mode', group: 'Views', includeInQuickSwitcher: true },
+    themeDark: { id: 'themeDark', label: 'Dark Appearance', icon: 'dark_mode', group: 'Views', includeInQuickSwitcher: true },
   },
 }));
 
@@ -129,7 +131,9 @@ describe('QuickSwitcher', () => {
     const text = container.textContent ?? '';
     expect(text).toContain('Export…');
     expect(text).toContain('Settings');
-    expect(text).toContain('True Dark');
+    expect(text).toContain('Auto Appearance');
+    expect(text).toContain('Light Appearance');
+    expect(text).toContain('Dark Appearance');
   });
 
   it('shows chapter items', () => {

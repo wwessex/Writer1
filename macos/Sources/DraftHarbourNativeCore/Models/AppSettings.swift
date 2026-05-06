@@ -1,9 +1,37 @@
 import Foundation
 
 public enum ThemePreference: String, Codable, CaseIterable, Sendable {
-  case dark
+  case auto
   case light
-  case highContrast = "high-contrast"
+  case dark
+
+  public init(storageValue: String) {
+    switch storageValue {
+    case "auto", "system":
+      self = .auto
+    case "light":
+      self = .light
+    case "dark", "high-contrast":
+      self = .dark
+    default:
+      self = .light
+    }
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    let value = try container.decode(String.self)
+    self = ThemePreference(storageValue: value)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(rawValue)
+  }
+
+  public static func normalizedRawValue(_ value: String) -> String {
+    ThemePreference(storageValue: value).rawValue
+  }
 }
 
 public struct SyncConfig: Codable, Equatable, Sendable {

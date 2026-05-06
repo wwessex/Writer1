@@ -1,6 +1,6 @@
 /**
  * CodeMirror 6 theme that maps DraftHarbour CSS custom properties.
- * Supports light, dark, and high-contrast themes.
+ * Supports light and dark themes.
  */
 import { EditorView } from '@codemirror/view';
 

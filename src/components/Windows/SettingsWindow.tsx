@@ -61,7 +61,24 @@ const LINE_HEIGHT_OPTIONS = [
   { value: '2.25', label: 'Wide (2.25)' }
 ];
 
+const APPEARANCE_OPTIONS = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+];
+
 const SETTINGS_SECTIONS = [
+  {
+    id: 'appearance',
+    title: 'Appearance',
+    group: 'general',
+    difficulty: 'beginner',
+    recommended: true,
+    keywords: ['theme', 'auto', 'light', 'dark', 'system'],
+    fields: [
+      { id: 'theme', label: 'Theme', keywords: ['appearance', 'mode', 'system', 'auto', 'light', 'dark'] }
+    ]
+  },
   {
     id: 'typography',
     title: 'Typography',
@@ -206,6 +223,7 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
     disabled: isMobile,
   });
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+    appearance: false,
     typography: false,
     ai: false,
     localai: true,
@@ -533,6 +551,7 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
   const applyRecommendedDefaults = useCallback((groupId: string) => {
     if (groupId === 'general') {
       updateSettings({
+        theme: 'light',
         typography: { ...state.settings.typography, fontFamily: 'system', fontSize: 16, lineHeight: 1.625 },
         autosaveMs: 800,
       });
@@ -649,6 +668,36 @@ export function SettingsWindow({ open, onClose }: SettingsWindowProps) {
               );
             })}
           </div>
+
+          {/* Appearance Section */}
+          {isSectionVisible('appearance') && (
+          <section className={styles.section} ref={el => { sectionRefs.current.appearance = el; }}>
+            <button className={styles.sectionToggle} onClick={() => toggleSection('appearance')}>
+              <h4>
+                <span className="material-symbols-rounded">contrast</span>
+                {highlightMatch('Appearance')}
+              </h4>
+              <span className={`material-symbols-rounded ${styles.sectionChevron}`}>
+                {isSectionCollapsed('appearance') ? 'expand_more' : 'expand_less'}
+              </span>
+            </button>
+            {!isSectionCollapsed('appearance') && (
+              <div className={styles.sectionContent}>
+                {isFieldVisible('appearance', 'theme') && <div className={styles.field}>
+                  <label>
+                    {highlightMatch('Theme')}
+                    <HelpTooltip text="Auto follows your operating system. Light and Dark stay fixed between launches." />
+                  </label>
+                  <Select
+                    options={APPEARANCE_OPTIONS}
+                    value={state.settings.theme}
+                    onChange={e => updateSettings({ theme: e.target.value as typeof state.settings.theme })}
+                  />
+                </div>}
+              </div>
+            )}
+          </section>
+          )}
 
           {/* Typography Section */}
           {isSectionVisible('typography') && (
