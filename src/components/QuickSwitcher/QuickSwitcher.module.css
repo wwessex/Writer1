@@ -95,6 +95,38 @@
   line-height: 1.4;
 }
 
+.closeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background var(--transition-fast, 120ms ease),
+    color var(--transition-fast, 120ms ease),
+    transform 160ms var(--ease-spring, ease);
+}
+
+.closeButton:hover {
+  background: var(--btn-bg);
+  color: var(--text);
+}
+
+.closeButton:active {
+  transform: scale(0.94);
+}
+
+.closeButton .material-symbols-rounded {
+  font-size: 1.125rem;
+}
+
 
 .modeBar {
   display: flex;

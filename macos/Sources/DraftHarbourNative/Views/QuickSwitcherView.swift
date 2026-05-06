@@ -13,9 +13,21 @@ struct QuickSwitcherView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      TextField("Search sections, commands, characters, world", text: $query)
-        .textFieldStyle(.roundedBorder)
-        .padding()
+      HStack(spacing: 8) {
+        TextField("Search sections, commands, characters, world", text: $query)
+          .textFieldStyle(.roundedBorder)
+
+        Button {
+          dismiss()
+        } label: {
+          Label("Close", systemImage: "xmark")
+        }
+        .buttonStyle(.bordered)
+        .keyboardShortcut(.cancelAction)
+        .accessibilityLabel("Close quick switcher")
+        .help("Close quick switcher")
+      }
+      .padding()
 
       List(results) { item in
         Button {
@@ -39,7 +51,10 @@ struct QuickSwitcherView: View {
         .buttonStyle(.plain)
       }
     }
-    .frame(minWidth: 560, minHeight: 460)
+    .frame(width: 640, height: 520)
+    .onExitCommand {
+      dismiss()
+    }
   }
 
   private func select(_ item: QuickSwitcherItem) {

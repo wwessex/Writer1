@@ -100,6 +100,19 @@ final class ImportExportParityTests: XCTestCase {
     XCTAssertEqual(payload["projectType"], .string("book"))
   }
 
+  func testEveryExportMenuFormatProducesAFile() throws {
+    for format in ExportFormat.allCases {
+      let envelope = format == .screenplayPdf || format == .fountain
+        ? screenplayEnvelope(paragraphCount: 2)
+        : bookEnvelope()
+      let exported = try ExporterRegistry.exporter(for: format).export(envelope)
+
+      XCTAssertFalse(exported.filename.isEmpty, format.rawValue)
+      XCTAssertFalse(exported.contentType.isEmpty, format.rawValue)
+      XCTAssertFalse(exported.data.isEmpty, format.rawValue)
+    }
+  }
+
   func testLongPDFExportsPaginateInsteadOfTruncating() throws {
     var envelope = DhprojCodec.newProject(title: "Long PDF")
     envelope.sections[0].title = "Chapter One"
@@ -155,6 +168,19 @@ final class ImportExportParityTests: XCTestCase {
         """
       }
       .joined(separator: "\n\n")
+    return envelope
+  }
+
+  private func bookEnvelope() -> DhprojEnvelope {
+    var envelope = DhprojCodec.newProject(title: "Export Menu")
+    envelope.sections[0].title = "Chapter One"
+    envelope.sections[0].summary = "A chapter prepared for export checks."
+    envelope.sections[0].tags = ["draft", "native"]
+    envelope.sections[0].content = """
+    This chapter gives every native exporter enough manuscript text to produce a useful file.
+
+    It includes a second paragraph so rich text, PDF, DOCX, Markdown, plain text, and bundle exports all have body content.
+    """
     return envelope
   }
 }

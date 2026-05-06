@@ -413,6 +413,15 @@ export function QuickSwitcher({ open, onClose, onAction }: QuickSwitcherProps) {
             autoComplete="off"
             spellCheck={false}
           />
+          <button
+            className={styles.closeButton}
+            type="button"
+            aria-label="Close quick switcher"
+            title="Close quick switcher"
+            onClick={handleClose}
+          >
+            <span className="material-symbols-rounded">close</span>
+          </button>
           <kbd className={styles.kbd}>Esc</kbd>
         </div>
         <div className={styles.modeBar} role="tablist" aria-label="Search mode">

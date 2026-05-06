@@ -98,9 +98,12 @@ struct ToolPanelView: View {
         HStack {
           Label(selectedPanel.title, systemImage: selectedPanel.systemImage)
             .font(.title2.bold())
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
           Spacer()
           Button("Done") { dismiss() }
             .keyboardShortcut(.defaultAction)
+            .help("Close tool panel")
         }
 
         Divider()
@@ -115,6 +118,7 @@ struct ToolPanelView: View {
       selectedPanel = panel
       hydrateSyncFields()
     }
+    .frame(width: 860, height: 640)
   }
 
   @ViewBuilder

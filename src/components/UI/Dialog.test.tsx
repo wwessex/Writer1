@@ -262,6 +262,8 @@ describe('Dialog', () => {
     const card = container.querySelector('.modal__card') as HTMLElement;
     expect(card?.style.width).toBe('600px');
     expect(card?.style.height).toBe('480px');
+    expect(card?.style.maxWidth).toBe('calc(100vw - 2rem)');
+    expect(card?.style.maxHeight).toBe('calc(100dvh - 2rem)');
   });
 
   it('renders all three size variants', () => {
