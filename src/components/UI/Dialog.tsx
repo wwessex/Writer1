@@ -106,7 +106,12 @@ export function Dialog({
     <dialog ref={dialogRef} className={`${styles.modal} ${sizeClass} ${closingClass}`}>
       <div
         className={styles.modal__card}
-        style={!isMobile ? { width, height, maxWidth: 'none', maxHeight: 'none' } : undefined}
+        style={!isMobile ? {
+          width,
+          height,
+          maxWidth: 'calc(100vw - 2rem)',
+          maxHeight: 'calc(100dvh - 2rem)',
+        } : undefined}
       >
         <div className={styles.modal__header}>
           <h2 className={styles.modal__title}>{title}</h2>

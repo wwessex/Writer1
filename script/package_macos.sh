@@ -20,11 +20,33 @@ trap cleanup EXIT
 strip_bundle_metadata() {
   local bundle="$1"
   if command -v xattr >/dev/null 2>&1; then
-    xattr -cr "$bundle" 2>/dev/null || true
-    xattr -d com.apple.FinderInfo "$bundle" 2>/dev/null || true
-    xattr -d 'com.apple.fileprovider.fpfs#P' "$bundle" 2>/dev/null || true
+    for _ in 1 2 3; do
+      xattr -cr "$bundle" 2>/dev/null || true
+      find "$bundle" -exec xattr -c {} + 2>/dev/null || true
+      xattr -d com.apple.FinderInfo "$bundle" 2>/dev/null || true
+      xattr -d com.apple.ResourceFork "$bundle" 2>/dev/null || true
+      xattr -d 'com.apple.fileprovider.fpfs#P' "$bundle" 2>/dev/null || true
+      xattr -d com.apple.provenance "$bundle" 2>/dev/null || true
+      sleep 0.1
+    done
+    xattr -c "$bundle" 2>/dev/null || true
+    find "$bundle" -exec xattr -c {} + 2>/dev/null || true
   fi
   find "$bundle" -name '._*' -delete
+  find "$bundle" -name '.DS_Store' -delete
+}
+
+verify_bundle_signature() {
+  local bundle="$1"
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    strip_bundle_metadata "$bundle"
+    if codesign --verify --deep --strict "$bundle" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 0.1
+  done
+  codesign --verify --deep --strict "$bundle"
 }
 
 "$ROOT_DIR/script/build_and_run.sh" --release --no-launch
@@ -49,11 +71,10 @@ else
 fi
 
 echo "Code signature verification:"
-codesign --verify --deep --strict "$WORK_APP"
+verify_bundle_signature "$WORK_APP"
 
 ditto --norsrc --noextattr --noqtn "$WORK_APP" "$RELEASE_APP"
-strip_bundle_metadata "$RELEASE_APP"
-codesign --verify --deep --strict "$RELEASE_APP"
+verify_bundle_signature "$RELEASE_APP"
 
 echo "Creating $DMG_PATH"
 hdiutil create \

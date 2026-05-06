@@ -139,7 +139,7 @@ struct NativeDocumentView: View {
         exportAction: export(format:),
         runCommand: runCommand(_:)
       )
-      .frame(minWidth: 680, minHeight: 520)
+      .frame(width: 860, height: 640)
     }
     .sheet(isPresented: $showingQuickSwitcher) {
       QuickSwitcherView(store: store, runCommand: runCommand(_:))

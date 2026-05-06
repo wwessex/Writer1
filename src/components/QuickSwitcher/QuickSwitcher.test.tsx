@@ -191,4 +191,25 @@ describe('QuickSwitcher', () => {
     expect(onCloseMock).toHaveBeenCalled();
     vi.useRealTimers();
   });
+
+  it('has a visible close button that closes without selecting an item', () => {
+    vi.useFakeTimers();
+    act(() => {
+      root.render(
+        <QuickSwitcher open={true} onClose={onCloseMock} onAction={onActionMock} />
+      );
+    });
+    const closeButton = container.querySelector('button[aria-label="Close quick switcher"]');
+    expect(closeButton).not.toBeNull();
+
+    act(() => {
+      closeButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    act(() => { vi.advanceTimersByTime(250); });
+
+    expect(onCloseMock).toHaveBeenCalledTimes(1);
+    expect(onActionMock).not.toHaveBeenCalled();
+    expect(setActiveChapterMock).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
 });

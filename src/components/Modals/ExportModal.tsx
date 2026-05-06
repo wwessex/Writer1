@@ -138,6 +138,11 @@ const EXPORT_PRESETS: ExportPreset[] = [
 
 type ExportTab = 'presets' | 'manuscript' | 'custom' | 'publishing';
 
+interface ExportActionOptions {
+  includeHeadings?: boolean;
+  fountainOptions?: Partial<FountainExportOptions>;
+}
+
 export function ExportModal({ open, onClose }: ExportModalProps) {
   const { state } = useApp();
   const { showToast } = useToast();
@@ -245,38 +250,46 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
     setMarginIn(defaults.marginIn);
   };
 
-  const handleExport = async (format: ExportFormat, presetId?: string, manuscriptOpts?: ManuscriptExportOptions) => {
+  const handleExport = async (
+    format: ExportFormat,
+    presetId?: string,
+    manuscriptOpts?: ManuscriptExportOptions,
+    exportOptions: ExportActionOptions = {},
+  ) => {
+    const resolvedIncludeHeadings = exportOptions.includeHeadings ?? includeHeadings;
+    const resolvedFountainOptions = {
+      includeSectionTitles: exportOptions.fountainOptions?.includeSectionTitles ?? includeSectionTitles,
+      includeMetadataBlock: exportOptions.fountainOptions?.includeMetadataBlock ?? includeMetadataBlock,
+      filenameConvention: exportOptions.fountainOptions?.filenameConvention ?? filenameConvention,
+    };
+
     setExporting(true);
     try {
       switch (format) {
         case 'docx':
-          await exportToDocx(state.chapters, state.novelTitle, includeHeadings, manuscriptOpts);
+          await exportToDocx(state.chapters, state.novelTitle, resolvedIncludeHeadings, manuscriptOpts);
           break;
         case 'pdf':
-          await exportToPdf(state.chapters, state.novelTitle, includeHeadings, manuscriptOpts);
+          await exportToPdf(state.chapters, state.novelTitle, resolvedIncludeHeadings, manuscriptOpts);
           break;
         case 'screenplayPdf':
           await exportToScreenplayPdf(state.chapters, state.novelTitle);
           break;
         case 'fountain':
-          await exportToFountain(state.chapters, state.novelTitle, {
-            includeSectionTitles,
-            includeMetadataBlock,
-            filenameConvention,
-          });
+          await exportToFountain(state.chapters, state.novelTitle, resolvedFountainOptions);
           break;
         case 'rtf':
-          await exportToRtf(state.chapters, state.novelTitle, includeHeadings, manuscriptOpts);
+          await exportToRtf(state.chapters, state.novelTitle, resolvedIncludeHeadings, manuscriptOpts);
           break;
         case 'markdown':
-          await exportToMarkdown(state.chapters, state.novelTitle, includeHeadings);
+          await exportToMarkdown(state.chapters, state.novelTitle, resolvedIncludeHeadings);
           break;
         case 'txt':
-          await exportToPlainText(state.chapters, state.novelTitle, includeHeadings);
+          await exportToPlainText(state.chapters, state.novelTitle, resolvedIncludeHeadings);
           break;
         case 'publishingBundle':
           await exportPublishingBundle(state.chapters, state.novelTitle, {
-            includeHeadings,
+            includeHeadings: resolvedIncludeHeadings,
             includeKdpTemplate,
             manuscriptFormat: 'docx',
             data: {
@@ -333,7 +346,10 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
       }
     }
     setIncludeHeadings(preset.includeHeadings);
-    await handleExport(preset.format, preset.id, manuscriptOpts);
+    await handleExport(preset.format, preset.id, manuscriptOpts, {
+      includeHeadings: preset.includeHeadings,
+      fountainOptions: preset.fountainOptions,
+    });
   };
 
   const handleManuscriptExport = async () => {
