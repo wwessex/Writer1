@@ -29,11 +29,9 @@
     "macos:package": "./script/package_macos.sh",
     "desktop:build": "npm --prefix desktop run build",
     "desktop:build:debug": "npm --prefix desktop run build:debug",
-    "desktop:build:mac": "npm run macos:package",
     "desktop:build:win": "npm --prefix desktop run build -- --target x86_64-pc-windows-msvc",
     "desktop:build:linux": "npm --prefix desktop run build -- --target x86_64-unknown-linux-gnu",
-    "release:verify-artifacts": "node scripts/verify-release-artifacts.mjs",
-    "desktop:build:mac:debug": "npm run macos:build"
+    "release:verify-artifacts": "node scripts/verify-release-artifacts.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.1.0",

@@ -140,9 +140,35 @@ describe('SettingsWindow', () => {
     const rendered = renderSettingsWindow();
 
     const text = rendered.container.textContent ?? '';
+    expect(text).toContain('Appearance');
     expect(text).toContain('Typography');
     expect(text).toContain('AI Provider');
     expect(text).toContain('Application');
+    rendered.unmount();
+  });
+
+  it('renders persistent appearance choices', () => {
+    const rendered = renderSettingsWindow();
+
+    const themeSelect = Array.from(rendered.container.querySelectorAll('select'))
+      .find(select => Array.from(select.options).some(option => option.value === 'auto'));
+    expect(themeSelect).toBeDefined();
+    expect(Array.from(themeSelect?.options ?? []).map(option => option.value)).toEqual(['auto', 'light', 'dark']);
+
+    rendered.unmount();
+  });
+
+  it('persists theme preference updates through app settings', () => {
+    const rendered = renderSettingsWindow();
+
+    const themeSelect = Array.from(rendered.container.querySelectorAll('select'))
+      .find(select => Array.from(select.options).some(option => option.value === 'auto')) as HTMLSelectElement;
+    act(() => {
+      themeSelect.value = 'dark';
+      themeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(mocks.updateSettings).toHaveBeenCalledWith({ theme: 'dark' });
     rendered.unmount();
   });
 

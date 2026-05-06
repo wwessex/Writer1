@@ -65,7 +65,7 @@ struct NativeDocumentView: View {
   @State private var selectedRange = NSRange(location: 0, length: 0)
   @State private var showingAddCommentPrompt = false
   @State private var commentDraft = ""
-  @AppStorage("DraftHarbour.editor.theme") private var theme = "system"
+  @AppStorage("DraftHarbour.editor.theme") private var theme = "auto"
   @AppStorage("DraftHarbour.editor.pageView") private var pageView = false
   @AppStorage("DraftHarbour.editor.focusMode") private var focusMode = false
   @AppStorage("DraftHarbour.editor.typewriterMode") private var typewriterMode = false
@@ -180,10 +180,17 @@ struct NativeDocumentView: View {
       document.envelope = store.envelope
       _ = try? recoveryService.save(envelope: store.envelope, activeSectionID: store.activeSectionID, sourceURL: fileURL)
     }
+    .onChange(of: theme) { _, newValue in
+      let normalized = ThemePreference.normalizedRawValue(newValue)
+      if normalized != newValue {
+        theme = normalized
+      }
+    }
     .onChange(of: store.activeSectionID) { _, newValue in
       recoveryService.recordActiveSectionID(newValue, projectId: store.envelope.project.id)
     }
     .onAppear {
+      theme = ThemePreference.normalizedRawValue(theme)
       if let fileURL {
         recoveryService.recordLastOpenedProjectURL(fileURL)
         NSDocumentController.shared.noteNewRecentDocumentURL(fileURL)
@@ -207,6 +214,7 @@ struct NativeDocumentView: View {
       guard let raw = notification.object as? String, let command = NativeCommandID(rawValue: raw) else { return }
       runCommand(command)
     }
+    .preferredColorScheme(preferredColorScheme)
   }
 
   private var workspace: some View {
@@ -218,6 +226,17 @@ struct NativeDocumentView: View {
         InspectorView(store: store, selectedRange: selectedRange)
           .frame(minWidth: 260, idealWidth: 320, maxWidth: 420)
       }
+    }
+  }
+
+  private var preferredColorScheme: ColorScheme? {
+    switch ThemePreference(storageValue: theme) {
+    case .auto:
+      return nil
+    case .light:
+      return .light
+    case .dark:
+      return .dark
     }
   }
 
@@ -493,12 +512,12 @@ struct NativeDocumentView: View {
       focusMode.toggle()
       inspectorVisible = !focusMode
       columnVisibility = focusMode ? .detailOnly : .all
-    case .themeDark:
-      theme = "dark"
+    case .themeAuto:
+      theme = "auto"
     case .themeLight:
       theme = "light"
-    case .themeHighContrast:
-      theme = "high-contrast"
+    case .themeDark:
+      theme = "dark"
     case .toggleTypewriterMode:
       typewriterMode.toggle()
     }

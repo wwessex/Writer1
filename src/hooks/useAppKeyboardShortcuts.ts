@@ -7,7 +7,10 @@ import type { FindReplaceControls } from '@/components/FindReplace/useFindReplac
 
 type ToastFn = (message: string, type?: 'success' | 'error' | 'info' | 'warning', icon?: string) => void;
 
-type AppDispatch = Dispatch<{ type: 'TOGGLE_SIDEBAR' | 'TOGGLE_PAGE_VIEW' | 'TOGGLE_FOCUS_MODE' } | { type: 'SET_THEME'; payload: 'dark' | 'light' | 'high-contrast' }>;
+type AppDispatch = Dispatch<
+  { type: 'TOGGLE_SIDEBAR' | 'TOGGLE_PAGE_VIEW' | 'TOGGLE_FOCUS_MODE' }
+  | { type: 'SET_THEME'; payload: AppSettings['theme'] }
+>;
 
 interface UseAppKeyboardShortcutsParams {
   editor: EditorAdapter | null;

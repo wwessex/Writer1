@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AboutWindow } from './AboutWindow';
 
 const mocks = vi.hoisted(() => ({
-  theme: 'dark' as 'light' | 'dark',
+  theme: 'dark' as 'auto' | 'light' | 'dark',
   createDiagnosticsReportMock: vi.fn(async () => '{"ok":true}'),
 }));
 

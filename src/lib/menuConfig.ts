@@ -57,9 +57,9 @@ export const APP_MENUS: AppMenuConfig[] = [
       { divider: true },
       { label: 'Quick Switcher', action: COMMAND_IDS.QUICK_SWITCHER, shortcut: 'Ctrl+K' },
       { divider: true },
-      { label: 'True Dark', action: COMMAND_IDS.THEME_DARK },
-      { label: 'Warm Light (Default)', action: COMMAND_IDS.THEME_LIGHT },
-      { label: 'High Contrast (Optional)', action: COMMAND_IDS.THEME_HIGH_CONTRAST },
+      { label: 'Auto Appearance', action: COMMAND_IDS.THEME_AUTO },
+      { label: 'Light Appearance', action: COMMAND_IDS.THEME_LIGHT },
+      { label: 'Dark Appearance', action: COMMAND_IDS.THEME_DARK },
       { divider: true },
       { label: 'Project Dashboard', action: COMMAND_IDS.DASHBOARD }
     ]

@@ -25,6 +25,7 @@ import {
   withSavingDispatch
 } from './services/appServices';
 import { getWorkspaceStore, setLastOpenedChapter, trackProjectOpen } from './services/workspaceService';
+import { useResolvedTheme } from '@/hooks/useResolvedTheme';
 
 import { isMobileViewport } from '@/hooks/useIsMobile';
 
@@ -65,6 +66,7 @@ const SavingStateContext = createContext<boolean | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, createInitialAppState({ isMobile, isOnline: navigator.onLine }));
+  const resolvedTheme = useResolvedTheme(state.settings.theme);
   const stateRef = useRef(state);
   const { showErrorToast } = useToast();
 
@@ -118,8 +120,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [state.settings]);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = state.settings.theme;
-  }, [state.settings.theme]);
+    document.documentElement.dataset.theme = resolvedTheme;
+    document.documentElement.style.colorScheme = resolvedTheme;
+  }, [resolvedTheme]);
 
   useEffect(() => {
     const handleOnline = () => dispatch({ type: 'SET_ONLINE', payload: true });

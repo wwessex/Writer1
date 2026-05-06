@@ -17,7 +17,7 @@ export type AppAction =
   | { type: 'SET_SAVING'; payload: boolean }
   | { type: 'TOGGLE_SIDEBAR' }
   | { type: 'TOGGLE_PAGE_VIEW' }
-  | { type: 'SET_THEME'; payload: 'dark' | 'light' | 'high-contrast' }
+  | { type: 'SET_THEME'; payload: AppSettings['theme'] }
   | { type: 'TOGGLE_FOCUS_MODE' };
 
 export function createInitialAppState(options?: { isMobile?: boolean; isOnline?: boolean }): AppState {

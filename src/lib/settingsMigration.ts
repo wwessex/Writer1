@@ -1,4 +1,5 @@
 import type { AppSettings, SidebarPanelId, SidebarPanelsSettings } from '@/types';
+import { normalizeThemePreference } from '@/lib/appearance';
 
 export const CURRENT_SETTINGS_VERSION = 2;
 
@@ -135,9 +136,7 @@ const sanitizeSettings = (rawSettings: unknown, defaults: AppSettings): AppSetti
       languageToolUrl: asString(assist.languageToolUrl, defaults.assist.languageToolUrl),
       languageToolLanguage: asString(assist.languageToolLanguage, defaults.assist.languageToolLanguage)
     },
-    theme: rawSettings.theme === 'dark' || rawSettings.theme === 'light' || rawSettings.theme === 'high-contrast'
-      ? rawSettings.theme
-      : defaults.theme,
+    theme: normalizeThemePreference(rawSettings.theme, defaults.theme),
     sidebarHidden: asBoolean(rawSettings.sidebarHidden, defaults.sidebarHidden),
     pageView: asBoolean(rawSettings.pageView, defaults.pageView),
     focusMode: asBoolean(rawSettings.focusMode, defaults.focusMode),

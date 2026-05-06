@@ -154,16 +154,16 @@ struct DraftHarbourCommands: Commands {
 
       Divider()
 
-      Button("True Dark") {
-        post(.themeDark)
+      Button("Auto Appearance") {
+        post(.themeAuto)
       }
 
-      Button("Warm Light") {
+      Button("Light Appearance") {
         post(.themeLight)
       }
 
-      Button("High Contrast") {
-        post(.themeHighContrast)
+      Button("Dark Appearance") {
+        post(.themeDark)
       }
     }
 

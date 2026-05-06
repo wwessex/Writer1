@@ -9,6 +9,7 @@ import { SaveStatus } from './SaveStatus';
 import { getProjectMetrics } from '@/lib/projectMetrics';
 import { getMonthlyHistory } from '@/lib/progressTracker';
 import { createProvider, loadAIConfig } from '@/lib/ai';
+import { useResolvedTheme } from '@/hooks/useResolvedTheme';
 import { COMMAND_IDS, COMMAND_METADATA, isCommandEnabled, type CommandId } from '@/lib/commands';
 import { APP_MENUS } from '@/lib/menuConfig';
 import styles from './Header.module.css';
@@ -40,6 +41,7 @@ const MOBILE_SECTION_BY_MENU_LABEL: Record<string, MobileMenuSection['section']>
 
 export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSelection = false, editorFocused = false }: HeaderProps) {
   const { state, updateNovelTitle } = useApp();
+  const resolvedTheme = useResolvedTheme(state.settings.theme);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuRootRef = useRef<HTMLDivElement>(null);
   const mobileMenuListRef = useRef<HTMLDivElement>(null);
@@ -249,7 +251,7 @@ export function Header({ onAction, onToggleInspector, inspectorOpen, hasTextSele
               className={styles.menuBtn}
             />
           </div>
-          <img src={`${import.meta.env.BASE_URL}assets/${state.settings.theme === 'light' ? 'icon-black' : 'icon-blue'}-64.png`} alt="DraftHarbour" className={styles.logo} />
+          <img src={`${import.meta.env.BASE_URL}assets/${resolvedTheme === 'light' ? 'icon-black' : 'icon-blue'}-64.png`} alt="DraftHarbour" className={styles.logo} />
           <Input
             variant="title"
             value={state.novelTitle}

@@ -36,9 +36,9 @@ public enum NativeCommandID: String, Codable, CaseIterable, Sendable {
   case toggleSidebar
   case togglePageView
   case toggleFocusMode
-  case themeDark
+  case themeAuto
   case themeLight
-  case themeHighContrast
+  case themeDark
   case undo
   case redo
   case cut
@@ -62,7 +62,7 @@ public enum NativeCommandID: String, Codable, CaseIterable, Sendable {
       return .responderChain
     case .openProjectFile, .saveProjectFile, .openRecent, .reopenLastProject, .exportBackup, .importBackup, .saveProjectCopy, .settings, .about:
       return .system
-    case .importDocument, .newSection, .export, .snapshots, .analysis, .wordCount, .dashboard, .onboarding, .characterBible, .aiWriting, .comments, .addComment, .advancedAnalytics, .integrations, .projects, .sceneTemplates, .exportHistory, .aiPanel, .translation, .corkboard, .inspector, .quickSwitcher, .findReplace, .toggleSidebar, .togglePageView, .toggleFocusMode, .themeDark, .themeLight, .themeHighContrast, .insertHorizontalRule, .insertBlockquote, .formatBold, .formatItalic, .formatUnderline, .formatHeading1, .formatHeading2, .formatParagraph, .toggleTypewriterMode, .storyCards:
+    case .importDocument, .newSection, .export, .snapshots, .analysis, .wordCount, .dashboard, .onboarding, .characterBible, .aiWriting, .comments, .addComment, .advancedAnalytics, .integrations, .projects, .sceneTemplates, .exportHistory, .aiPanel, .translation, .corkboard, .inspector, .quickSwitcher, .findReplace, .toggleSidebar, .togglePageView, .toggleFocusMode, .themeAuto, .themeLight, .themeDark, .insertHorizontalRule, .insertBlockquote, .formatBold, .formatItalic, .formatUnderline, .formatHeading1, .formatHeading2, .formatParagraph, .toggleTypewriterMode, .storyCards:
       return .native
     }
   }
