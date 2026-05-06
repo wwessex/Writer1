@@ -6,15 +6,32 @@ PACKAGE_DIR="$ROOT_DIR/macos"
 PRODUCT="DraftHarbourNative"
 APP_NAME="DraftHarbour"
 APP_BUNDLE="$ROOT_DIR/dist/$APP_NAME.app"
-CONTENTS_DIR="$APP_BUNDLE/Contents"
-MACOS_DIR="$CONTENTS_DIR/MacOS"
-RESOURCES_DIR="$CONTENTS_DIR/Resources"
 ICON_SOURCE="$ROOT_DIR/macos/Resources/DraftHarbour.icns"
 CONFIGURATION="debug"
 SHOULD_LAUNCH=1
 SHOULD_VERIFY=0
 STREAM_LOGS=0
 DEBUG_LAUNCH=0
+STAGING_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/draftharbour-build.XXXXXX")"
+STAGING_APP="$STAGING_ROOT/$APP_NAME.app"
+CONTENTS_DIR="$STAGING_APP/Contents"
+MACOS_DIR="$CONTENTS_DIR/MacOS"
+RESOURCES_DIR="$CONTENTS_DIR/Resources"
+
+cleanup() {
+  rm -rf "$STAGING_ROOT"
+}
+trap cleanup EXIT
+
+strip_bundle_metadata() {
+  local bundle="$1"
+  if command -v xattr >/dev/null 2>&1; then
+    xattr -cr "$bundle" 2>/dev/null || true
+    xattr -d com.apple.FinderInfo "$bundle" 2>/dev/null || true
+    xattr -d 'com.apple.fileprovider.fpfs#P' "$bundle" 2>/dev/null || true
+  fi
+  find "$bundle" -name '._*' -delete
+}
 
 for arg in "$@"; do
   case "$arg" in
@@ -58,7 +75,7 @@ fi
 
 pkill -x "$PRODUCT" >/dev/null 2>&1 || true
 
-rm -rf "$APP_BUNDLE"
+rm -rf "$STAGING_APP"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 cp "$BIN_PATH" "$MACOS_DIR/$PRODUCT"
 chmod +x "$MACOS_DIR/$PRODUCT"
@@ -158,11 +175,15 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-if command -v xattr >/dev/null 2>&1; then
-  xattr -cr "$APP_BUNDLE"
-fi
-find "$APP_BUNDLE" -name '._*' -delete
-codesign --force --deep --sign - "$APP_BUNDLE" >/dev/null
+strip_bundle_metadata "$STAGING_APP"
+codesign --force --deep --sign - "$STAGING_APP" >/dev/null
+codesign --verify --deep --strict "$STAGING_APP"
+
+mkdir -p "$(dirname "$APP_BUNDLE")"
+rm -rf "$APP_BUNDLE"
+ditto --norsrc --noextattr --noqtn "$STAGING_APP" "$APP_BUNDLE"
+strip_bundle_metadata "$APP_BUNDLE"
+codesign --verify --deep --strict "$APP_BUNDLE"
 
 if [[ "$SHOULD_LAUNCH" -eq 1 ]]; then
   echo "Launching $APP_BUNDLE..."
@@ -172,7 +193,7 @@ else
 fi
 
 if [[ "$DEBUG_LAUNCH" -eq 1 ]]; then
-  lldb "$MACOS_DIR/$PRODUCT"
+  lldb "$APP_BUNDLE/Contents/MacOS/$PRODUCT"
 elif [[ "$STREAM_LOGS" -eq 1 ]]; then
   /usr/bin/log stream --info --predicate "process == '$PRODUCT'"
 elif [[ "$SHOULD_VERIFY" -eq 1 ]]; then
