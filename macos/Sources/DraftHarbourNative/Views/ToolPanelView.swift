@@ -60,6 +60,13 @@ struct ToolPanelView: View {
   @State private var scrivenerPath = ""
   @State private var scrivenerMessage: String?
   @State private var isScrivenerSyncing = false
+  @State private var googleDriveClientID = UserDefaults.standard.string(forKey: "DraftHarbour.googleDrive.clientId") ?? NativeOAuthDefaults.googleClientID
+  @State private var googleDriveMessage: String?
+  @State private var isGoogleDriveSyncing = false
+  @State private var dropboxAppKey = UserDefaults.standard.string(forKey: "DraftHarbour.dropbox.appKey") ?? NativeOAuthDefaults.dropboxAppKey
+  @State private var dropboxFolderPath = UserDefaults.standard.string(forKey: "DraftHarbour.dropbox.folderPath") ?? "/DraftHarbour"
+  @State private var dropboxMessage: String?
+  @State private var isDropboxSyncing = false
 
   @State private var aiEndpoint = UserDefaults.standard.string(forKey: "DraftHarbour.ai.endpoint") ?? "http://localhost:11434/v1/chat/completions"
   @State private var aiModel = UserDefaults.standard.string(forKey: "DraftHarbour.ai.model") ?? "llama3.1"
@@ -625,6 +632,9 @@ struct ToolPanelView: View {
         .padding(.vertical, 4)
       }
 
+      googleDriveBox
+      dropboxBox
+
       GroupBox("Scrivener Package Bridge") {
         VStack(alignment: .leading, spacing: 10) {
           TextField("Package or folder path", text: $scrivenerPath)
@@ -684,14 +694,84 @@ struct ToolPanelView: View {
           }
         }
       }
+    }
+  }
 
-      GroupBox("Deferred Provider OAuth") {
-        VStack(alignment: .leading, spacing: 6) {
-          Text("Dropbox and Google Drive native OAuth are intentionally deferred for this pass.")
-          Text("Use Generic REST sync now, or Scrivener local package import/export.")
+  private var googleDriveBox: some View {
+    GroupBox("Google Drive") {
+      VStack(alignment: .leading, spacing: 10) {
+        TextField("Desktop OAuth client ID", text: $googleDriveClientID)
+          .textFieldStyle(.roundedBorder)
+        cloudProviderStatus(for: .googleDrive)
+        HStack {
+          Button {
+            Task { await runCloud(.googleDrive, .connect) }
+          } label: {
+            Label("Connect", systemImage: "link")
+          }
+          Button {
+            Task { await runCloud(.googleDrive, .disconnect) }
+          } label: {
+            Label("Disconnect", systemImage: "xmark.circle")
+          }
+          Button {
+            Task { await runCloud(.googleDrive, .sync) }
+          } label: {
+            Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
+          }
+          Button {
+            Task { await runCloud(.googleDrive, .revisions) }
+          } label: {
+            Label("Revisions", systemImage: "clock.arrow.circlepath")
+          }
+        }
+        .disabled(isGoogleDriveSyncing)
+        if let googleDriveMessage {
+          Text(googleDriveMessage)
             .foregroundStyle(.secondary)
         }
       }
+      .padding(.vertical, 4)
+    }
+  }
+
+  private var dropboxBox: some View {
+    GroupBox("Dropbox") {
+      VStack(alignment: .leading, spacing: 10) {
+        TextField("Dropbox app key", text: $dropboxAppKey)
+          .textFieldStyle(.roundedBorder)
+        TextField("Folder path", text: $dropboxFolderPath)
+          .textFieldStyle(.roundedBorder)
+        cloudProviderStatus(for: .dropbox)
+        HStack {
+          Button {
+            Task { await runCloud(.dropbox, .connect) }
+          } label: {
+            Label("Connect", systemImage: "link")
+          }
+          Button {
+            Task { await runCloud(.dropbox, .disconnect) }
+          } label: {
+            Label("Disconnect", systemImage: "xmark.circle")
+          }
+          Button {
+            Task { await runCloud(.dropbox, .sync) }
+          } label: {
+            Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
+          }
+          Button {
+            Task { await runCloud(.dropbox, .revisions) }
+          } label: {
+            Label("Revisions", systemImage: "clock.arrow.circlepath")
+          }
+        }
+        .disabled(isDropboxSyncing)
+        if let dropboxMessage {
+          Text(dropboxMessage)
+            .foregroundStyle(.secondary)
+        }
+      }
+      .padding(.vertical, 4)
     }
   }
 
@@ -915,12 +995,43 @@ struct ToolPanelView: View {
     return text.count > 120 ? String(text.prefix(120)) + "..." : text
   }
 
+  @ViewBuilder
+  private func cloudProviderStatus(for type: IntegrationType) -> some View {
+    let config = store.integrationConfig(for: type)
+    HStack(spacing: 10) {
+      Label(config.enabled ? "Connected" : "Not connected", systemImage: config.enabled ? "checkmark.circle.fill" : "circle")
+        .foregroundStyle(config.enabled ? .green : .secondary)
+      if let providerUserId = config.providerUserId, !providerUserId.isEmpty {
+        Text(providerUserId)
+          .foregroundStyle(.secondary)
+      }
+      if let status = config.status, !status.isEmpty {
+        Text(status.capitalized)
+          .foregroundStyle(.secondary)
+      }
+      if let lastSyncAt = config.lastSyncAt {
+        Text(Date(timeIntervalSince1970: Double(lastSyncAt) / 1_000).formatted())
+          .foregroundStyle(.secondary)
+      }
+    }
+    .font(.caption)
+  }
+
   private func hydrateSyncFields() {
     let config = store.integrationConfig(for: .genericREST)
     syncBaseURL = config.baseUrl ?? UserDefaults.standard.string(forKey: "DraftHarbour.sync.baseUrl") ?? ""
-    syncToken = config.accessToken ?? ""
+    syncToken = (try? OAuthTokenPersistence.tokenValue(
+      config.accessToken,
+      account: config.accessTokenKeychainAccount,
+      tokenStore: KeychainClient.shared
+    )) ?? ""
     let scrivenerConfig = store.integrationConfig(for: .scrivener)
     scrivenerPath = scrivenerConfig.syncFolderPath ?? scrivenerConfig.folderId ?? UserDefaults.standard.string(forKey: "DraftHarbour.scrivener.path") ?? ""
+    let googleConfig = store.integrationConfig(for: .googleDrive)
+    googleDriveClientID = googleConfig.clientId ?? UserDefaults.standard.string(forKey: "DraftHarbour.googleDrive.clientId") ?? NativeOAuthDefaults.googleClientID
+    let dropboxConfig = store.integrationConfig(for: .dropbox)
+    dropboxAppKey = dropboxConfig.clientId ?? UserDefaults.standard.string(forKey: "DraftHarbour.dropbox.appKey") ?? NativeOAuthDefaults.dropboxAppKey
+    dropboxFolderPath = dropboxConfig.syncFolderPath ?? UserDefaults.standard.string(forKey: "DraftHarbour.dropbox.folderPath") ?? "/DraftHarbour"
     if let config = store.envelope.aiProviders.first {
       loadAIProvider(config)
     }
@@ -928,16 +1039,32 @@ struct ToolPanelView: View {
 
   private func saveSyncConfig(status: String? = nil) {
     UserDefaults.standard.set(syncBaseURL, forKey: "DraftHarbour.sync.baseUrl")
-    store.updateIntegration(
-      IntegrationConfig(
-        type: .genericREST,
-        enabled: !syncBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-        status: status,
-        lastSyncAt: store.integrationConfig(for: .genericREST).lastSyncAt,
-        accessToken: syncToken.isEmpty ? nil : syncToken,
-        baseUrl: syncBaseURL.isEmpty ? nil : syncBaseURL
-      )
-    )
+    var config = store.integrationConfig(for: .genericREST)
+    config.enabled = !syncBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    config.status = status
+    config.baseUrl = syncBaseURL.isEmpty ? nil : syncBaseURL
+
+    let token = syncToken.trimmingCharacters(in: .whitespacesAndNewlines)
+    if token.isEmpty {
+      if let account = config.accessTokenKeychainAccount {
+        try? KeychainClient.shared.deleteSecret(account: account)
+      }
+      config.accessToken = nil
+      config.accessTokenKeychainAccount = nil
+    } else {
+      let connectionID = config.connectionId ?? makeIdentifier()
+      config.connectionId = connectionID
+      let account = config.accessTokenKeychainAccount ?? "integration.generic-rest.access.\(connectionID)"
+      do {
+        try KeychainClient.shared.setSecret(token, account: account)
+        config.accessTokenKeychainAccount = account
+        config.accessToken = nil
+      } catch {
+        syncMessage = error.localizedDescription
+        config.accessToken = token
+      }
+    }
+    store.updateIntegration(config)
   }
 
   private func saveScrivenerConfig(status: String? = nil) -> IntegrationConfig {
@@ -954,10 +1081,42 @@ struct ToolPanelView: View {
     return config
   }
 
+  private func saveGoogleDriveConfig(status: String? = nil) -> IntegrationConfig {
+    UserDefaults.standard.set(googleDriveClientID, forKey: "DraftHarbour.googleDrive.clientId")
+    var config = store.integrationConfig(for: .googleDrive)
+    config.clientId = googleDriveClientID.trimmingCharacters(in: .whitespacesAndNewlines)
+    if let status {
+      config.status = status
+    }
+    store.updateIntegration(config)
+    return config
+  }
+
+  private func saveDropboxConfig(status: String? = nil) -> IntegrationConfig {
+    UserDefaults.standard.set(dropboxAppKey, forKey: "DraftHarbour.dropbox.appKey")
+    UserDefaults.standard.set(dropboxFolderPath, forKey: "DraftHarbour.dropbox.folderPath")
+    var config = store.integrationConfig(for: .dropbox)
+    config.clientId = dropboxAppKey.trimmingCharacters(in: .whitespacesAndNewlines)
+    let folderPath = dropboxFolderPath.trimmingCharacters(in: .whitespacesAndNewlines)
+    config.syncFolderPath = folderPath.isEmpty ? "/DraftHarbour" : folderPath
+    if let status {
+      config.status = status
+    }
+    store.updateIntegration(config)
+    return config
+  }
+
   private enum SyncAction {
     case connect
     case push
     case pull
+    case revisions
+  }
+
+  private enum CloudAction {
+    case connect
+    case disconnect
+    case sync
     case revisions
   }
 
@@ -1010,6 +1169,72 @@ struct ToolPanelView: View {
       syncMessage = error.localizedDescription
     }
     isSyncing = false
+  }
+
+  @MainActor
+  private func runCloud(_ type: IntegrationType, _ action: CloudAction) async {
+    setCloudBusy(type, true)
+    setCloudMessage(type, nil)
+    syncConflicts = []
+    defer { setCloudBusy(type, false) }
+
+    let config = type == .dropbox ? saveDropboxConfig() : saveGoogleDriveConfig()
+    let clientID = config.clientId ?? NativeOAuthDefaults.defaultClientID(for: type)
+    let provider = NativeIntegrationProviderRegistry.provider(for: type, config: config)
+
+    do {
+      switch action {
+      case .connect:
+        let oauthConfig = try await NativeOAuthCoordinator.shared.connect(
+          provider: type,
+          clientID: clientID,
+          existingConfig: config
+        )
+        store.updateIntegration(oauthConfig)
+        let result = try await provider.connect(config: oauthConfig)
+        store.applySyncResult(result)
+        setCloudMessage(type, result.message)
+      case .disconnect:
+        let disconnected = try await NativeOAuthCoordinator.shared.disconnect(provider: type, config: config)
+        store.updateIntegration(disconnected)
+        setCloudMessage(type, disconnected.status ?? "Disconnected \(type.displayName).")
+      case .sync:
+        let pushResult = try await provider.push(config: config, payload: IntegrationPayload(envelope: store.envelope))
+        store.applySyncResult(pushResult)
+        let latestConfig = store.integrationConfig(for: type)
+        let pullResult = try await provider.pull(config: latestConfig, payload: IntegrationPayload(envelope: store.envelope))
+        store.applySyncResult(pullResult)
+        syncConflicts = pullResult.conflicts
+        setCloudMessage(type, "\(pushResult.message) \(pullResult.message)")
+      case .revisions:
+        remoteRevisions = try await provider.listRevisions(config: config)
+        setCloudMessage(type, "Loaded \(remoteRevisions.count) \(type.displayName) revision(s).")
+      }
+    } catch {
+      setCloudMessage(type, error.localizedDescription)
+    }
+  }
+
+  private func setCloudBusy(_ type: IntegrationType, _ value: Bool) {
+    switch type {
+    case .dropbox:
+      isDropboxSyncing = value
+    case .googleDrive:
+      isGoogleDriveSyncing = value
+    case .genericREST, .scrivener:
+      break
+    }
+  }
+
+  private func setCloudMessage(_ type: IntegrationType, _ value: String?) {
+    switch type {
+    case .dropbox:
+      dropboxMessage = value
+    case .googleDrive:
+      googleDriveMessage = value
+    case .genericREST, .scrivener:
+      break
+    }
   }
 
   private func resolve(_ conflict: ConflictInfo, _ option: ConflictResolutionOption) {

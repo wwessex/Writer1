@@ -452,7 +452,7 @@ public final class ProjectStore {
       envelope = DhprojCodec.normalize(pulledEnvelope)
       activeSectionID = envelope.sections.first(where: { $0.id == activeSectionID })?.id ?? envelope.sections.first?.id
     }
-    var config = integrationConfig(for: result.provider)
+    var config = result.updatedConfig ?? integrationConfig(for: result.provider)
     config.status = result.conflicts.isEmpty ? result.message : "\(result.conflicts.count) conflict(s)"
     config.lastSyncAt = currentTimeMilliseconds()
     updateIntegration(config)

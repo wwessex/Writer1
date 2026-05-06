@@ -112,10 +112,12 @@ public enum SyncMergeEngine {
 public struct GenericRESTSyncProvider: IntegrationProvider {
   public var type: IntegrationType
   public var session: URLSession
+  public var tokenStore: (any SecretStore)?
 
-  public init(type: IntegrationType = .genericREST, session: URLSession = .shared) {
+  public init(type: IntegrationType = .genericREST, session: URLSession = .shared, tokenStore: (any SecretStore)? = KeychainClient.shared) {
     self.type = type
     self.session = session
+    self.tokenStore = tokenStore
   }
 
   public func connect(config: IntegrationConfig) async throws -> IntegrationResult {
@@ -130,7 +132,7 @@ public struct GenericRESTSyncProvider: IntegrationProvider {
     var request = URLRequest(url: base.appending(path: "projects/\(payload.envelope.project.id)"))
     request.httpMethod = "PUT"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    if let token = config.accessToken {
+    if let token = try authToken(config) {
       request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
     }
     request.httpBody = try JSONEncoder().encode(ProviderPayload(envelope: payload.envelope))
@@ -142,7 +144,7 @@ public struct GenericRESTSyncProvider: IntegrationProvider {
   public func pull(config: IntegrationConfig, payload: IntegrationPayload) async throws -> IntegrationResult {
     let base = try baseURL(config)
     var request = URLRequest(url: base.appending(path: "projects/\(payload.envelope.project.id)"))
-    if let token = config.accessToken {
+    if let token = try authToken(config) {
       request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
     }
     let (data, response) = try await session.data(for: request)
@@ -160,7 +162,7 @@ public struct GenericRESTSyncProvider: IntegrationProvider {
   public func listRevisions(config: IntegrationConfig) async throws -> [RemoteRevision] {
     let base = try baseURL(config)
     var request = URLRequest(url: base.appending(path: "revisions"))
-    if let token = config.accessToken {
+    if let token = try authToken(config) {
       request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
     }
     let (data, response) = try await session.data(for: request)
@@ -207,6 +209,10 @@ public struct GenericRESTSyncProvider: IntegrationProvider {
       throw DraftHarbourError.providerNotConfigured("\(type.rawValue) base URL")
     }
     return url
+  }
+
+  private func authToken(_ config: IntegrationConfig) throws -> String? {
+    try OAuthTokenPersistence.tokenValue(config.accessToken, account: config.accessTokenKeychainAccount, tokenStore: tokenStore)
   }
 
   private func validate(_ response: URLResponse) throws {

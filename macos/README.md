@@ -15,10 +15,11 @@ This SwiftUI/AppKit app is now the supported macOS desktop application. The exis
 - Session recovery with active section and recent project metadata.
 - Native AI provider configuration with Keychain-backed tokens, workflow stages, translation, insertion modes, and revision logging.
 - Generic REST sync with connect/test, push, pull, revisions, conflict display, and keep-local/use-remote/keep-both resolution.
+- Native Dropbox and Google Drive sync with PKCE OAuth, Keychain-backed access/refresh tokens, provider revisions, refresh-on-401, and conflict-aware pulls.
 - Scrivener local package bridge for plain-text package import/export.
 - Native menus for file, view, insert, format, tools, help, and project workflows.
 
-Dropbox and Google Drive provider-native OAuth are intentionally deferred for this pass. Use Generic REST sync for native cloud sync, or the Scrivener local package bridge for file-based workflows.
+Dropbox requires a registered app key with the `draftharbour://oauth/dropbox` redirect. Google Drive requires a desktop OAuth client; the app uses Google's loopback redirect flow and the `https://www.googleapis.com/auth/drive.file` scope.
 
 ## Build And Run
 

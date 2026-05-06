@@ -95,6 +95,17 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
       </array>
     </dict>
   </array>
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key>
+      <string>DraftHarbour OAuth</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>draftharbour</string>
+      </array>
+    </dict>
+  </array>
   <key>CFBundleExecutable</key>
   <string>DraftHarbourNative</string>
   <key>CFBundleIdentifier</key>

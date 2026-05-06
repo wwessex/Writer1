@@ -34,7 +34,7 @@ In Chrome/Edge/Safari (iOS): use "Add to Home Screen" / "Install App".
 
 ## Native macOS App
 
-The macOS desktop app is the SwiftUI/AppKit document app in `macos/`. It opens and saves `.dhproj` v1 files directly, includes native import/export, AI workflow configuration, recovery metadata, Generic REST sync, and the Scrivener package bridge.
+The macOS desktop app is the SwiftUI/AppKit document app in `macos/`. It opens and saves `.dhproj` v1 files directly, includes native import/export, AI workflow configuration, recovery metadata, Generic REST sync, Dropbox/Google Drive sync, and the Scrivener package bridge.
 
 ```bash
 swift test --package-path macos
@@ -49,7 +49,7 @@ Build-only and packaging checks:
 ./script/package_macos.sh
 ```
 
-`./script/package_macos.sh` creates `dist/release/DraftHarbour.dmg`, verifies the DMG, and writes `dist/release/checksums.txt`. Local beta builds are ad-hoc signed and may be rejected by Gatekeeper unless `APPLE_SIGNING_IDENTITY` is configured. Dropbox and Google Drive provider-native OAuth are deferred for this pass; use Generic REST sync or the Scrivener local package bridge in the native app.
+`./script/package_macos.sh` creates `dist/release/DraftHarbour.dmg`, verifies the DMG, and writes `dist/release/checksums.txt`. Local beta builds are ad-hoc signed and may be rejected by Gatekeeper unless `APPLE_SIGNING_IDENTITY` is configured. Dropbox and Google Drive sync use native PKCE OAuth; enter a registered Dropbox app key and Google desktop OAuth client ID in the native Integrations panel.
 
 ## Non-Mac Desktop App (Tauri)
 

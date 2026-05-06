@@ -4,7 +4,12 @@ public protocol SecretStore: Sendable {
   func secret(account: String) throws -> String?
 }
 
-extension KeychainClient: SecretStore {}
+public protocol WritableSecretStore: SecretStore {
+  func setSecret(_ value: String, account: String) throws
+  func deleteSecret(account: String) throws
+}
+
+extension KeychainClient: WritableSecretStore {}
 
 public enum PipelineInsertionMode: String, Codable, CaseIterable, Sendable {
   case replace
