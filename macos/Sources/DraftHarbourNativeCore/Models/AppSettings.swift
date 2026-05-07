@@ -7,14 +7,14 @@ public enum ThemePreference: String, Codable, CaseIterable, Sendable {
 
   public init(storageValue: String) {
     switch storageValue {
-    case "auto", "system":
+    case "auto", "system", "high-contrast":
       self = .auto
     case "light":
       self = .light
-    case "dark", "high-contrast":
+    case "dark":
       self = .dark
     default:
-      self = .light
+      self = .auto
     }
   }
 
