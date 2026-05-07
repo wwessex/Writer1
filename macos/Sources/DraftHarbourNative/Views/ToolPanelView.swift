@@ -41,6 +41,7 @@ struct ToolPanelView: View {
   @Environment(\.dismiss) private var dismiss
 
   @State private var selectedPanel = ToolPanel.dashboard
+  @AppStorage("DraftHarbour.export.lastFormat") private var selectedExportFormatRaw = ExportFormat.markdown.rawValue
   @State private var storyMode = StoryPanelMode.corkboard
   @State private var cardSize = CorkboardCardSize.normal
   @State private var corkboardReorderMode = false
@@ -85,6 +86,14 @@ struct ToolPanelView: View {
 
   private let characterRoles = ["protagonist", "antagonist", "supporting", "minor", "other"]
   private let worldCategories = ["location", "lore", "item", "event", "organisation", "other"]
+
+  private var selectedExportFormat: Binding<ExportFormat> {
+    Binding {
+      ExportFormat(rawValue: selectedExportFormatRaw) ?? .markdown
+    } set: { format in
+      selectedExportFormatRaw = format.rawValue
+    }
+  }
 
   var body: some View {
     NavigationSplitView {
@@ -149,20 +158,38 @@ struct ToolPanelView: View {
 
   private var exportContent: some View {
     VStack(alignment: .leading, spacing: 14) {
-      Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 12) {
-        GridRow {
-          Button("Markdown") { exportAction(.markdown) }
-          Button("Plain Text") { exportAction(.plainText) }
-          Button("Fountain") { exportAction(.fountain) }
-        }
-        GridRow {
-          Button("RTF") { exportAction(.rtf) }
-          Button("PDF") { exportAction(.pdf) }
-          Button("DOCX") { exportAction(.docx) }
-        }
-        GridRow {
-          Button("Screenplay PDF") { exportAction(.screenplayPdf) }
-          Button("Publishing Bundle") { exportAction(.publishingBundle) }
+      GroupBox("Export Review") {
+        VStack(alignment: .leading, spacing: 12) {
+          Picker("Format", selection: selectedExportFormat) {
+            ForEach(ExportFormat.allCases, id: \.self) { format in
+              Text(exportTitle(format)).tag(format)
+            }
+          }
+          .pickerStyle(.menu)
+          .frame(width: 260)
+
+          let issues = ExportValidator.validate(store.envelope, format: selectedExportFormat.wrappedValue)
+          if issues.isEmpty {
+            Label("No blocking validation issues for this format.", systemImage: "checkmark.circle")
+              .foregroundStyle(.secondary)
+          } else {
+            ForEach(issues) { issue in
+              Label(issue.message, systemImage: issue.severity == .error ? "xmark.octagon" : "exclamationmark.triangle")
+                .foregroundStyle(issue.severity == .error ? .red : .orange)
+            }
+          }
+
+          HStack {
+            Button {
+              exportAction(selectedExportFormat.wrappedValue)
+            } label: {
+              Label("Export \(exportTitle(selectedExportFormat.wrappedValue))", systemImage: "square.and.arrow.up")
+            }
+
+            Button("Export Backup") {
+              runCommand(.exportBackup)
+            }
+          }
         }
       }
 
@@ -187,6 +214,27 @@ struct ToolPanelView: View {
           }
         }
       }
+    }
+  }
+
+  private func exportTitle(_ format: ExportFormat) -> String {
+    switch format {
+    case .markdown:
+      return "Markdown"
+    case .plainText:
+      return "Plain Text"
+    case .fountain:
+      return "Fountain"
+    case .rtf:
+      return "RTF"
+    case .pdf:
+      return "PDF"
+    case .screenplayPdf:
+      return "Screenplay PDF"
+    case .docx:
+      return "DOCX"
+    case .publishingBundle:
+      return "Publishing Bundle"
     }
   }
 

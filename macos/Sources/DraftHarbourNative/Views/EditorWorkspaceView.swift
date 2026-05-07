@@ -7,6 +7,7 @@ struct EditorWorkspaceView: View {
   @Binding var selectedRange: NSRange
   @Binding var showingFindReplace: Bool
   @AppStorage("DraftHarbour.editor.fontSize") private var fontSize = 15.0
+  @AppStorage("DraftHarbour.editor.pageView") private var pageView = false
   @AppStorage("DraftHarbour.editor.typewriterMode") private var typewriterMode = false
   @State private var screenplayMode = false
 
@@ -19,17 +20,27 @@ struct EditorWorkspaceView: View {
       if let section = store.activeSection {
         header(section: section)
         Divider()
-        DraftEditorView(
-          text: Binding(get: {
-            store.activeSection?.content ?? ""
-          }, set: { value in
-            store.updateActiveSectionContent(value)
-          }),
-          selectedRange: $selectedRange,
-          screenplayMode: screenplayMode || store.projectType == .screenplay,
-          typewriterMode: typewriterMode,
-          fontSize: fontSize
-        )
+        HStack(spacing: 0) {
+          if pageView {
+            Spacer(minLength: 24)
+          }
+          DraftEditorView(
+            text: Binding(get: {
+              store.activeSection?.content ?? ""
+            }, set: { value in
+              store.updateActiveSectionContent(value)
+            }),
+            selectedRange: $selectedRange,
+            screenplayMode: screenplayMode || store.projectType == .screenplay,
+            typewriterMode: typewriterMode,
+            fontSize: fontSize
+          )
+          .frame(maxWidth: pageView ? 820 : .infinity)
+          if pageView {
+            Spacer(minLength: 24)
+          }
+        }
+        .background(pageView ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear))
       } else {
         ContentUnavailableView("No Section Selected", systemImage: "doc.text.magnifyingglass")
       }
@@ -40,50 +51,50 @@ struct EditorWorkspaceView: View {
   }
 
   private func header(section: DraftHarbourNativeCore.Section) -> some View {
-    VStack(alignment: .leading, spacing: 10) {
-      HStack {
-        TextField("Section Title", text: Binding(get: {
-          section.title
-        }, set: { title in
-          store.updateActiveSectionTitle(title)
-        }))
-        .textFieldStyle(.plain)
-        .font(.system(size: 24, weight: .semibold))
+    HStack(spacing: 12) {
+      TextField("Section Title", text: Binding(get: {
+        section.title
+      }, set: { title in
+        store.updateActiveSectionTitle(title)
+      }))
+      .textFieldStyle(.plain)
+      .font(.system(size: 22, weight: .semibold))
 
-        Spacer()
+      Text("\(MarkdownTools.wordCount(section.content ?? "")) words")
+        .font(.caption)
+        .foregroundStyle(.secondary)
 
-        formattingButton("bold", command: .bold)
-        formattingButton("italic", command: .italic)
-        formattingButton("underline", command: .underline)
-        formattingButton("quote.bubble", command: .blockquote)
+      Spacer()
 
-        Picker("Status", selection: Binding(get: {
-          section.status
-        }, set: { status in
-          store.updateActiveSectionStatus(status)
-        })) {
-          ForEach(ChapterStatus.allCases, id: \.self) { status in
-            Text(status.rawValue.capitalized).tag(status)
-          }
-        }
-        .frame(width: 130)
+      formattingButton("bold", command: .bold)
+      formattingButton("italic", command: .italic)
+      formattingButton("underline", command: .underline)
+      formattingButton("quote.bubble", command: .blockquote)
 
-        Toggle("Typewriter", isOn: $typewriterMode)
-          .toggleStyle(.switch)
-
-        if store.projectType == .screenplay {
-          Toggle("Screenplay", isOn: $screenplayMode)
-            .toggleStyle(.switch)
+      Picker("Status", selection: Binding(get: {
+        section.status
+      }, set: { status in
+        store.updateActiveSectionStatus(status)
+      })) {
+        ForEach(ChapterStatus.allCases, id: \.self) { status in
+          Text(status.rawValue.capitalized).tag(status)
         }
       }
+      .frame(width: 130)
 
-      TextField("Summary", text: Binding(get: {
-        section.summary
-      }, set: { summary in
-        store.updateActiveSectionSummary(summary)
-      }), axis: .vertical)
-      .textFieldStyle(.roundedBorder)
-      .lineLimit(1...3)
+      Toggle("Page", isOn: $pageView)
+        .toggleStyle(.button)
+        .help("Toggle page view")
+
+      Toggle("Typewriter", isOn: $typewriterMode)
+        .toggleStyle(.button)
+        .help("Toggle typewriter mode")
+
+      if store.projectType == .screenplay {
+        Toggle("Screenplay", isOn: $screenplayMode)
+          .toggleStyle(.button)
+          .help("Use screenplay editor styling")
+      }
     }
     .padding(16)
   }

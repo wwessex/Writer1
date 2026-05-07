@@ -130,6 +130,26 @@ struct DraftHarbourCommands: Commands {
     }
 
     CommandMenu("View") {
+      Button("Write Workspace") {
+        post(.workspaceWrite)
+      }
+      .keyboardShortcut("1", modifiers: [.command, .shift])
+      .disabled(store == nil)
+
+      Button("Corkboard Workspace") {
+        post(.workspaceCorkboard)
+      }
+      .keyboardShortcut("2", modifiers: [.command, .shift])
+      .disabled(store == nil)
+
+      Button("Review Workspace") {
+        post(.workspaceReview)
+      }
+      .keyboardShortcut("3", modifiers: [.command, .shift])
+      .disabled(store == nil)
+
+      Divider()
+
       Button("Toggle Sidebar") {
         post(.toggleSidebar)
       }

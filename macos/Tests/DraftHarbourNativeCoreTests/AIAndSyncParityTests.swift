@@ -9,6 +9,10 @@ final class AIAndSyncParityTests: XCTestCase {
     XCTAssertEqual(NativeCommandID.openProjectFile.disposition, .system)
     XCTAssertEqual(NativeCommandID.importDocument.disposition, .native)
     XCTAssertEqual(NativeCommandID.storyCards.disposition, .native)
+    XCTAssertEqual(NativeCommandID.workspaceReview.disposition, .native)
+    XCTAssertEqual(WorkspaceMode.corkboard.title, "Corkboard")
+    XCTAssertEqual(InspectorTab.metrics.title, "Metrics")
+    XCTAssertEqual(ReviewFilter.aiRevisions.title, "AI Revisions")
   }
 
   func testAIWorkflowRendersStoryContextAndInsertionModes() {

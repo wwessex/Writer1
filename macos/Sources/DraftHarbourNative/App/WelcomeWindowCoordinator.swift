@@ -14,6 +14,11 @@ struct WelcomeRecentProject: Identifiable, Equatable {
 struct WelcomeProjectConfiguration: Equatable {
   var title: String
   var projectType: ProjectType
+  var genre: String
+  var targetWordCount: Int
+  var dailyWordTarget: Int
+  var deadline: String
+  var structure: StoryStructurePreference
 }
 
 @MainActor
@@ -89,7 +94,19 @@ final class WelcomeWindowCoordinator: NSObject, NSWindowDelegate {
       guard let self, response == .OK, let url = panel.url else { return }
 
       do {
-        let envelope = DhprojCodec.newProject(title: configuration.title, projectType: configuration.projectType)
+        var envelope = DhprojCodec.newProject(title: configuration.title, projectType: configuration.projectType)
+        envelope.storyBlueprint = StoryBlueprint(
+          genre: configuration.genre,
+          structure: configuration.structure,
+          targetWordCount: max(0, configuration.targetWordCount)
+        )
+        envelope.settings.dailyWordGoal = configuration.dailyWordTarget > 0 ? configuration.dailyWordTarget : nil
+        envelope.settings.novelWordGoal = configuration.targetWordCount > 0 ? configuration.targetWordCount : nil
+        envelope.settings.novelDeadline = configuration.deadline.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : configuration.deadline
+        envelope.settings.goalConfiguration = GoalConfiguration(
+          dailyWordTarget: configuration.dailyWordTarget > 0 ? configuration.dailyWordTarget : nil,
+          draftCompletionDeadline: configuration.deadline.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : configuration.deadline
+        )
         let data = try DhprojCodec.encode(envelope)
         try data.write(to: url, options: .atomic)
         self.openProject(at: url)
