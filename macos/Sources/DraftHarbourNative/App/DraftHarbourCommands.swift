@@ -13,6 +13,16 @@ extension FocusedValues {
   }
 }
 
+final class NativeDocumentCommandRequest {
+  let command: NativeCommandID
+  let target: ProjectStore
+
+  init(command: NativeCommandID, target: ProjectStore) {
+    self.command = command
+    self.target = target
+  }
+}
+
 struct DraftHarbourCommands: Commands {
   @FocusedValue(\.projectStore) private var store
 
@@ -26,10 +36,10 @@ struct DraftHarbourCommands: Commands {
       Divider()
 
       Button(store?.projectType == .screenplay ? "New Scene" : "New Chapter") {
-        post(.newSection)
+        perform(.newSection)
       }
       .keyboardShortcut("n", modifiers: [.command, .shift])
-      .disabled(store == nil)
+      .disabled(!canPerform(.newSection))
     }
 
     CommandGroup(after: .newItem) {
@@ -38,77 +48,111 @@ struct DraftHarbourCommands: Commands {
       }
       .keyboardShortcut("o", modifiers: .command)
 
-      Button("Open Recent Projects") {
-        post(.openRecent)
-      }
-
       Button("Reopen Last Project") {
-        post(.reopenLastProject)
+        perform(.reopenLastProject)
       }
+      .disabled(!canPerform(.reopenLastProject))
 
       Divider()
 
       Button("Save Project") {
-        post(.saveProjectFile)
+        perform(.saveProjectFile)
       }
       .keyboardShortcut("s", modifiers: .command)
-      .disabled(store == nil)
+      .disabled(!canPerform(.saveProjectFile))
 
       Button("Save Project Copy...") {
-        post(.saveProjectCopy)
+        perform(.saveProjectCopy)
       }
       .keyboardShortcut("s", modifiers: [.command, .shift])
-      .disabled(store == nil)
+      .disabled(!canPerform(.saveProjectCopy))
 
       Divider()
 
       Button("Import Document...") {
-        post(.importDocument)
+        perform(.importDocument)
       }
-      .disabled(store == nil)
+      .disabled(!canPerform(.importDocument))
 
       Button("Export...") {
-        post(.export)
+        perform(.export)
       }
       .keyboardShortcut("e", modifiers: [.command, .shift])
-      .disabled(store == nil)
+      .disabled(!canPerform(.export))
 
       Button("Export Backup...") {
-        post(.exportBackup)
+        perform(.exportBackup)
       }
-      .disabled(store == nil)
+      .disabled(!canPerform(.exportBackup))
 
       Button("Import Backup...") {
-        post(.importBackup)
+        perform(.importBackup)
       }
-      .disabled(store == nil)
+      .disabled(!canPerform(.importBackup))
+
+      Divider()
+
+      Button("Reveal Project in Finder") {
+        perform(.revealProjectInFinder)
+      }
+      .disabled(!canPerform(.revealProjectInFinder))
+
+      Button("Copy Project Path") {
+        perform(.copyProjectPath)
+      }
+      .disabled(!canPerform(.copyProjectPath))
+
+      Button("Share Active Section") {
+        perform(.shareActiveSection)
+      }
+      .disabled(!canPerform(.shareActiveSection))
+
+      Divider()
+
+      Button("Print Active Section") {
+        perform(.printActiveSection)
+      }
+      .keyboardShortcut("p", modifiers: [.command, .shift])
+      .disabled(!canPerform(.printActiveSection))
+
+      Button("Print Project") {
+        perform(.printProject)
+      }
+      .keyboardShortcut("p", modifiers: .command)
+      .disabled(!canPerform(.printProject))
     }
 
     CommandMenu("Project") {
       Button("Project Dashboard") {
-        post(.dashboard)
+        perform(.dashboard)
       }
-      .disabled(store == nil)
+      .disabled(!canPerform(.dashboard))
 
       Button("Quick Switcher") {
-        post(.quickSwitcher)
+        perform(.quickSwitcher)
       }
       .keyboardShortcut("k", modifiers: .command)
-      .disabled(store == nil)
+      .disabled(!canPerform(.quickSwitcher))
 
-      Button("Find And Replace") {
-        post(.findReplace)
+      Button("Find") {
+        perform(.nativeFind)
       }
       .keyboardShortcut("f", modifiers: .command)
-      .disabled(store == nil)
+      .disabled(!canPerform(.nativeFind))
+
+      Button("Find And Replace In Project") {
+        perform(.projectFindReplace)
+      }
+      .keyboardShortcut("f", modifiers: [.command, .option])
+      .disabled(!canPerform(.projectFindReplace))
 
       Divider()
 
       Button("Create Snapshot") {
-        post(.snapshots)
+        perform(.snapshots)
       }
       .keyboardShortcut("s", modifiers: [.command, .option])
-      .disabled(store?.activeSection == nil)
+      .disabled(!canPerform(.snapshots))
 
       Button("Delete Section") {
         try? store?.deleteActiveSection()
@@ -131,213 +175,240 @@ struct DraftHarbourCommands: Commands {
 
     CommandMenu("View") {
       Button("Write Workspace") {
-        post(.workspaceWrite)
+        perform(.workspaceWrite)
       }
       .keyboardShortcut("1", modifiers: [.command, .shift])
-      .disabled(store == nil)
+      .disabled(!canPerform(.workspaceWrite))
 
       Button("Corkboard Workspace") {
-        post(.workspaceCorkboard)
+        perform(.workspaceCorkboard)
       }
       .keyboardShortcut("2", modifiers: [.command, .shift])
-      .disabled(store == nil)
+      .disabled(!canPerform(.workspaceCorkboard))
 
       Button("Review Workspace") {
-        post(.workspaceReview)
+        perform(.workspaceReview)
       }
       .keyboardShortcut("3", modifiers: [.command, .shift])
-      .disabled(store == nil)
+      .disabled(!canPerform(.workspaceReview))
 
       Divider()
 
       Button("Toggle Sidebar") {
-        post(.toggleSidebar)
+        perform(.toggleSidebar)
       }
       .keyboardShortcut("b", modifiers: [.command, .shift])
-      .disabled(store == nil)
+      .disabled(!canPerform(.toggleSidebar))
 
       Button("Toggle Inspector") {
-        post(.inspector)
+        perform(.inspector)
       }
       .keyboardShortcut("i", modifiers: [.command, .shift])
-      .disabled(store == nil)
+      .disabled(!canPerform(.inspector))
+
+      Button("Toggle Tool Panel") {
+        perform(.toggleToolPanel)
+      }
+      .disabled(!canPerform(.toggleToolPanel))
 
       Button("Toggle Page View") {
-        post(.togglePageView)
+        perform(.togglePageView)
       }
-      .disabled(store == nil)
+      .disabled(!canPerform(.togglePageView))
 
       Button("Focus Mode") {
-        post(.toggleFocusMode)
+        perform(.toggleFocusMode)
       }
       .keyboardShortcut("f", modifiers: [.command, .shift])
-      .disabled(store == nil)
+      .disabled(!canPerform(.toggleFocusMode))
 
       Button("Typewriter Mode") {
-        post(.toggleTypewriterMode)
+        perform(.toggleTypewriterMode)
       }
       .keyboardShortcut("t", modifiers: [.command, .shift])
-      .disabled(store == nil)
+      .disabled(!canPerform(.toggleTypewriterMode))
 
       Divider()
 
       Button("Auto Appearance") {
-        post(.themeAuto)
+        perform(.themeAuto)
       }
 
       Button("Light Appearance") {
-        post(.themeLight)
+        perform(.themeLight)
       }
 
       Button("Dark Appearance") {
-        post(.themeDark)
+        perform(.themeDark)
       }
     }
 
     CommandMenu("Insert") {
       Button("Comment") {
-        post(.addComment)
+        perform(.addComment)
       }
       .keyboardShortcut("m", modifiers: [.command, .shift])
-      .disabled(store?.activeSection == nil)
+      .disabled(!canPerform(.addComment))
 
       Button("Scene Template") {
-        post(.sceneTemplates)
+        perform(.sceneTemplates)
       }
-      .disabled(store?.activeSection == nil)
+      .disabled(!canPerform(.sceneTemplates))
 
       Divider()
 
       Button("Blockquote") {
-        post(.insertBlockquote)
+        perform(.insertBlockquote)
       }
       .keyboardShortcut(">", modifiers: [.command, .option])
-      .disabled(store?.activeSection == nil)
+      .disabled(!canPerform(.insertBlockquote))
 
       Button("Horizontal Rule") {
-        post(.insertHorizontalRule)
+        perform(.insertHorizontalRule)
       }
-      .disabled(store?.activeSection == nil)
+      .disabled(!canPerform(.insertHorizontalRule))
     }
 
     CommandMenu("Format") {
       Button("Bold") {
-        post(.formatBold)
+        perform(.formatBold)
       }
       .keyboardShortcut("b", modifiers: .command)
 
       Button("Italic") {
-        post(.formatItalic)
+        perform(.formatItalic)
       }
       .keyboardShortcut("i", modifiers: .command)
 
       Button("Underline") {
-        post(.formatUnderline)
+        perform(.formatUnderline)
       }
       .keyboardShortcut("u", modifiers: .command)
 
       Divider()
 
       Button("Heading 1") {
-        post(.formatHeading1)
+        perform(.formatHeading1)
       }
       .keyboardShortcut("1", modifiers: [.command, .option])
 
       Button("Heading 2") {
-        post(.formatHeading2)
+        perform(.formatHeading2)
       }
       .keyboardShortcut("2", modifiers: [.command, .option])
 
       Button("Blockquote") {
-        post(.insertBlockquote)
+        perform(.insertBlockquote)
       }
       .keyboardShortcut(">", modifiers: [.command, .option])
 
       Button("Horizontal Rule") {
-        post(.insertHorizontalRule)
+        perform(.insertHorizontalRule)
       }
     }
 
     CommandMenu("Tools") {
       Button("Snapshots") {
-        post(.snapshots)
+        perform(.snapshots)
       }
-      .disabled(store == nil)
+      .disabled(!canPerform(.snapshots))
 
       Button("Word Count") {
-        post(.wordCount)
+        perform(.wordCount)
       }
-      .disabled(store == nil)
+      .disabled(!canPerform(.wordCount))
 
       Button("Writing Analysis") {
-        post(.analysis)
+        perform(.analysis)
       }
-      .disabled(store == nil)
+      .disabled(!canPerform(.analysis))
 
       Button("Advanced Analytics") {
-        post(.advancedAnalytics)
+        perform(.advancedAnalytics)
       }
-      .disabled(store == nil)
+      .disabled(!canPerform(.advancedAnalytics))
 
       Divider()
 
       Button("Character And World Bible") {
-        post(.characterBible)
+        perform(.characterBible)
       }
-      .disabled(store == nil)
+      .disabled(!canPerform(.characterBible))
 
       Button("Story Cards And Corkboard") {
-        post(.storyCards)
+        perform(.storyCards)
       }
-      .disabled(store == nil)
+      .disabled(!canPerform(.storyCards))
 
       Button("Comments") {
-        post(.comments)
+        perform(.comments)
       }
-      .disabled(store == nil)
+      .disabled(!canPerform(.comments))
 
       Divider()
 
       Button("AI Writing Tools") {
-        post(.aiWriting)
+        perform(.aiWriting)
       }
-      .disabled(store == nil)
+      .disabled(!canPerform(.aiWriting))
 
       Button("Translate") {
-        post(.translation)
+        perform(.translation)
       }
-      .disabled(store == nil)
+      .disabled(!canPerform(.translation))
 
       Button("Integrations") {
-        post(.integrations)
+        perform(.integrations)
       }
-      .disabled(store == nil)
+      .disabled(!canPerform(.integrations))
 
       Divider()
 
       Button("Export History") {
-        post(.exportHistory)
+        perform(.exportHistory)
       }
-      .disabled(store == nil)
+      .disabled(!canPerform(.exportHistory))
 
       Button("Settings") {
-        post(.settings)
+        perform(.settings)
       }
     }
 
     CommandGroup(replacing: .help) {
       Button("Getting Started") {
-        post(.onboarding)
+        perform(.onboarding)
       }
-      .disabled(store == nil)
+      .disabled(!canPerform(.onboarding))
 
       Button("About DraftHarbour") {
-        post(.about)
+        perform(.about)
       }
     }
   }
 
-  private func post(_ command: NativeCommandID) {
-    NotificationCenter.default.post(name: .draftHarbourRunCommand, object: command.rawValue)
+  private func canPerform(_ command: NativeCommandID) -> Bool {
+    switch command {
+    case .openProjectFile, .settings, .about:
+      return true
+    default:
+      return store != nil
+    }
+  }
+
+  private func perform(_ command: NativeCommandID) {
+    switch command {
+    case .openProjectFile:
+      NotificationCenter.default.post(name: .draftHarbourOpenProjectFile, object: nil)
+    case .settings:
+      NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    case .about:
+      NSApp.sendAction(#selector(NSApplication.orderFrontStandardAboutPanel(_:)), to: nil, from: nil)
+    default:
+      guard let store else { return }
+      NotificationCenter.default.post(
+        name: .draftHarbourRunCommand,
+        object: NativeDocumentCommandRequest(command: command, target: store)
+      )
+    }
   }
 }

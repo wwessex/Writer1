@@ -126,8 +126,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       return
     }
 
+    if let deepLink = NativeDeepLink.parse(url) {
+      route(deepLink)
+      return
+    }
+
     Task { @MainActor in
       OAuthCallbackCenter.shared.receive(url)
     }
+  }
+
+  private func route(_ deepLink: NativeDeepLink) {
+    NotificationCenter.default.post(name: .draftHarbourOpenDeepLink, object: deepLink)
+
+    guard let url = recentProjectURL(for: deepLink.projectID) else { return }
+    NSDocumentController.shared.openDocument(withContentsOf: url, display: true) { _, _, _ in
+      NotificationCenter.default.post(name: .draftHarbourOpenDeepLink, object: deepLink)
+    }
+  }
+
+  private func recentProjectURL(for projectID: String) -> URL? {
+    let recoveryService = SessionRecoveryService()
+    return recoveryService.recentProjectURLs()
+      .filter { FileManager.default.fileExists(atPath: $0.path) }
+      .first { url in
+        guard let data = try? Data(contentsOf: url),
+              let envelope = try? DhprojCodec.decode(data) else {
+          return false
+        }
+        return envelope.project.id == projectID
+      }
   }
 }

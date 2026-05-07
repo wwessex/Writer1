@@ -53,11 +53,11 @@ struct NativeDocumentView: View {
   private let fileURL: URL?
   private let recoveryService = SessionRecoveryService()
   @State private var store: ProjectStore
+  @State private var toolPanelCoordinator = ToolPanelWindowCoordinator()
   @State private var columnVisibility = NavigationSplitViewVisibility.all
   @SceneStorage("DraftHarbour.workspaceMode") private var workspaceModeRaw = WorkspaceMode.write.rawValue
   @SceneStorage("DraftHarbour.selectedToolPanel") private var selectedToolPanel = ToolPanel.dashboard.rawValue
   @SceneStorage("DraftHarbour.inspectorVisible") private var inspectorVisible = true
-  @State private var showingToolPanel = false
   @State private var showingQuickSwitcher = false
   @State private var showingFindReplace = false
   @State private var exportError: String?
@@ -67,11 +67,13 @@ struct NativeDocumentView: View {
   @State private var spotlightIndexTask: Task<Void, Never>?
   @State private var selectedRange = NSRange(location: 0, length: 0)
   @State private var showingAddCommentPrompt = false
+  @State private var isRunningSelectionAI = false
   @State private var commentDraft = ""
   @AppStorage("DraftHarbour.editor.theme") private var theme = "auto"
   @AppStorage("DraftHarbour.editor.pageView") private var pageView = false
   @AppStorage("DraftHarbour.editor.focusMode") private var focusMode = false
   @AppStorage("DraftHarbour.editor.typewriterMode") private var typewriterMode = false
+  @AppStorage("DraftHarbour.ai.translationLanguage") private var contextTranslationCode = "es"
 
   private var workspaceMode: Binding<WorkspaceMode> {
     Binding {
@@ -99,10 +101,22 @@ struct NativeDocumentView: View {
     .toolbar {
       ToolbarItemGroup {
         Button {
-          _ = store.createSection(after: store.activeSectionID)
+          runCommand(.toggleSidebar)
+        } label: {
+          Label("Toggle Sidebar", systemImage: "sidebar.left")
+        }
+        .labelStyle(.iconOnly)
+        .help("Toggle sidebar")
+        .disabled(!commandEnabled(.toggleSidebar))
+
+        Button {
+          runCommand(.newSection)
         } label: {
           Label(store.projectType == .screenplay ? "New Scene" : "New Chapter", systemImage: "plus")
         }
+        .labelStyle(.iconOnly)
+        .help(store.projectType == .screenplay ? "New scene" : "New chapter")
+        .disabled(!commandEnabled(.newSection))
 
         Picker("Workspace", selection: workspaceMode) {
           ForEach(WorkspaceMode.allCases) { mode in
@@ -110,52 +124,54 @@ struct NativeDocumentView: View {
           }
         }
         .pickerStyle(.segmented)
-        .frame(width: 300)
-
-        Picker("Tools", selection: $selectedToolPanel) {
-          ForEach(ToolPanel.allCases) { panel in
-            Label(panel.title, systemImage: panel.systemImage).tag(panel.rawValue)
-          }
-        }
-        .pickerStyle(.menu)
-        .onChange(of: selectedToolPanel) { _, _ in showingToolPanel = true }
+        .frame(width: 260)
+        .disabled(!commandEnabled(.workspaceWrite))
 
         Button {
-          showingQuickSwitcher = true
+          runCommand(.quickSwitcher)
         } label: {
           Label("Quick Switcher", systemImage: "command")
         }
+        .labelStyle(.iconOnly)
+        .help("Quick switcher")
+        .disabled(!commandEnabled(.quickSwitcher))
 
         Button {
-          showingFindReplace.toggle()
+          runCommand(.nativeFind)
         } label: {
           Label("Find", systemImage: "magnifyingglass")
         }
+        .labelStyle(.iconOnly)
+        .help("Find in active section")
+        .disabled(!commandEnabled(.nativeFind))
 
         Button {
-          showingToolPanel = true
+          runCommand(.projectFindReplace)
+        } label: {
+          Label("Project Find and Replace", systemImage: "doc.text.magnifyingglass")
+        }
+        .labelStyle(.iconOnly)
+        .help("Find and replace in project")
+        .disabled(!commandEnabled(.projectFindReplace))
+
+        Button {
+          runCommand(.toggleToolPanel)
         } label: {
           Label("Open Tool", systemImage: "slider.horizontal.3")
         }
+        .labelStyle(.iconOnly)
+        .help("Toggle tool panel")
+        .disabled(!commandEnabled(.toggleToolPanel))
 
         Button {
-          if workspaceMode.wrappedValue != .write {
-            workspaceMode.wrappedValue = .write
-          }
-          inspectorVisible.toggle()
+          runCommand(.inspector)
         } label: {
-          Label("Inspector", systemImage: inspectorVisible ? "sidebar.right" : "sidebar.right")
+          Label("Inspector", systemImage: "sidebar.right")
         }
+        .labelStyle(.iconOnly)
+        .help("Toggle inspector")
+        .disabled(!commandEnabled(.inspector))
       }
-    }
-    .sheet(isPresented: $showingToolPanel) {
-      ToolPanelView(
-        panel: ToolPanel(rawValue: selectedToolPanel) ?? .dashboard,
-        store: store,
-        exportAction: export(format:),
-        runCommand: runCommand(_:)
-      )
-      .frame(width: 860, height: 640)
     }
     .sheet(isPresented: $showingQuickSwitcher) {
       QuickSwitcherView(store: store, runCommand: runCommand(_:))
@@ -225,6 +241,7 @@ struct NativeDocumentView: View {
     }
     .onDisappear {
       spotlightIndexTask?.cancel()
+      toolPanelCoordinator.close()
     }
     .onReceive(NotificationCenter.default.publisher(for: .draftHarbourShowQuickSwitcher)) { _ in
       showingQuickSwitcher = true
@@ -233,8 +250,22 @@ struct NativeDocumentView: View {
       showingFindReplace = true
     }
     .onReceive(NotificationCenter.default.publisher(for: .draftHarbourRunCommand)) { notification in
-      guard let raw = notification.object as? String, let command = NativeCommandID(rawValue: raw) else { return }
-      runCommand(command)
+      guard let request = notification.object as? NativeDocumentCommandRequest,
+            request.target === store,
+            commandEnabled(request.command) else {
+        return
+      }
+      runCommand(request.command)
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .draftHarbourOpenDeepLink)) { notification in
+      guard let deepLink = notification.object as? NativeDeepLink,
+            deepLink.projectID == store.envelope.project.id else {
+        return
+      }
+      if let sectionID = deepLink.sectionID,
+         store.envelope.sections.contains(where: { $0.id == sectionID }) {
+        store.selectSection(sectionID)
+      }
     }
     .safeAreaInset(edge: .bottom) {
       WritingStatusBar(store: store, fileURL: fileURL, recoveryState: recoveryState) { result in
@@ -250,7 +281,17 @@ struct NativeDocumentView: View {
       switch workspaceMode.wrappedValue {
       case .write:
         HSplitView {
-          EditorWorkspaceView(store: store, selectedRange: $selectedRange, showingFindReplace: $showingFindReplace)
+          EditorWorkspaceView(
+            store: store,
+            selectedRange: $selectedRange,
+            showingFindReplace: $showingFindReplace,
+            addComment: { runCommand(.addComment) },
+            createSnapshot: createContextSnapshot,
+            reviseSelection: { runSelectionAI(stageID: "revise") },
+            translateSelection: { runSelectionAI(stageID: "translate") },
+            shareSelection: { runCommand(.shareSelection) },
+            copyMarkdown: copySelectionMarkdown
+          )
             .frame(minWidth: 520, maxWidth: .infinity)
 
           if inspectorVisible {
@@ -438,7 +479,171 @@ struct NativeDocumentView: View {
 
   private func showToolPanel(_ panel: ToolPanel) {
     selectedToolPanel = panel.rawValue
-    showingToolPanel = true
+    toolPanelCoordinator.show(
+      panel: panel,
+      store: store,
+      exportAction: export(format:),
+      runCommand: runCommand(_:)
+    )
+  }
+
+  private func commandEnabled(_ command: NativeCommandID) -> Bool {
+    switch command {
+    case .newSection, .importDocument, .export, .saveProjectFile, .exportBackup, .importBackup, .saveProjectCopy, .openRecent, .reopenLastProject, .dashboard, .quickSwitcher, .nativeFind, .projectFindReplace, .workspaceWrite, .workspaceCorkboard, .workspaceReview, .toggleSidebar, .toggleToolPanel, .togglePageView, .toggleFocusMode, .toggleTypewriterMode, .themeAuto, .themeLight, .themeDark, .wordCount, .analysis, .advancedAnalytics, .characterBible, .storyCards, .comments, .aiWriting, .translation, .integrations, .exportHistory, .onboarding, .inspector, .findReplace:
+      return true
+    case .snapshots, .addComment, .sceneTemplates, .insertBlockquote, .insertHorizontalRule, .formatBold, .formatItalic, .formatUnderline, .formatHeading1, .formatHeading2, .formatParagraph, .shareActiveSection, .printActiveSection:
+      return store.activeSection != nil
+    case .shareSelection:
+      return !selectedText().isEmpty
+    case .revealProjectInFinder, .copyProjectPath:
+      return fileURL != nil
+    case .printProject:
+      return !store.envelope.sections.isEmpty
+    case .settings, .about, .openProjectFile, .projects, .aiPanel, .corkboard:
+      return true
+    case .undo, .redo, .cut, .copy, .paste, .selectAll:
+      return true
+    }
+  }
+
+  private func showNativeFind() {
+    let menuItem = NSMenuItem()
+    if #available(macOS 13.0, *) {
+      menuItem.tag = NSTextFinder.Action.showFindInterface.rawValue
+    }
+
+    if !NSApp.sendAction(#selector(NSTextView.performFindPanelAction(_:)), to: nil, from: menuItem) {
+      NSApp.sendAction(Selector(("orderFrontFindPanel:")), to: nil, from: nil)
+    }
+  }
+
+  private func revealProjectInFinder() {
+    guard let fileURL else { return }
+    NSWorkspace.shared.activateFileViewerSelecting([fileURL])
+  }
+
+  private func copyProjectPath() {
+    guard let fileURL else { return }
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(fileURL.path, forType: .string)
+    operationMessage = "Copied project path."
+  }
+
+  private func copySelectionMarkdown() {
+    let text = selectedText()
+    guard !text.isEmpty else { return }
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(text, forType: .string)
+    operationMessage = "Copied selection as Markdown."
+  }
+
+  private func shareSelection() {
+    let text = selectedText()
+    guard !text.isEmpty else { return }
+    showSharingPicker(items: [text])
+  }
+
+  private func shareActiveSection() {
+    guard let section = store.activeSection else { return }
+    showSharingPicker(items: [printableText(for: [section])])
+  }
+
+  private func showSharingPicker(items: [Any]) {
+    guard let view = NSApp.keyWindow?.contentView else { return }
+    let picker = NSSharingServicePicker(items: items)
+    picker.show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
+  }
+
+  private func printActiveSection() {
+    guard let section = store.activeSection else { return }
+    printText(printableText(for: [section]), title: section.title)
+  }
+
+  private func printProject() {
+    printText(printableText(for: store.envelope.sections), title: store.envelope.project.title)
+  }
+
+  private func printableText(for sections: [DraftHarbourNativeCore.Section]) -> String {
+    sections.map { section in
+      [
+        section.title,
+        MarkdownTools.plainText(from: section.content ?? "")
+      ]
+      .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+      .joined(separator: "\n\n")
+    }
+    .joined(separator: "\n\n---\n\n")
+  }
+
+  private func printText(_ text: String, title: String) {
+    let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 612, height: 792))
+    textView.string = text
+    textView.font = NSFont.systemFont(ofSize: 12)
+    textView.isEditable = false
+    textView.isSelectable = false
+    textView.textContainerInset = NSSize(width: 36, height: 36)
+    textView.sizeToFit()
+
+    let operation = NSPrintOperation(view: textView)
+    operation.jobTitle = title
+    operation.showsPrintPanel = true
+    operation.showsProgressPanel = true
+    operation.run()
+  }
+
+  private func selectedText() -> String {
+    guard let content = store.activeSection?.content else { return "" }
+    let bounded = boundedRange(selectedRange, in: content)
+    guard bounded.length > 0, let range = Range(bounded, in: content) else { return "" }
+    return String(content[range])
+  }
+
+  private func createContextSnapshot() {
+    do {
+      _ = try store.createSnapshot(label: "Context")
+      operationMessage = "Created snapshot for \(store.activeSection?.title ?? "active section")."
+    } catch {
+      exportError = error.localizedDescription
+    }
+  }
+
+  private func runSelectionAI(stageID: String) {
+    guard !isRunningSelectionAI else { return }
+    let source = selectedText()
+    guard let section = store.activeSection, !source.isEmpty else { return }
+    guard let config = store.envelope.aiProviders.first(where: \.enabled) else {
+      showToolPanel(.ai)
+      operationMessage = "Configure an AI provider before using selection actions."
+      return
+    }
+
+    isRunningSelectionAI = true
+    Task { @MainActor in
+      defer { isRunningSelectionAI = false }
+      do {
+        let provider = try NativeAIProviderFactory().provider(from: config)
+        let prompt: String
+        if stageID == "translate" {
+          let language = AIWorkflowServices.translationLanguages.first { $0.code == contextTranslationCode } ?? AIWorkflowServices.translationLanguages[0]
+          prompt = AIWorkflowServices.translationPrompt(text: source, language: language, preserveFormatting: true)
+        } else {
+          prompt = "Revise this selected passage for clarity, tension, and character voice:\n\n\(source)"
+        }
+        let response = try await provider.generate(AIRequest(prompt: prompt, context: source, projectType: store.projectType, sectionTitle: section.title, model: config.model))
+        let before = section.content ?? ""
+        store.applyGeneratedText(response.text, mode: .replace, range: selectedRange)
+        store.recordAIRevision(
+          sectionID: section.id,
+          providerId: response.provider,
+          prompt: prompt,
+          before: before,
+          after: store.activeSection?.content ?? ""
+        )
+        operationMessage = stageID == "translate" ? "Translated selection." : "Revised selection."
+      } catch {
+        exportError = error.localizedDescription
+      }
+    }
   }
 
   private func scheduleSpotlightIndexing(delay: UInt64 = 750_000_000) {
@@ -466,10 +671,7 @@ struct NativeDocumentView: View {
     case .openProjectFile:
       NSDocumentController.shared.openDocument(nil)
     case .openRecent:
-      let recent = recoveryService.recentProjectURLs()
-      operationMessage = recent.isEmpty
-        ? "No recent DraftHarbour projects have been recorded yet."
-        : recent.map(\.path).joined(separator: "\n")
+      reopenLastProject()
     case .reopenLastProject:
       reopenLastProject()
     case .exportBackup:
@@ -482,8 +684,10 @@ struct NativeDocumentView: View {
       sendResponderAction("showSettingsWindow:")
     case .about:
       sendResponderAction("orderFrontStandardAboutPanel:")
-    case .findReplace:
+    case .findReplace, .projectFindReplace:
       showingFindReplace = true
+    case .nativeFind:
+      showNativeFind()
     case .workspaceWrite:
       workspaceMode.wrappedValue = .write
     case .workspaceCorkboard:
@@ -558,6 +762,12 @@ struct NativeDocumentView: View {
       inspectorVisible.toggle()
     case .toggleSidebar:
       columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+    case .toggleToolPanel:
+      if toolPanelCoordinator.isOpen {
+        toolPanelCoordinator.close()
+      } else {
+        showToolPanel(ToolPanel(rawValue: selectedToolPanel) ?? .dashboard)
+      }
     case .togglePageView:
       pageView.toggle()
     case .toggleFocusMode:
@@ -572,6 +782,18 @@ struct NativeDocumentView: View {
       theme = "dark"
     case .toggleTypewriterMode:
       typewriterMode.toggle()
+    case .revealProjectInFinder:
+      revealProjectInFinder()
+    case .copyProjectPath:
+      copyProjectPath()
+    case .shareSelection:
+      shareSelection()
+    case .shareActiveSection:
+      shareActiveSection()
+    case .printActiveSection:
+      printActiveSection()
+    case .printProject:
+      printProject()
     }
   }
 }
@@ -580,6 +802,7 @@ extension Notification.Name {
   static let draftHarbourShowQuickSwitcher = Notification.Name("DraftHarbourShowQuickSwitcher")
   static let draftHarbourShowFindReplace = Notification.Name("DraftHarbourShowFindReplace")
   static let draftHarbourRunCommand = Notification.Name("DraftHarbourRunCommand")
+  static let draftHarbourOpenDeepLink = Notification.Name("DraftHarbourOpenDeepLink")
   static let draftHarbourShowNewProjectSetup = Notification.Name("DraftHarbourShowNewProjectSetup")
   static let draftHarbourOpenProjectFile = Notification.Name("DraftHarbourOpenProjectFile")
 }

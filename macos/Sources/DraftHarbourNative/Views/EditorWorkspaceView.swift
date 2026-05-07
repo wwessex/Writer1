@@ -6,6 +6,12 @@ struct EditorWorkspaceView: View {
   @Bindable var store: ProjectStore
   @Binding var selectedRange: NSRange
   @Binding var showingFindReplace: Bool
+  var addComment: () -> Void = {}
+  var createSnapshot: () -> Void = {}
+  var reviseSelection: () -> Void = {}
+  var translateSelection: () -> Void = {}
+  var shareSelection: () -> Void = {}
+  var copyMarkdown: () -> Void = {}
   @AppStorage("DraftHarbour.editor.fontSize") private var fontSize = 15.0
   @AppStorage("DraftHarbour.editor.pageView") private var pageView = false
   @AppStorage("DraftHarbour.editor.typewriterMode") private var typewriterMode = false
@@ -33,7 +39,13 @@ struct EditorWorkspaceView: View {
             selectedRange: $selectedRange,
             screenplayMode: screenplayMode || store.projectType == .screenplay,
             typewriterMode: typewriterMode,
-            fontSize: fontSize
+            fontSize: fontSize,
+            addComment: addComment,
+            createSnapshot: createSnapshot,
+            reviseSelection: reviseSelection,
+            translateSelection: translateSelection,
+            shareSelection: shareSelection,
+            copyMarkdown: copyMarkdown
           )
           .frame(maxWidth: pageView ? 820 : .infinity)
           if pageView {

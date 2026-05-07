@@ -38,6 +38,7 @@ struct ToolPanelView: View {
   @Bindable var store: ProjectStore
   var exportAction: (ExportFormat) -> Void
   var runCommand: (NativeCommandID) -> Void = { _ in }
+  var closeAction: (() -> Void)?
   @Environment(\.dismiss) private var dismiss
 
   @State private var selectedPanel = ToolPanel.dashboard
@@ -110,7 +111,13 @@ struct ToolPanelView: View {
             .lineLimit(1)
             .minimumScaleFactor(0.85)
           Spacer()
-          Button("Done") { dismiss() }
+          Button("Done") {
+            if let closeAction {
+              closeAction()
+            } else {
+              dismiss()
+            }
+          }
             .keyboardShortcut(.defaultAction)
             .help("Close tool panel")
         }

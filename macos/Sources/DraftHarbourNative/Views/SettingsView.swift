@@ -13,23 +13,46 @@ struct SettingsView: View {
   @AppStorage("DraftHarbour.ai.endpoint") private var aiEndpoint = "http://localhost:11434/v1/chat/completions"
   @AppStorage("DraftHarbour.ai.model") private var aiModel = "llama3.1"
   @AppStorage("DraftHarbour.ai.provider") private var aiProvider = "local-openai"
+  @AppStorage("DraftHarbour.ai.translationLanguage") private var translationLanguage = "es"
   @AppStorage("DraftHarbour.sync.baseUrl") private var syncBaseURL = ""
 
   var body: some View {
     TabView {
+      generalPane
+        .tabItem { Label("General", systemImage: "gearshape") }
       editorPane
         .tabItem { Label("Editor", systemImage: "textformat") }
       goalsPane
-        .tabItem { Label("Goals", systemImage: "target") }
+        .tabItem { Label("Writing Goals", systemImage: "target") }
       aiPane
         .tabItem { Label("AI", systemImage: "sparkles") }
       syncPane
         .tabItem { Label("Sync", systemImage: "arrow.triangle.2.circlepath") }
-      releasePane
-        .tabItem { Label("Release", systemImage: "shippingbox") }
+      updatesPane
+        .tabItem { Label("Updates", systemImage: "shippingbox") }
     }
     .padding()
     .frame(width: 580, height: 430)
+  }
+
+  private var generalPane: some View {
+    Form {
+      Section("Appearance") {
+        Picker("Theme", selection: themeSelection) {
+          Text("Auto").tag("auto")
+          Text("Light").tag("light")
+          Text("Dark").tag("dark")
+        }
+        .pickerStyle(.segmented)
+      }
+
+      Section("New Projects") {
+        TextField("Default Project Word Goal", value: $defaultWordGoal, format: .number)
+        Text("These defaults prefill the native New Project flow. Existing project-specific goals remain stored in the .dhproj document.")
+          .foregroundStyle(.secondary)
+      }
+    }
+    .formStyle(.grouped)
   }
 
   private var editorPane: some View {
@@ -42,17 +65,11 @@ struct SettingsView: View {
         } maximumValueLabel: {
           Text("24")
         }
-        Toggle("Page View", isOn: $pageView)
-        Toggle("Typewriter Mode", isOn: $typewriterMode)
       }
 
-      Section("Appearance") {
-        Picker("Theme", selection: themeSelection) {
-          Text("Auto").tag("auto")
-          Text("Light").tag("light")
-          Text("Dark").tag("dark")
-        }
-        .pickerStyle(.segmented)
+      Section("Writing Surface") {
+        Toggle("Use page view by default", isOn: $pageView)
+        Toggle("Use typewriter mode by default", isOn: $typewriterMode)
       }
     }
     .formStyle(.grouped)
@@ -64,11 +81,6 @@ struct SettingsView: View {
         TextField("Daily Words", value: $dailyTarget, format: .number)
         TextField("Weekly Words", value: $weeklyTarget, format: .number)
         TextField("Default Project Word Goal", value: $defaultWordGoal, format: .number)
-      }
-
-      Section("New Projects") {
-        Text("These defaults prefill the native New Project flow. Existing project-specific goals remain stored in the .dhproj document.")
-          .foregroundStyle(.secondary)
       }
     }
     .formStyle(.grouped)
@@ -85,6 +97,11 @@ struct SettingsView: View {
         }
         TextField("Endpoint", text: $aiEndpoint)
         TextField("Model", text: $aiModel)
+        Picker("Selection Translation", selection: $translationLanguage) {
+          ForEach(AIWorkflowServices.translationLanguages) { language in
+            Text(language.name).tag(language.code)
+          }
+        }
       }
     }
     .formStyle(.grouped)
@@ -104,7 +121,7 @@ struct SettingsView: View {
     .formStyle(.grouped)
   }
 
-  private var releasePane: some View {
+  private var updatesPane: some View {
     Form {
       Section("Update Channel") {
         Picker("Channel", selection: $releaseChannel) {

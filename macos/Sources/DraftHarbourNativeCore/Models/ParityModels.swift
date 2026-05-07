@@ -33,10 +33,13 @@ public enum NativeCommandID: String, Codable, CaseIterable, Sendable {
   case inspector
   case quickSwitcher
   case findReplace
+  case nativeFind
+  case projectFindReplace
   case workspaceWrite
   case workspaceCorkboard
   case workspaceReview
   case toggleSidebar
+  case toggleToolPanel
   case togglePageView
   case toggleFocusMode
   case themeAuto
@@ -58,14 +61,20 @@ public enum NativeCommandID: String, Codable, CaseIterable, Sendable {
   case formatParagraph
   case toggleTypewriterMode
   case storyCards
+  case revealProjectInFinder
+  case copyProjectPath
+  case shareSelection
+  case shareActiveSection
+  case printActiveSection
+  case printProject
 
   public var disposition: NativeCommandDisposition {
     switch self {
     case .undo, .redo, .cut, .copy, .paste, .selectAll:
       return .responderChain
-    case .openProjectFile, .saveProjectFile, .openRecent, .reopenLastProject, .exportBackup, .importBackup, .saveProjectCopy, .settings, .about:
+    case .openProjectFile, .settings, .about:
       return .system
-    case .importDocument, .newSection, .export, .snapshots, .analysis, .wordCount, .dashboard, .onboarding, .characterBible, .aiWriting, .comments, .addComment, .advancedAnalytics, .integrations, .projects, .sceneTemplates, .exportHistory, .aiPanel, .translation, .corkboard, .inspector, .quickSwitcher, .findReplace, .workspaceWrite, .workspaceCorkboard, .workspaceReview, .toggleSidebar, .togglePageView, .toggleFocusMode, .themeAuto, .themeLight, .themeDark, .insertHorizontalRule, .insertBlockquote, .formatBold, .formatItalic, .formatUnderline, .formatHeading1, .formatHeading2, .formatParagraph, .toggleTypewriterMode, .storyCards:
+    case .importDocument, .newSection, .export, .saveProjectFile, .openRecent, .reopenLastProject, .exportBackup, .importBackup, .saveProjectCopy, .snapshots, .analysis, .wordCount, .dashboard, .onboarding, .characterBible, .aiWriting, .comments, .addComment, .advancedAnalytics, .integrations, .projects, .sceneTemplates, .exportHistory, .aiPanel, .translation, .corkboard, .inspector, .quickSwitcher, .findReplace, .nativeFind, .projectFindReplace, .workspaceWrite, .workspaceCorkboard, .workspaceReview, .toggleSidebar, .toggleToolPanel, .togglePageView, .toggleFocusMode, .themeAuto, .themeLight, .themeDark, .insertHorizontalRule, .insertBlockquote, .formatBold, .formatItalic, .formatUnderline, .formatHeading1, .formatHeading2, .formatParagraph, .toggleTypewriterMode, .storyCards, .revealProjectInFinder, .copyProjectPath, .shareSelection, .shareActiveSection, .printActiveSection, .printProject:
       return .native
     }
   }
@@ -75,6 +84,66 @@ public enum NativeCommandDisposition: String, Codable, Sendable {
   case native
   case responderChain
   case system
+}
+
+public struct NativeDocumentCommandHandler {
+  public var canRun: (NativeCommandID) -> Bool
+  public var run: (NativeCommandID) -> Void
+
+  public init(
+    canRun: @escaping (NativeCommandID) -> Bool,
+    run: @escaping (NativeCommandID) -> Void
+  ) {
+    self.canRun = canRun
+    self.run = run
+  }
+
+  public func perform(_ command: NativeCommandID) {
+    guard canRun(command) else { return }
+    run(command)
+  }
+}
+
+public struct NativeDeepLink: Equatable, Sendable {
+  public var projectID: String
+  public var sectionID: String?
+
+  public init(projectID: String, sectionID: String? = nil) {
+    self.projectID = projectID
+    self.sectionID = sectionID
+  }
+
+  public static func parse(_ url: URL) -> NativeDeepLink? {
+    guard url.scheme?.caseInsensitiveCompare("draftharbour") == .orderedSame else {
+      return nil
+    }
+
+    var parts: [String] = []
+    if let host = url.host, !host.isEmpty {
+      parts.append(host)
+    }
+    parts.append(contentsOf: url.pathComponents.filter { $0 != "/" })
+
+    guard parts.count == 2 || parts.count == 4,
+          parts.first == "project",
+          !parts[1].isEmpty else {
+      return nil
+    }
+
+    if parts.count == 4 {
+      guard parts[2] == "section", !parts[3].isEmpty else { return nil }
+      return NativeDeepLink(projectID: parts[1], sectionID: parts[3])
+    }
+
+    return NativeDeepLink(projectID: parts[1])
+  }
+
+  public var url: URL? {
+    if let sectionID {
+      return URL(string: "draftharbour://project/\(projectID)/section/\(sectionID)")
+    }
+    return URL(string: "draftharbour://project/\(projectID)")
+  }
 }
 
 public enum WorkspaceMode: String, Codable, CaseIterable, Identifiable, Sendable {
