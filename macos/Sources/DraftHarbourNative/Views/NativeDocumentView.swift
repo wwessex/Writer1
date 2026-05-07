@@ -7,12 +7,17 @@ enum ToolPanel: String, CaseIterable, Identifiable, Hashable {
   case export
   case snapshots
   case dashboard
+  case analysis
   case wordCount
   case comments
   case characterBible
   case storyCards
+  case sceneTemplates
   case integrations
   case ai
+  case aiSuggestions
+  case publishingAssistant
+  case gettingStarted
   case diagnostics
 
   var id: String { rawValue }
@@ -22,12 +27,17 @@ enum ToolPanel: String, CaseIterable, Identifiable, Hashable {
     case .export: "Export"
     case .snapshots: "Snapshots"
     case .dashboard: "Dashboard"
+    case .analysis: "Analysis"
     case .wordCount: "Word Count"
     case .comments: "Comments"
     case .characterBible: "Character & World"
     case .storyCards: "Story Cards"
+    case .sceneTemplates: "Scene Templates"
     case .integrations: "Integrations"
     case .ai: "AI Writing"
+    case .aiSuggestions: "AI Suggestions"
+    case .publishingAssistant: "Publishing Assistant"
+    case .gettingStarted: "Getting Started"
     case .diagnostics: "Diagnostics"
     }
   }
@@ -37,12 +47,17 @@ enum ToolPanel: String, CaseIterable, Identifiable, Hashable {
     case .export: "square.and.arrow.up"
     case .snapshots: "clock.arrow.circlepath"
     case .dashboard: "chart.bar.xaxis"
+    case .analysis: "text.magnifyingglass"
     case .wordCount: "textformat.abc"
     case .comments: "text.bubble"
     case .characterBible: "person.2"
     case .storyCards: "rectangle.grid.2x2"
+    case .sceneTemplates: "doc.badge.plus"
     case .integrations: "point.3.connected.trianglepath.dotted"
     case .ai: "sparkles"
+    case .aiSuggestions: "wand.and.stars"
+    case .publishingAssistant: "book.pages"
+    case .gettingStarted: "checklist"
     case .diagnostics: "stethoscope"
     }
   }
@@ -268,10 +283,14 @@ struct NativeDocumentView: View {
       }
     }
     .safeAreaInset(edge: .bottom) {
-      WritingStatusBar(store: store, fileURL: fileURL, recoveryState: recoveryState) { result in
+      WritingStatusBar(store: store, fileURL: fileURL, recoveryState: recoveryState, focusMode: focusMode) { result in
         operationMessage = result.wordsWritten == 1
           ? "Recorded 1 word for today's writing session."
           : "Recorded \(result.wordsWritten) words for today's writing session."
+      } onExitFocusMode: {
+        focusMode = false
+        inspectorVisible = true
+        columnVisibility = .all
       }
     }
   }
@@ -489,7 +508,7 @@ struct NativeDocumentView: View {
 
   private func commandEnabled(_ command: NativeCommandID) -> Bool {
     switch command {
-    case .newSection, .importDocument, .export, .saveProjectFile, .exportBackup, .importBackup, .saveProjectCopy, .openRecent, .reopenLastProject, .dashboard, .quickSwitcher, .nativeFind, .projectFindReplace, .workspaceWrite, .workspaceCorkboard, .workspaceReview, .toggleSidebar, .toggleToolPanel, .togglePageView, .toggleFocusMode, .toggleTypewriterMode, .themeAuto, .themeLight, .themeDark, .wordCount, .analysis, .advancedAnalytics, .characterBible, .storyCards, .comments, .aiWriting, .translation, .integrations, .exportHistory, .onboarding, .inspector, .findReplace:
+    case .newSection, .importDocument, .export, .saveProjectFile, .exportBackup, .importBackup, .saveProjectCopy, .openRecent, .reopenLastProject, .dashboard, .quickSwitcher, .nativeFind, .projectFindReplace, .workspaceWrite, .workspaceCorkboard, .workspaceReview, .toggleSidebar, .toggleToolPanel, .togglePageView, .toggleFocusMode, .toggleTypewriterMode, .themeAuto, .themeLight, .themeDark, .wordCount, .analysis, .advancedAnalytics, .characterBible, .storyCards, .comments, .aiWriting, .aiSuggestions, .translation, .integrations, .exportHistory, .publishingAssistant, .onboarding, .inspector, .findReplace:
       return true
     case .snapshots, .addComment, .sceneTemplates, .insertBlockquote, .insertHorizontalRule, .formatBold, .formatItalic, .formatUnderline, .formatHeading1, .formatHeading2, .formatParagraph, .shareActiveSection, .printActiveSection:
       return store.activeSection != nil
@@ -736,25 +755,29 @@ struct NativeDocumentView: View {
     case .wordCount:
       showToolPanel(.wordCount)
     case .analysis, .advancedAnalytics:
-      workspaceMode.wrappedValue = .review
+      showToolPanel(.analysis)
     case .characterBible:
       showToolPanel(.characterBible)
     case .storyCards, .corkboard:
       workspaceMode.wrappedValue = .corkboard
     case .integrations:
       showToolPanel(.integrations)
-    case .aiWriting, .aiPanel, .translation:
+    case .aiWriting, .translation:
       showToolPanel(.ai)
+    case .aiPanel, .aiSuggestions:
+      showToolPanel(.aiSuggestions)
     case .export:
       showToolPanel(.export)
     case .projects:
       importProjectBackup()
     case .sceneTemplates:
-      insertSceneTemplate()
+      showToolPanel(.sceneTemplates)
     case .exportHistory:
-      workspaceMode.wrappedValue = .review
+      showToolPanel(.export)
+    case .publishingAssistant:
+      showToolPanel(.publishingAssistant)
     case .onboarding:
-      operationMessage = "Use the project settings and Character & World tools to finish setup for this native document."
+      showToolPanel(.gettingStarted)
     case .inspector:
       if workspaceMode.wrappedValue != .write {
         workspaceMode.wrappedValue = .write

@@ -1,4 +1,5 @@
 import AppKit
+import Charts
 import DraftHarbourNativeCore
 import SwiftUI
 
@@ -31,6 +32,12 @@ private enum CorkboardCardSize: String, CaseIterable, Identifiable {
     case .large: 310
     }
   }
+}
+
+private struct AnalysisChartPoint: Identifiable {
+  var id: String { label }
+  var label: String
+  var value: Int
 }
 
 struct ToolPanelView: View {
@@ -84,6 +91,19 @@ struct ToolPanelView: View {
   @State private var translationCode = AIWorkflowServices.translationLanguages.first?.code ?? "es"
   @State private var preserveTranslationFormatting = true
   @State private var isGenerating = false
+  @State private var selectedTemplateCategory = "all"
+  @State private var selectedTemplateID = SceneTemplateServices.templates.first?.id ?? ""
+  @State private var templatePOV = ""
+  @State private var templateWordGoal = 0
+  @State private var selectedSnapshotID: String?
+  @State private var compareSnapshotID: String?
+  @State private var showSnapshotDiff = false
+  @State private var languageToolURL = UserDefaults.standard.string(forKey: "DraftHarbour.assist.languageToolUrl") ?? "https://api.languagetool.org/v2/check"
+  @State private var languageToolLanguage = UserDefaults.standard.string(forKey: "DraftHarbour.assist.languageToolLanguage") ?? "en-US"
+  @State private var grammarMatches: [LanguageToolMatch] = []
+  @State private var grammarStatus: String?
+  @State private var isCheckingGrammar = false
+  @State private var publishingDraft: PublishingDraft?
 
   private let characterRoles = ["protagonist", "antagonist", "supporting", "minor", "other"]
   private let worldCategories = ["location", "lore", "item", "event", "organisation", "other"]
@@ -133,6 +153,10 @@ struct ToolPanelView: View {
     .onAppear {
       selectedPanel = panel
       hydrateSyncFields()
+      if selectedTemplateID.isEmpty {
+        selectedTemplateID = SceneTemplateServices.templates.first?.id ?? ""
+      }
+      publishingDraft = PublishingAssistantServices.draft(for: store.envelope)
     }
     .frame(width: 860, height: 640)
   }
@@ -146,6 +170,8 @@ struct ToolPanelView: View {
       snapshotsContent
     case .dashboard:
       dashboardContent
+    case .analysis:
+      analysisContent
     case .wordCount:
       wordCountContent
     case .comments:
@@ -154,10 +180,18 @@ struct ToolPanelView: View {
       characterBibleContent
     case .storyCards:
       storyCardsContent
+    case .sceneTemplates:
+      sceneTemplatesContent
     case .integrations:
       integrationsContent
     case .ai:
       aiContent
+    case .aiSuggestions:
+      aiSuggestionsContent
+    case .publishingAssistant:
+      publishingAssistantContent
+    case .gettingStarted:
+      gettingStartedContent
     case .diagnostics:
       diagnosticsContent
     }
@@ -246,32 +280,99 @@ struct ToolPanelView: View {
   }
 
   private var snapshotsContent: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      Button("Create Snapshot") { _ = try? store.createSnapshot(label: "Manual") }
-      ForEach(store.envelope.snapshots) { snapshot in
-        HStack {
-          TextField("Label", text: Binding(get: {
-            snapshot.label ?? ""
-          }, set: { value in
-            try? store.updateSnapshotLabel(id: snapshot.id, label: value)
-          }))
-          Text(Date(timeIntervalSince1970: Double(snapshot.createdAt) / 1000).formatted())
-            .font(.caption)
-            .foregroundStyle(.secondary)
-          Spacer()
-          Button("Restore") { try? store.restoreSnapshot(id: snapshot.id) }
-          Button(role: .destructive) {
-            try? store.deleteSnapshot(id: snapshot.id)
-          } label: {
-            Image(systemName: "trash")
+    let activeSnapshots = store.envelope.snapshots.filter { $0.chapterId == store.activeSectionID }
+    let selected = activeSnapshots.first { $0.id == selectedSnapshotID }
+    let compare = activeSnapshots.first { $0.id == compareSnapshotID }
+    return VStack(alignment: .leading, spacing: 14) {
+      HStack {
+        Button {
+          let snapshot = try? store.createSnapshot(label: "Manual")
+          selectedSnapshotID = snapshot?.id
+        } label: {
+          Label("Create Snapshot", systemImage: "camera")
+        }
+        .disabled(store.activeSection == nil)
+
+        Button("Compare") {
+          if selectedSnapshotID == nil {
+            selectedSnapshotID = activeSnapshots.first?.id
           }
+          compareSnapshotID = activeSnapshots.dropFirst().first?.id
+          showSnapshotDiff = true
+        }
+        .disabled(activeSnapshots.isEmpty)
+
+        Spacer()
+        Text("\(activeSnapshots.count) for active section")
+          .foregroundStyle(.secondary)
+      }
+
+      if activeSnapshots.isEmpty {
+        ContentUnavailableView("No Snapshots", systemImage: "clock.arrow.circlepath")
+      } else {
+        HSplitView {
+          List(activeSnapshots, selection: $selectedSnapshotID) { snapshot in
+            VStack(alignment: .leading, spacing: 4) {
+              Text(snapshot.label?.isEmpty == false ? snapshot.label ?? "Snapshot" : "Snapshot")
+              Text(Date(timeIntervalSince1970: Double(snapshot.createdAt) / 1_000).formatted())
+                .font(.caption)
+                .foregroundStyle(.secondary)
+              Text("\(MarkdownTools.wordCount(snapshot.doc)) words")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+            .tag(snapshot.id)
+          }
+          .frame(minWidth: 240)
+
+          VStack(alignment: .leading, spacing: 12) {
+            if let selected {
+              HStack {
+                TextField("Label", text: Binding(get: {
+                  selected.label ?? ""
+                }, set: { value in
+                  try? store.updateSnapshotLabel(id: selected.id, label: value)
+                }))
+                Button("Restore") { try? store.restoreSnapshot(id: selected.id) }
+                Button(role: .destructive) {
+                  try? store.deleteSnapshot(id: selected.id)
+                  selectedSnapshotID = activeSnapshots.first { $0.id != selected.id }?.id
+                } label: {
+                  Image(systemName: "trash")
+                }
+              }
+
+              if showSnapshotDiff {
+                let diff = SnapshotDiffServices.diff(old: compare?.doc ?? store.activeSection?.content ?? "", new: selected.doc)
+                List(diff) { line in
+                  Text(line.text.isEmpty ? " " : line.text)
+                    .foregroundStyle(line.kind == .added ? .green : line.kind == .removed ? .red : .primary)
+                    .font(.system(.body, design: .monospaced))
+                }
+                .frame(minHeight: 260)
+              } else {
+                Text(MarkdownTools.plainText(from: selected.doc))
+                  .textSelection(.enabled)
+                  .frame(maxWidth: .infinity, minHeight: 260, alignment: .topLeading)
+                  .padding(10)
+                  .background(.regularMaterial)
+                  .clipShape(RoundedRectangle(cornerRadius: 8))
+              }
+
+              Toggle("Show diff", isOn: $showSnapshotDiff)
+            } else {
+              ContentUnavailableView("Select a Snapshot", systemImage: "doc.text.magnifyingglass")
+            }
+          }
+          .frame(minWidth: 420)
         }
       }
     }
   }
 
   private var dashboardContent: some View {
-    VStack(alignment: .leading, spacing: 16) {
+    let dashboard = ProgressDashboardServices.dashboard(for: store.envelope)
+    return VStack(alignment: .leading, spacing: 16) {
       Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 12) {
         GridRow {
           metric("Total Words", "\(store.metrics.totalWords)")
@@ -279,18 +380,93 @@ struct ToolPanelView: View {
           metric("Sentences", "\(store.metrics.sentenceCount)")
         }
         GridRow {
-          metric("Average Words", "\(store.metrics.averageWordsPerSection)")
-          metric("Characters", "\(store.envelope.characters.count)")
-          metric("World Entries", "\(store.envelope.worldEntries.count)")
+          metric("Today", "\(dashboard.todayWords)")
+          metric("Daily Goal", dashboard.dailyGoal > 0 ? "\(dashboard.dailyGoalPercent)%" : "Not set")
+          metric("Project Goal", dashboard.projectGoal > 0 ? "\(dashboard.projectGoalPercent)%" : "Not set")
         }
       }
+
+      GroupBox("Writing Goals") {
+        Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 10) {
+          GridRow {
+            TextField("Daily Words", value: Binding(get: { store.dailyWordTarget }, set: { store.updateGoals(daily: $0) }), format: .number)
+            TextField("Weekly Words", value: Binding(get: { store.envelope.settings.goalConfiguration?.weeklyWordTarget ?? 0 }, set: { store.updateGoals(weekly: $0) }), format: .number)
+          }
+          GridRow {
+            TextField("Project Words", value: Binding(get: { store.envelope.settings.novelWordGoal ?? 0 }, set: { store.updateGoals(project: $0) }), format: .number)
+            TextField("Deadline YYYY-MM-DD", text: textBinding(
+              get: { store.envelope.settings.goalConfiguration?.draftCompletionDeadline ?? store.envelope.settings.novelDeadline ?? "" },
+              set: { store.updateGoals(deadline: $0) }
+            ))
+          }
+        }
+      }
+
+      if let deadlineDate = dashboard.deadlineDate, !deadlineDate.isEmpty {
+        GroupBox("Deadline Pace") {
+          VStack(alignment: .leading, spacing: 6) {
+            LabeledContent("Deadline", value: deadlineDate)
+            LabeledContent("Days Remaining", value: dashboard.daysRemaining.map(String.init) ?? "Unknown")
+            LabeledContent("Words Remaining", value: "\(dashboard.wordsRemaining)")
+            LabeledContent("Daily Needed", value: "\(dashboard.dailyWordsNeeded)")
+            if dashboard.isBehindPace {
+              Label("Current daily goal is below the pace needed for this deadline.", systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.orange)
+            }
+          }
+        }
+      }
+
       if let progress = store.envelope.progress {
-        Divider()
-        Text("Writing Progress")
-          .font(.headline)
-        LabeledContent("Sessions", value: "\(progress.totalSessions)")
-        LabeledContent("All-time Words", value: "\(progress.totalWordsAllTime)")
-        LabeledContent("Current Streak", value: "\(progress.streak.current)")
+        GroupBox("Writing Progress") {
+          Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 10) {
+            GridRow {
+              metric("Sessions", "\(progress.totalSessions)")
+              metric("All-time Words", "\(progress.totalWordsAllTime)")
+              metric("Current Streak", "\(progress.streak.current)")
+            }
+          }
+          if !progress.dailyHistory.isEmpty {
+            Chart(progress.dailyHistory.suffix(14)) { entry in
+              BarMark(
+                x: .value("Date", entry.date),
+                y: .value("Words", entry.wordsWritten)
+              )
+              .foregroundStyle(entry.goalMet ? Color.green : Color.accentColor)
+            }
+            .frame(height: 150)
+          }
+        }
+      }
+
+      GroupBox("Next Actions") {
+        VStack(alignment: .leading, spacing: 8) {
+          if let resumeID = dashboard.resumeSectionId,
+             let section = store.envelope.sections.first(where: { $0.id == resumeID }) {
+            Button {
+              store.selectSection(resumeID)
+              dismiss()
+            } label: {
+              Label("Resume \(section.title)", systemImage: "arrow.right.circle")
+            }
+          }
+          if dashboard.overdueSectionIds.isEmpty {
+            Label("No stale unfinished sections.", systemImage: "checkmark.circle")
+              .foregroundStyle(.secondary)
+          } else {
+            ForEach(dashboard.overdueSectionIds.prefix(5), id: \.self) { sectionID in
+              if let section = store.envelope.sections.first(where: { $0.id == sectionID }) {
+                Button {
+                  store.selectSection(section.id)
+                  dismiss()
+                } label: {
+                  Label(section.title, systemImage: "clock.badge.exclamationmark")
+                }
+                .buttonStyle(.plain)
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -306,6 +482,147 @@ struct ToolPanelView: View {
       }
     }
     .frame(minHeight: 320)
+  }
+
+  private var analysisContent: some View {
+    let activeText = store.activeSection?.content ?? ""
+    let textAnalysis = AnalysisServices.textAnalysis(for: activeText)
+    let advanced = AnalysisServices.advancedAnalytics(for: activeText)
+    let weather = AnalysisServices.narrativeWeather(for: store.envelope)
+    let distribution = [
+      AnalysisChartPoint(label: "Short", value: advanced.sentenceDistribution.short),
+      AnalysisChartPoint(label: "Medium", value: advanced.sentenceDistribution.medium),
+      AnalysisChartPoint(label: "Long", value: advanced.sentenceDistribution.long),
+      AnalysisChartPoint(label: "Very Long", value: advanced.sentenceDistribution.veryLong)
+    ]
+
+    return VStack(alignment: .leading, spacing: 16) {
+      if store.activeSection == nil {
+        ContentUnavailableView("No Section Selected", systemImage: "doc.text.magnifyingglass")
+      } else {
+        GroupBox("Readability") {
+          Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 12) {
+            GridRow {
+              metric("Words", "\(textAnalysis.wordCount)")
+              metric("Sentences", "\(textAnalysis.sentenceCount)")
+              metric("Avg Sentence", String(format: "%.1f", textAnalysis.averageSentenceLength))
+              metric("Flesch", "\(textAnalysis.fleschScore)")
+            }
+          }
+        }
+
+        GroupBox("Sentence Distribution") {
+          Chart(distribution) { item in
+            BarMark(
+              x: .value("Bucket", item.label),
+              y: .value("Count", item.value)
+            )
+          }
+          .frame(height: 150)
+        }
+
+        HStack(alignment: .top, spacing: 16) {
+          GroupBox("Repeated Words") {
+            VStack(alignment: .leading, spacing: 6) {
+              if advanced.repeatedWords.isEmpty {
+                Text("No notable repeated words.")
+                  .foregroundStyle(.secondary)
+              } else {
+                ForEach(advanced.repeatedWords.sorted { $0.value > $1.value }.prefix(12), id: \.key) { word, count in
+                  LabeledContent(word, value: "\(count)")
+                }
+              }
+            }
+            .frame(minWidth: 220)
+          }
+
+          GroupBox("Advanced") {
+            VStack(alignment: .leading, spacing: 6) {
+              LabeledContent("Vocabulary Richness", value: "\(Int(advanced.vocabularyRichness))%")
+              LabeledContent("Dialogue", value: "\(Int(advanced.dialoguePercentage))%")
+              LabeledContent("Avg Paragraph", value: String(format: "%.1f", advanced.averageParagraphLength))
+              LabeledContent("Sentiment", value: AnalysisServices.sentiment(activeText).label.rawValue.capitalized)
+            }
+            .frame(minWidth: 220)
+          }
+        }
+
+        GroupBox("Long Sentences") {
+          if textAnalysis.longSentences.isEmpty {
+            Text("No 30+ word sentences found.")
+              .foregroundStyle(.secondary)
+          } else {
+            ForEach(textAnalysis.longSentences, id: \.self) { sentence in
+              Text(sentence)
+                .lineLimit(2)
+                .foregroundStyle(.secondary)
+            }
+          }
+        }
+
+        GroupBox("Grammar & Style") {
+          VStack(alignment: .leading, spacing: 10) {
+            HStack {
+              TextField("LanguageTool URL", text: $languageToolURL)
+              TextField("Language", text: $languageToolLanguage)
+                .frame(width: 90)
+              Button(isCheckingGrammar ? "Checking..." : "Run Grammar Check") {
+                Task { await runGrammarCheck(text: activeText) }
+              }
+              .disabled(isCheckingGrammar || activeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            if let grammarStatus {
+              Text(grammarStatus)
+                .foregroundStyle(.secondary)
+            }
+            if grammarMatches.isEmpty {
+              Text("No grammar results loaded.")
+                .foregroundStyle(.secondary)
+            } else {
+              ForEach(grammarMatches) { match in
+                VStack(alignment: .leading, spacing: 3) {
+                  Text(match.message)
+                  Text(match.context.text)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                  if !match.replacements.isEmpty {
+                    Text("Suggestions: \(match.replacements.map(\.value).joined(separator: ", "))")
+                      .font(.caption)
+                  }
+                }
+                Divider()
+              }
+            }
+          }
+        }
+
+        GroupBox("Narrative Weather") {
+          if weather.isEmpty {
+            Text("No sections available.")
+              .foregroundStyle(.secondary)
+          } else {
+            Chart(weather) { point in
+              LineMark(
+                x: .value("Section", point.title),
+                y: .value("Sentiment", point.sentiment)
+              )
+              .foregroundStyle(.blue)
+              LineMark(
+                x: .value("Section", point.title),
+                y: .value("Pacing", point.pacing)
+              )
+              .foregroundStyle(.orange)
+              LineMark(
+                x: .value("Section", point.title),
+                y: .value("Dialogue", point.dialogueDensity)
+              )
+              .foregroundStyle(.green)
+            }
+            .frame(height: 170)
+          }
+        }
+      }
+    }
   }
 
   private var commentsContent: some View {
@@ -667,6 +984,86 @@ struct ToolPanelView: View {
     }
   }
 
+  private var filteredSceneTemplates: [SceneTemplate] {
+    SceneTemplateServices.templates.filter { template in
+      (selectedTemplateCategory == "all" || template.category.rawValue == selectedTemplateCategory) &&
+        template.projectTypes.contains(store.projectType)
+    }
+  }
+
+  private var selectedSceneTemplate: SceneTemplate? {
+    filteredSceneTemplates.first { $0.id == selectedTemplateID } ?? filteredSceneTemplates.first
+  }
+
+  private var sceneTemplatesContent: some View {
+    HSplitView {
+      VStack(alignment: .leading, spacing: 12) {
+        Picker("Category", selection: $selectedTemplateCategory) {
+          Text("All").tag("all")
+          ForEach(SceneTemplateCategory.allCases) { category in
+            Text(category.rawValue.capitalized).tag(category.rawValue)
+          }
+        }
+        .pickerStyle(.segmented)
+
+        List(filteredSceneTemplates, selection: $selectedTemplateID) { template in
+          Label(template.name, systemImage: template.icon)
+            .tag(template.id)
+        }
+        .frame(minWidth: 260, minHeight: 420)
+      }
+
+      VStack(alignment: .leading, spacing: 16) {
+        if let template = selectedSceneTemplate {
+          Label(template.name, systemImage: template.icon)
+            .font(.title3.bold())
+          Text(template.summary)
+            .foregroundStyle(.secondary)
+
+          GroupBox("Beats") {
+            VStack(alignment: .leading, spacing: 8) {
+              ForEach(Array(template.beats.enumerated()), id: \.offset) { index, beat in
+                Label("\(index + 1). \(beat)", systemImage: "circle")
+                  .labelStyle(.titleOnly)
+              }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+          }
+
+          HStack {
+            TextField("POV Character", text: $templatePOV)
+            TextField("Word Goal", value: $templateWordGoal, format: .number)
+              .frame(width: 120)
+          }
+
+          if !template.tags.isEmpty {
+            Text(template.tags.joined(separator: ", "))
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+
+          Button {
+            if let scene = try? store.applySceneTemplate(template, pov: templatePOV, wordGoal: templateWordGoal) {
+              templatePOV = ""
+              templateWordGoal = 0
+              selectedTemplateID = template.id
+              expandedStoryCardID = scene.id
+              selectedPanel = .storyCards
+            }
+          } label: {
+            Label("Add Scene from Template", systemImage: "plus")
+          }
+          .buttonStyle(.borderedProminent)
+          .disabled(store.activeSection == nil)
+        } else {
+          ContentUnavailableView("No Template", systemImage: "doc.badge.plus")
+        }
+      }
+      .frame(minWidth: 440, maxWidth: .infinity, alignment: .topLeading)
+      .padding(.leading, 10)
+    }
+  }
+
   private var integrationsContent: some View {
     VStack(alignment: .leading, spacing: 16) {
       GroupBox("Generic REST Sync") {
@@ -951,6 +1348,213 @@ struct ToolPanelView: View {
     }
   }
 
+  private var aiSuggestionsContent: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      GroupBox("Quick Actions") {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 10)], spacing: 10) {
+          aiSuggestionButton("Continue", systemImage: "square.and.pencil", stageID: "continue")
+          aiSuggestionButton("Revise", systemImage: "wand.and.stars", stageID: "revise")
+          aiSuggestionButton("Strengthen", systemImage: "bolt", stageID: "revise", prompt: "Make the current section more vivid with stronger verbs, sensory details, and clearer stakes.")
+          aiSuggestionButton("Shorten", systemImage: "arrow.down.forward.and.arrow.up.backward", stageID: "revise", prompt: "Tighten the current section to half its length without losing meaning.")
+          aiSuggestionButton("Brainstorm Plot", systemImage: "lightbulb", stageID: "continue", prompt: "Suggest three surprising plot developments that could happen next.")
+          aiSuggestionButton("Scene Outline", systemImage: "list.number", stageID: "continue", prompt: "Create a five-beat outline for the current scene.")
+        }
+      }
+
+      GroupBox("Custom Prompt") {
+        VStack(alignment: .leading, spacing: 10) {
+          TextField("Ask for a rewrite, brainstorm, critique, or continuation", text: $aiPrompt, axis: .vertical)
+            .lineLimit(3...6)
+          HStack {
+            Picker("Insertion", selection: $insertionMode) {
+              ForEach(PipelineInsertionMode.allCases, id: \.self) { mode in
+                Text(mode.rawValue.capitalized).tag(mode)
+              }
+            }
+            .frame(width: 220)
+            Button(isGenerating ? "Generating..." : "Run Prompt") {
+              selectedStageID = "continue"
+              Task { await runAIWorkflow() }
+            }
+            .disabled(isGenerating || store.activeSection == nil)
+          }
+        }
+      }
+
+      if !aiResult.isEmpty {
+        GroupBox("Latest Suggestion") {
+          Text(aiResult)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+      }
+
+      if let aiError {
+        Text(aiError)
+          .foregroundStyle(.red)
+      }
+    }
+  }
+
+  private func aiSuggestionButton(_ title: String, systemImage: String, stageID: String, prompt: String = "") -> some View {
+    Button {
+      selectedStageID = stageID
+      aiPrompt = prompt
+      Task { await runAIWorkflow() }
+    } label: {
+      Label(title, systemImage: systemImage)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .disabled(isGenerating || store.activeSection == nil)
+  }
+
+  private var publishingAssistantContent: some View {
+    let draft = publishingDraft ?? PublishingAssistantServices.draft(for: store.envelope)
+    return VStack(alignment: .leading, spacing: 14) {
+      HStack {
+        Button {
+          publishingDraft = PublishingAssistantServices.draft(for: store.envelope)
+        } label: {
+          Label("Regenerate Draft", systemImage: "arrow.clockwise")
+        }
+        Button {
+          copyPublishingDraft()
+        } label: {
+          Label("Copy All", systemImage: "doc.on.doc")
+        }
+        Spacer()
+      }
+
+      publishingField("Book description / blurb", value: Binding(get: {
+        draft.bookDescription
+      }, set: { value in
+        var copy = draft
+        copy.bookDescription = value
+        publishingDraft = copy
+      }), rows: 4)
+      publishingField("Short synopsis", value: Binding(get: {
+        draft.shortSynopsis
+      }, set: { value in
+        var copy = draft
+        copy.shortSynopsis = value
+        publishingDraft = copy
+      }), rows: 3)
+      publishingField("Long synopsis", value: Binding(get: {
+        draft.longSynopsis
+      }, set: { value in
+        var copy = draft
+        copy.longSynopsis = value
+        publishingDraft = copy
+      }), rows: 5)
+      publishingField("Author bio", value: Binding(get: {
+        draft.authorBioShort
+      }, set: { value in
+        var copy = draft
+        copy.authorBioShort = value
+        publishingDraft = copy
+      }), rows: 3)
+      publishingField("Keywords", value: Binding(get: {
+        draft.keywordSuggestions
+      }, set: { value in
+        var copy = draft
+        copy.keywordSuggestions = value
+        publishingDraft = copy
+      }), rows: 2)
+      publishingField("Back-cover copy", value: Binding(get: {
+        draft.backCoverCopy
+      }, set: { value in
+        var copy = draft
+        copy.backCoverCopy = value
+        publishingDraft = copy
+      }), rows: 4)
+      publishingField("Hook lines", value: Binding(get: {
+        draft.hookLines
+      }, set: { value in
+        var copy = draft
+        copy.hookLines = value
+        publishingDraft = copy
+      }), rows: 4)
+    }
+  }
+
+  private func publishingField(_ label: String, value: Binding<String>, rows: Int) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Text(label)
+        .font(.headline)
+      TextField(label, text: value, axis: .vertical)
+        .lineLimit(2...max(2, rows))
+        .textFieldStyle(.roundedBorder)
+    }
+  }
+
+  private var gettingStartedContent: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      GroupBox("Project Blueprint") {
+        Form {
+          TextField("Genre", text: textBinding(
+            get: { store.envelope.storyBlueprint?.genre ?? "" },
+            set: { value in updateBlueprint { $0.genre = value } }
+          ))
+          TextField("Subgenre", text: textBinding(
+            get: { store.envelope.storyBlueprint?.subgenre ?? "" },
+            set: { value in updateBlueprint { $0.subgenre = value } }
+          ))
+          TextField("Target Audience", text: textBinding(
+            get: { store.envelope.storyBlueprint?.targetAudience ?? "" },
+            set: { value in updateBlueprint { $0.targetAudience = value } }
+          ))
+          TextField("Age Band", text: textBinding(
+            get: { store.envelope.storyBlueprint?.ageBand ?? "" },
+            set: { value in updateBlueprint { $0.ageBand = value } }
+          ))
+          TextField("Tone", text: textBinding(
+            get: { store.envelope.storyBlueprint?.tone ?? "" },
+            set: { value in updateBlueprint { $0.tone = value } }
+          ))
+          TextField("Voice", text: textBinding(
+            get: { store.envelope.storyBlueprint?.voice ?? "" },
+            set: { value in updateBlueprint { $0.voice = value } }
+          ))
+          Picker("Structure", selection: Binding(get: {
+            store.envelope.storyBlueprint?.structure ?? .threeAct
+          }, set: { value in
+            updateBlueprint { $0.structure = value }
+          })) {
+            Text("Three Act").tag(StoryStructurePreference.threeAct)
+            Text("Save The Cat").tag(StoryStructurePreference.saveTheCat)
+            Text("Hero Journey").tag(StoryStructurePreference.heroJourney)
+          }
+          Picker("Pacing", selection: Binding(get: {
+            store.envelope.storyBlueprint?.pacingProfile ?? .balanced
+          }, set: { value in
+            updateBlueprint { $0.pacingProfile = value }
+          })) {
+            Text("Fast").tag(PacingProfile.fast)
+            Text("Balanced").tag(PacingProfile.balanced)
+            Text("Slow Burn").tag(PacingProfile.slowBurn)
+          }
+          TextField("Target Words", value: Binding(get: {
+            store.envelope.storyBlueprint?.targetWordCount ?? store.envelope.settings.novelWordGoal ?? 80_000
+          }, set: { value in
+            updateBlueprint { $0.targetWordCount = value }
+            store.updateGoals(project: value)
+          }), format: .number)
+        }
+        .formStyle(.grouped)
+      }
+
+      GroupBox("Quick Start") {
+        VStack(alignment: .leading, spacing: 8) {
+          Label("Create sections from the sidebar or Project menu.", systemImage: "plus.circle")
+          Label("Use snapshots before major rewrites.", systemImage: "clock.arrow.circlepath")
+          Label("Open Scene Templates to add structured beats.", systemImage: "doc.badge.plus")
+          Label("Open AI Suggestions after configuring a provider.", systemImage: "wand.and.stars")
+        }
+        .foregroundStyle(.secondary)
+      }
+    }
+  }
+
   private var diagnosticsContent: some View {
     let summary = store.diagnosticsSummary()
     let advanced = AnalyticsEngine.advancedAnalytics(for: store.envelope)
@@ -1028,6 +1632,12 @@ struct ToolPanelView: View {
       get: { get() },
       set: { value in set(value) }
     )
+  }
+
+  private func updateBlueprint(_ update: (inout StoryBlueprint) -> Void) {
+    var blueprint = store.envelope.storyBlueprint ?? StoryBlueprint()
+    update(&blueprint)
+    store.updateStoryBlueprint(blueprint)
   }
 
   private func parseCSV(_ value: String) -> [String] {
@@ -1380,6 +1990,72 @@ struct ToolPanelView: View {
     store.upsertAIProvider(config)
     selectedAIProviderID = config.id
     return config
+  }
+
+  @MainActor
+  private func runGrammarCheck(text: String) async {
+    guard let url = URL(string: languageToolURL) else {
+      grammarStatus = "LanguageTool URL is invalid."
+      return
+    }
+    UserDefaults.standard.set(languageToolURL, forKey: "DraftHarbour.assist.languageToolUrl")
+    UserDefaults.standard.set(languageToolLanguage, forKey: "DraftHarbour.assist.languageToolLanguage")
+
+    isCheckingGrammar = true
+    grammarStatus = nil
+    grammarMatches = []
+    defer { isCheckingGrammar = false }
+
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+    request.httpBody = LanguageToolServices.requestBody(text: MarkdownTools.plainText(from: text), language: languageToolLanguage)
+
+    do {
+      let (data, response) = try await URLSession.shared.data(for: request)
+      if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+        grammarStatus = "LanguageTool returned HTTP \(http.statusCode)."
+        return
+      }
+      grammarMatches = try LanguageToolServices.parseMatches(from: data)
+      grammarStatus = grammarMatches.isEmpty ? "No grammar or style issues returned." : "Loaded \(grammarMatches.count) issue(s)."
+    } catch {
+      grammarStatus = error.localizedDescription
+    }
+  }
+
+  private func copyPublishingDraft() {
+    let draft = publishingDraft ?? PublishingAssistantServices.draft(for: store.envelope)
+    let text = """
+    Book description:
+    \(draft.bookDescription)
+
+    Short synopsis:
+    \(draft.shortSynopsis)
+
+    Long synopsis:
+    \(draft.longSynopsis)
+
+    Short author bio:
+    \(draft.authorBioShort)
+
+    Long author bio:
+    \(draft.authorBioLong)
+
+    Keywords:
+    \(draft.keywordSuggestions)
+
+    Categories:
+    \(draft.categorySuggestions)
+
+    Back-cover copy:
+    \(draft.backCoverCopy)
+
+    Hooks:
+    \(draft.hookLines)
+    """
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(text, forType: .string)
   }
 
   @MainActor

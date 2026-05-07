@@ -12,7 +12,15 @@ final class NativeCommandAndDeepLinkTests: XCTestCase {
       .shareActiveSection,
       .printActiveSection,
       .printProject,
-      .toggleToolPanel
+      .toggleToolPanel,
+      .dashboard,
+      .analysis,
+      .advancedAnalytics,
+      .sceneTemplates,
+      .aiSuggestions,
+      .publishingAssistant,
+      .exportHistory,
+      .onboarding
     ]
 
     for command in commands {
@@ -32,6 +40,19 @@ final class NativeCommandAndDeepLinkTests: XCTestCase {
     handler.perform(.printProject)
 
     XCTAssertEqual(performed, [.printProject])
+  }
+
+  func testQuickSwitcherIndexesNativeParityToolPanels() {
+    let envelope = DhprojCodec.newProject(title: "Switcher")
+
+    XCTAssertTrue(QuickSwitcherIndex.search("dashboard", in: envelope).contains { $0.commandID == .dashboard })
+    XCTAssertTrue(QuickSwitcherIndex.search("analysis", in: envelope).contains { $0.commandID == .analysis })
+    XCTAssertTrue(QuickSwitcherIndex.search("advanced", in: envelope).contains { $0.commandID == .advancedAnalytics })
+    XCTAssertTrue(QuickSwitcherIndex.search("templates", in: envelope).contains { $0.commandID == .sceneTemplates })
+    XCTAssertTrue(QuickSwitcherIndex.search("suggestions", in: envelope).contains { $0.commandID == .aiSuggestions })
+    XCTAssertTrue(QuickSwitcherIndex.search("publishing", in: envelope).contains { $0.commandID == .publishingAssistant })
+    XCTAssertTrue(QuickSwitcherIndex.search("export history", in: envelope).contains { $0.commandID == .exportHistory })
+    XCTAssertTrue(QuickSwitcherIndex.search("onboarding", in: envelope).contains { $0.commandID == .onboarding })
   }
 
   func testNativeDeepLinkParsesProjectURL() throws {

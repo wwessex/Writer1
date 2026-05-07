@@ -352,6 +352,11 @@ struct DraftHarbourCommands: Commands {
       }
       .disabled(!canPerform(.aiWriting))
 
+      Button("AI Suggestions") {
+        perform(.aiSuggestions)
+      }
+      .disabled(!canPerform(.aiSuggestions))
+
       Button("Translate") {
         perform(.translation)
       }
@@ -368,6 +373,11 @@ struct DraftHarbourCommands: Commands {
         perform(.exportHistory)
       }
       .disabled(!canPerform(.exportHistory))
+
+      Button("Publishing Assistant") {
+        perform(.publishingAssistant)
+      }
+      .disabled(!canPerform(.publishingAssistant))
 
       Button("Settings") {
         perform(.settings)

@@ -83,6 +83,30 @@ public final class ProjectStore {
     markChanged()
   }
 
+  public func updateGoals(daily: Int? = nil, weekly: Int? = nil, project: Int? = nil, deadline: String? = nil) {
+    if let daily {
+      envelope.settings.dailyWordGoal = daily > 0 ? daily : nil
+    }
+    if let project {
+      envelope.settings.novelWordGoal = project > 0 ? project : nil
+    }
+
+    var goalConfiguration = envelope.settings.goalConfiguration ?? GoalConfiguration()
+    if let daily {
+      goalConfiguration.dailyWordTarget = daily > 0 ? daily : nil
+    }
+    if let weekly {
+      goalConfiguration.weeklyWordTarget = weekly > 0 ? weekly : nil
+    }
+    if let deadline {
+      let trimmed = deadline.trimmingCharacters(in: .whitespacesAndNewlines)
+      envelope.settings.novelDeadline = trimmed.isEmpty ? nil : trimmed
+      goalConfiguration.draftCompletionDeadline = trimmed.isEmpty ? nil : trimmed
+    }
+    envelope.settings.goalConfiguration = goalConfiguration
+    markChanged()
+  }
+
   @discardableResult
   public func importSections(_ sections: [Section], selectFirst: Bool = true) -> [String] {
     guard !sections.isEmpty else { return [] }
@@ -284,6 +308,18 @@ public final class ProjectStore {
       section.scenes.append(scene)
     }
     return scene
+  }
+
+  @discardableResult
+  public func applySceneTemplate(_ template: SceneTemplate, pov: String = "", wordGoal: Int = 0) throws -> Scene {
+    try createScene(
+      initialData: SceneTemplateServices.scene(
+        from: template,
+        pov: pov.trimmingCharacters(in: .whitespacesAndNewlines),
+        wordGoal: wordGoal,
+        projectType: projectType
+      )
+    )
   }
 
   public func updateScene(sectionID: String, sceneID: String, update: (inout Scene) -> Void) {
@@ -613,7 +649,30 @@ public final class ProjectStore {
       progress.streak = WritingStreak(current: 1, longest: max(1, progress.streak.longest), lastActiveDate: date)
     }
     envelope.progress = progress
+    recordGoalTrendSnapshot(date: date, wordsToday: progress.dailyHistory.first { $0.date == date }?.wordsWritten ?? 0)
     markChanged()
+  }
+
+  public func recordGoalTrendSnapshot(date: String = ProjectStore.todayString(), wordsToday: Int? = nil) {
+    let dailyGoal = dailyWordTarget
+    let words = wordsToday ?? progress(for: date)?.wordsWritten ?? 0
+    let snapshot: JSONValue = .object([
+      "date": .string(date),
+      "wordsToday": .number(Double(words)),
+      "dailyGoal": .number(Double(dailyGoal)),
+      "goalMet": .bool(dailyGoal > 0 && words >= dailyGoal)
+    ])
+    envelope.goalTrends.removeAll {
+      guard case .object(let object) = $0,
+            case .string(let existingDate) = object["date"] else {
+        return false
+      }
+      return existingDate == date
+    }
+    envelope.goalTrends.append(snapshot)
+    if envelope.goalTrends.count > 30 {
+      envelope.goalTrends = Array(envelope.goalTrends.suffix(30))
+    }
   }
 
   public func recordExport(_ exported: ExportedFile, format: ExportFormat, validationIssues: [ExportValidationIssue] = []) {

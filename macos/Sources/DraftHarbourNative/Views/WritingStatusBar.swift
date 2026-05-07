@@ -5,10 +5,21 @@ struct WritingStatusBar: View {
   @Bindable var store: ProjectStore
   var fileURL: URL?
   var recoveryState: String
+  var focusMode: Bool = false
   var onStoppedSession: (WritingSessionResult) -> Void
+  var onExitFocusMode: () -> Void = {}
 
   var body: some View {
     HStack(spacing: 14) {
+      if focusMode {
+        Button {
+          onExitFocusMode()
+        } label: {
+          Label("Exit Focus", systemImage: "arrow.down.right.and.arrow.up.left")
+        }
+        .controlSize(.small)
+      }
+
       Button {
         if store.writingSession == nil {
           _ = store.startWritingSession()
@@ -22,6 +33,11 @@ struct WritingStatusBar: View {
 
       if store.writingSession != nil {
         Label("\(store.currentWritingSessionDelta) session words", systemImage: "timer")
+          .foregroundStyle(.secondary)
+      }
+
+      if focusMode, let session = store.writingSession {
+        Text(Date(timeIntervalSince1970: Double(session.startedAt) / 1_000).formatted(date: .omitted, time: .shortened))
           .foregroundStyle(.secondary)
       }
 

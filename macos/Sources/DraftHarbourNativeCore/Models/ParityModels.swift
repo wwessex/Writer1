@@ -20,6 +20,7 @@ public enum NativeCommandID: String, Codable, CaseIterable, Sendable {
   case about
   case characterBible
   case aiWriting
+  case aiSuggestions
   case comments
   case addComment
   case advancedAnalytics
@@ -27,6 +28,7 @@ public enum NativeCommandID: String, Codable, CaseIterable, Sendable {
   case projects
   case sceneTemplates
   case exportHistory
+  case publishingAssistant
   case aiPanel
   case translation
   case corkboard
@@ -74,7 +76,7 @@ public enum NativeCommandID: String, Codable, CaseIterable, Sendable {
       return .responderChain
     case .openProjectFile, .settings, .about:
       return .system
-    case .importDocument, .newSection, .export, .saveProjectFile, .openRecent, .reopenLastProject, .exportBackup, .importBackup, .saveProjectCopy, .snapshots, .analysis, .wordCount, .dashboard, .onboarding, .characterBible, .aiWriting, .comments, .addComment, .advancedAnalytics, .integrations, .projects, .sceneTemplates, .exportHistory, .aiPanel, .translation, .corkboard, .inspector, .quickSwitcher, .findReplace, .nativeFind, .projectFindReplace, .workspaceWrite, .workspaceCorkboard, .workspaceReview, .toggleSidebar, .toggleToolPanel, .togglePageView, .toggleFocusMode, .themeAuto, .themeLight, .themeDark, .insertHorizontalRule, .insertBlockquote, .formatBold, .formatItalic, .formatUnderline, .formatHeading1, .formatHeading2, .formatParagraph, .toggleTypewriterMode, .storyCards, .revealProjectInFinder, .copyProjectPath, .shareSelection, .shareActiveSection, .printActiveSection, .printProject:
+    case .importDocument, .newSection, .export, .saveProjectFile, .openRecent, .reopenLastProject, .exportBackup, .importBackup, .saveProjectCopy, .snapshots, .analysis, .wordCount, .dashboard, .onboarding, .characterBible, .aiWriting, .aiSuggestions, .comments, .addComment, .advancedAnalytics, .integrations, .projects, .sceneTemplates, .exportHistory, .publishingAssistant, .aiPanel, .translation, .corkboard, .inspector, .quickSwitcher, .findReplace, .nativeFind, .projectFindReplace, .workspaceWrite, .workspaceCorkboard, .workspaceReview, .toggleSidebar, .toggleToolPanel, .togglePageView, .toggleFocusMode, .themeAuto, .themeLight, .themeDark, .insertHorizontalRule, .insertBlockquote, .formatBold, .formatItalic, .formatUnderline, .formatHeading1, .formatHeading2, .formatParagraph, .toggleTypewriterMode, .storyCards, .revealProjectInFinder, .copyProjectPath, .shareSelection, .shareActiveSection, .printActiveSection, .printProject:
       return .native
     }
   }

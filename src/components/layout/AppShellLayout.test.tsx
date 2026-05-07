@@ -72,8 +72,10 @@ describe('AppShellLayout', () => {
         isSaving: false,
         isOnline: true,
         novelId: 'novel-1',
+        settings: { theme: 'auto' },
       },
       activeChapter: { id: 'c1', content: [{ t: 1 }], wordGoal: 500 },
+      updateSettings: vi.fn(),
     });
 
     editorToPlainTextMock.mockImplementation((content: unknown) => {
@@ -168,8 +170,10 @@ describe('AppShellLayout', () => {
         isSaving: true,
         isOnline: false,
         novelId: 'novel-1',
+        settings: { theme: 'auto' },
       },
       activeChapter: { id: 'c1', content: [{ t: 1 }], wordGoal: 100 },
+      updateSettings: vi.fn(),
     });
 
     const container = document.createElement('div');
