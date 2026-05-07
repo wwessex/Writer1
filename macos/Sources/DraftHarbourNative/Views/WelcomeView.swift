@@ -7,6 +7,10 @@ struct WelcomeView: View {
   let createProject: @MainActor (WelcomeProjectConfiguration) -> Void
   let openProjectPanel: @MainActor () -> Void
   let openRecentProject: @MainActor (URL) -> Void
+  let revealRecentProject: @MainActor (URL) -> Void
+  let copyRecentProjectPath: @MainActor (URL) -> Void
+  let copyRecentProjectLink: @MainActor (String) -> Void
+  let removeRecentProject: @MainActor (URL) -> Void
 
   @State private var recentProjects: [WelcomeRecentProject]
   @State private var showingProjectSetup: Bool
@@ -18,12 +22,20 @@ struct WelcomeView: View {
     refreshRecentProjects: @escaping @MainActor () -> [WelcomeRecentProject],
     createProject: @escaping @MainActor (WelcomeProjectConfiguration) -> Void,
     openProjectPanel: @escaping @MainActor () -> Void,
-    openRecentProject: @escaping @MainActor (URL) -> Void
+    openRecentProject: @escaping @MainActor (URL) -> Void,
+    revealRecentProject: @escaping @MainActor (URL) -> Void,
+    copyRecentProjectPath: @escaping @MainActor (URL) -> Void,
+    copyRecentProjectLink: @escaping @MainActor (String) -> Void,
+    removeRecentProject: @escaping @MainActor (URL) -> Void
   ) {
     self.refreshRecentProjects = refreshRecentProjects
     self.createProject = createProject
     self.openProjectPanel = openProjectPanel
     self.openRecentProject = openRecentProject
+    self.revealRecentProject = revealRecentProject
+    self.copyRecentProjectPath = copyRecentProjectPath
+    self.copyRecentProjectLink = copyRecentProjectLink
+    self.removeRecentProject = removeRecentProject
     self._recentProjects = State(initialValue: recentProjects)
     self._showingProjectSetup = State(initialValue: showingProjectSetup)
   }
@@ -153,6 +165,28 @@ struct WelcomeView: View {
             .padding(.vertical, 6)
           }
           .buttonStyle(.plain)
+          .contextMenu {
+            Button("Open") {
+              openRecentProject(project.url)
+            }
+            Button("Reveal in Finder") {
+              revealRecentProject(project.url)
+            }
+            Button("Copy Path") {
+              copyRecentProjectPath(project.url)
+            }
+            if let projectID = project.projectID {
+              Button("Copy Project Link") {
+                copyRecentProjectLink(projectID)
+              }
+              .disabled(!project.canCopyProjectLink)
+            }
+            Divider()
+            Button("Remove from Recents", role: .destructive) {
+              removeRecentProject(project.url)
+              recentProjects = refreshRecentProjects()
+            }
+          }
         }
         .listStyle(.inset)
       }

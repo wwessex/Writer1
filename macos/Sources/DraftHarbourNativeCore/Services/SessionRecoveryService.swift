@@ -84,6 +84,20 @@ public struct SessionRecoveryService {
     (defaults.stringArray(forKey: Self.recentProjectURLsKey) ?? []).map { URL(fileURLWithPath: $0) }
   }
 
+  public func removeRecentProjectURL(_ url: URL) {
+    let path = url.standardizedFileURL.path
+    var paths = defaults.stringArray(forKey: Self.recentProjectURLsKey) ?? []
+    paths.removeAll { $0 == path }
+    defaults.set(paths, forKey: Self.recentProjectURLsKey)
+  }
+
+  @discardableResult
+  public func pruneMissingRecentProjectURLs() -> [URL] {
+    let existing = recentProjectURLs().filter { fileManager.fileExists(atPath: $0.path) }
+    defaults.set(existing.map { $0.standardizedFileURL.path }, forKey: Self.recentProjectURLsKey)
+    return existing
+  }
+
   public func recordActiveSectionID(_ id: String?, projectId: String) {
     let key = activeSectionKey(projectId: projectId)
     if let id {

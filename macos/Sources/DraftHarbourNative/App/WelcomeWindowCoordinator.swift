@@ -5,10 +5,13 @@ import UniformTypeIdentifiers
 
 struct WelcomeRecentProject: Identifiable, Equatable {
   let url: URL
+  let projectID: String?
+  let projectTitle: String?
 
   var id: String { url.standardizedFileURL.path }
-  var title: String { url.deletingPathExtension().lastPathComponent }
+  var title: String { projectTitle?.isEmpty == false ? projectTitle ?? url.deletingPathExtension().lastPathComponent : url.deletingPathExtension().lastPathComponent }
   var location: String { (url.deletingLastPathComponent().path as NSString).abbreviatingWithTildeInPath }
+  var canCopyProjectLink: Bool { projectID?.isEmpty == false }
 }
 
 struct WelcomeProjectConfiguration: Equatable {
@@ -144,7 +147,11 @@ final class WelcomeWindowCoordinator: NSObject, NSWindowDelegate {
       refreshRecentProjects: { [weak self] in self?.recentProjects() ?? [] },
       createProject: { [weak self] configuration in self?.createProject(configuration) },
       openProjectPanel: { [weak self] in self?.openProjectPanel() },
-      openRecentProject: { [weak self] url in self?.openProject(at: url) }
+      openRecentProject: { [weak self] url in self?.openProject(at: url) },
+      revealRecentProject: { [weak self] url in self?.revealProject(at: url) },
+      copyRecentProjectPath: { [weak self] url in self?.copyProjectPath(url) },
+      copyRecentProjectLink: { [weak self] projectID in self?.copyProjectLink(projectID: projectID) },
+      removeRecentProject: { [weak self] url in self?.removeRecentProject(url) }
     )
   }
 
@@ -174,9 +181,35 @@ final class WelcomeWindowCoordinator: NSObject, NSWindowDelegate {
   }
 
   private func recentProjects() -> [WelcomeRecentProject] {
-    recoveryService.recentProjectURLs()
-      .filter { fileManager.fileExists(atPath: $0.path) }
-      .map { WelcomeRecentProject(url: $0) }
+    recoveryService.pruneMissingRecentProjectURLs()
+      .map { url in
+        let envelope = envelope(at: url)
+        return WelcomeRecentProject(url: url, projectID: envelope?.project.id, projectTitle: envelope?.project.title)
+      }
+  }
+
+  private func envelope(at url: URL) -> DhprojEnvelope? {
+    guard let data = try? Data(contentsOf: url) else { return nil }
+    return try? DhprojCodec.decode(data)
+  }
+
+  private func revealProject(at url: URL) {
+    NSWorkspace.shared.activateFileViewerSelecting([url])
+  }
+
+  private func copyProjectPath(_ url: URL) {
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(url.path, forType: .string)
+  }
+
+  private func copyProjectLink(projectID: String) {
+    guard let url = NativeDeepLink(projectID: projectID).url else { return }
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(url.absoluteString, forType: .string)
+  }
+
+  private func removeRecentProject(_ url: URL) {
+    recoveryService.removeRecentProjectURL(url)
   }
 
   private func defaultFilename(for title: String) -> String {

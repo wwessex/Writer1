@@ -49,6 +49,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       name: .draftHarbourOpenProjectFile,
       object: nil
     )
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleWelcomeRequest),
+      name: .draftHarbourShowWelcomeWindow,
+      object: nil
+    )
     NSAppleEventManager.shared().setEventHandler(
       self,
       andSelector: #selector(handleGetURLEvent(_:withReplyEvent:)),
@@ -89,6 +95,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   @objc private func handleOpenProjectRequest() {
     welcomeCoordinator.openProjectPanel()
+  }
+
+  @objc private func handleWelcomeRequest() {
+    welcomeCoordinator.show()
   }
 
   private func scheduleEmptyLaunchWelcomeChecks() {

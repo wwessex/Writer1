@@ -31,7 +31,7 @@ public struct DhprojManifest: Codable, Equatable, Sendable {
   public init(
     format: String = "dhproj",
     version: Int = 1,
-    appVersion: String = "native-0.1.0",
+    appVersion: String = "native-2.0.0",
     createdAt: String = ISO8601DateFormatter().string(from: Date()),
     exportOptions: ExportOptions? = nil
   ) {

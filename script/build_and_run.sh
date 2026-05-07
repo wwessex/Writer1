@@ -7,6 +7,8 @@ PRODUCT="DraftHarbourNative"
 APP_NAME="DraftHarbour"
 APP_BUNDLE="$ROOT_DIR/dist/$APP_NAME.app"
 ICON_SOURCE="$ROOT_DIR/macos/Resources/DraftHarbour.icns"
+APP_VERSION="${DRAFTHARBOUR_VERSION:-2.0.0}"
+APP_BUILD="${DRAFTHARBOUR_BUILD:-200}"
 CONFIGURATION="debug"
 SHOULD_LAUNCH=1
 SHOULD_VERIFY=0
@@ -124,7 +126,7 @@ if [[ -f "$ICON_SOURCE" ]]; then
   cp "$ICON_SOURCE" "$RESOURCES_DIR/DraftHarbour.icns"
 fi
 
-cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
+cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -149,6 +151,8 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
       </array>
       <key>CFBundleTypeName</key>
       <string>DraftHarbour Project</string>
+      <key>CFBundleTypeIconFile</key>
+      <string>DraftHarbour</string>
       <key>CFBundleTypeRole</key>
       <string>Editor</string>
       <key>LSHandlerRank</key>
@@ -183,9 +187,11 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>$APP_VERSION</string>
   <key>CFBundleVersion</key>
-  <string>1</string>
+  <string>$APP_BUILD</string>
+  <key>LSApplicationCategoryType</key>
+  <string>public.app-category.productivity</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>NSHumanReadableCopyright</key>
@@ -207,6 +213,8 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
       <string>DraftHarbour Project</string>
       <key>UTTypeIdentifier</key>
       <string>com.draftharbour.project</string>
+      <key>UTTypeIconFile</key>
+      <string>DraftHarbour</string>
       <key>UTTypeTagSpecification</key>
       <dict>
         <key>public.filename-extension</key>

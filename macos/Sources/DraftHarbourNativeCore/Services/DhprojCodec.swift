@@ -1,7 +1,7 @@
 import Foundation
 
 public enum DhprojCodec {
-  public static let currentAppVersion = "native-0.1.0"
+  public static let currentAppVersion = "native-2.0.0"
 
   public static func decode(_ data: Data) throws -> DhprojEnvelope {
     let decoder = JSONDecoder()

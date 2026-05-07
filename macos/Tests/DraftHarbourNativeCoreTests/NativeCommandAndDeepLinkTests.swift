@@ -20,7 +20,11 @@ final class NativeCommandAndDeepLinkTests: XCTestCase {
       .aiSuggestions,
       .publishingAssistant,
       .exportHistory,
-      .onboarding
+      .onboarding,
+      .copyProjectLink,
+      .copySectionLink,
+      .indexSpotlight,
+      .clearSpotlightIndex
     ]
 
     for command in commands {
@@ -77,5 +81,34 @@ final class NativeCommandAndDeepLinkTests: XCTestCase {
     let url = try XCTUnwrap(URL(string: "draftharbour://oauth/dropbox?code=abc&state=123"))
 
     XCTAssertNil(NativeDeepLink.parse(url))
+  }
+
+  func testNativeDeepLinkBuildsCopyableURLs() throws {
+    XCTAssertEqual(
+      NativeDeepLink(projectID: "project-123").url?.absoluteString,
+      "draftharbour://project/project-123"
+    )
+    XCTAssertEqual(
+      NativeDeepLink(projectID: "project-123", sectionID: "section-456").url?.absoluteString,
+      "draftharbour://project/project-123/section/section-456"
+    )
+  }
+
+  func testSpellingAndSubstitutionCommandsRouteThroughResponderChain() {
+    let commands: [NativeCommandID] = [
+      .showSpellingPanel,
+      .checkSpelling,
+      .toggleContinuousSpellChecking,
+      .toggleGrammarChecking,
+      .toggleAutomaticSpellingCorrection,
+      .showSubstitutionsPanel,
+      .toggleSmartQuotes,
+      .toggleSmartDashes,
+      .toggleTextReplacement
+    ]
+
+    for command in commands {
+      XCTAssertEqual(command.disposition, .responderChain)
+    }
   }
 }

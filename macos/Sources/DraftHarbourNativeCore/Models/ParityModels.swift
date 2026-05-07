@@ -69,14 +69,28 @@ public enum NativeCommandID: String, Codable, CaseIterable, Sendable {
   case shareActiveSection
   case printActiveSection
   case printProject
+  case welcome
+  case copyProjectLink
+  case copySectionLink
+  case indexSpotlight
+  case clearSpotlightIndex
+  case showSpellingPanel
+  case checkSpelling
+  case toggleContinuousSpellChecking
+  case toggleGrammarChecking
+  case toggleAutomaticSpellingCorrection
+  case showSubstitutionsPanel
+  case toggleSmartQuotes
+  case toggleSmartDashes
+  case toggleTextReplacement
 
   public var disposition: NativeCommandDisposition {
     switch self {
-    case .undo, .redo, .cut, .copy, .paste, .selectAll:
+    case .undo, .redo, .cut, .copy, .paste, .selectAll, .showSpellingPanel, .checkSpelling, .toggleContinuousSpellChecking, .toggleGrammarChecking, .toggleAutomaticSpellingCorrection, .showSubstitutionsPanel, .toggleSmartQuotes, .toggleSmartDashes, .toggleTextReplacement:
       return .responderChain
-    case .openProjectFile, .settings, .about:
+    case .openProjectFile, .settings, .about, .welcome:
       return .system
-    case .importDocument, .newSection, .export, .saveProjectFile, .openRecent, .reopenLastProject, .exportBackup, .importBackup, .saveProjectCopy, .snapshots, .analysis, .wordCount, .dashboard, .onboarding, .characterBible, .aiWriting, .aiSuggestions, .comments, .addComment, .advancedAnalytics, .integrations, .projects, .sceneTemplates, .exportHistory, .publishingAssistant, .aiPanel, .translation, .corkboard, .inspector, .quickSwitcher, .findReplace, .nativeFind, .projectFindReplace, .workspaceWrite, .workspaceCorkboard, .workspaceReview, .toggleSidebar, .toggleToolPanel, .togglePageView, .toggleFocusMode, .themeAuto, .themeLight, .themeDark, .insertHorizontalRule, .insertBlockquote, .formatBold, .formatItalic, .formatUnderline, .formatHeading1, .formatHeading2, .formatParagraph, .toggleTypewriterMode, .storyCards, .revealProjectInFinder, .copyProjectPath, .shareSelection, .shareActiveSection, .printActiveSection, .printProject:
+    case .importDocument, .newSection, .export, .saveProjectFile, .openRecent, .reopenLastProject, .exportBackup, .importBackup, .saveProjectCopy, .snapshots, .analysis, .wordCount, .dashboard, .onboarding, .characterBible, .aiWriting, .aiSuggestions, .comments, .addComment, .advancedAnalytics, .integrations, .projects, .sceneTemplates, .exportHistory, .publishingAssistant, .aiPanel, .translation, .corkboard, .inspector, .quickSwitcher, .findReplace, .nativeFind, .projectFindReplace, .workspaceWrite, .workspaceCorkboard, .workspaceReview, .toggleSidebar, .toggleToolPanel, .togglePageView, .toggleFocusMode, .themeAuto, .themeLight, .themeDark, .insertHorizontalRule, .insertBlockquote, .formatBold, .formatItalic, .formatUnderline, .formatHeading1, .formatHeading2, .formatParagraph, .toggleTypewriterMode, .storyCards, .revealProjectInFinder, .copyProjectPath, .shareSelection, .shareActiveSection, .printActiveSection, .printProject, .copyProjectLink, .copySectionLink, .indexSpotlight, .clearSpotlightIndex:
       return .native
     }
   }

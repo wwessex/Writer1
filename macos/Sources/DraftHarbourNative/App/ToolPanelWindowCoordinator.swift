@@ -15,13 +15,15 @@ final class ToolPanelWindowCoordinator: NSObject, NSWindowDelegate {
     panel selectedPanel: ToolPanel,
     store: ProjectStore,
     exportAction: @escaping (ExportFormat) -> Void,
-    runCommand: @escaping (NativeCommandID) -> Void
+    runCommand: @escaping (NativeCommandID) -> Void,
+    selectionChanged: @escaping (String) -> Void
   ) {
     let content = ToolPanelView(
       panel: selectedPanel,
       store: store,
       exportAction: exportAction,
       runCommand: runCommand,
+      selectionChanged: selectionChanged,
       closeAction: { [weak self] in self?.close() }
     )
 
@@ -45,14 +47,14 @@ final class ToolPanelWindowCoordinator: NSObject, NSWindowDelegate {
     panel.isReleasedWhenClosed = false
     panel.delegate = self
     panel.collectionBehavior = [.fullScreenAuxiliary]
-    panel.center()
+    let autosaveName = "DraftHarbour.toolPanel.frame.\(store.envelope.project.id)"
+    if !panel.setFrameUsingName(autosaveName) {
+      panel.center()
+    }
+    panel.setFrameAutosaveName(autosaveName)
 
     self.hostingController = hostingController
     self.panel = panel
-
-    if let owner = NSApp.keyWindow, owner !== panel {
-      owner.addChildWindow(panel, ordered: .above)
-    }
 
     panel.makeKeyAndOrderFront(nil)
     NSApp.activate(ignoringOtherApps: true)
@@ -64,9 +66,6 @@ final class ToolPanelWindowCoordinator: NSObject, NSWindowDelegate {
 
   func windowWillClose(_ notification: Notification) {
     guard notification.object as? NSPanel === panel else { return }
-    if let panel, let parent = panel.parent {
-      parent.removeChildWindow(panel)
-    }
     hostingController = nil
     panel = nil
   }

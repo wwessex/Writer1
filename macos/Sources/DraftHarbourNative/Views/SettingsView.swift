@@ -28,6 +28,7 @@ struct SettingsView: View {
   @AppStorage("DraftHarbour.export.includeSnapshots") private var exportIncludeSnapshots = true
   @AppStorage("DraftHarbour.export.includeIntegrationArtifacts") private var exportIncludeIntegrationArtifacts = false
   @AppStorage("DraftHarbour.export.validateBeforeExport") private var exportValidateBeforeExport = true
+  @AppStorage("DraftHarbour.spotlight.indexingLevel") private var spotlightIndexingLevelRaw = SpotlightIndexingLevel.metadataOnly.rawValue
   @AppStorage("DraftHarbour.onboarding.defaultGenre") private var onboardingGenre = ""
   @AppStorage("DraftHarbour.onboarding.defaultAudience") private var onboardingAudience = ""
   @AppStorage("DraftHarbour.onboarding.defaultStructure") private var onboardingStructure = StoryStructurePreference.threeAct.rawValue
@@ -92,6 +93,18 @@ struct SettingsView: View {
         }
       }
 
+      if sectionMatches("spotlight privacy indexing search metadata full text off") {
+        Section("Spotlight") {
+          Picker("Project Indexing", selection: $spotlightIndexingLevelRaw) {
+            ForEach(SpotlightIndexingLevel.allCases) { level in
+              Text(level.title).tag(level.rawValue)
+            }
+          }
+          Text("Metadata Only indexes project, section titles, and tags. Full Text also indexes manuscript body text.")
+            .foregroundStyle(.secondary)
+        }
+      }
+
       if sectionMatches("new projects default word goal project title onboarding genre audience structure pacing") {
         Section("New Projects") {
           TextField("Default Project Word Goal", value: $defaultWordGoal, format: .number)
@@ -113,7 +126,7 @@ struct SettingsView: View {
         }
       }
 
-      if !paneMatches("appearance theme auto light dark general new projects default word goal project title onboarding genre audience structure pacing deadline") {
+      if !paneMatches("appearance theme auto light dark general spotlight privacy indexing search metadata full text off new projects default word goal project title onboarding genre audience structure pacing deadline") {
         Section {
           noResultsText
         }
