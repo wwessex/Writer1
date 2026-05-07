@@ -509,4 +509,6 @@ extension Notification.Name {
   static let draftHarbourShowQuickSwitcher = Notification.Name("DraftHarbourShowQuickSwitcher")
   static let draftHarbourShowFindReplace = Notification.Name("DraftHarbourShowFindReplace")
   static let draftHarbourRunCommand = Notification.Name("DraftHarbourRunCommand")
+  static let draftHarbourShowNewProjectSetup = Notification.Name("DraftHarbourShowNewProjectSetup")
+  static let draftHarbourOpenProjectFile = Notification.Name("DraftHarbourOpenProjectFile")
 }

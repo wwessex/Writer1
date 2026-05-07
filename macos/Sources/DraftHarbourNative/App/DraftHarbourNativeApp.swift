@@ -8,6 +8,16 @@ struct DraftHarbourNativeApp: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
   var body: some SwiftUI.Scene {
+    documentScene
+
+    Settings {
+      SettingsView()
+        .nativeAppearanceBridge()
+    }
+  }
+
+  @SceneBuilder
+  private var documentScene: some SwiftUI.Scene {
     DocumentGroup(newDocument: DraftHarbourDocument()) { file in
       NativeDocumentView(document: file.$document, fileURL: file.fileURL)
         .nativeAppearanceBridge()
@@ -15,18 +25,30 @@ struct DraftHarbourNativeApp: App {
     .commands {
       DraftHarbourCommands()
     }
-
-    Settings {
-      SettingsView()
-        .nativeAppearanceBridge()
-    }
   }
 }
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+  private let welcomeCoordinator = WelcomeWindowCoordinator()
+  private var handledInitialUntitledRequest = false
+
   func applicationDidFinishLaunching(_ notification: Notification) {
     NSApp.setActivationPolicy(.regular)
     NSApp.activate(ignoringOtherApps: true)
+    scheduleEmptyLaunchWelcomeChecks()
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleNewProjectRequest),
+      name: .draftHarbourShowNewProjectSetup,
+      object: nil
+    )
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleOpenProjectRequest),
+      name: .draftHarbourOpenProjectFile,
+      object: nil
+    )
     NSAppleEventManager.shared().setEventHandler(
       self,
       andSelector: #selector(handleGetURLEvent(_:withReplyEvent:)),
@@ -36,10 +58,66 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationWillTerminate(_ notification: Notification) {
+    NotificationCenter.default.removeObserver(self)
     NSAppleEventManager.shared().removeEventHandler(
       forEventClass: AEEventClass(kInternetEventClass),
       andEventID: AEEventID(kAEGetURL)
     )
+  }
+
+  func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
+    !handledInitialUntitledRequest
+  }
+
+  func applicationOpenUntitledFile(_ sender: NSApplication) -> Bool {
+    guard !handledInitialUntitledRequest else { return false }
+    handledInitialUntitledRequest = true
+    welcomeCoordinator.show()
+    return true
+  }
+
+  func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+    if flag || !NSDocumentController.shared.documents.isEmpty {
+      return true
+    }
+    return false
+  }
+
+  @objc private func handleNewProjectRequest() {
+    welcomeCoordinator.showProjectSetup()
+  }
+
+  @objc private func handleOpenProjectRequest() {
+    welcomeCoordinator.openProjectPanel()
+  }
+
+  private func scheduleEmptyLaunchWelcomeChecks() {
+    for delay in [250_000_000, 750_000_000] as [UInt64] {
+      Task { @MainActor in
+        try? await Task.sleep(nanoseconds: delay)
+        replaceEmptyLaunchDocumentPromptIfNeeded()
+      }
+    }
+  }
+
+  private func replaceEmptyLaunchDocumentPromptIfNeeded() {
+    guard NSDocumentController.shared.documents.isEmpty else { return }
+    closeInitialOpenPanels()
+
+    guard !handledInitialUntitledRequest else { return }
+    handledInitialUntitledRequest = true
+    welcomeCoordinator.show()
+  }
+
+  private func closeInitialOpenPanels() {
+    for window in NSApp.windows where window is NSPanel && isDocumentOpenPanel(window) {
+      window.close()
+    }
+  }
+
+  private func isDocumentOpenPanel(_ window: NSWindow) -> Bool {
+    let className = String(describing: type(of: window))
+    return window.title == "Open" || className.localizedCaseInsensitiveContains("OpenPanel")
   }
 
   @objc private func handleGetURLEvent(_ event: NSAppleEventDescriptor, withReplyEvent replyEvent: NSAppleEventDescriptor) {

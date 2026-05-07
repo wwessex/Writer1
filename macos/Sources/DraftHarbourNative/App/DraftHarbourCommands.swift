@@ -17,17 +17,24 @@ struct DraftHarbourCommands: Commands {
   @FocusedValue(\.projectStore) private var store
 
   var body: some Commands {
-    CommandGroup(after: .newItem) {
+    CommandGroup(replacing: .newItem) {
+      Button("New Project...") {
+        NotificationCenter.default.post(name: .draftHarbourShowNewProjectSetup, object: nil)
+      }
+      .keyboardShortcut("n", modifiers: .command)
+
+      Divider()
+
       Button(store?.projectType == .screenplay ? "New Scene" : "New Chapter") {
         post(.newSection)
       }
       .keyboardShortcut("n", modifiers: [.command, .shift])
       .disabled(store == nil)
+    }
 
-      Divider()
-
-      Button("Open Project File...") {
-        post(.openProjectFile)
+    CommandGroup(after: .newItem) {
+      Button("Open Project...") {
+        NotificationCenter.default.post(name: .draftHarbourOpenProjectFile, object: nil)
       }
       .keyboardShortcut("o", modifiers: .command)
 
