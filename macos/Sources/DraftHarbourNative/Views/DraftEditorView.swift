@@ -7,6 +7,8 @@ struct DraftEditorView: NSViewRepresentable {
   var screenplayMode: Bool
   var typewriterMode: Bool
   var fontSize: Double
+  var fontFamily: String
+  var lineHeight: Double
   var addComment: () -> Void = {}
   var createSnapshot: () -> Void = {}
   var reviseSelection: () -> Void = {}
@@ -66,21 +68,21 @@ struct DraftEditorView: NSViewRepresentable {
   }
 
   private func applyStyle(to textView: NSTextView) {
-    let font: NSFont
-    if screenplayMode {
-      font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
-    } else {
-      font = NSFont.systemFont(ofSize: fontSize)
-    }
+    let font = resolvedFont()
+    let paragraphStyle = NSMutableParagraphStyle()
+    paragraphStyle.lineHeightMultiple = max(1.0, min(2.5, lineHeight))
+
     textView.font = font
     textView.textColor = .labelColor
     textView.backgroundColor = .textBackgroundColor
     textView.insertionPointColor = .controlAccentColor
     textView.usesFindPanel = true
     textView.usesRuler = false
+    textView.defaultParagraphStyle = paragraphStyle
     textView.typingAttributes = [
       .font: font,
-      .foregroundColor: NSColor.labelColor
+      .foregroundColor: NSColor.labelColor,
+      .paragraphStyle: paragraphStyle
     ]
 
     if typewriterMode {
@@ -88,6 +90,29 @@ struct DraftEditorView: NSViewRepresentable {
     } else {
       textView.textContainerInset = NSSize(width: 44, height: 36)
     }
+
+    let fullRange = NSRange(location: 0, length: (textView.string as NSString).length)
+    if fullRange.length > 0 {
+      textView.textStorage?.addAttributes([
+        .font: font,
+        .foregroundColor: NSColor.labelColor,
+        .paragraphStyle: paragraphStyle
+      ], range: fullRange)
+    }
+  }
+
+  private func resolvedFont() -> NSFont {
+    let trimmedFamily = fontFamily.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmedFamily.isEmpty,
+       trimmedFamily.localizedCaseInsensitiveCompare("System") != .orderedSame,
+       let namedFont = NSFont(name: trimmedFamily, size: fontSize) {
+      return namedFont
+    }
+
+    if screenplayMode {
+      return NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+    }
+    return NSFont.systemFont(ofSize: fontSize)
   }
 
   final class Coordinator: NSObject, NSTextViewDelegate, NSMenuItemValidation {
@@ -97,11 +122,18 @@ struct DraftEditorView: NSViewRepresentable {
       self.parent = parent
     }
 
-    func makeContextMenu() -> NSMenu {
+    @MainActor func makeContextMenu() -> NSMenu {
       let menu = NSMenu()
+      addResponderItem("Look Up", action: NSSelectorFromString("lookupSelection:"), to: menu)
+      addServicesSubmenu(to: menu)
+      menu.addItem(.separator())
       addResponderItem("Cut", action: #selector(NSText.cut(_:)), to: menu)
       addResponderItem("Copy", action: #selector(NSText.copy(_:)), to: menu)
       addResponderItem("Paste", action: #selector(NSText.paste(_:)), to: menu)
+      menu.addItem(.separator())
+      addSpellingSubmenu(to: menu)
+      addSubstitutionsSubmenu(to: menu)
+      addTransformationsSubmenu(to: menu)
       menu.addItem(.separator())
       addItem("Add Comment", action: #selector(addComment(_:)), to: menu)
       addItem("Create Snapshot", action: #selector(createSnapshot(_:)), to: menu)
@@ -132,6 +164,54 @@ struct DraftEditorView: NSViewRepresentable {
     private func addResponderItem(_ title: String, action: Selector, to menu: NSMenu) {
       let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
       item.target = nil
+      menu.addItem(item)
+    }
+
+    @MainActor private func addServicesSubmenu(to menu: NSMenu) {
+      let item = NSMenuItem(title: "Services", action: nil, keyEquivalent: "")
+      if let servicesMenu = NSApp.servicesMenu?.copy() as? NSMenu {
+        item.submenu = servicesMenu
+      } else {
+        item.isEnabled = false
+      }
+      menu.addItem(item)
+    }
+
+    private func addSpellingSubmenu(to menu: NSMenu) {
+      let submenu = NSMenu(title: "Spelling and Grammar")
+      addResponderItem("Show Spelling and Grammar", action: NSSelectorFromString("showGuessPanel:"), to: submenu)
+      addResponderItem("Check Document Now", action: NSSelectorFromString("checkSpelling:"), to: submenu)
+      submenu.addItem(.separator())
+      addResponderItem("Check Spelling While Typing", action: NSSelectorFromString("toggleContinuousSpellChecking:"), to: submenu)
+      addResponderItem("Check Grammar With Spelling", action: NSSelectorFromString("toggleGrammarChecking:"), to: submenu)
+      addResponderItem("Correct Spelling Automatically", action: NSSelectorFromString("toggleAutomaticSpellingCorrection:"), to: submenu)
+
+      let item = NSMenuItem(title: "Spelling and Grammar", action: nil, keyEquivalent: "")
+      item.submenu = submenu
+      menu.addItem(item)
+    }
+
+    private func addSubstitutionsSubmenu(to menu: NSMenu) {
+      let submenu = NSMenu(title: "Substitutions")
+      addResponderItem("Show Substitutions", action: NSSelectorFromString("orderFrontSubstitutionsPanel:"), to: submenu)
+      submenu.addItem(.separator())
+      addResponderItem("Smart Quotes", action: NSSelectorFromString("toggleAutomaticQuoteSubstitution:"), to: submenu)
+      addResponderItem("Smart Dashes", action: NSSelectorFromString("toggleAutomaticDashSubstitution:"), to: submenu)
+      addResponderItem("Text Replacement", action: NSSelectorFromString("toggleAutomaticTextReplacement:"), to: submenu)
+
+      let item = NSMenuItem(title: "Substitutions", action: nil, keyEquivalent: "")
+      item.submenu = submenu
+      menu.addItem(item)
+    }
+
+    private func addTransformationsSubmenu(to menu: NSMenu) {
+      let submenu = NSMenu(title: "Transformations")
+      addResponderItem("Make Upper Case", action: NSSelectorFromString("uppercaseWord:"), to: submenu)
+      addResponderItem("Make Lower Case", action: NSSelectorFromString("lowercaseWord:"), to: submenu)
+      addResponderItem("Capitalize", action: NSSelectorFromString("capitalizeWord:"), to: submenu)
+
+      let item = NSMenuItem(title: "Transformations", action: nil, keyEquivalent: "")
+      item.submenu = submenu
       menu.addItem(item)
     }
 

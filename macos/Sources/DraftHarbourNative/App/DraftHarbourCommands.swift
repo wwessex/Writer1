@@ -48,6 +48,11 @@ struct DraftHarbourCommands: Commands {
       }
       .keyboardShortcut("o", modifiers: .command)
 
+      Button("Welcome") {
+        perform(.welcome)
+      }
+      .keyboardShortcut("0", modifiers: [.command, .shift])
+
       Button("Reopen Last Project") {
         perform(.reopenLastProject)
       }
@@ -101,6 +106,16 @@ struct DraftHarbourCommands: Commands {
         perform(.copyProjectPath)
       }
       .disabled(!canPerform(.copyProjectPath))
+
+      Button("Copy Project Link") {
+        perform(.copyProjectLink)
+      }
+      .disabled(!canPerform(.copyProjectLink))
+
+      Button("Copy Section Link") {
+        perform(.copySectionLink)
+      }
+      .disabled(!canPerform(.copySectionLink))
 
       Button("Share Active Section") {
         perform(.shareActiveSection)
@@ -374,6 +389,18 @@ struct DraftHarbourCommands: Commands {
       }
       .disabled(!canPerform(.exportHistory))
 
+      Divider()
+
+      Button("Index Project in Spotlight") {
+        perform(.indexSpotlight)
+      }
+      .disabled(!canPerform(.indexSpotlight))
+
+      Button("Clear Project Spotlight Index") {
+        perform(.clearSpotlightIndex)
+      }
+      .disabled(!canPerform(.clearSpotlightIndex))
+
       Button("Publishing Assistant") {
         perform(.publishingAssistant)
       }
@@ -394,11 +421,61 @@ struct DraftHarbourCommands: Commands {
         perform(.about)
       }
     }
+
+    CommandGroup(after: .textEditing) {
+      Divider()
+
+      Menu("Spelling and Grammar") {
+        Button("Show Spelling and Grammar") {
+          perform(.showSpellingPanel)
+        }
+        .keyboardShortcut(":", modifiers: .command)
+
+        Button("Check Document Now") {
+          perform(.checkSpelling)
+        }
+        .keyboardShortcut(";", modifiers: .command)
+
+        Divider()
+
+        Button("Check Spelling While Typing") {
+          perform(.toggleContinuousSpellChecking)
+        }
+
+        Button("Check Grammar With Spelling") {
+          perform(.toggleGrammarChecking)
+        }
+
+        Button("Correct Spelling Automatically") {
+          perform(.toggleAutomaticSpellingCorrection)
+        }
+      }
+
+      Menu("Substitutions") {
+        Button("Show Substitutions") {
+          perform(.showSubstitutionsPanel)
+        }
+
+        Divider()
+
+        Button("Smart Quotes") {
+          perform(.toggleSmartQuotes)
+        }
+
+        Button("Smart Dashes") {
+          perform(.toggleSmartDashes)
+        }
+
+        Button("Text Replacement") {
+          perform(.toggleTextReplacement)
+        }
+      }
+    }
   }
 
   private func canPerform(_ command: NativeCommandID) -> Bool {
     switch command {
-    case .openProjectFile, .settings, .about:
+    case .openProjectFile, .settings, .about, .welcome, .showSpellingPanel, .checkSpelling, .toggleContinuousSpellChecking, .toggleGrammarChecking, .toggleAutomaticSpellingCorrection, .showSubstitutionsPanel, .toggleSmartQuotes, .toggleSmartDashes, .toggleTextReplacement:
       return true
     default:
       return store != nil
@@ -409,10 +486,30 @@ struct DraftHarbourCommands: Commands {
     switch command {
     case .openProjectFile:
       NotificationCenter.default.post(name: .draftHarbourOpenProjectFile, object: nil)
+    case .welcome:
+      NotificationCenter.default.post(name: .draftHarbourShowWelcomeWindow, object: nil)
     case .settings:
-      NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+      NSApp.sendAction(NSSelectorFromString("showSettingsWindow:"), to: nil, from: nil)
     case .about:
       NSApp.sendAction(#selector(NSApplication.orderFrontStandardAboutPanel(_:)), to: nil, from: nil)
+    case .showSpellingPanel:
+      sendResponderAction("showGuessPanel:")
+    case .checkSpelling:
+      sendResponderAction("checkSpelling:")
+    case .toggleContinuousSpellChecking:
+      sendResponderAction("toggleContinuousSpellChecking:")
+    case .toggleGrammarChecking:
+      sendResponderAction("toggleGrammarChecking:")
+    case .toggleAutomaticSpellingCorrection:
+      sendResponderAction("toggleAutomaticSpellingCorrection:")
+    case .showSubstitutionsPanel:
+      sendResponderAction("orderFrontSubstitutionsPanel:")
+    case .toggleSmartQuotes:
+      sendResponderAction("toggleAutomaticQuoteSubstitution:")
+    case .toggleSmartDashes:
+      sendResponderAction("toggleAutomaticDashSubstitution:")
+    case .toggleTextReplacement:
+      sendResponderAction("toggleAutomaticTextReplacement:")
     default:
       guard let store else { return }
       NotificationCenter.default.post(
@@ -420,5 +517,9 @@ struct DraftHarbourCommands: Commands {
         object: NativeDocumentCommandRequest(command: command, target: store)
       )
     }
+  }
+
+  private func sendResponderAction(_ selector: String) {
+    NSApp.sendAction(NSSelectorFromString(selector), to: nil, from: nil)
   }
 }

@@ -89,6 +89,7 @@ struct NativeDocumentView: View {
   @AppStorage("DraftHarbour.editor.focusMode") private var focusMode = false
   @AppStorage("DraftHarbour.editor.typewriterMode") private var typewriterMode = false
   @AppStorage("DraftHarbour.ai.translationLanguage") private var contextTranslationCode = "es"
+  @AppStorage("DraftHarbour.spotlight.indexingLevel") private var spotlightIndexingLevelRaw = SpotlightIndexingLevel.metadataOnly.rawValue
 
   private var workspaceMode: Binding<WorkspaceMode> {
     Binding {
@@ -96,6 +97,10 @@ struct NativeDocumentView: View {
     } set: { mode in
       workspaceModeRaw = mode.rawValue
     }
+  }
+
+  private var spotlightIndexingLevel: SpotlightIndexingLevel {
+    SpotlightIndexingLevel(storageValue: spotlightIndexingLevelRaw)
   }
 
   init(document: Binding<DraftHarbourDocument>, fileURL: URL? = nil) {
@@ -238,7 +243,11 @@ struct NativeDocumentView: View {
     .onChange(of: store.activeSectionID) { _, newValue in
       recoveryService.recordActiveSectionID(newValue, projectId: store.envelope.project.id)
     }
+    .onChange(of: spotlightIndexingLevelRaw) { _, _ in
+      scheduleSpotlightIndexing(delay: 0)
+    }
     .onAppear {
+      selectedToolPanel = persistedToolPanelSelection() ?? selectedToolPanel
       if let fileURL {
         recoveryService.recordLastOpenedProjectURL(fileURL)
         NSDocumentController.shared.noteNewRecentDocumentURL(fileURL)
@@ -487,7 +496,7 @@ struct NativeDocumentView: View {
   }
 
   private func sendResponderAction(_ selector: String) {
-    NSApp.sendAction(Selector((selector)), to: nil, from: nil)
+    NSApp.sendAction(NSSelectorFromString(selector), to: nil, from: nil)
   }
 
   private func boundedRange(_ range: NSRange, in text: String) -> NSRange {
@@ -498,20 +507,27 @@ struct NativeDocumentView: View {
 
   private func showToolPanel(_ panel: ToolPanel) {
     selectedToolPanel = panel.rawValue
+    persistToolPanelSelection(panel.rawValue)
     toolPanelCoordinator.show(
       panel: panel,
       store: store,
       exportAction: export(format:),
-      runCommand: runCommand(_:)
+      runCommand: runCommand(_:),
+      selectionChanged: { rawValue in
+        selectedToolPanel = rawValue
+        persistToolPanelSelection(rawValue)
+      }
     )
   }
 
   private func commandEnabled(_ command: NativeCommandID) -> Bool {
     switch command {
-    case .newSection, .importDocument, .export, .saveProjectFile, .exportBackup, .importBackup, .saveProjectCopy, .openRecent, .reopenLastProject, .dashboard, .quickSwitcher, .nativeFind, .projectFindReplace, .workspaceWrite, .workspaceCorkboard, .workspaceReview, .toggleSidebar, .toggleToolPanel, .togglePageView, .toggleFocusMode, .toggleTypewriterMode, .themeAuto, .themeLight, .themeDark, .wordCount, .analysis, .advancedAnalytics, .characterBible, .storyCards, .comments, .aiWriting, .aiSuggestions, .translation, .integrations, .exportHistory, .publishingAssistant, .onboarding, .inspector, .findReplace:
+    case .newSection, .importDocument, .export, .saveProjectFile, .exportBackup, .importBackup, .saveProjectCopy, .openRecent, .reopenLastProject, .dashboard, .quickSwitcher, .nativeFind, .projectFindReplace, .workspaceWrite, .workspaceCorkboard, .workspaceReview, .toggleSidebar, .toggleToolPanel, .togglePageView, .toggleFocusMode, .toggleTypewriterMode, .themeAuto, .themeLight, .themeDark, .wordCount, .analysis, .advancedAnalytics, .characterBible, .storyCards, .comments, .aiWriting, .aiSuggestions, .translation, .integrations, .exportHistory, .publishingAssistant, .onboarding, .inspector, .findReplace, .copyProjectLink, .indexSpotlight, .clearSpotlightIndex, .welcome, .showSpellingPanel, .checkSpelling, .toggleContinuousSpellChecking, .toggleGrammarChecking, .toggleAutomaticSpellingCorrection, .showSubstitutionsPanel, .toggleSmartQuotes, .toggleSmartDashes, .toggleTextReplacement:
       return true
     case .snapshots, .addComment, .sceneTemplates, .insertBlockquote, .insertHorizontalRule, .formatBold, .formatItalic, .formatUnderline, .formatHeading1, .formatHeading2, .formatParagraph, .shareActiveSection, .printActiveSection:
       return store.activeSection != nil
+    case .copySectionLink:
+      return store.activeSectionID != nil
     case .shareSelection:
       return !selectedText().isEmpty
     case .revealProjectInFinder, .copyProjectPath:
@@ -532,7 +548,7 @@ struct NativeDocumentView: View {
     }
 
     if !NSApp.sendAction(#selector(NSTextView.performFindPanelAction(_:)), to: nil, from: menuItem) {
-      NSApp.sendAction(Selector(("orderFrontFindPanel:")), to: nil, from: nil)
+      NSApp.sendAction(NSSelectorFromString("orderFrontFindPanel:"), to: nil, from: nil)
     }
   }
 
@@ -546,6 +562,23 @@ struct NativeDocumentView: View {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(fileURL.path, forType: .string)
     operationMessage = "Copied project path."
+  }
+
+  private func copyProjectLink() {
+    copyDeepLink(sectionID: nil)
+    operationMessage = "Copied project link."
+  }
+
+  private func copySectionLink() {
+    guard let sectionID = store.activeSectionID else { return }
+    copyDeepLink(sectionID: sectionID)
+    operationMessage = "Copied section link."
+  }
+
+  private func copyDeepLink(sectionID: String?) {
+    guard let url = NativeDeepLink(projectID: store.envelope.project.id, sectionID: sectionID).url else { return }
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(url.absoluteString, forType: .string)
   }
 
   private func copySelectionMarkdown() {
@@ -668,14 +701,27 @@ struct NativeDocumentView: View {
   private func scheduleSpotlightIndexing(delay: UInt64 = 750_000_000) {
     let envelope = store.envelope
     let fileURL = fileURL
+    let level = spotlightIndexingLevel
     spotlightIndexTask?.cancel()
     spotlightIndexTask = Task {
       if delay > 0 {
         try? await Task.sleep(nanoseconds: delay)
       }
       guard !Task.isCancelled else { return }
-      SpotlightIndexingService.index(envelope: envelope, fileURL: fileURL)
+      SpotlightIndexingService.index(envelope: envelope, fileURL: fileURL, level: level)
     }
+  }
+
+  private func persistedToolPanelSelection() -> String? {
+    UserDefaults.standard.string(forKey: toolPanelSelectionKey)
+  }
+
+  private func persistToolPanelSelection(_ rawValue: String) {
+    UserDefaults.standard.set(rawValue, forKey: toolPanelSelectionKey)
+  }
+
+  private var toolPanelSelectionKey: String {
+    "DraftHarbour.toolPanel.selection.\(store.envelope.project.id)"
   }
 
   private func runCommand(_ command: NativeCommandID) {
@@ -701,6 +747,8 @@ struct NativeDocumentView: View {
       exportProjectBackup(copyOnly: true)
     case .settings:
       sendResponderAction("showSettingsWindow:")
+    case .welcome:
+      NotificationCenter.default.post(name: .draftHarbourShowWelcomeWindow, object: nil)
     case .about:
       sendResponderAction("orderFrontStandardAboutPanel:")
     case .findReplace, .projectFindReplace:
@@ -809,6 +857,16 @@ struct NativeDocumentView: View {
       revealProjectInFinder()
     case .copyProjectPath:
       copyProjectPath()
+    case .copyProjectLink:
+      copyProjectLink()
+    case .copySectionLink:
+      copySectionLink()
+    case .indexSpotlight:
+      scheduleSpotlightIndexing(delay: 0)
+      operationMessage = spotlightIndexingLevel == .off ? "Spotlight indexing is off; existing index was cleared." : "Spotlight index updated."
+    case .clearSpotlightIndex:
+      SpotlightIndexingService.clear(projectID: store.envelope.project.id)
+      operationMessage = "Cleared Spotlight index for this project."
     case .shareSelection:
       shareSelection()
     case .shareActiveSection:
@@ -817,6 +875,24 @@ struct NativeDocumentView: View {
       printActiveSection()
     case .printProject:
       printProject()
+    case .showSpellingPanel:
+      sendResponderAction("showGuessPanel:")
+    case .checkSpelling:
+      sendResponderAction("checkSpelling:")
+    case .toggleContinuousSpellChecking:
+      sendResponderAction("toggleContinuousSpellChecking:")
+    case .toggleGrammarChecking:
+      sendResponderAction("toggleGrammarChecking:")
+    case .toggleAutomaticSpellingCorrection:
+      sendResponderAction("toggleAutomaticSpellingCorrection:")
+    case .showSubstitutionsPanel:
+      sendResponderAction("orderFrontSubstitutionsPanel:")
+    case .toggleSmartQuotes:
+      sendResponderAction("toggleAutomaticQuoteSubstitution:")
+    case .toggleSmartDashes:
+      sendResponderAction("toggleAutomaticDashSubstitution:")
+    case .toggleTextReplacement:
+      sendResponderAction("toggleAutomaticTextReplacement:")
     }
   }
 }
@@ -828,4 +904,5 @@ extension Notification.Name {
   static let draftHarbourOpenDeepLink = Notification.Name("DraftHarbourOpenDeepLink")
   static let draftHarbourShowNewProjectSetup = Notification.Name("DraftHarbourShowNewProjectSetup")
   static let draftHarbourOpenProjectFile = Notification.Name("DraftHarbourOpenProjectFile")
+  static let draftHarbourShowWelcomeWindow = Notification.Name("DraftHarbourShowWelcomeWindow")
 }

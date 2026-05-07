@@ -45,6 +45,7 @@ struct ToolPanelView: View {
   @Bindable var store: ProjectStore
   var exportAction: (ExportFormat) -> Void
   var runCommand: (NativeCommandID) -> Void = { _ in }
+  var selectionChanged: (String) -> Void = { _ in }
   var closeAction: (() -> Void)?
   @Environment(\.dismiss) private var dismiss
 
@@ -157,6 +158,9 @@ struct ToolPanelView: View {
         selectedTemplateID = SceneTemplateServices.templates.first?.id ?? ""
       }
       publishingDraft = PublishingAssistantServices.draft(for: store.envelope)
+    }
+    .onChange(of: selectedPanel) { _, newValue in
+      selectionChanged(newValue.rawValue)
     }
     .frame(width: 860, height: 640)
   }

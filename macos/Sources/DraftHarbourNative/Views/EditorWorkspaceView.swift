@@ -13,6 +13,8 @@ struct EditorWorkspaceView: View {
   var shareSelection: () -> Void = {}
   var copyMarkdown: () -> Void = {}
   @AppStorage("DraftHarbour.editor.fontSize") private var fontSize = 15.0
+  @AppStorage("DraftHarbour.editor.fontFamily") private var fontFamily = "System"
+  @AppStorage("DraftHarbour.editor.lineHeight") private var lineHeight = 1.5
   @AppStorage("DraftHarbour.editor.pageView") private var pageView = false
   @AppStorage("DraftHarbour.editor.typewriterMode") private var typewriterMode = false
   @State private var screenplayMode = false
@@ -40,6 +42,8 @@ struct EditorWorkspaceView: View {
             screenplayMode: screenplayMode || store.projectType == .screenplay,
             typewriterMode: typewriterMode,
             fontSize: fontSize,
+            fontFamily: fontFamily,
+            lineHeight: lineHeight,
             addComment: addComment,
             createSnapshot: createSnapshot,
             reviseSelection: reviseSelection,

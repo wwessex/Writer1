@@ -87,8 +87,13 @@ final class ProjectStoreParityTests: XCTestCase {
     XCTAssertFalse(service.shouldOfferRestore(snapshot, documentURL: documentURL))
 
     service.recordLastOpenedProjectURL(documentURL)
+    let missingURL = temp.appendingPathComponent("Missing.dhproj")
+    service.recordLastOpenedProjectURL(missingURL)
     service.recordActiveSectionID(envelope.sections[0].id, projectId: envelope.project.id)
-    XCTAssertEqual(service.recentProjectURLs().first?.path, documentURL.path)
+    XCTAssertEqual(service.recentProjectURLs().first?.path, missingURL.path)
+    XCTAssertEqual(service.pruneMissingRecentProjectURLs().map(\.path), [documentURL.path])
+    service.removeRecentProjectURL(documentURL)
+    XCTAssertTrue(service.recentProjectURLs().isEmpty)
     XCTAssertEqual(service.activeSectionID(projectId: envelope.project.id), envelope.sections[0].id)
 
     try service.clear(projectId: envelope.project.id)
