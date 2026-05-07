@@ -5,6 +5,7 @@ import Observation
 public final class ProjectStore {
   public var envelope: DhprojEnvelope
   public var activeSectionID: String?
+  public private(set) var writingSession: WritingSessionState?
   public private(set) var revision: Int = 0
   private var sectionOrderUndoStack: [[String]] = []
   private var sectionOrderRedoStack: [[String]] = []
@@ -25,6 +26,24 @@ public final class ProjectStore {
 
   public var metrics: ProjectMetrics {
     AnalyticsEngine.metrics(for: envelope)
+  }
+
+  public var dailyWordTarget: Int {
+    envelope.settings.dailyWordGoal ?? envelope.settings.goalConfiguration?.dailyWordTarget ?? 0
+  }
+
+  public var todayProgress: DailyProgress? {
+    progress(for: Self.todayString())
+  }
+
+  public var currentWritingSessionDelta: Int {
+    guard let writingSession else { return 0 }
+    return max(0, metrics.totalWords - writingSession.startingWordCount)
+  }
+
+  public var dailyGoalCompletionRatio: Double {
+    guard dailyWordTarget > 0 else { return 0 }
+    return min(1, Double(todayProgress?.wordsWritten ?? 0) / Double(dailyWordTarget))
   }
 
   public var canUndoSectionReorder: Bool {
@@ -151,17 +170,17 @@ public final class ProjectStore {
     }
   }
 
-  public func updateActiveSectionStatus(_ status: ChapterStatus) {
-    guard let activeSectionID else { return }
-    updateSection(id: activeSectionID) { section in
-      section.status = status
-    }
-  }
-
   public func updateActiveSectionPOV(_ pov: String) {
     guard let activeSectionID else { return }
     updateSection(id: activeSectionID) { section in
       section.pov = pov
+    }
+  }
+
+  public func updateActiveSectionStatus(_ status: ChapterStatus) {
+    guard let activeSectionID else { return }
+    updateSection(id: activeSectionID) { section in
+      section.status = status
     }
   }
 
@@ -176,6 +195,36 @@ public final class ProjectStore {
     guard let activeSectionID else { return }
     updateSection(id: activeSectionID) { section in
       section.tags = tags
+    }
+  }
+
+  public func updateActiveSectionPart(_ part: String?) {
+    guard let activeSectionID else { return }
+    updateSection(id: activeSectionID) { section in
+      let trimmed = part?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+      section.part = trimmed.isEmpty ? nil : trimmed
+    }
+  }
+
+  public func updateActiveSectionAct(_ act: Int?) {
+    guard let activeSectionID else { return }
+    updateSection(id: activeSectionID) { section in
+      if let act, act > 0 {
+        section.act = act
+      } else {
+        section.act = nil
+      }
+    }
+  }
+
+  public func updateActiveSectionSequence(_ sequence: Int?) {
+    guard let activeSectionID else { return }
+    updateSection(id: activeSectionID) { section in
+      if let sequence, sequence > 0 {
+        section.sequence = sequence
+      } else {
+        section.sequence = nil
+      }
     }
   }
 
@@ -393,6 +442,34 @@ public final class ProjectStore {
     }
   }
 
+  public func applyGeneratedText(_ incoming: String, mode: PipelineInsertionMode, range: NSRange? = nil) {
+    guard var content = activeSection?.content, let activeSectionID else { return }
+    let trimmed = incoming.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+
+    if let range, range.length > 0 {
+      let safeRange = boundedRange(range, in: content)
+      guard let stringRange = Range(safeRange, in: content) else { return }
+      let selected = String(content[stringRange])
+      let replacement: String
+      switch mode {
+      case .replace:
+        replacement = trimmed
+      case .append:
+        replacement = AIWorkflowServices.applyInsertionMode(base: selected, incoming: trimmed, mode: .append)
+      case .sideBySide:
+        replacement = AIWorkflowServices.applyInsertionMode(base: selected, incoming: trimmed, mode: .sideBySide)
+      }
+      content.replaceSubrange(stringRange, with: replacement)
+    } else {
+      content = AIWorkflowServices.applyInsertionMode(base: content, incoming: trimmed, mode: mode)
+    }
+
+    updateSection(id: activeSectionID) { section in
+      section.content = content
+    }
+  }
+
   @discardableResult
   public func addCharacter(name: String) -> CharacterEntity {
     let character = CharacterEntity(novelId: envelope.project.id, name: name)
@@ -469,28 +546,72 @@ public final class ProjectStore {
   }
 
   public func updateProgress(wordsWritten: Int, date: String? = nil) {
+    recordWritingSession(wordsWritten: wordsWritten, date: date)
+  }
+
+  @discardableResult
+  public func startWritingSession(startedAt: Int64 = currentTimeMilliseconds()) -> WritingSessionState {
+    if let writingSession {
+      return writingSession
+    }
+
+    let session = WritingSessionState(startedAt: startedAt, startingWordCount: metrics.totalWords)
+    writingSession = session
+    return session
+  }
+
+  @discardableResult
+  public func stopWritingSession(date: String? = nil, endedAt: Int64 = currentTimeMilliseconds()) -> WritingSessionResult? {
+    guard let session = writingSession else { return nil }
+    let date = date ?? Self.todayString()
+    let endingWordCount = metrics.totalWords
+    let wordsWritten = max(0, endingWordCount - session.startingWordCount)
+    writingSession = nil
+    recordWritingSession(wordsWritten: wordsWritten, date: date)
+    return WritingSessionResult(
+      session: session,
+      endedAt: endedAt,
+      endingWordCount: endingWordCount,
+      wordsWritten: wordsWritten,
+      date: date
+    )
+  }
+
+  public func cancelWritingSession() {
+    writingSession = nil
+  }
+
+  public func progress(for date: String) -> DailyProgress? {
+    envelope.progress?.dailyHistory.first { $0.date == date }
+  }
+
+  public func recordWritingSession(wordsWritten: Int, date: String? = nil) {
     let date = date ?? ProjectStore.todayString()
     var progress = envelope.progress ?? ProgressData()
     let currentWords = metrics.totalWords
+    let delta = max(0, wordsWritten)
     if let index = progress.dailyHistory.firstIndex(where: { $0.date == date }) {
-      progress.dailyHistory[index].wordsWritten = max(0, wordsWritten)
-      progress.dailyHistory[index].wordsAtStart = max(0, currentWords - wordsWritten)
-      progress.dailyHistory[index].goalMet = wordsWritten >= (envelope.settings.dailyWordGoal ?? envelope.settings.goalConfiguration?.dailyWordTarget ?? 0)
+      progress.dailyHistory[index].wordsWritten += delta
+      progress.dailyHistory[index].wordsAtStart = min(progress.dailyHistory[index].wordsAtStart, max(0, currentWords - progress.dailyHistory[index].wordsWritten))
+      progress.dailyHistory[index].goalMet = dailyWordTarget > 0 && progress.dailyHistory[index].wordsWritten >= dailyWordTarget
       progress.dailyHistory[index].sessions += 1
     } else {
       progress.dailyHistory.append(
         DailyProgress(
           date: date,
-          wordsWritten: max(0, wordsWritten),
-          wordsAtStart: max(0, currentWords - wordsWritten),
-          goalMet: wordsWritten >= (envelope.settings.dailyWordGoal ?? envelope.settings.goalConfiguration?.dailyWordTarget ?? 0),
+          wordsWritten: delta,
+          wordsAtStart: max(0, currentWords - delta),
+          goalMet: dailyWordTarget > 0 && delta >= dailyWordTarget,
           sessions: 1
         )
       )
+      progress.streak = Self.nextWritingStreak(previous: progress.streak, newDate: date)
     }
     progress.totalSessions += 1
-    progress.totalWordsAllTime = max(progress.totalWordsAllTime, currentWords)
-    progress.streak = WritingStreak(current: progress.streak.current + 1, longest: max(progress.streak.longest, progress.streak.current + 1), lastActiveDate: date)
+    progress.totalWordsAllTime = max(progress.totalWordsAllTime + delta, currentWords)
+    if progress.streak.lastActiveDate.isEmpty {
+      progress.streak = WritingStreak(current: 1, longest: max(1, progress.streak.longest), lastActiveDate: date)
+    }
     envelope.progress = progress
     markChanged()
   }
@@ -543,6 +664,26 @@ public final class ProjectStore {
     formatter.locale = Locale(identifier: "en_US_POSIX")
     formatter.dateFormat = "yyyy-MM-dd"
     return formatter.string(from: date)
+  }
+
+  private static func nextWritingStreak(previous: WritingStreak, newDate: String) -> WritingStreak {
+    guard previous.lastActiveDate != newDate else {
+      return previous
+    }
+
+    let formatter = DateFormatter()
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.dateFormat = "yyyy-MM-dd"
+
+    guard let previousDate = formatter.date(from: previous.lastActiveDate),
+          let currentDate = formatter.date(from: newDate),
+          let dayDelta = formatter.calendar.dateComponents([.day], from: previousDate, to: currentDate).day else {
+      return WritingStreak(current: 1, longest: max(1, previous.longest), lastActiveDate: newDate)
+    }
+
+    let current = dayDelta == 1 ? previous.current + 1 : 1
+    return WritingStreak(current: current, longest: max(previous.longest, current), lastActiveDate: newDate)
   }
 
   private func updateSection(id: String, update: (inout Section) -> Void) {

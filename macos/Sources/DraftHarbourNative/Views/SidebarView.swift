@@ -3,6 +3,21 @@ import SwiftUI
 
 struct SidebarView: View {
   @Bindable var store: ProjectStore
+  @State private var searchText = ""
+  @State private var statusFilter = "all"
+
+  private var filteredSections: [DraftHarbourNativeCore.Section] {
+    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    return store.envelope.sections.filter { section in
+      let statusMatches = statusFilter == "all" || section.status.rawValue == statusFilter
+      guard statusMatches else { return false }
+      guard !query.isEmpty else { return true }
+      return section.title.range(of: query, options: .caseInsensitive) != nil ||
+        section.summary.range(of: query, options: .caseInsensitive) != nil ||
+        (section.content ?? "").range(of: query, options: .caseInsensitive) != nil ||
+        section.tags.contains { $0.range(of: query, options: .caseInsensitive) != nil }
+    }
+  }
 
   var body: some View {
     List(selection: Binding(get: {
@@ -11,7 +26,7 @@ struct SidebarView: View {
       store.selectSection(newValue)
     })) {
       Section("Manuscript") {
-        ForEach(store.envelope.sections) { section in
+        ForEach(filteredSections) { section in
           HStack(spacing: 10) {
             Image(systemName: store.projectType == .screenplay ? "film" : "doc.text")
               .foregroundStyle(.secondary)
@@ -24,6 +39,13 @@ struct SidebarView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+            }
+
+            if section.wordGoal > 0 {
+              ProgressView(value: min(1, Double(MarkdownTools.wordCount(section.content ?? "")) / Double(section.wordGoal)))
+                .controlSize(.mini)
+                .frame(width: 38)
+                .help("\(MarkdownTools.wordCount(section.content ?? "")) of \(section.wordGoal) words")
             }
           }
           .tag(section.id)
@@ -39,11 +61,25 @@ struct SidebarView: View {
           }
         }
         .onMove { source, destination in
+          guard searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, statusFilter == "all" else { return }
           store.moveSections(from: source, to: destination)
         }
       }
     }
     .listStyle(.sidebar)
+    .searchable(text: $searchText, placement: .sidebar, prompt: "Search manuscript")
+    .safeAreaInset(edge: .top) {
+      Picker("Status", selection: $statusFilter) {
+        Text("All").tag("all")
+        ForEach(ChapterStatus.allCases, id: \.self) { status in
+          Text(status.rawValue.capitalized).tag(status.rawValue)
+        }
+      }
+      .pickerStyle(.menu)
+      .padding(.horizontal, 12)
+      .padding(.vertical, 8)
+      .background(.bar)
+    }
     .safeAreaInset(edge: .bottom) {
       HStack {
         Button {

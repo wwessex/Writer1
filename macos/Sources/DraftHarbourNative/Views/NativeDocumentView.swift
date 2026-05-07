@@ -54,6 +54,7 @@ struct NativeDocumentView: View {
   private let recoveryService = SessionRecoveryService()
   @State private var store: ProjectStore
   @State private var columnVisibility = NavigationSplitViewVisibility.all
+  @SceneStorage("DraftHarbour.workspaceMode") private var workspaceModeRaw = WorkspaceMode.write.rawValue
   @SceneStorage("DraftHarbour.selectedToolPanel") private var selectedToolPanel = ToolPanel.dashboard.rawValue
   @SceneStorage("DraftHarbour.inspectorVisible") private var inspectorVisible = true
   @State private var showingToolPanel = false
@@ -61,7 +62,9 @@ struct NativeDocumentView: View {
   @State private var showingFindReplace = false
   @State private var exportError: String?
   @State private var operationMessage: String?
+  @State private var recoveryState = "Ready"
   @State private var pendingRecovery: RecoverySnapshot?
+  @State private var spotlightIndexTask: Task<Void, Never>?
   @State private var selectedRange = NSRange(location: 0, length: 0)
   @State private var showingAddCommentPrompt = false
   @State private var commentDraft = ""
@@ -69,6 +72,14 @@ struct NativeDocumentView: View {
   @AppStorage("DraftHarbour.editor.pageView") private var pageView = false
   @AppStorage("DraftHarbour.editor.focusMode") private var focusMode = false
   @AppStorage("DraftHarbour.editor.typewriterMode") private var typewriterMode = false
+
+  private var workspaceMode: Binding<WorkspaceMode> {
+    Binding {
+      WorkspaceMode(rawValue: workspaceModeRaw) ?? .write
+    } set: { mode in
+      workspaceModeRaw = mode.rawValue
+    }
+  }
 
   init(document: Binding<DraftHarbourDocument>, fileURL: URL? = nil) {
     self._document = document
@@ -92,6 +103,14 @@ struct NativeDocumentView: View {
         } label: {
           Label(store.projectType == .screenplay ? "New Scene" : "New Chapter", systemImage: "plus")
         }
+
+        Picker("Workspace", selection: workspaceMode) {
+          ForEach(WorkspaceMode.allCases) { mode in
+            Label(mode.title, systemImage: mode.systemImage).tag(mode)
+          }
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 300)
 
         Picker("Tools", selection: $selectedToolPanel) {
           ForEach(ToolPanel.allCases) { panel in
@@ -120,6 +139,9 @@ struct NativeDocumentView: View {
         }
 
         Button {
+          if workspaceMode.wrappedValue != .write {
+            workspaceMode.wrappedValue = .write
+          }
           inspectorVisible.toggle()
         } label: {
           Label("Inspector", systemImage: inspectorVisible ? "sidebar.right" : "sidebar.right")
@@ -179,6 +201,8 @@ struct NativeDocumentView: View {
     .onChange(of: store.revision) { _, _ in
       document.envelope = store.envelope
       _ = try? recoveryService.save(envelope: store.envelope, activeSectionID: store.activeSectionID, sourceURL: fileURL)
+      recoveryState = "Recovery saved"
+      scheduleSpotlightIndexing()
     }
     .onChange(of: store.activeSectionID) { _, newValue in
       recoveryService.recordActiveSectionID(newValue, projectId: store.envelope.project.id)
@@ -195,7 +219,12 @@ struct NativeDocumentView: View {
       if let snapshot = try? recoveryService.load(projectId: store.envelope.project.id),
          recoveryService.shouldOfferRestore(snapshot, documentURL: fileURL) {
         pendingRecovery = snapshot
+        recoveryState = "Recovery available"
       }
+      scheduleSpotlightIndexing(delay: 0)
+    }
+    .onDisappear {
+      spotlightIndexTask?.cancel()
     }
     .onReceive(NotificationCenter.default.publisher(for: .draftHarbourShowQuickSwitcher)) { _ in
       showingQuickSwitcher = true
@@ -207,16 +236,32 @@ struct NativeDocumentView: View {
       guard let raw = notification.object as? String, let command = NativeCommandID(rawValue: raw) else { return }
       runCommand(command)
     }
+    .safeAreaInset(edge: .bottom) {
+      WritingStatusBar(store: store, fileURL: fileURL, recoveryState: recoveryState) { result in
+        operationMessage = result.wordsWritten == 1
+          ? "Recorded 1 word for today's writing session."
+          : "Recorded \(result.wordsWritten) words for today's writing session."
+      }
+    }
   }
 
   private var workspace: some View {
-    HSplitView {
-      EditorWorkspaceView(store: store, selectedRange: $selectedRange, showingFindReplace: $showingFindReplace)
-        .frame(minWidth: 520, maxWidth: .infinity)
+    Group {
+      switch workspaceMode.wrappedValue {
+      case .write:
+        HSplitView {
+          EditorWorkspaceView(store: store, selectedRange: $selectedRange, showingFindReplace: $showingFindReplace)
+            .frame(minWidth: 520, maxWidth: .infinity)
 
-      if inspectorVisible {
-        InspectorView(store: store, selectedRange: selectedRange)
-          .frame(minWidth: 260, idealWidth: 320, maxWidth: 420)
+          if inspectorVisible {
+            InspectorView(store: store, selectedRange: selectedRange)
+              .frame(minWidth: 280, idealWidth: 340, maxWidth: 460)
+          }
+        }
+      case .corkboard:
+        CorkboardWorkspaceView(store: store)
+      case .review:
+        ReviewWorkspaceView(store: store, selectedRange: selectedRange, runCommand: runCommand(_:))
       }
     }
   }
@@ -228,10 +273,14 @@ struct NativeDocumentView: View {
       let panel = NSSavePanel()
       panel.nameFieldStringValue = exported.filename
       panel.canCreateDirectories = true
+      if let directory = UserDefaults.standard.string(forKey: "DraftHarbour.export.lastDirectory") {
+        panel.directoryURL = URL(fileURLWithPath: directory, isDirectory: true)
+      }
       panel.begin { response in
         guard response == .OK, let url = panel.url else { return }
         do {
           try exported.data.write(to: url, options: .atomic)
+          UserDefaults.standard.set(url.deletingLastPathComponent().path, forKey: "DraftHarbour.export.lastDirectory")
           store.recordExport(exported, format: format, validationIssues: validation)
         } catch {
           exportError = error.localizedDescription
@@ -392,6 +441,19 @@ struct NativeDocumentView: View {
     showingToolPanel = true
   }
 
+  private func scheduleSpotlightIndexing(delay: UInt64 = 750_000_000) {
+    let envelope = store.envelope
+    let fileURL = fileURL
+    spotlightIndexTask?.cancel()
+    spotlightIndexTask = Task {
+      if delay > 0 {
+        try? await Task.sleep(nanoseconds: delay)
+      }
+      guard !Task.isCancelled else { return }
+      SpotlightIndexingService.index(envelope: envelope, fileURL: fileURL)
+    }
+  }
+
   private func runCommand(_ command: NativeCommandID) {
     switch command {
     case .newSection:
@@ -422,6 +484,12 @@ struct NativeDocumentView: View {
       sendResponderAction("orderFrontStandardAboutPanel:")
     case .findReplace:
       showingFindReplace = true
+    case .workspaceWrite:
+      workspaceMode.wrappedValue = .write
+    case .workspaceCorkboard:
+      workspaceMode.wrappedValue = .corkboard
+    case .workspaceReview:
+      workspaceMode.wrappedValue = .review
     case .quickSwitcher:
       showingQuickSwitcher = true
     case .undo:
@@ -464,11 +532,11 @@ struct NativeDocumentView: View {
     case .wordCount:
       showToolPanel(.wordCount)
     case .analysis, .advancedAnalytics:
-      showToolPanel(.diagnostics)
+      workspaceMode.wrappedValue = .review
     case .characterBible:
       showToolPanel(.characterBible)
     case .storyCards, .corkboard:
-      showToolPanel(.storyCards)
+      workspaceMode.wrappedValue = .corkboard
     case .integrations:
       showToolPanel(.integrations)
     case .aiWriting, .aiPanel, .translation:
@@ -480,10 +548,13 @@ struct NativeDocumentView: View {
     case .sceneTemplates:
       insertSceneTemplate()
     case .exportHistory:
-      showToolPanel(.export)
+      workspaceMode.wrappedValue = .review
     case .onboarding:
       operationMessage = "Use the project settings and Character & World tools to finish setup for this native document."
     case .inspector:
+      if workspaceMode.wrappedValue != .write {
+        workspaceMode.wrappedValue = .write
+      }
       inspectorVisible.toggle()
     case .toggleSidebar:
       columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly

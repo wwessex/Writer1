@@ -33,6 +33,9 @@ public enum NativeCommandID: String, Codable, CaseIterable, Sendable {
   case inspector
   case quickSwitcher
   case findReplace
+  case workspaceWrite
+  case workspaceCorkboard
+  case workspaceReview
   case toggleSidebar
   case togglePageView
   case toggleFocusMode
@@ -62,7 +65,7 @@ public enum NativeCommandID: String, Codable, CaseIterable, Sendable {
       return .responderChain
     case .openProjectFile, .saveProjectFile, .openRecent, .reopenLastProject, .exportBackup, .importBackup, .saveProjectCopy, .settings, .about:
       return .system
-    case .importDocument, .newSection, .export, .snapshots, .analysis, .wordCount, .dashboard, .onboarding, .characterBible, .aiWriting, .comments, .addComment, .advancedAnalytics, .integrations, .projects, .sceneTemplates, .exportHistory, .aiPanel, .translation, .corkboard, .inspector, .quickSwitcher, .findReplace, .toggleSidebar, .togglePageView, .toggleFocusMode, .themeAuto, .themeLight, .themeDark, .insertHorizontalRule, .insertBlockquote, .formatBold, .formatItalic, .formatUnderline, .formatHeading1, .formatHeading2, .formatParagraph, .toggleTypewriterMode, .storyCards:
+    case .importDocument, .newSection, .export, .snapshots, .analysis, .wordCount, .dashboard, .onboarding, .characterBible, .aiWriting, .comments, .addComment, .advancedAnalytics, .integrations, .projects, .sceneTemplates, .exportHistory, .aiPanel, .translation, .corkboard, .inspector, .quickSwitcher, .findReplace, .workspaceWrite, .workspaceCorkboard, .workspaceReview, .toggleSidebar, .togglePageView, .toggleFocusMode, .themeAuto, .themeLight, .themeDark, .insertHorizontalRule, .insertBlockquote, .formatBold, .formatItalic, .formatUnderline, .formatHeading1, .formatHeading2, .formatParagraph, .toggleTypewriterMode, .storyCards:
       return .native
     }
   }
@@ -72,6 +75,114 @@ public enum NativeCommandDisposition: String, Codable, Sendable {
   case native
   case responderChain
   case system
+}
+
+public enum WorkspaceMode: String, Codable, CaseIterable, Identifiable, Sendable {
+  case write
+  case corkboard
+  case review
+
+  public var id: String { rawValue }
+
+  public var title: String {
+    switch self {
+    case .write:
+      return "Write"
+    case .corkboard:
+      return "Corkboard"
+    case .review:
+      return "Review"
+    }
+  }
+
+  public var systemImage: String {
+    switch self {
+    case .write:
+      return "square.and.pencil"
+    case .corkboard:
+      return "rectangle.grid.2x2"
+    case .review:
+      return "checklist"
+    }
+  }
+}
+
+public enum InspectorTab: String, Codable, CaseIterable, Identifiable, Sendable {
+  case details
+  case comments
+  case snapshots
+  case metrics
+
+  public var id: String { rawValue }
+
+  public var title: String {
+    switch self {
+    case .details:
+      return "Details"
+    case .comments:
+      return "Comments"
+    case .snapshots:
+      return "Snapshots"
+    case .metrics:
+      return "Metrics"
+    }
+  }
+}
+
+public enum ReviewFilter: String, Codable, CaseIterable, Identifiable, Sendable {
+  case all
+  case comments
+  case snapshots
+  case validation
+  case continuity
+  case aiRevisions = "ai-revisions"
+
+  public var id: String { rawValue }
+
+  public var title: String {
+    switch self {
+    case .all:
+      return "All"
+    case .comments:
+      return "Comments"
+    case .snapshots:
+      return "Snapshots"
+    case .validation:
+      return "Validation"
+    case .continuity:
+      return "Continuity"
+    case .aiRevisions:
+      return "AI Revisions"
+    }
+  }
+}
+
+public struct WritingSessionState: Codable, Equatable, Identifiable, Sendable {
+  public var id: String
+  public var startedAt: Int64
+  public var startingWordCount: Int
+
+  public init(id: String = makeIdentifier(), startedAt: Int64 = currentTimeMilliseconds(), startingWordCount: Int) {
+    self.id = id
+    self.startedAt = startedAt
+    self.startingWordCount = startingWordCount
+  }
+}
+
+public struct WritingSessionResult: Codable, Equatable, Sendable {
+  public var session: WritingSessionState
+  public var endedAt: Int64
+  public var endingWordCount: Int
+  public var wordsWritten: Int
+  public var date: String
+
+  public init(session: WritingSessionState, endedAt: Int64, endingWordCount: Int, wordsWritten: Int, date: String) {
+    self.session = session
+    self.endedAt = endedAt
+    self.endingWordCount = endingWordCount
+    self.wordsWritten = wordsWritten
+    self.date = date
+  }
 }
 
 public enum StoryStructurePreference: String, Codable, CaseIterable, Sendable {

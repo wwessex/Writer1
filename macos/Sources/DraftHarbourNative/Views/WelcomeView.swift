@@ -167,27 +167,58 @@ struct WelcomeProjectSetupView: View {
 
   @State private var title = ""
   @State private var projectType: ProjectType = .book
+  @State private var genre = ""
+  @State private var deadline = ""
+  @State private var structure: StoryStructurePreference = .threeAct
+  @AppStorage("DraftHarbour.writing.defaultWordGoal") private var targetWordCount = 80_000
+  @AppStorage("DraftHarbour.writing.dailyTarget") private var dailyWordTarget = 0
 
   private var trimmedTitle: String {
     title.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 20) {
-      Text("New Project")
-        .font(.title2.bold())
+    VStack(alignment: .leading, spacing: 0) {
+      ScrollView {
+        VStack(alignment: .leading, spacing: 20) {
+          Text("New Project")
+            .font(.title2.bold())
 
-      VStack(alignment: .leading, spacing: 14) {
-        TextField("Project Title", text: $title)
-          .textFieldStyle(.roundedBorder)
+          VStack(alignment: .leading, spacing: 14) {
+            TextField("Project Title", text: $title)
+              .textFieldStyle(.roundedBorder)
 
-        Picker("Type", selection: $projectType) {
-          ForEach(ProjectType.allCases, id: \.self) { type in
-            Text(type.welcomeTitle).tag(type)
+            Picker("Type", selection: $projectType) {
+              ForEach(ProjectType.allCases, id: \.self) { type in
+                Text(type.welcomeTitle).tag(type)
+              }
+            }
+            .pickerStyle(.segmented)
+
+            TextField("Genre", text: $genre)
+              .textFieldStyle(.roundedBorder)
+
+            Picker("Structure", selection: $structure) {
+              ForEach(StoryStructurePreference.allCases, id: \.self) { structure in
+                Text(structure.welcomeTitle).tag(structure)
+              }
+            }
+
+            TextField("Target Words", value: $targetWordCount, format: .number)
+              .textFieldStyle(.roundedBorder)
+
+            TextField("Daily Target", value: $dailyWordTarget, format: .number)
+              .textFieldStyle(.roundedBorder)
+
+            TextField("Deadline", text: $deadline)
+              .textFieldStyle(.roundedBorder)
+              .help("Use YYYY-MM-DD for portable project files.")
           }
         }
-        .pickerStyle(.segmented)
+        .padding(24)
       }
+
+      Divider()
 
       HStack {
         Spacer()
@@ -198,14 +229,22 @@ struct WelcomeProjectSetupView: View {
         .keyboardShortcut(.cancelAction)
 
         Button("Choose Location...") {
-          continueAction(WelcomeProjectConfiguration(title: trimmedTitle, projectType: projectType))
+          continueAction(WelcomeProjectConfiguration(
+            title: trimmedTitle,
+            projectType: projectType,
+            genre: genre.trimmingCharacters(in: .whitespacesAndNewlines),
+            targetWordCount: targetWordCount,
+            dailyWordTarget: dailyWordTarget,
+            deadline: deadline.trimmingCharacters(in: .whitespacesAndNewlines),
+            structure: structure
+          ))
         }
         .keyboardShortcut(.defaultAction)
         .disabled(trimmedTitle.isEmpty)
       }
+      .padding(24)
     }
-    .padding(24)
-    .frame(width: 420)
+    .frame(width: 460, height: 480)
   }
 }
 
@@ -214,6 +253,19 @@ private extension ProjectType {
     switch self {
     case .book: "Book"
     case .screenplay: "Screenplay"
+    }
+  }
+}
+
+private extension StoryStructurePreference {
+  var welcomeTitle: String {
+    switch self {
+    case .threeAct:
+      return "Three Act"
+    case .saveTheCat:
+      return "Save The Cat"
+    case .heroJourney:
+      return "Hero Journey"
     }
   }
 }
