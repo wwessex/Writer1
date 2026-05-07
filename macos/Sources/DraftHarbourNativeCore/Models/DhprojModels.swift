@@ -277,11 +277,13 @@ public struct CharacterVoiceProfile: Codable, Equatable, Sendable {
   public var characterId: String
   public var sampleCount: Int
   public var updatedAt: Int64
+  public var fingerprint: VoiceFingerprint?
 
-  public init(characterId: String, sampleCount: Int = 0, updatedAt: Int64 = currentTimeMilliseconds()) {
+  public init(characterId: String, sampleCount: Int = 0, updatedAt: Int64 = currentTimeMilliseconds(), fingerprint: VoiceFingerprint? = nil) {
     self.characterId = characterId
     self.sampleCount = sampleCount
     self.updatedAt = updatedAt
+    self.fingerprint = fingerprint
   }
 }
 
