@@ -55,6 +55,24 @@ verify_bundle_signature() {
   codesign --verify --deep --strict "$bundle"
 }
 
+stage_localization_resources() {
+  local localization
+  for localization in en en_GB; do
+    mkdir -p "$RESOURCES_DIR/$localization.lproj"
+    cat > "$RESOURCES_DIR/$localization.lproj/InfoPlist.strings" <<'STRINGS'
+"CFBundleDisplayName" = "DraftHarbour";
+"CFBundleName" = "DraftHarbour";
+"CFBundleTypeName" = "DraftHarbour Project";
+"CFBundleURLName" = "DraftHarbour OAuth";
+"NSHumanReadableCopyright" = "Copyright DraftHarbour";
+"UTTypeDescription" = "DraftHarbour Project";
+STRINGS
+    cat > "$RESOURCES_DIR/$localization.lproj/Localizable.strings" <<'STRINGS'
+/* Marks this bundle localization; app strings currently fall back to source literals. */
+STRINGS
+  done
+}
+
 for arg in "$@"; do
   case "$arg" in
     --release)
@@ -111,10 +129,17 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+  <key>CFBundleAllowMixedLocalizations</key>
+  <true/>
   <key>CFBundleDevelopmentRegion</key>
   <string>en</string>
   <key>CFBundleDisplayName</key>
   <string>DraftHarbour</string>
+  <key>CFBundleLocalizations</key>
+  <array>
+    <string>en</string>
+    <string>en_GB</string>
+  </array>
   <key>CFBundleDocumentTypes</key>
   <array>
     <dict>
@@ -196,6 +221,8 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
+
+stage_localization_resources
 
 strip_bundle_metadata "$STAGING_APP"
 codesign --force --deep --sign - "$STAGING_APP" >/dev/null
