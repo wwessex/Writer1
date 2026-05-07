@@ -180,17 +180,10 @@ struct NativeDocumentView: View {
       document.envelope = store.envelope
       _ = try? recoveryService.save(envelope: store.envelope, activeSectionID: store.activeSectionID, sourceURL: fileURL)
     }
-    .onChange(of: theme) { _, newValue in
-      let normalized = ThemePreference.normalizedRawValue(newValue)
-      if normalized != newValue {
-        theme = normalized
-      }
-    }
     .onChange(of: store.activeSectionID) { _, newValue in
       recoveryService.recordActiveSectionID(newValue, projectId: store.envelope.project.id)
     }
     .onAppear {
-      theme = ThemePreference.normalizedRawValue(theme)
       if let fileURL {
         recoveryService.recordLastOpenedProjectURL(fileURL)
         NSDocumentController.shared.noteNewRecentDocumentURL(fileURL)
@@ -214,7 +207,6 @@ struct NativeDocumentView: View {
       guard let raw = notification.object as? String, let command = NativeCommandID(rawValue: raw) else { return }
       runCommand(command)
     }
-    .preferredColorScheme(preferredColorScheme)
   }
 
   private var workspace: some View {
@@ -226,17 +218,6 @@ struct NativeDocumentView: View {
         InspectorView(store: store, selectedRange: selectedRange)
           .frame(minWidth: 260, idealWidth: 320, maxWidth: 420)
       }
-    }
-  }
-
-  private var preferredColorScheme: ColorScheme? {
-    switch ThemePreference(storageValue: theme) {
-    case .auto:
-      return nil
-    case .light:
-      return .light
-    case .dark:
-      return .dark
     }
   }
 

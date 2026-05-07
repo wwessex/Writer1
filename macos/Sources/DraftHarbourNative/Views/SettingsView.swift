@@ -55,9 +55,6 @@ struct SettingsView: View {
     .formStyle(.grouped)
     .padding()
     .frame(width: 520)
-    .onAppear {
-      theme = ThemePreference.normalizedRawValue(theme)
-    }
   }
 
   private var themeSelection: Binding<String> {

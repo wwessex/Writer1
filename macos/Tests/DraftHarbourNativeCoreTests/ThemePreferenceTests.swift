@@ -7,7 +7,8 @@ final class ThemePreferenceTests: XCTestCase {
     XCTAssertEqual(try decodeTheme("\"light\""), .light)
     XCTAssertEqual(try decodeTheme("\"dark\""), .dark)
     XCTAssertEqual(try decodeTheme("\"system\""), .auto)
-    XCTAssertEqual(try decodeTheme("\"high-contrast\""), .dark)
+    XCTAssertEqual(try decodeTheme("\"high-contrast\""), .auto)
+    XCTAssertEqual(try decodeTheme("\"sepia\""), .auto)
   }
 
   func testEncodesCanonicalThemeValues() throws {
@@ -18,8 +19,9 @@ final class ThemePreferenceTests: XCTestCase {
 
   func testNormalizesStoredThemeValues() {
     XCTAssertEqual(ThemePreference.normalizedRawValue("system"), "auto")
-    XCTAssertEqual(ThemePreference.normalizedRawValue("high-contrast"), "dark")
+    XCTAssertEqual(ThemePreference.normalizedRawValue("high-contrast"), "auto")
     XCTAssertEqual(ThemePreference.normalizedRawValue("light"), "light")
+    XCTAssertEqual(ThemePreference.normalizedRawValue("sepia"), "auto")
   }
 
   private func decodeTheme(_ raw: String) throws -> ThemePreference {

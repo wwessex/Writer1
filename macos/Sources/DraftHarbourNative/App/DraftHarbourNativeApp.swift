@@ -10,6 +10,7 @@ struct DraftHarbourNativeApp: App {
   var body: some SwiftUI.Scene {
     DocumentGroup(newDocument: DraftHarbourDocument()) { file in
       NativeDocumentView(document: file.$document, fileURL: file.fileURL)
+        .nativeAppearanceBridge()
     }
     .commands {
       DraftHarbourCommands()
@@ -17,6 +18,7 @@ struct DraftHarbourNativeApp: App {
 
     Settings {
       SettingsView()
+        .nativeAppearanceBridge()
     }
   }
 }
