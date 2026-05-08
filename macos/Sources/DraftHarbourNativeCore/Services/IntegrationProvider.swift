@@ -65,6 +65,9 @@ public struct PlannedIntegrationProvider: IntegrationProvider {
 
 public enum NativeIntegrationProviderRegistry {
   public static func provider(for type: IntegrationType, config: IntegrationConfig? = nil) -> IntegrationProvider {
+    if NativeOperationalGuardrails.shared.currentPolicy().forceLocalOnly == true, type != .scrivener {
+      return PolicyDisabledIntegrationProvider(type: type)
+    }
     if config?.baseUrl != nil {
       return GenericRESTSyncProvider(type: type)
     }
@@ -79,6 +82,30 @@ public enum NativeIntegrationProviderRegistry {
     case .googleDrive:
       return GoogleDriveSyncProvider()
     }
+  }
+}
+
+public struct PolicyDisabledIntegrationProvider: IntegrationProvider {
+  public var type: IntegrationType
+
+  public init(type: IntegrationType) {
+    self.type = type
+  }
+
+  public func connect(config: IntegrationConfig) async throws -> IntegrationResult {
+    throw DraftHarbourError.providerNotConfigured("\(type.rawValue) disabled by managed local-only policy")
+  }
+
+  public func push(config: IntegrationConfig, payload: IntegrationPayload) async throws -> IntegrationResult {
+    throw DraftHarbourError.providerNotConfigured("\(type.rawValue) disabled by managed local-only policy")
+  }
+
+  public func pull(config: IntegrationConfig, payload: IntegrationPayload) async throws -> IntegrationResult {
+    throw DraftHarbourError.providerNotConfigured("\(type.rawValue) disabled by managed local-only policy")
+  }
+
+  public func listRevisions(config: IntegrationConfig) async throws -> [RemoteRevision] {
+    throw DraftHarbourError.providerNotConfigured("\(type.rawValue) disabled by managed local-only policy")
   }
 }
 

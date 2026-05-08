@@ -49,7 +49,11 @@ Build-only and packaging checks:
 ./script/package_macos.sh
 ```
 
-`./script/package_macos.sh` creates `dist/release/DraftHarbour.dmg`, verifies the DMG, and writes `dist/release/checksums.txt`. Local beta builds are ad-hoc signed and may be rejected by Gatekeeper unless `APPLE_SIGNING_IDENTITY` is configured. Dropbox and Google Drive sync use native PKCE OAuth; enter a registered Dropbox app key and Google desktop OAuth client ID in the native Integrations panel.
+`./script/package_macos.sh` creates `dist/release/DraftHarbour.dmg`, verifies the DMG, writes `checksums.txt`, and generates `macos-update-manifest.json`. Local dry-runs are ad-hoc signed and may be rejected by Gatekeeper. Release builds should run `./script/package_macos.sh --distribution --channel stable` with `APPLE_SIGNING_IDENTITY`, `APPLE_NOTARY_KEYCHAIN_PROFILE`, and `RELEASE_SIGNING_KEY` configured so the DMG is Developer ID signed, notarized, stapled, and accompanied by signed checksum/update metadata.
+
+Credential-backed provider smoke checks can be run with `npm run smoke:providers`. Add `-- --require-configured` in secure release environments to fail when no provider credentials are configured.
+
+Dropbox and Google Drive sync use native PKCE OAuth; enter a registered Dropbox app key and Google desktop OAuth client ID in the native Integrations panel.
 
 ## Non-Mac Desktop App (Tauri)
 
@@ -101,7 +105,7 @@ The non-Mac packaging config is in `desktop/src-tauri/tauri.conf.json` and is en
 Set these in your CI provider secrets before release jobs.
 
 Suggested CI matrix:
-- macOS: native Swift package via `./script/package_macos.sh`
+- macOS: native Swift package via `./script/package_macos.sh --distribution --channel "$RELEASE_CHANNEL"`
 - Windows: `x86_64-pc-windows-msvc`
 - Linux: `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu` (optional)
 

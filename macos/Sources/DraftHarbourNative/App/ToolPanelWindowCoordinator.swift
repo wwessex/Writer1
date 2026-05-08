@@ -14,7 +14,7 @@ final class ToolPanelWindowCoordinator: NSObject, NSWindowDelegate {
   func show(
     panel selectedPanel: ToolPanel,
     store: ProjectStore,
-    exportAction: @escaping (ExportFormat) -> Void,
+    exportAction: @escaping (ExportRequest) -> Void,
     runCommand: @escaping (NativeCommandID) -> Void,
     selectionChanged: @escaping (String) -> Void
   ) {

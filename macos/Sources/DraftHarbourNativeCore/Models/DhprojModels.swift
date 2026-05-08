@@ -394,6 +394,7 @@ public struct DhprojEnvelope: Codable, Equatable, Sendable {
   public var exportHistory: [ExportHistoryRecord]
   public var aiProviders: [AIProviderConfig]
   public var aiRevisionLog: [AIRevisionRecord]
+  public var collaboration: CollaborationState
 
   enum CodingKeys: String, CodingKey {
     case manifest
@@ -412,6 +413,7 @@ public struct DhprojEnvelope: Codable, Equatable, Sendable {
     case exportHistory
     case aiProviders
     case aiRevisionLog
+    case collaboration
   }
 
   public init(
@@ -430,7 +432,8 @@ public struct DhprojEnvelope: Codable, Equatable, Sendable {
     storyBlueprint: StoryBlueprint? = nil,
     exportHistory: [ExportHistoryRecord] = [],
     aiProviders: [AIProviderConfig] = [],
-    aiRevisionLog: [AIRevisionRecord] = []
+    aiRevisionLog: [AIRevisionRecord] = [],
+    collaboration: CollaborationState = CollaborationState()
   ) {
     self.manifest = manifest
     self.project = project
@@ -448,6 +451,7 @@ public struct DhprojEnvelope: Codable, Equatable, Sendable {
     self.exportHistory = exportHistory
     self.aiProviders = aiProviders
     self.aiRevisionLog = aiRevisionLog
+    self.collaboration = collaboration
   }
 
   public init(from decoder: Decoder) throws {
@@ -469,6 +473,7 @@ public struct DhprojEnvelope: Codable, Equatable, Sendable {
     exportHistory = try container.decodeIfPresent([ExportHistoryRecord].self, forKey: .exportHistory) ?? []
     aiProviders = try container.decodeIfPresent([AIProviderConfig].self, forKey: .aiProviders) ?? []
     aiRevisionLog = try container.decodeIfPresent([AIRevisionRecord].self, forKey: .aiRevisionLog) ?? []
+    collaboration = try container.decodeIfPresent(CollaborationState.self, forKey: .collaboration) ?? CollaborationState()
     sections.sort { $0.order < $1.order }
   }
 }

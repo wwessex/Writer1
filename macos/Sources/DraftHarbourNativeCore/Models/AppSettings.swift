@@ -171,6 +171,26 @@ public struct AppSettings: Codable, Equatable, Sendable {
     self.sidebarPanels = sidebarPanels
     self.goalConfiguration = goalConfiguration
   }
+
+  public mutating func merge(overrides: AppSettings) {
+    autosaveMs = overrides.autosaveMs ?? autosaveMs
+    dailyWordGoal = overrides.dailyWordGoal ?? dailyWordGoal
+    novelWordGoal = overrides.novelWordGoal ?? novelWordGoal
+    novelDeadline = overrides.novelDeadline ?? novelDeadline
+    sync = overrides.sync ?? sync
+    assist = overrides.assist ?? assist
+    theme = overrides.theme ?? theme
+    sidebarHidden = overrides.sidebarHidden ?? sidebarHidden
+    pageView = overrides.pageView ?? pageView
+    focusMode = overrides.focusMode ?? focusMode
+    quickSwitcherMode = overrides.quickSwitcherMode ?? quickSwitcherMode
+    typography = overrides.typography ?? typography
+    onboardingComplete = overrides.onboardingComplete ?? onboardingComplete
+    typewriterMode = overrides.typewriterMode ?? typewriterMode
+    releaseChannel = overrides.releaseChannel ?? releaseChannel
+    sidebarPanels = overrides.sidebarPanels ?? sidebarPanels
+    goalConfiguration = overrides.goalConfiguration ?? goalConfiguration
+  }
 }
 
 public struct DailyProgress: Codable, Equatable, Identifiable, Sendable {

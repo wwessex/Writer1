@@ -3,6 +3,9 @@ import SwiftUI
 
 struct SettingsView: View {
   @State private var settingsSearch = ""
+  @State private var safeModeEnabled = NativeOperationalGuardrails.shared.isSafeModeEnabledForSession
+  @State private var pinnedUpdateVersion = NativeOperationalGuardrails.shared.pinnedUpdateVersion ?? ""
+  @State private var guardrailsMessage = ""
 
   @AppStorage("DraftHarbour.editor.fontSize") private var fontSize = 15.0
   @AppStorage("DraftHarbour.editor.fontFamily") private var fontFamily = "System"
@@ -336,7 +339,45 @@ struct SettingsView: View {
         }
       }
 
-      if !paneMatches("update channel stable beta nightly release") {
+      if sectionMatches("safe mode policy managed updates crash guardrails fallback pin version signed local only") {
+        Section("Operational Guardrails") {
+          Toggle("Safe Mode for Current Session", isOn: safeModeBinding)
+          Button("Enable Safe Mode on Next Launch") {
+            NativeOperationalGuardrails.shared.enableSafeModeForNextLaunch()
+            guardrailsMessage = "Safe mode will be enabled after the app restarts."
+          }
+          HStack {
+            TextField("Pinned update version", text: $pinnedUpdateVersion)
+            Button("Save Pin") {
+              NativeOperationalGuardrails.shared.pinUpdateVersion(pinnedUpdateVersion)
+              pinnedUpdateVersion = NativeOperationalGuardrails.shared.pinnedUpdateVersion ?? ""
+              guardrailsMessage = pinnedUpdateVersion.isEmpty ? "Update pin cleared." : "Updates pinned to \(pinnedUpdateVersion)."
+            }
+          }
+          HStack {
+            LabeledContent("Failed Update Attempts", value: "\(NativeOperationalGuardrails.shared.updateFailureCount)")
+            Button("Clear Failures") {
+              NativeOperationalGuardrails.shared.clearUpdateFailures()
+              guardrailsMessage = "Update fallback counter cleared."
+            }
+          }
+          LabeledContent("Fallback Mode", value: NativeOperationalGuardrails.shared.isUpdaterFallbackMode ? "Enabled" : "Disabled")
+          LabeledContent("Last Good Version", value: NativeOperationalGuardrails.shared.lastGoodVersion ?? "Not recorded")
+          let policy = NativeOperationalGuardrails.shared.currentPolicy()
+          LabeledContent("Managed Policy", value: managedPolicySummary(policy))
+          if let remoteCrashReportURL = policy.remoteCrashReportURL, !remoteCrashReportURL.isEmpty {
+            LabeledContent("Crash Endpoint", value: remoteCrashReportURL)
+          }
+          if !guardrailsMessage.isEmpty {
+            Text(guardrailsMessage)
+              .foregroundStyle(.secondary)
+          }
+          Text("Safe mode disables plugin callbacks and filters for the current session. Managed policy can force local-only operation, disable AI providers, and apply settings overrides.")
+            .foregroundStyle(.secondary)
+        }
+      }
+
+      if !paneMatches("update channel stable beta nightly release safe mode policy managed updates crash guardrails fallback pin version signed local only") {
         Section {
           noResultsText
         }
@@ -356,6 +397,39 @@ struct SettingsView: View {
     } set: { newValue in
       theme = ThemePreference.normalizedRawValue(newValue)
     }
+  }
+
+  private var safeModeBinding: Binding<Bool> {
+    Binding {
+      safeModeEnabled
+    } set: { newValue in
+      safeModeEnabled = newValue
+      NativeOperationalGuardrails.shared.setSafeModeForCurrentSession(newValue)
+      guardrailsMessage = newValue ? "Safe mode is active for this session." : "Safe mode is disabled for this session."
+    }
+  }
+
+  private func managedPolicySummary(_ policy: NativeManagedPolicy) -> String {
+    var parts: [String] = []
+    if policy.forceLocalOnly == true {
+      parts.append("local-only")
+    }
+    if policy.disableAIProviders == true {
+      parts.append("AI disabled")
+    }
+    if policy.disableTelemetry == true {
+      parts.append("telemetry disabled")
+    }
+    if let disabled = policy.disabledAIProviderTypes, !disabled.isEmpty {
+      parts.append("disabled providers: \(disabled.map(\.rawValue).joined(separator: ", "))")
+    }
+    if policy.requireSignedUpdates == true {
+      parts.append("signed updates required")
+    }
+    if policy.settingsOverrides != nil {
+      parts.append("settings overrides")
+    }
+    return parts.isEmpty ? "None" : parts.joined(separator: ", ")
   }
 
   private func sectionMatches(_ terms: String) -> Bool {

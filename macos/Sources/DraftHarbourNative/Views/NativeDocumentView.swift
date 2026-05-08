@@ -10,6 +10,7 @@ enum ToolPanel: String, CaseIterable, Identifiable, Hashable {
   case analysis
   case wordCount
   case comments
+  case collaboration
   case characterBible
   case storyCards
   case sceneTemplates
@@ -30,6 +31,7 @@ enum ToolPanel: String, CaseIterable, Identifiable, Hashable {
     case .analysis: "Analysis"
     case .wordCount: "Word Count"
     case .comments: "Comments"
+    case .collaboration: "Collaboration"
     case .characterBible: "Character & World"
     case .storyCards: "Story Cards"
     case .sceneTemplates: "Scene Templates"
@@ -50,6 +52,7 @@ enum ToolPanel: String, CaseIterable, Identifiable, Hashable {
     case .analysis: "text.magnifyingglass"
     case .wordCount: "textformat.abc"
     case .comments: "text.bubble"
+    case .collaboration: "person.3"
     case .characterBible: "person.2"
     case .storyCards: "rectangle.grid.2x2"
     case .sceneTemplates: "doc.badge.plus"
@@ -337,9 +340,13 @@ struct NativeDocumentView: View {
   }
 
   private func export(format: ExportFormat) {
+    export(request: ExportRequest(format: format))
+  }
+
+  private func export(request: ExportRequest) {
     do {
-      let exported = try ExporterRegistry.exporter(for: format).export(store.envelope)
-      let validation = ExportValidator.validate(store.envelope, format: format)
+      let exported = try ExporterRegistry.exporter(for: request.format).export(store.envelope, request: request)
+      let validation = ExportValidator.validate(store.envelope, request: request)
       let panel = NSSavePanel()
       panel.nameFieldStringValue = exported.filename
       panel.canCreateDirectories = true
@@ -351,7 +358,7 @@ struct NativeDocumentView: View {
         do {
           try exported.data.write(to: url, options: .atomic)
           UserDefaults.standard.set(url.deletingLastPathComponent().path, forKey: "DraftHarbour.export.lastDirectory")
-          store.recordExport(exported, format: format, validationIssues: validation)
+          store.recordExport(exported, format: request.format, validationIssues: validation)
         } catch {
           exportError = error.localizedDescription
         }
@@ -512,7 +519,7 @@ struct NativeDocumentView: View {
     toolPanelCoordinator.show(
       panel: panel,
       store: store,
-      exportAction: export(format:),
+      exportAction: export(request:),
       runCommand: runCommand(_:),
       selectionChanged: { rawValue in
         selectedToolPanel = rawValue

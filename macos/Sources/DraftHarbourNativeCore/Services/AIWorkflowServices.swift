@@ -134,6 +134,16 @@ public struct NativeAIProviderFactory {
     guard config.enabled else {
       throw DraftHarbourError.providerNotConfigured(config.label)
     }
+    let policy = NativeOperationalGuardrails.shared.currentPolicy()
+    if policy.disableAIProviders == true {
+      throw DraftHarbourError.providerNotConfigured("AI disabled by managed policy")
+    }
+    if policy.forceLocalOnly == true, config.provider != .localOpenAI {
+      throw DraftHarbourError.providerNotConfigured("\(config.label) disabled by local-only policy")
+    }
+    if policy.disabledAIProviderTypes?.contains(config.provider) == true {
+      throw DraftHarbourError.providerNotConfigured("\(config.label) disabled by managed policy")
+    }
     guard let endpoint = URL(string: config.endpoint) else {
       throw DraftHarbourError.providerNotConfigured("\(config.label) endpoint")
     }

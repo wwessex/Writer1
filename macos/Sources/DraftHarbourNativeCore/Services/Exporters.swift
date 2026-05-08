@@ -27,7 +27,13 @@ public struct ExportedFile: Equatable, Sendable {
 
 public protocol Exporter: Sendable {
   var format: ExportFormat { get }
-  func export(_ envelope: DhprojEnvelope) throws -> ExportedFile
+  func export(_ envelope: DhprojEnvelope, request: ExportRequest) throws -> ExportedFile
+}
+
+public extension Exporter {
+  func export(_ envelope: DhprojEnvelope) throws -> ExportedFile {
+    try export(envelope, request: ExportRequest(format: format))
+  }
 }
 
 public struct MarkdownExporter: Exporter {
@@ -35,8 +41,10 @@ public struct MarkdownExporter: Exporter {
 
   public init() {}
 
-  public func export(_ envelope: DhprojEnvelope) throws -> ExportedFile {
-    let body = envelope.sections.map { "# \($0.title)\n\n\($0.content ?? "")" }.joined(separator: "\n\n")
+  public func export(_ envelope: DhprojEnvelope, request: ExportRequest) throws -> ExportedFile {
+    let body = envelope.sections.map { section in
+      request.includeHeadings ? "# \(section.title)\n\n\(section.content ?? "")" : section.content ?? ""
+    }.joined(separator: "\n\n")
     return ExportedFile(
       filename: "\(safeFilename(envelope.project.title)).md",
       contentType: "text/markdown",
@@ -50,9 +58,12 @@ public struct PlainTextExporter: Exporter {
 
   public init() {}
 
-  public func export(_ envelope: DhprojEnvelope) throws -> ExportedFile {
+  public func export(_ envelope: DhprojEnvelope, request: ExportRequest) throws -> ExportedFile {
     let body = envelope.sections
-      .map { "\($0.title)\n\n\(MarkdownTools.plainText(from: $0.content ?? ""))" }
+      .map { section in
+        let text = MarkdownTools.plainText(from: section.content ?? "")
+        return request.includeHeadings ? "\(section.title)\n\n\(text)" : text
+      }
       .joined(separator: "\n\n")
     return ExportedFile(
       filename: "\(safeFilename(envelope.project.title)).txt",
@@ -67,14 +78,34 @@ public struct FountainExporter: Exporter {
 
   public init() {}
 
-  public func export(_ envelope: DhprojEnvelope) throws -> ExportedFile {
+  public func export(_ envelope: DhprojEnvelope, request: ExportRequest) throws -> ExportedFile {
+    let options = request.fountainOptions ?? FountainExportOptions(includeSectionTitles: request.includeHeadings, includeMetadataBlock: false)
+    let metadata = options.includeMetadataBlock
+      ? [
+        "Title: \(envelope.project.title)",
+        request.manuscriptOptions?.authorName.isEmpty == false ? "Author: \(request.manuscriptOptions?.authorName ?? "")" : nil,
+        "Draft date: \(ISO8601DateFormatter().string(from: Date()))"
+      ].compactMap { $0 }.joined(separator: "\n") + "\n\n"
+      : ""
     let body = envelope.sections
-      .map { "## \($0.title)\n\n\(($0.content ?? "").trimmingCharacters(in: .whitespacesAndNewlines))" }
+      .map { section in
+        let content = (section.content ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return options.includeSectionTitles ? "## \(section.title)\n\n\(content)" : content
+      }
       .joined(separator: "\n\n")
+    let suffix: String
+    switch options.filenameConvention {
+    case .title:
+      suffix = ".fountain"
+    case .titleScreenplay:
+      suffix = "-screenplay.fountain"
+    case .titleFountain:
+      suffix = "-fountain-export.fountain"
+    }
     return ExportedFile(
-      filename: "\(safeFilename(envelope.project.title)).fountain",
+      filename: "\(safeFilename(envelope.project.title))\(suffix)",
       contentType: "text/plain",
-      data: Data(body.utf8)
+      data: Data((metadata + body).utf8)
     )
   }
 }
@@ -84,15 +115,21 @@ public struct RTFExporter: Exporter {
 
   public init() {}
 
-  public func export(_ envelope: DhprojEnvelope) throws -> ExportedFile {
-    let plain = envelope.sections
-      .map { "\($0.title)\n\n\(MarkdownTools.plainText(from: $0.content ?? ""))" }
-      .joined(separator: "\n\n")
+  public func export(_ envelope: DhprojEnvelope, request: ExportRequest) throws -> ExportedFile {
+    let plain = manuscriptPlainText(envelope, request: request)
+    let options = request.manuscriptOptions
+    let paragraph = NSMutableParagraphStyle()
+    paragraph.lineSpacing = CGFloat(((options?.lineSpacing ?? 1.15) - 1) * (options?.fontSizePt ?? 13))
+    paragraph.paragraphSpacingBefore = CGFloat(options?.paragraphSpacingBeforePt ?? 0)
+    paragraph.paragraphSpacing = CGFloat(options?.paragraphSpacingAfterPt ?? 0)
+    paragraph.firstLineHeadIndent = CGFloat((options?.firstLineIndentIn ?? 0) * 72)
+    paragraph.alignment = options?.alignment.nsAlignment ?? .left
     let attributed = NSAttributedString(
       string: plain,
       attributes: [
-        .font: NSFont.systemFont(ofSize: 13),
-        .foregroundColor: NSColor.labelColor
+        .font: exportFont(options?.fontFamily, size: CGFloat(options?.fontSizePt ?? 13)),
+        .foregroundColor: NSColor.labelColor,
+        .paragraphStyle: paragraph
       ]
     )
     let data = try attributed.data(
@@ -112,20 +149,26 @@ public struct PDFExporter: Exporter {
 
   public init() {}
 
-  public func export(_ envelope: DhprojEnvelope) throws -> ExportedFile {
-    let text = envelope.sections
-      .map { "\($0.title)\n\n\(MarkdownTools.plainText(from: $0.content ?? ""))" }
-      .joined(separator: "\n\n")
+  public func export(_ envelope: DhprojEnvelope, request: ExportRequest) throws -> ExportedFile {
+    let text = manuscriptPlainText(envelope, request: request)
+    let options = request.manuscriptOptions
     let paragraph = NSMutableParagraphStyle()
-    paragraph.lineSpacing = 4
+    paragraph.lineSpacing = CGFloat(((options?.lineSpacing ?? 1.35) - 1) * (options?.fontSizePt ?? 12))
+    paragraph.paragraphSpacingBefore = CGFloat(options?.paragraphSpacingBeforePt ?? 0)
+    paragraph.paragraphSpacing = CGFloat(options?.paragraphSpacingAfterPt ?? 0)
+    paragraph.firstLineHeadIndent = CGFloat((options?.firstLineIndentIn ?? 0) * 72)
+    paragraph.alignment = options?.alignment.nsAlignment ?? .left
+    let margins = options.map { manuscriptMargins($0) } ?? NSEdgeInsets(top: 54, left: 54, bottom: 54, right: 54)
     let data = try PDFTextRenderer.render(
       text: text,
-      pageSize: CGSize(width: 612, height: 792),
-      margins: NSEdgeInsets(top: 54, left: 54, bottom: 54, right: 54),
+      pageSize: options?.pageSize.dimensions ?? CGSize(width: 612, height: 792),
+      margins: margins,
       attributes: [
-        .font: NSFont.systemFont(ofSize: 12),
+        .font: exportFont(options?.fontFamily, size: CGFloat(options?.fontSizePt ?? 12)),
         .paragraphStyle: paragraph
-      ]
+      ],
+      headerText: manuscriptHeader(options),
+      pageNumbering: options?.pageNumbering ?? false
     )
 
     return ExportedFile(
@@ -141,7 +184,7 @@ public struct ScreenplayPDFExporter: Exporter {
 
   public init() {}
 
-  public func export(_ envelope: DhprojEnvelope) throws -> ExportedFile {
+  public func export(_ envelope: DhprojEnvelope, request: ExportRequest) throws -> ExportedFile {
     let text = envelope.sections
       .flatMap { MarkdownTools.screenplayBlocks(from: $0.content) }
       .map { block in
@@ -179,7 +222,9 @@ private enum PDFTextRenderer {
     text: String,
     pageSize: CGSize,
     margins: NSEdgeInsets,
-    attributes: [NSAttributedString.Key: Any]
+    attributes: [NSAttributedString.Key: Any],
+    headerText: String? = nil,
+    pageNumbering: Bool = false
   ) throws -> Data {
     let data = NSMutableData()
     var mediaBox = CGRect(origin: .zero, size: pageSize)
@@ -206,9 +251,11 @@ private enum PDFTextRenderer {
         break
       }
 
+      let pageIndex = layoutManager.textContainers.count
       context.beginPDFPage(nil)
       NSGraphicsContext.saveGraphicsState()
       NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+      drawHeader(headerText: headerText, pageNumbering: pageNumbering, pageIndex: pageIndex, pageSize: pageSize, margins: margins)
       let origin = CGPoint(x: margins.left, y: margins.bottom)
       layoutManager.drawBackground(forGlyphRange: glyphRange, at: origin)
       layoutManager.drawGlyphs(forGlyphRange: glyphRange, at: origin)
@@ -223,6 +270,29 @@ private enum PDFTextRenderer {
     context.closePDF()
     return data as Data
   }
+
+  private static func drawHeader(
+    headerText: String?,
+    pageNumbering: Bool,
+    pageIndex: Int,
+    pageSize: CGSize,
+    margins: NSEdgeInsets
+  ) {
+    guard headerText?.isEmpty == false || pageNumbering else { return }
+    let header = [headerText, pageNumbering ? "\(pageIndex)" : nil]
+      .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+      .joined(separator: " / ")
+    guard !header.isEmpty else { return }
+    let attributed = NSAttributedString(
+      string: header,
+      attributes: [
+        .font: NSFont.systemFont(ofSize: 9),
+        .foregroundColor: NSColor.secondaryLabelColor
+      ]
+    )
+    attributed.draw(at: CGPoint(x: margins.left, y: pageSize.height - margins.top + 16))
+  }
 }
 
 public struct DOCXExporter: Exporter {
@@ -230,8 +300,8 @@ public struct DOCXExporter: Exporter {
 
   public init() {}
 
-  public func export(_ envelope: DhprojEnvelope) throws -> ExportedFile {
-    let documentXML = DOCXTextCodec.documentXML(title: envelope.project.title, sections: envelope.sections)
+  public func export(_ envelope: DhprojEnvelope, request: ExportRequest) throws -> ExportedFile {
+    let documentXML = DOCXTextCodec.documentXML(title: envelope.project.title, sections: envelope.sections, request: request)
     let entries: [String: Data] = [
       "[Content_Types].xml": Data(DOCXTextCodec.contentTypesXML.utf8),
       "_rels/.rels": Data(DOCXTextCodec.relationshipsXML.utf8),
@@ -251,7 +321,7 @@ public struct PublishingBundleExporter: Exporter {
 
   public init() {}
 
-  public func export(_ envelope: DhprojEnvelope) throws -> ExportedFile {
+  public func export(_ envelope: DhprojEnvelope, request: ExportRequest) throws -> ExportedFile {
     let synopsis = envelope.sections
       .map { $0.summary }
       .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -299,6 +369,11 @@ public enum ExporterRegistry {
 
 public enum ExportValidator {
   public static func validate(_ envelope: DhprojEnvelope, format: ExportFormat) -> [ExportValidationIssue] {
+    validate(envelope, request: ExportRequest(format: format))
+  }
+
+  public static func validate(_ envelope: DhprojEnvelope, request: ExportRequest) -> [ExportValidationIssue] {
+    let format = request.format
     var issues: [ExportValidationIssue] = []
     if envelope.sections.isEmpty {
       issues.append(ExportValidationIssue(severity: .error, message: "Project has no sections to export."))
@@ -313,6 +388,58 @@ public enum ExportValidator {
       if !hasSceneHeading {
         issues.append(ExportValidationIssue(severity: .warning, message: "Screenplay export has no scene headings."))
       }
+    }
+    if envelope.projectType == .book, let options = request.manuscriptOptions {
+      issues.append(contentsOf: manuscriptValidationIssues(options: options, sections: envelope.sections, format: format))
+    }
+    return issues
+  }
+
+  private static func manuscriptValidationIssues(
+    options: ManuscriptExportOptions,
+    sections: [Section],
+    format: ExportFormat
+  ) -> [ExportValidationIssue] {
+    var issues: [ExportValidationIssue] = []
+    if options.profile == .submission {
+      if ![ExportFormat.docx, .pdf, .rtf].contains(format) {
+        issues.append(ExportValidationIssue(severity: .error, message: "Format \"\(format.rawValue)\" is not standard for submission. Use DOCX, PDF, or RTF."))
+      }
+      if options.fontSizePt < 12 {
+        issues.append(ExportValidationIssue(severity: .warning, message: "Font size \(formatNumber(options.fontSizePt))pt is below the recommended 12pt minimum."))
+      }
+      if options.lineSpacing != 2 {
+        issues.append(ExportValidationIssue(severity: .warning, message: "Line spacing is \(formatNumber(options.lineSpacing)). Double spacing (2.0) is the standard default."))
+      }
+      if options.paragraphSpacingBeforePt != 0 || options.paragraphSpacingAfterPt != 0 {
+        issues.append(ExportValidationIssue(severity: .error, message: "Extra paragraph spacing detected. Submission manuscripts should use first-line indents, not paragraph spacing."))
+      }
+      if !options.pageNumbering {
+        issues.append(ExportValidationIssue(severity: .error, message: "Page numbering is disabled. Submissions require numbered pages."))
+      }
+      if options.headerContent.authorSurname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        options.headerContent.shortTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        issues.append(ExportValidationIssue(severity: .warning, message: "Header is missing author surname or short title. Many agents expect these in the page header."))
+      }
+      if !options.chapterStartsNewPage {
+        issues.append(ExportValidationIssue(severity: .error, message: "Chapters do not start on new pages. This is expected for submission manuscripts."))
+      }
+      if options.marginIn < 0.75 || options.marginIn > 1.25 {
+        issues.append(ExportValidationIssue(severity: .warning, message: "Margin of \(formatNumber(options.marginIn))\" is outside the standard range (0.75\"-1.25\")."))
+      }
+      if options.firstLineIndentIn < 0.3 || options.firstLineIndentIn > 0.5 {
+        issues.append(ExportValidationIssue(severity: .warning, message: "First-line indent of \(formatNumber(options.firstLineIndentIn))\" is outside the standard range (0.3\"-0.5\")."))
+      }
+      if !options.includeTitlePage || options.authorName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        issues.append(ExportValidationIssue(severity: .info, message: "Consider adding a title page with your name for agent/editor submissions."))
+      }
+    }
+    if options.profile == .print, options.pageSize != .a4, options.pageSize != .letter {
+      issues.append(ExportValidationIssue(severity: .warning, message: "Print exports should use a standard page size."))
+    }
+    let hasContent = sections.contains { MarkdownTools.wordCount($0.content ?? "") > 0 }
+    if !hasContent {
+      issues.append(ExportValidationIssue(severity: .warning, message: "No chapters with content found. Add content before exporting."))
     }
     return issues
   }
@@ -365,22 +492,41 @@ public enum DOCXTextCodec {
   """
 
   public static func documentXML(title: String, sections: [Section]) -> String {
+    documentXML(title: title, sections: sections, request: ExportRequest(format: .docx))
+  }
+
+  public static func documentXML(title: String, sections: [Section], request: ExportRequest) -> String {
+    let options = request.manuscriptOptions
+    let bodyParagraphProperties = options.map { paragraphProperties($0) }
+    var leading: [String] = []
+    if options?.includeTitlePage == true {
+      leading.append(paragraph(title, style: "Title"))
+      if options?.authorName.isEmpty == false {
+        leading.append(paragraph(options?.authorName ?? ""))
+      }
+      leading.append(pageBreak())
+    } else {
+      leading.append(paragraph(title, style: "Title"))
+    }
+
     let paragraphs = sections.flatMap { section -> [String] in
-      let heading = paragraph(section.title, style: "Heading1")
+      let heading = request.includeHeadings && (options?.includeHeadings ?? true) ? [paragraph(section.title, style: "Heading1")] : []
       let body = (section.content ?? "")
         .replacingOccurrences(of: "\r\n", with: "\n")
         .components(separatedBy: "\n")
-        .map { paragraph(MarkdownTools.plainText(from: $0)) }
-      return [heading] + body
+        .map { paragraph(MarkdownTools.plainText(from: $0), properties: bodyParagraphProperties) }
+      let breakBefore = options?.chapterStartsNewPage == true ? [pageBreak()] : []
+      return breakBefore + heading + body
     }.joined()
+    let sectionProperties = sectionProperties(options)
 
     return """
     <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
       <w:body>
-        \(paragraph(title, style: "Title"))
+        \(leading.joined())
         \(paragraphs)
-        <w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>
+        \(sectionProperties)
       </w:body>
     </w:document>
     """
@@ -400,10 +546,95 @@ public enum DOCXTextCodec {
       .replacingOccurrences(of: "\u{00a0}", with: " ")
   }
 
-  private static func paragraph(_ text: String, style: String? = nil) -> String {
-    let styleXML = style.map { "<w:pPr><w:pStyle w:val=\"\($0)\"/></w:pPr>" } ?? ""
-    return "<w:p>\(styleXML)<w:r><w:t xml:space=\"preserve\">\(text.xmlEscaped)</w:t></w:r></w:p>"
+  private static func paragraph(_ text: String, style: String? = nil, properties: String? = nil) -> String {
+    let styleXML = style.map { "<w:pStyle w:val=\"\($0)\"/>" } ?? ""
+    let propertiesXML = [styleXML, properties ?? ""].filter { !$0.isEmpty }.joined()
+    let paragraphProperties = propertiesXML.isEmpty ? "" : "<w:pPr>\(propertiesXML)</w:pPr>"
+    return "<w:p>\(paragraphProperties)<w:r><w:t xml:space=\"preserve\">\(text.xmlEscaped)</w:t></w:r></w:p>"
   }
+
+  private static func pageBreak() -> String {
+    "<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>"
+  }
+
+  private static func paragraphProperties(_ options: ManuscriptExportOptions) -> String {
+    let line = max(240, Int((options.lineSpacing * 240).rounded()))
+    let before = max(0, Int((options.paragraphSpacingBeforePt * 20).rounded()))
+    let after = max(0, Int((options.paragraphSpacingAfterPt * 20).rounded()))
+    let firstLine = max(0, Int((options.firstLineIndentIn * 1440).rounded()))
+    let justification: String
+    switch options.alignment {
+    case .left:
+      justification = "left"
+    case .center:
+      justification = "center"
+    case .right:
+      justification = "right"
+    case .justified:
+      justification = "both"
+    }
+    return "<w:spacing w:before=\"\(before)\" w:after=\"\(after)\" w:line=\"\(line)\" w:lineRule=\"auto\"/><w:ind w:firstLine=\"\(firstLine)\"/><w:jc w:val=\"\(justification)\"/>"
+  }
+
+  private static func sectionProperties(_ options: ManuscriptExportOptions?) -> String {
+    let pageSize = options?.pageSize ?? .letter
+    let size: (width: Int, height: Int)
+    switch pageSize {
+    case .letter:
+      size = (12_240, 15_840)
+    case .a4:
+      size = (11_906, 16_838)
+    }
+    let margin = max(0, Int(((options?.marginIn ?? 1) * 1440).rounded()))
+    return "<w:sectPr><w:pgSz w:w=\"\(size.width)\" w:h=\"\(size.height)\"/><w:pgMar w:top=\"\(margin)\" w:right=\"\(margin)\" w:bottom=\"\(margin)\" w:left=\"\(margin)\"/></w:sectPr>"
+  }
+}
+
+private func manuscriptPlainText(_ envelope: DhprojEnvelope, request: ExportRequest) -> String {
+  let options = request.manuscriptOptions
+  var parts: [String] = []
+  if options?.includeTitlePage == true {
+    parts.append([
+      envelope.project.title,
+      options?.authorName.isEmpty == false ? "by \(options?.authorName ?? "")" : nil,
+      "\(AnalyticsEngine.metrics(for: envelope).totalWords) words"
+    ].compactMap { $0 }.joined(separator: "\n\n"))
+  }
+  for section in envelope.sections {
+    if request.includeHeadings && (options?.includeHeadings ?? true) {
+      parts.append(section.title)
+    }
+    let body = MarkdownTools.plainText(from: section.content ?? "")
+      .replacingOccurrences(of: "\n---\n", with: "\n\(options?.sceneBreakMarker ?? "* * *")\n")
+    if !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      parts.append(body)
+    }
+  }
+  return parts.joined(separator: options?.chapterStartsNewPage == true ? "\n\n\n" : "\n\n")
+}
+
+private func exportFont(_ name: String?, size: CGFloat) -> NSFont {
+  if let name, let font = NSFont(name: name, size: size) {
+    return font
+  }
+  return NSFont(name: "Times New Roman", size: size) ?? NSFont.systemFont(ofSize: size)
+}
+
+private func manuscriptMargins(_ options: ManuscriptExportOptions) -> NSEdgeInsets {
+  let value = CGFloat(options.marginIn * 72)
+  return NSEdgeInsets(top: value, left: value, bottom: value, right: value)
+}
+
+private func manuscriptHeader(_ options: ManuscriptExportOptions?) -> String? {
+  guard let options else { return nil }
+  let surname = options.headerContent.authorSurname.trimmingCharacters(in: .whitespacesAndNewlines)
+  let title = options.headerContent.shortTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+  guard !surname.isEmpty || !title.isEmpty else { return nil }
+  return [surname, title].filter { !$0.isEmpty }.joined(separator: " / ")
+}
+
+private func formatNumber(_ value: Double) -> String {
+  value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
 }
 
 private func safeFilename(_ title: String) -> String {
