@@ -7,6 +7,8 @@ struct WelcomeRecentProject: Identifiable, Equatable {
   let url: URL
   let projectID: String?
   let projectTitle: String?
+  let isPinned: Bool
+  let isReadOnly: Bool
 
   var id: String { url.standardizedFileURL.path }
   var title: String { projectTitle?.isEmpty == false ? projectTitle ?? url.deletingPathExtension().lastPathComponent : url.deletingPathExtension().lastPathComponent }
@@ -148,9 +150,11 @@ final class WelcomeWindowCoordinator: NSObject, NSWindowDelegate {
       createProject: { [weak self] configuration in self?.createProject(configuration) },
       openProjectPanel: { [weak self] in self?.openProjectPanel() },
       openRecentProject: { [weak self] url in self?.openProject(at: url) },
+      openRecentProjectInNewWindow: { [weak self] url in self?.openProjectInNewWindow(at: url) },
       revealRecentProject: { [weak self] url in self?.revealProject(at: url) },
       copyRecentProjectPath: { [weak self] url in self?.copyProjectPath(url) },
       copyRecentProjectLink: { [weak self] projectID in self?.copyProjectLink(projectID: projectID) },
+      toggleRecentProjectPin: { [weak self] url in self?.toggleRecentProjectPin(url) },
       removeRecentProject: { [weak self] url in self?.removeRecentProject(url) }
     )
   }
@@ -182,10 +186,27 @@ final class WelcomeWindowCoordinator: NSObject, NSWindowDelegate {
 
   private func recentProjects() -> [WelcomeRecentProject] {
     recoveryService.pruneMissingRecentProjectURLs()
-      .map { url in
+      .enumerated()
+      .map { offset, url in
         let envelope = envelope(at: url)
-        return WelcomeRecentProject(url: url, projectID: envelope?.project.id, projectTitle: envelope?.project.title)
+        return (
+          offset,
+          WelcomeRecentProject(
+          url: url,
+          projectID: envelope?.project.id,
+          projectTitle: envelope?.project.title,
+          isPinned: recoveryService.isProjectPinned(url),
+          isReadOnly: !fileManager.isWritableFile(atPath: url.path)
+          )
+        )
       }
+      .sorted { lhs, rhs in
+        if lhs.1.isPinned != rhs.1.isPinned {
+          return lhs.1.isPinned && !rhs.1.isPinned
+        }
+        return lhs.0 < rhs.0
+      }
+      .map(\.1)
   }
 
   private func envelope(at url: URL) -> DhprojEnvelope? {
@@ -195,6 +216,10 @@ final class WelcomeWindowCoordinator: NSObject, NSWindowDelegate {
 
   private func revealProject(at url: URL) {
     NSWorkspace.shared.activateFileViewerSelecting([url])
+  }
+
+  private func openProjectInNewWindow(at url: URL) {
+    openProject(at: url)
   }
 
   private func copyProjectPath(_ url: URL) {
@@ -210,6 +235,11 @@ final class WelcomeWindowCoordinator: NSObject, NSWindowDelegate {
 
   private func removeRecentProject(_ url: URL) {
     recoveryService.removeRecentProjectURL(url)
+  }
+
+  private func toggleRecentProjectPin(_ url: URL) {
+    recoveryService.toggleProjectPin(url)
+    refresh()
   }
 
   private func defaultFilename(for title: String) -> String {

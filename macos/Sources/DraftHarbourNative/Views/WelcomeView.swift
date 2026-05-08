@@ -7,9 +7,11 @@ struct WelcomeView: View {
   let createProject: @MainActor (WelcomeProjectConfiguration) -> Void
   let openProjectPanel: @MainActor () -> Void
   let openRecentProject: @MainActor (URL) -> Void
+  let openRecentProjectInNewWindow: @MainActor (URL) -> Void
   let revealRecentProject: @MainActor (URL) -> Void
   let copyRecentProjectPath: @MainActor (URL) -> Void
   let copyRecentProjectLink: @MainActor (String) -> Void
+  let toggleRecentProjectPin: @MainActor (URL) -> Void
   let removeRecentProject: @MainActor (URL) -> Void
 
   @State private var recentProjects: [WelcomeRecentProject]
@@ -23,18 +25,22 @@ struct WelcomeView: View {
     createProject: @escaping @MainActor (WelcomeProjectConfiguration) -> Void,
     openProjectPanel: @escaping @MainActor () -> Void,
     openRecentProject: @escaping @MainActor (URL) -> Void,
+    openRecentProjectInNewWindow: @escaping @MainActor (URL) -> Void,
     revealRecentProject: @escaping @MainActor (URL) -> Void,
     copyRecentProjectPath: @escaping @MainActor (URL) -> Void,
     copyRecentProjectLink: @escaping @MainActor (String) -> Void,
+    toggleRecentProjectPin: @escaping @MainActor (URL) -> Void,
     removeRecentProject: @escaping @MainActor (URL) -> Void
   ) {
     self.refreshRecentProjects = refreshRecentProjects
     self.createProject = createProject
     self.openProjectPanel = openProjectPanel
     self.openRecentProject = openRecentProject
+    self.openRecentProjectInNewWindow = openRecentProjectInNewWindow
     self.revealRecentProject = revealRecentProject
     self.copyRecentProjectPath = copyRecentProjectPath
     self.copyRecentProjectLink = copyRecentProjectLink
+    self.toggleRecentProjectPin = toggleRecentProjectPin
     self.removeRecentProject = removeRecentProject
     self._recentProjects = State(initialValue: recentProjects)
     self._showingProjectSetup = State(initialValue: showingProjectSetup)
@@ -161,6 +167,19 @@ struct WelcomeView: View {
                   .lineLimit(1)
                   .foregroundStyle(.secondary)
               }
+
+              Spacer()
+
+              if project.isReadOnly {
+                Image(systemName: "lock")
+                  .foregroundStyle(.secondary)
+                  .help("Read-only project file")
+              }
+              if project.isPinned {
+                Image(systemName: "pin.fill")
+                  .foregroundStyle(.secondary)
+                  .help("Pinned project")
+              }
             }
             .padding(.vertical, 6)
           }
@@ -168,6 +187,13 @@ struct WelcomeView: View {
           .contextMenu {
             Button("Open") {
               openRecentProject(project.url)
+            }
+            Button("Open in New Window") {
+              openRecentProjectInNewWindow(project.url)
+            }
+            Button(project.isPinned ? "Unpin Project" : "Pin Project") {
+              toggleRecentProjectPin(project.url)
+              recentProjects = refreshRecentProjects()
             }
             Button("Reveal in Finder") {
               revealRecentProject(project.url)

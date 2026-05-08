@@ -147,6 +147,102 @@ final class ImportExportParityTests: XCTestCase {
     XCTAssertTrue(fountainText.contains("INT. ROOM 11 - DAY"))
   }
 
+  func testExportPresetCatalogMatchesWebPresetSurface() {
+    let bookIDs = Set(ExportPresetCatalog.presets(for: .book).map(\.id))
+    XCTAssertTrue(bookIDs.isSuperset(of: [
+      "submission-us",
+      "submission-uk",
+      "reading-copy",
+      "print-ready",
+      "plain-text",
+      "archive-docx",
+      "markdown",
+      "publishing-bundle",
+      "plain-text-file"
+    ]))
+
+    let screenplayIDs = Set(ExportPresetCatalog.presets(for: .screenplay).map(\.id))
+    XCTAssertTrue(screenplayIDs.isSuperset(of: [
+      "screenplay-pdf",
+      "fountain-full",
+      "archive-docx",
+      "markdown",
+      "plain-text-file"
+    ]))
+  }
+
+  func testManuscriptValidationMatchesSubmissionRules() {
+    var envelope = bookEnvelope()
+    envelope.sections[0].content = "A complete chapter."
+    var options = ManuscriptExportOptions.defaults(profile: .submission, locale: .enUS)
+    options.fontSizePt = 10
+    options.lineSpacing = 1.5
+    options.paragraphSpacingAfterPt = 6
+    options.pageNumbering = false
+    options.headerContent = ManuscriptHeaderContent(authorSurname: "", shortTitle: "")
+    options.chapterStartsNewPage = false
+    options.marginIn = 2
+    options.firstLineIndentIn = 0
+    options.includeTitlePage = false
+    options.authorName = ""
+
+    let request = ExportRequest(format: .markdown, manuscriptOptions: options)
+    let issues = ExportValidator.validate(envelope, request: request)
+    let messages = issues.map(\.message).joined(separator: "\n")
+
+    XCTAssertTrue(messages.contains("not standard for submission"))
+    XCTAssertTrue(messages.contains("below the recommended 12pt"))
+    XCTAssertTrue(messages.contains("Double spacing"))
+    XCTAssertTrue(messages.contains("Extra paragraph spacing"))
+    XCTAssertTrue(messages.contains("Page numbering is disabled"))
+    XCTAssertTrue(messages.contains("Header is missing"))
+    XCTAssertTrue(messages.contains("Chapters do not start"))
+    XCTAssertTrue(messages.contains("outside the standard range"))
+    XCTAssertTrue(messages.contains("title page"))
+    XCTAssertTrue(issues.contains { $0.severity == .error })
+  }
+
+  func testManuscriptOptionsAffectDocxLayoutAndHeadingExport() throws {
+    let envelope = bookEnvelope()
+    var options = ManuscriptExportOptions.defaults(profile: .submission, locale: .enGB)
+    options.authorName = "Jane Writer"
+    options.headerContent = ManuscriptHeaderContent(authorSurname: "Writer", shortTitle: "Harbour")
+    options.marginIn = 1.25
+    options.includeTitlePage = true
+    let request = ExportRequest(format: .docx, includeHeadings: true, manuscriptOptions: options)
+
+    let documentXML = DOCXTextCodec.documentXML(title: envelope.project.title, sections: envelope.sections, request: request)
+    XCTAssertTrue(documentXML.contains("Jane Writer"))
+    XCTAssertTrue(documentXML.contains("w:pgSz w:w=\"11906\""))
+    XCTAssertTrue(documentXML.contains("w:pgMar w:top=\"1800\""))
+    XCTAssertTrue(documentXML.contains("w:br w:type=\"page\""))
+
+    let noHeading = try MarkdownExporter().export(envelope, request: ExportRequest(format: .markdown, includeHeadings: false))
+    let markdown = String(decoding: noHeading.data, as: UTF8.self)
+    XCTAssertFalse(markdown.contains("# Chapter One"))
+    XCTAssertTrue(markdown.contains("This chapter gives every native exporter"))
+  }
+
+  func testFountainOptionsControlMetadataSectionTitlesAndFilename() throws {
+    let request = ExportRequest(
+      format: .fountain,
+      includeHeadings: false,
+      manuscriptOptions: ManuscriptExportOptions(authorName: "Dev Writer"),
+      fountainOptions: FountainExportOptions(
+        includeSectionTitles: false,
+        includeMetadataBlock: true,
+        filenameConvention: .titleScreenplay
+      )
+    )
+
+    let exported = try FountainExporter().export(screenplayEnvelope(paragraphCount: 1), request: request)
+    let text = String(decoding: exported.data, as: UTF8.self)
+    XCTAssertEqual(exported.filename, "Long Screenplay-screenplay.fountain")
+    XCTAssertTrue(text.contains("Title: Long Screenplay"))
+    XCTAssertTrue(text.contains("Author: Dev Writer"))
+    XCTAssertFalse(text.contains("##"))
+  }
+
   private func pageCount(_ data: Data) -> Int {
     guard let provider = CGDataProvider(data: data as CFData), let document = CGPDFDocument(provider) else {
       return 0

@@ -6,6 +6,8 @@ PACKAGE_DIR="$ROOT_DIR/macos"
 PRODUCT="DraftHarbourNative"
 APP_NAME="DraftHarbour"
 APP_BUNDLE="$ROOT_DIR/dist/$APP_NAME.app"
+APP_OUTPUT_ROOT="${DRAFTHARBOUR_APP_OUTPUT_ROOT:-$HOME/Library/Caches/DraftHarbour/BuildProducts}"
+APP_BUNDLE_REAL="$APP_OUTPUT_ROOT/$APP_NAME.app"
 ICON_SOURCE="$ROOT_DIR/macos/Resources/DraftHarbour.icns"
 APP_VERSION="${DRAFTHARBOUR_VERSION:-2.0.0}"
 APP_BUILD="${DRAFTHARBOUR_BUILD:-200}"
@@ -236,9 +238,11 @@ strip_bundle_metadata "$STAGING_APP"
 codesign --force --deep --sign - "$STAGING_APP" >/dev/null
 verify_bundle_signature "$STAGING_APP"
 
-mkdir -p "$(dirname "$APP_BUNDLE")"
-rm -rf "$APP_BUNDLE"
-ditto --norsrc --noextattr --noqtn "$STAGING_APP" "$APP_BUNDLE"
+mkdir -p "$(dirname "$APP_BUNDLE")" "$APP_OUTPUT_ROOT"
+rm -rf "$APP_BUNDLE" "$APP_BUNDLE_REAL"
+ditto --norsrc --noextattr --noqtn "$STAGING_APP" "$APP_BUNDLE_REAL"
+verify_bundle_signature "$APP_BUNDLE_REAL"
+ln -s "$APP_BUNDLE_REAL" "$APP_BUNDLE"
 verify_bundle_signature "$APP_BUNDLE"
 
 if [[ "$SHOULD_LAUNCH" -eq 1 ]]; then

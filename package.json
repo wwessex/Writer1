@@ -31,7 +31,8 @@
     "desktop:build:debug": "npm --prefix desktop run build:debug",
     "desktop:build:win": "npm --prefix desktop run build -- --target x86_64-pc-windows-msvc",
     "desktop:build:linux": "npm --prefix desktop run build -- --target x86_64-unknown-linux-gnu",
-    "release:verify-artifacts": "node scripts/verify-release-artifacts.mjs"
+    "release:verify-artifacts": "node scripts/verify-release-artifacts.mjs",
+    "smoke:providers": "node scripts/provider-smoke.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.1.0",

@@ -34,6 +34,14 @@ private enum CorkboardCardSize: String, CaseIterable, Identifiable {
   }
 }
 
+private enum ExportPanelTab: String, CaseIterable, Identifiable {
+  case presets
+  case manuscript
+  case custom
+
+  var id: String { rawValue }
+}
+
 private struct AnalysisChartPoint: Identifiable {
   var id: String { label }
   var label: String
@@ -43,7 +51,7 @@ private struct AnalysisChartPoint: Identifiable {
 struct ToolPanelView: View {
   var panel: ToolPanel
   @Bindable var store: ProjectStore
-  var exportAction: (ExportFormat) -> Void
+  var exportAction: (ExportRequest) -> Void
   var runCommand: (NativeCommandID) -> Void = { _ in }
   var selectionChanged: (String) -> Void = { _ in }
   var closeAction: (() -> Void)?
@@ -60,6 +68,13 @@ struct ToolPanelView: View {
   @State private var selectedCharacterID: String?
   @State private var selectedWorldEntryID: String?
   @State private var replyDrafts: [String: String] = [:]
+  @State private var inviteEmail = ""
+  @State private var invitePermission = CollaborationPermission.comment
+  @State private var presenceEmail = ""
+  @State private var presenceDisplayName = NSFullUserName()
+  @State private var collaborationMessage: String?
+  @State private var collaborationSyncToken = ""
+  @State private var isCollaborationSyncing = false
 
   @State private var syncBaseURL = ""
   @State private var syncToken = ""
@@ -99,6 +114,27 @@ struct ToolPanelView: View {
   @State private var selectedSnapshotID: String?
   @State private var compareSnapshotID: String?
   @State private var showSnapshotDiff = false
+  @State private var exportTab = ExportPanelTab.presets
+  @State private var selectedPresetID = ExportPresetCatalog.presets.first?.id ?? ""
+  @State private var exportProfile = ExportProfile.submission
+  @State private var exportLocale = ManuscriptLocale.enUS
+  @State private var manuscriptFormat = ExportFormat.docx
+  @State private var manuscriptAuthorName = ""
+  @State private var manuscriptAuthorSurname = ""
+  @State private var manuscriptShortTitle = ""
+  @State private var manuscriptFontSize = 12.0
+  @State private var manuscriptLineSpacing = 2.0
+  @State private var manuscriptFirstLineIndent = 0.5
+  @State private var manuscriptMargin = 1.0
+  @State private var manuscriptAlignment = ManuscriptTextAlignment.left
+  @State private var manuscriptChapterStartsNewPage = true
+  @State private var manuscriptIncludeTitlePage = true
+  @State private var manuscriptPageNumbering = true
+  @State private var manuscriptSceneBreakMarker = "* * *"
+  @State private var exportIncludeHeadings = true
+  @State private var fountainIncludeSectionTitles = true
+  @State private var fountainIncludeMetadataBlock = true
+  @State private var fountainFilenameConvention = FountainFilenameConvention.title
   @State private var languageToolURL = UserDefaults.standard.string(forKey: "DraftHarbour.assist.languageToolUrl") ?? "https://api.languagetool.org/v2/check"
   @State private var languageToolLanguage = UserDefaults.standard.string(forKey: "DraftHarbour.assist.languageToolLanguage") ?? "en-US"
   @State private var grammarMatches: [LanguageToolMatch] = []
@@ -180,6 +216,8 @@ struct ToolPanelView: View {
       wordCountContent
     case .comments:
       commentsContent
+    case .collaboration:
+      collaborationContent
     case .characterBible:
       characterBibleContent
     case .storyCards:
@@ -202,34 +240,48 @@ struct ToolPanelView: View {
   }
 
   private var exportContent: some View {
-    VStack(alignment: .leading, spacing: 14) {
-      GroupBox("Export Review") {
-        VStack(alignment: .leading, spacing: 12) {
-          Picker("Format", selection: selectedExportFormat) {
-            ForEach(ExportFormat.allCases, id: \.self) { format in
-              Text(exportTitle(format)).tag(format)
-            }
-          }
-          .pickerStyle(.menu)
-          .frame(width: 260)
+    let request = currentExportRequest()
+    let issues = ExportValidator.validate(store.envelope, request: request)
+    let hasErrors = issues.contains { $0.severity == .error }
 
-          let issues = ExportValidator.validate(store.envelope, format: selectedExportFormat.wrappedValue)
+    return VStack(alignment: .leading, spacing: 14) {
+      Picker("Export Mode", selection: $exportTab) {
+        ForEach(ExportPanelTab.allCases.filter { store.projectType == .book || $0 != .manuscript }) { tab in
+          Text(exportTabTitle(tab)).tag(tab)
+        }
+      }
+      .pickerStyle(.segmented)
+
+      GroupBox("Export Options") {
+        VStack(alignment: .leading, spacing: 14) {
+          switch exportTab {
+          case .presets:
+            exportPresetsContent
+          case .manuscript:
+            manuscriptExportContent
+          case .custom:
+            customExportContent
+          }
+
+          Divider()
+
           if issues.isEmpty {
-            Label("No blocking validation issues for this format.", systemImage: "checkmark.circle")
+            Label("All preflight checks passed.", systemImage: "checkmark.circle")
               .foregroundStyle(.secondary)
           } else {
             ForEach(issues) { issue in
-              Label(issue.message, systemImage: issue.severity == .error ? "xmark.octagon" : "exclamationmark.triangle")
-                .foregroundStyle(issue.severity == .error ? .red : .orange)
+              Label(issue.message, systemImage: validationIcon(issue.severity))
+                .foregroundStyle(validationStyle(issue.severity))
             }
           }
 
           HStack {
             Button {
-              exportAction(selectedExportFormat.wrappedValue)
+              exportAction(request)
             } label: {
-              Label("Export \(exportTitle(selectedExportFormat.wrappedValue))", systemImage: "square.and.arrow.up")
+              Label("Export \(exportTitle(request.format))", systemImage: "square.and.arrow.up")
             }
+            .disabled(hasErrors)
 
             Button("Export Backup") {
               runCommand(.exportBackup)
@@ -259,6 +311,250 @@ struct ToolPanelView: View {
           }
         }
       }
+    }
+    .onChange(of: exportProfile) { _, _ in hydrateManuscriptDefaults() }
+    .onChange(of: exportLocale) { _, _ in hydrateManuscriptDefaults() }
+  }
+
+  private var exportPresetsContent: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      ForEach(exportPresets) { preset in
+        Button {
+          selectedPresetID = preset.id
+          exportAction(preset.request(
+            authorName: manuscriptAuthorName,
+            authorSurname: manuscriptAuthorSurname,
+            shortTitle: manuscriptShortTitle.isEmpty ? String(store.envelope.project.title.prefix(30)) : manuscriptShortTitle
+          ))
+        } label: {
+          HStack(spacing: 12) {
+            Image(systemName: exportPresetIcon(preset))
+              .frame(width: 18)
+              .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+              Text(preset.name)
+              Text(preset.description)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            }
+            Spacer()
+            Text(exportTitle(preset.format))
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+          .padding(.vertical, 4)
+        }
+        .buttonStyle(.plain)
+      }
+    }
+  }
+
+  private var manuscriptExportContent: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 10) {
+        GridRow {
+          Picker("Profile", selection: $exportProfile) {
+            Text("Submission").tag(ExportProfile.submission)
+            Text("Print").tag(ExportProfile.print)
+            Text("Custom").tag(ExportProfile.custom)
+          }
+          Picker("Locale", selection: $exportLocale) {
+            Text("en-US").tag(ManuscriptLocale.enUS)
+            Text("en-GB").tag(ManuscriptLocale.enGB)
+          }
+          Picker("Format", selection: $manuscriptFormat) {
+            Text("DOCX").tag(ExportFormat.docx)
+            Text("PDF").tag(ExportFormat.pdf)
+            Text("RTF").tag(ExportFormat.rtf)
+          }
+        }
+        GridRow {
+          TextField("Full name", text: $manuscriptAuthorName)
+          TextField("Surname", text: $manuscriptAuthorSurname)
+          TextField("Short title", text: $manuscriptShortTitle)
+        }
+        GridRow {
+          Picker("Font Size", selection: $manuscriptFontSize) {
+            Text("10").tag(10.0)
+            Text("11").tag(11.0)
+            Text("12").tag(12.0)
+            Text("14").tag(14.0)
+          }
+          Picker("Line Spacing", selection: $manuscriptLineSpacing) {
+            Text("Single").tag(1.0)
+            Text("1.15").tag(1.15)
+            Text("1.5").tag(1.5)
+            Text("Double").tag(2.0)
+          }
+          Picker("Alignment", selection: $manuscriptAlignment) {
+            Text("Left").tag(ManuscriptTextAlignment.left)
+            Text("Justified").tag(ManuscriptTextAlignment.justified)
+            Text("Center").tag(ManuscriptTextAlignment.center)
+          }
+        }
+        GridRow {
+          Picker("Indent", selection: $manuscriptFirstLineIndent) {
+            Text("None").tag(0.0)
+            Text("0.3 in").tag(0.3)
+            Text("0.5 in").tag(0.5)
+          }
+          Picker("Margins", selection: $manuscriptMargin) {
+            Text("0.75 in").tag(0.75)
+            Text("1.0 in").tag(1.0)
+            Text("1.25 in").tag(1.25)
+          }
+          Picker("Scene Break", selection: $manuscriptSceneBreakMarker) {
+            Text("* * *").tag("* * *")
+            Text("***").tag("***")
+            Text("# # #").tag("# # #")
+            Text("~").tag("~")
+          }
+        }
+      }
+
+      HStack {
+        Toggle("Title page", isOn: $manuscriptIncludeTitlePage)
+        Toggle("New page per chapter", isOn: $manuscriptChapterStartsNewPage)
+        Toggle("Page numbers", isOn: $manuscriptPageNumbering)
+      }
+    }
+  }
+
+  private var customExportContent: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Picker("Format", selection: selectedExportFormat) {
+        ForEach(ExportFormat.allCases, id: \.self) { format in
+          Text(exportTitle(format)).tag(format)
+        }
+      }
+      .pickerStyle(.menu)
+      .frame(width: 260)
+
+      Toggle("Include chapter headings", isOn: $exportIncludeHeadings)
+
+      if selectedExportFormat.wrappedValue == .fountain {
+        Toggle("Include Fountain section titles", isOn: $fountainIncludeSectionTitles)
+        Toggle("Include Fountain metadata block", isOn: $fountainIncludeMetadataBlock)
+        Picker("Filename", selection: $fountainFilenameConvention) {
+          Text("{title}.fountain").tag(FountainFilenameConvention.title)
+          Text("{title}-screenplay.fountain").tag(FountainFilenameConvention.titleScreenplay)
+          Text("{title}-fountain-export.fountain").tag(FountainFilenameConvention.titleFountain)
+        }
+      }
+    }
+  }
+
+  private var exportPresets: [ExportPreset] {
+    ExportPresetCatalog.presets(for: store.projectType)
+  }
+
+  private func currentExportRequest() -> ExportRequest {
+    switch exportTab {
+    case .presets:
+      let preset = exportPresets.first { $0.id == selectedPresetID } ?? exportPresets.first
+      return preset?.request(
+        authorName: manuscriptAuthorName,
+        authorSurname: manuscriptAuthorSurname,
+        shortTitle: manuscriptShortTitle.isEmpty ? String(store.envelope.project.title.prefix(30)) : manuscriptShortTitle
+      ) ?? ExportRequest(format: selectedExportFormat.wrappedValue)
+    case .manuscript:
+      return ExportRequest(
+        format: manuscriptFormat,
+        presetID: "manuscript-\(exportProfile.rawValue)",
+        includeHeadings: true,
+        manuscriptOptions: manuscriptOptions()
+      )
+    case .custom:
+      return ExportRequest(
+        format: selectedExportFormat.wrappedValue,
+        includeHeadings: exportIncludeHeadings,
+        fountainOptions: selectedExportFormat.wrappedValue == .fountain ? FountainExportOptions(
+          includeSectionTitles: fountainIncludeSectionTitles,
+          includeMetadataBlock: fountainIncludeMetadataBlock,
+          filenameConvention: fountainFilenameConvention
+        ) : nil
+      )
+    }
+  }
+
+  private func manuscriptOptions() -> ManuscriptExportOptions {
+    var options = ManuscriptExportOptions.defaults(profile: exportProfile, locale: exportLocale)
+    options.fontSizePt = manuscriptFontSize
+    options.lineSpacing = manuscriptLineSpacing
+    options.firstLineIndentIn = manuscriptFirstLineIndent
+    options.marginIn = manuscriptMargin
+    options.alignment = manuscriptAlignment
+    options.chapterStartsNewPage = manuscriptChapterStartsNewPage
+    options.includeTitlePage = manuscriptIncludeTitlePage
+    options.pageNumbering = manuscriptPageNumbering
+    options.sceneBreakMarker = manuscriptSceneBreakMarker
+    options.authorName = manuscriptAuthorName
+    options.headerContent = ManuscriptHeaderContent(authorSurname: manuscriptAuthorSurname, shortTitle: manuscriptShortTitle)
+    options.includeHeadings = true
+    return options
+  }
+
+  private func hydrateManuscriptDefaults() {
+    let defaults = ManuscriptExportOptions.defaults(profile: exportProfile, locale: exportLocale)
+    manuscriptFontSize = defaults.fontSizePt
+    manuscriptLineSpacing = defaults.lineSpacing
+    manuscriptFirstLineIndent = defaults.firstLineIndentIn
+    manuscriptMargin = defaults.marginIn
+    manuscriptAlignment = defaults.alignment
+    manuscriptChapterStartsNewPage = defaults.chapterStartsNewPage
+    manuscriptIncludeTitlePage = defaults.includeTitlePage
+    manuscriptPageNumbering = defaults.pageNumbering
+    manuscriptSceneBreakMarker = defaults.sceneBreakMarker
+  }
+
+  private func exportTabTitle(_ tab: ExportPanelTab) -> String {
+    switch tab {
+    case .presets:
+      return "Presets"
+    case .manuscript:
+      return "Manuscript"
+    case .custom:
+      return "Custom"
+    }
+  }
+
+  private func exportPresetIcon(_ preset: ExportPreset) -> String {
+    switch preset.format {
+    case .docx:
+      return "doc.richtext"
+    case .pdf, .screenplayPdf:
+      return "doc.viewfinder"
+    case .fountain:
+      return "film"
+    case .rtf, .plainText:
+      return "text.alignleft"
+    case .markdown:
+      return "chevron.left.forwardslash.chevron.right"
+    case .publishingBundle:
+      return "shippingbox"
+    }
+  }
+
+  private func validationIcon(_ severity: ValidationSeverity) -> String {
+    switch severity {
+    case .error:
+      return "xmark.octagon"
+    case .warning:
+      return "exclamationmark.triangle"
+    case .info:
+      return "info.circle"
+    }
+  }
+
+  private func validationStyle(_ severity: ValidationSeverity) -> Color {
+    switch severity {
+    case .error:
+      return .red
+    case .warning:
+      return .orange
+    case .info:
+      return .secondary
     }
   }
 
@@ -680,6 +976,183 @@ struct ToolPanelView: View {
         }
       }
       .frame(minHeight: 300)
+    }
+  }
+
+  private var collaborationContent: some View {
+    let activePresence = store.activeCollaborators()
+    return VStack(alignment: .leading, spacing: 14) {
+      GroupBox("Sync Endpoint") {
+        VStack(alignment: .leading, spacing: 10) {
+          TextField("https://collab.example.com/api", text: Binding(get: {
+            store.envelope.collaboration.syncEndpoint ?? ""
+          }, set: { value in
+            store.updateCollaborationSyncEndpoint(value)
+          }))
+          .textFieldStyle(.roundedBorder)
+
+          SecureField("Bearer token", text: $collaborationSyncToken)
+            .textFieldStyle(.roundedBorder)
+
+          HStack {
+            Button {
+              Task { await pushCollaborationState() }
+            } label: {
+              Label("Push", systemImage: "arrow.up.circle")
+            }
+            .disabled(isCollaborationSyncing)
+
+            Button {
+              Task { await pullCollaborationState() }
+            } label: {
+              Label("Pull", systemImage: "arrow.down.circle")
+            }
+            .disabled(isCollaborationSyncing)
+
+            if isCollaborationSyncing {
+              ProgressView()
+                .scaleEffect(0.7)
+            }
+          }
+
+          Text("Endpoint contract: PUT/GET /projects/{projectId}/collaboration, POST /projects/{projectId}/presence, POST /invites/{token}/accept.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+
+      GroupBox("Invite Collaborators") {
+        VStack(alignment: .leading, spacing: 10) {
+          HStack {
+            TextField("email@example.com", text: $inviteEmail)
+              .textFieldStyle(.roundedBorder)
+            Picker("Permission", selection: $invitePermission) {
+              ForEach(CollaborationPermission.allCases.filter { $0 != .owner }, id: \.self) { permission in
+                Text(permission.rawValue.capitalized).tag(permission)
+              }
+            }
+            .frame(width: 150)
+            Button {
+              do {
+                let invite = try store.inviteCollaborator(email: inviteEmail, permission: invitePermission)
+                collaborationMessage = "Created invite token \(invite.token)"
+                inviteEmail = ""
+              } catch {
+                collaborationMessage = error.localizedDescription
+              }
+            } label: {
+              Label("Invite", systemImage: "paperplane")
+            }
+          }
+          if let collaborationMessage {
+            Text(collaborationMessage)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+              .textSelection(.enabled)
+          }
+        }
+      }
+
+      GroupBox("Members") {
+        if store.envelope.collaboration.members.isEmpty {
+          ContentUnavailableView("No Collaborators", systemImage: "person.3")
+        } else {
+          VStack(alignment: .leading, spacing: 8) {
+            ForEach(store.envelope.collaboration.members) { member in
+              HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                  Text(member.displayName.isEmpty ? member.email : member.displayName)
+                  Text(member.email)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Picker("Permission", selection: Binding(get: {
+                  member.permission
+                }, set: { value in
+                  store.updateCollaboratorPermission(memberID: member.id, permission: value)
+                })) {
+                  ForEach(CollaborationPermission.allCases, id: \.self) { permission in
+                    Text(permission.rawValue.capitalized).tag(permission)
+                  }
+                }
+                .labelsHidden()
+                .frame(width: 130)
+                Button(role: .destructive) {
+                  store.removeCollaborator(memberID: member.id)
+                } label: {
+                  Image(systemName: "trash")
+                }
+              }
+            }
+          }
+        }
+      }
+
+      GroupBox("Presence") {
+        VStack(alignment: .leading, spacing: 10) {
+          HStack {
+            TextField("Your email", text: $presenceEmail)
+              .textFieldStyle(.roundedBorder)
+            TextField("Display name", text: $presenceDisplayName)
+              .textFieldStyle(.roundedBorder)
+            Button {
+              guard !presenceEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+              _ = store.updatePresence(email: presenceEmail, displayName: presenceDisplayName)
+            } label: {
+              Label("Heartbeat", systemImage: "dot.radiowaves.left.and.right")
+            }
+          }
+
+          if activePresence.isEmpty {
+            Text("No active collaborators in the current presence window.")
+              .foregroundStyle(.secondary)
+          } else {
+            ForEach(activePresence) { presence in
+              HStack {
+                Label(presence.displayName.isEmpty ? presence.email : presence.displayName, systemImage: "circle.fill")
+                  .foregroundStyle(.green)
+                Spacer()
+                if let sectionId = presence.sectionId,
+                   let section = store.envelope.sections.first(where: { $0.id == sectionId }) {
+                  Text(section.title)
+                    .foregroundStyle(.secondary)
+                }
+              }
+            }
+          }
+        }
+      }
+
+      GroupBox("Pending Invites") {
+        let invites = store.envelope.collaboration.invites
+        if invites.isEmpty {
+          Text("No invitations have been created.")
+            .foregroundStyle(.secondary)
+        } else {
+          VStack(alignment: .leading, spacing: 8) {
+            ForEach(invites) { invite in
+              HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                  Text(invite.email)
+                  Text("Token: \(invite.token)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                }
+                Spacer()
+                Text(invite.status.rawValue.capitalized)
+                  .foregroundStyle(.secondary)
+                if invite.status == .pending {
+                  Button("Revoke") {
+                    try? store.revokeCollaborationInvite(id: invite.id)
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 
@@ -1564,12 +2037,35 @@ struct ToolPanelView: View {
     let advanced = AnalyticsEngine.advancedAnalytics(for: store.envelope)
     let timeline = AnalysisServices.timelineFindings(for: store.envelope)
     let continuity = AnalysisServices.continuityWarnings(for: store.envelope)
+    let guardrails = NativeOperationalGuardrails.shared
+    let policy = guardrails.currentPolicy()
+    let plugins = NativePluginRuntime.shared.registeredPlugins()
+    let enabledPlugins = NativePluginRuntime.shared.enabledPlugins()
+    let errors = NativeCrashReporter.shared.localEntries()
     return VStack(alignment: .leading, spacing: 14) {
       ForEach(summary.keys.sorted(), id: \.self) { key in
         HStack {
           Text(key)
           Spacer()
           Text(String(describing: summary[key] ?? .null))
+            .foregroundStyle(.secondary)
+        }
+      }
+      Divider()
+      Text("Runtime")
+        .font(.headline)
+      LabeledContent("Safe Mode", value: guardrails.isSafeModeEnabledForSession ? "Enabled" : "Disabled")
+      LabeledContent("Updater Fallback", value: guardrails.isUpdaterFallbackMode ? "Enabled" : "Disabled")
+      LabeledContent("Update Failures", value: "\(guardrails.updateFailureCount)")
+      LabeledContent("Pinned Update", value: guardrails.pinnedUpdateVersion ?? "None")
+      LabeledContent("Last Good Version", value: guardrails.lastGoodVersion ?? "Not recorded")
+      LabeledContent("Managed Policy", value: runtimePolicySummary(policy))
+      LabeledContent("Registered Plugins", value: "\(plugins.count)")
+      LabeledContent("Enabled Plugins", value: "\(enabledPlugins.count)")
+      LabeledContent("Recent Error Reports", value: "\(errors.count)")
+      if !plugins.isEmpty {
+        ForEach(plugins) { plugin in
+          Label("\(plugin.name) \(plugin.version)", systemImage: enabledPlugins.contains(plugin) ? "checkmark.circle" : "pause.circle")
             .foregroundStyle(.secondary)
         }
       }
@@ -1589,6 +2085,79 @@ struct ToolPanelView: View {
         }
       }
     }
+  }
+
+  private func runtimePolicySummary(_ policy: NativeManagedPolicy) -> String {
+    var parts: [String] = []
+    if policy.forceLocalOnly == true {
+      parts.append("local-only")
+    }
+    if policy.disableAIProviders == true {
+      parts.append("AI disabled")
+    }
+    if policy.disableTelemetry == true {
+      parts.append("telemetry disabled")
+    }
+    if policy.requireSignedUpdates == true {
+      parts.append("signed updates")
+    }
+    if let disabled = policy.disabledAIProviderTypes, !disabled.isEmpty {
+      parts.append(disabled.map(\.rawValue).joined(separator: ", "))
+    }
+    if policy.settingsOverrides != nil {
+      parts.append("settings overrides")
+    }
+    return parts.isEmpty ? "None" : parts.joined(separator: ", ")
+  }
+
+  @MainActor
+  private func pushCollaborationState() async {
+    guard let config = collaborationSyncConfig() else {
+      collaborationMessage = "Enter a valid collaboration sync endpoint."
+      return
+    }
+    isCollaborationSyncing = true
+    defer { isCollaborationSyncing = false }
+    do {
+      let deviceId = Host.current().localizedName ?? "DraftHarbour macOS"
+      let request = store.collaborationSyncRequest(deviceId: deviceId)
+      let response = try await CollaborationSyncClient().push(request, config: config)
+      store.applyCollaborationSyncResponse(response)
+      collaborationMessage = "Pushed collaboration revision \(response.revision)."
+    } catch {
+      collaborationMessage = error.localizedDescription
+    }
+  }
+
+  @MainActor
+  private func pullCollaborationState() async {
+    guard let config = collaborationSyncConfig() else {
+      collaborationMessage = "Enter a valid collaboration sync endpoint."
+      return
+    }
+    isCollaborationSyncing = true
+    defer { isCollaborationSyncing = false }
+    do {
+      let response = try await CollaborationSyncClient().pull(
+        projectId: store.envelope.project.id,
+        since: store.envelope.collaboration.lastSyncRevision,
+        config: config
+      )
+      store.applyCollaborationSyncResponse(response)
+      collaborationMessage = "Pulled collaboration revision \(response.revision)."
+    } catch {
+      collaborationMessage = error.localizedDescription
+    }
+  }
+
+  private func collaborationSyncConfig() -> CollaborationSyncConfig? {
+    guard let rawEndpoint = store.envelope.collaboration.syncEndpoint,
+          let endpoint = URL(string: rawEndpoint),
+          endpoint.scheme?.hasPrefix("http") == true else {
+      return nil
+    }
+    let token = collaborationSyncToken.trimmingCharacters(in: .whitespacesAndNewlines)
+    return CollaborationSyncConfig(endpoint: endpoint, bearerToken: token.isEmpty ? nil : token)
   }
 
   private func metric(_ title: String, _ value: String) -> some View {

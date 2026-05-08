@@ -12,6 +12,7 @@ public final class ProjectStore {
 
   public init(envelope: DhprojEnvelope) {
     self.envelope = DhprojCodec.normalize(envelope)
+    self.envelope.settings = NativeOperationalGuardrails.shared.applyPolicy(to: self.envelope.settings)
     self.activeSectionID = self.envelope.sections.first?.id
   }
 
@@ -75,6 +76,7 @@ public final class ProjectStore {
 
   public func updateSettings(_ update: (inout AppSettings) -> Void) {
     update(&envelope.settings)
+    envelope.settings = NativeOperationalGuardrails.shared.applyPolicy(to: envelope.settings)
     markChanged()
   }
 
@@ -350,6 +352,11 @@ public final class ProjectStore {
     let snapshot = Snapshot(chapterId: section.id, doc: section.content ?? "", label: label)
     envelope.snapshots.insert(snapshot, at: 0)
     markChanged()
+    NativePluginRuntime.shared.emit("snapshot:create", payload: [
+      "projectId": .string(envelope.project.id),
+      "sectionId": .string(section.id),
+      "snapshotId": .string(snapshot.id)
+    ])
     return snapshot
   }
 
@@ -391,6 +398,11 @@ public final class ProjectStore {
     let thread = CommentThread(chapterId: section.id, anchor: anchor, comments: [Comment(text: text, author: author)])
     envelope.commentThreads.insert(thread, at: 0)
     markChanged()
+    NativePluginRuntime.shared.emit("collab:commentAdded", payload: [
+      "projectId": .string(envelope.project.id),
+      "sectionId": .string(section.id),
+      "threadId": .string(thread.id)
+    ])
     return thread
   }
 
@@ -422,6 +434,11 @@ public final class ProjectStore {
     envelope.commentThreads[index].resolved = resolved
     envelope.commentThreads[index].updatedAt = currentTimeMilliseconds()
     markChanged()
+    NativePluginRuntime.shared.emit("collab:commentResolved", payload: [
+      "projectId": .string(envelope.project.id),
+      "threadId": .string(threadID),
+      "resolved": .bool(resolved)
+    ])
   }
 
   public func deleteCommentThread(threadID: String) throws {
@@ -687,6 +704,11 @@ public final class ProjectStore {
       at: 0
     )
     markChanged()
+    NativePluginRuntime.shared.emit("export:after", payload: [
+      "projectId": .string(envelope.project.id),
+      "format": .string(format.rawValue),
+      "filename": .string(exported.filename)
+    ])
   }
 
   public func recordAIRevision(sectionID: String, providerId: String, prompt: String, before: String, after: String) {
@@ -706,6 +728,127 @@ public final class ProjectStore {
     markChanged()
   }
 
+  @discardableResult
+  public func inviteCollaborator(
+    email: String,
+    permission: CollaborationPermission,
+    expiresAt: Int64? = nil
+  ) throws -> CollaborationInvite {
+    let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    guard trimmed.contains("@"), trimmed.contains(".") else {
+      throw DraftHarbourError.invalidSelection
+    }
+    let invite = CollaborationInvite(email: trimmed, permission: permission, expiresAt: expiresAt)
+    envelope.collaboration.invites.insert(invite, at: 0)
+    if !envelope.collaboration.members.contains(where: { $0.email.lowercased() == trimmed }) {
+      envelope.collaboration.members.append(CollaborationMember(email: trimmed, permission: permission, invitedAt: invite.createdAt))
+    }
+    markChanged()
+    NativePluginRuntime.shared.emit("collab:inviteCreated", payload: [
+      "projectId": .string(envelope.project.id),
+      "email": .string(trimmed),
+      "permission": .string(permission.rawValue),
+      "inviteId": .string(invite.id)
+    ])
+    return invite
+  }
+
+  public func acceptCollaborationInvite(token: String, displayName: String = "", now: Int64 = currentTimeMilliseconds()) throws {
+    guard let inviteIndex = envelope.collaboration.invites.firstIndex(where: { $0.token == token }) else {
+      throw DraftHarbourError.invalidSelection
+    }
+    if let expiresAt = envelope.collaboration.invites[inviteIndex].expiresAt, expiresAt < now {
+      envelope.collaboration.invites[inviteIndex].status = .expired
+      markChanged()
+      throw DraftHarbourError.invalidSelection
+    }
+    envelope.collaboration.invites[inviteIndex].status = .accepted
+    let invite = envelope.collaboration.invites[inviteIndex]
+    if let memberIndex = envelope.collaboration.members.firstIndex(where: { $0.email.lowercased() == invite.email.lowercased() }) {
+      envelope.collaboration.members[memberIndex].displayName = displayName
+      envelope.collaboration.members[memberIndex].permission = invite.permission
+      envelope.collaboration.members[memberIndex].acceptedAt = now
+      envelope.collaboration.members[memberIndex].lastSeenAt = now
+    } else {
+      envelope.collaboration.members.append(CollaborationMember(email: invite.email, displayName: displayName, permission: invite.permission, invitedAt: invite.createdAt, acceptedAt: now, lastSeenAt: now))
+    }
+    markChanged()
+    NativePluginRuntime.shared.emit("collab:inviteAccepted", payload: [
+      "projectId": .string(envelope.project.id),
+      "email": .string(invite.email),
+      "permission": .string(invite.permission.rawValue)
+    ])
+  }
+
+  public func revokeCollaborationInvite(id: String) throws {
+    guard let index = envelope.collaboration.invites.firstIndex(where: { $0.id == id }) else {
+      throw DraftHarbourError.invalidSelection
+    }
+    envelope.collaboration.invites[index].status = .revoked
+    markChanged()
+  }
+
+  public func updateCollaboratorPermission(memberID: String, permission: CollaborationPermission) {
+    guard let index = envelope.collaboration.members.firstIndex(where: { $0.id == memberID }) else { return }
+    envelope.collaboration.members[index].permission = permission
+    markChanged()
+  }
+
+  public func removeCollaborator(memberID: String) {
+    envelope.collaboration.members.removeAll { $0.id == memberID }
+    markChanged()
+  }
+
+  public func updateCollaborationSyncEndpoint(_ endpoint: String?) {
+    let trimmed = endpoint?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    envelope.collaboration.syncEndpoint = trimmed.isEmpty ? nil : trimmed
+    markChanged()
+  }
+
+  public func collaborationSyncRequest(deviceId: String, baseRevision: String? = nil) -> CollaborationSyncRequest {
+    CollaborationSyncRequest(
+      projectId: envelope.project.id,
+      deviceId: deviceId,
+      baseRevision: baseRevision ?? envelope.collaboration.lastSyncRevision,
+      collaboration: envelope.collaboration,
+      commentThreads: envelope.commentThreads,
+      activeSectionId: activeSectionID
+    )
+  }
+
+  public func applyCollaborationSyncResponse(_ response: CollaborationSyncResponse) {
+    guard response.projectId == envelope.project.id else { return }
+    envelope.collaboration = response.collaboration
+    envelope.collaboration.lastSyncRevision = response.revision
+    envelope.commentThreads = response.commentThreads
+    markChanged()
+  }
+
+  @discardableResult
+  public func updatePresence(email: String, displayName: String = "", sectionId: String? = nil, now: Int64 = currentTimeMilliseconds()) -> CollaborationPresence {
+    let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    let presence = CollaborationPresence(email: trimmed, displayName: displayName, sectionId: sectionId ?? activeSectionID, lastSeenAt: now)
+    if let index = envelope.collaboration.presence.firstIndex(where: { $0.email.lowercased() == trimmed }) {
+      envelope.collaboration.presence[index].displayName = displayName
+      envelope.collaboration.presence[index].sectionId = sectionId ?? activeSectionID
+      envelope.collaboration.presence[index].lastSeenAt = now
+    } else {
+      envelope.collaboration.presence.append(presence)
+    }
+    if let memberIndex = envelope.collaboration.members.firstIndex(where: { $0.email.lowercased() == trimmed }) {
+      envelope.collaboration.members[memberIndex].displayName = displayName
+      envelope.collaboration.members[memberIndex].lastSeenAt = now
+    }
+    markChanged()
+    return presence
+  }
+
+  public func activeCollaborators(now: Int64 = currentTimeMilliseconds(), windowMs: Int64 = 120_000) -> [CollaborationPresence] {
+    envelope.collaboration.presence
+      .filter { $0.isActive(now: now, windowMs: windowMs) }
+      .sorted { $0.lastSeenAt > $1.lastSeenAt }
+  }
+
   public func diagnosticsSummary() -> [String: JSONValue] {
     [
       "projectId": .string(envelope.project.id),
@@ -713,6 +856,8 @@ public final class ProjectStore {
       "sectionCount": .number(Double(envelope.sections.count)),
       "snapshotCount": .number(Double(envelope.snapshots.count)),
       "commentThreadCount": .number(Double(envelope.commentThreads.count)),
+      "collaboratorCount": .number(Double(envelope.collaboration.members.count)),
+      "pendingInviteCount": .number(Double(envelope.collaboration.invites.filter { $0.status == .pending }.count)),
       "totalWords": .number(Double(metrics.totalWords))
     ]
   }

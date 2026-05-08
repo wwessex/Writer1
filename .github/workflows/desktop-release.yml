@@ -40,6 +40,8 @@ jobs:
       WINDOWS_CERT_THUMBPRINT: ${{ secrets.WINDOWS_CERT_THUMBPRINT }}
       APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_NOTARY_KEYCHAIN_PROFILE: ${{ secrets.APPLE_NOTARY_KEYCHAIN_PROFILE }}
+      RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -52,7 +54,7 @@ jobs:
         run: npm ci
       - name: Build native macOS artifact
         if: ${{ matrix.kind == 'native-macos' }}
-        run: ./script/package_macos.sh
+        run: ./script/package_macos.sh --distribution --channel "${RELEASE_CHANNEL}"
       - name: Build Tauri desktop artifact
         if: ${{ matrix.kind == 'tauri' }}
         run: npm run desktop:build -- --target ${{ matrix.target }}
@@ -70,14 +72,23 @@ jobs:
         shell: bash
         run: |
           cd "${{ matrix.artifact_dir }}"
-          echo "${{ secrets.RELEASE_SIGNING_KEY }}" > private_key.pem
-          openssl dgst -sha256 -sign private_key.pem -out checksums.sig checksums.txt
+          key_path="$RUNNER_TEMP/release_signing_key_${{ matrix.target }}.pem"
+          printf '%s\n' "${{ secrets.RELEASE_SIGNING_KEY }}" > "$key_path"
+          chmod 600 "$key_path"
+          openssl dgst -sha256 -sign "$key_path" -out checksums.sig checksums.txt
+          rm -f "$key_path"
       - name: Verify signed checksums
         shell: bash
         run: |
           cd "${{ matrix.artifact_dir }}"
           echo "${{ secrets.RELEASE_SIGNING_PUBKEY }}" > public_key.pem
           openssl dgst -sha256 -verify public_key.pem -signature checksums.sig checksums.txt
+      - name: Verify macOS update manifest signature
+        if: ${{ matrix.kind == 'native-macos' }}
+        shell: bash
+        run: |
+          cd "${{ matrix.artifact_dir }}"
+          openssl dgst -sha256 -verify public_key.pem -signature macos-update-manifest.sig macos-update-manifest.json
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.target }}-${{ inputs.channel }}
@@ -102,6 +113,9 @@ jobs:
             echo "Verifying $d"
             echo "${{ secrets.RELEASE_SIGNING_PUBKEY }}" > "$d/public_key.pem"
             openssl dgst -sha256 -verify "$d/public_key.pem" -signature "$d/checksums.sig" "$d/checksums.txt" || failed=1
+            if [ -f "$d/macos-update-manifest.sig" ]; then
+              openssl dgst -sha256 -verify "$d/public_key.pem" -signature "$d/macos-update-manifest.sig" "$d/macos-update-manifest.json" || failed=1
+            fi
           done
           if [ "$failed" -ne 0 ]; then
             echo "Signature verification failed"
