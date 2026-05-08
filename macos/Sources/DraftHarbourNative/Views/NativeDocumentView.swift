@@ -90,6 +90,7 @@ struct NativeDocumentView: View {
   @AppStorage("DraftHarbour.editor.typewriterMode") private var typewriterMode = false
   @AppStorage("DraftHarbour.ai.translationLanguage") private var contextTranslationCode = "es"
   @AppStorage("DraftHarbour.spotlight.indexingLevel") private var spotlightIndexingLevelRaw = SpotlightIndexingLevel.metadataOnly.rawValue
+  @Environment(\.openSettings) private var openSettings
 
   private var workspaceMode: Binding<WorkspaceMode> {
     Binding {
@@ -746,7 +747,7 @@ struct NativeDocumentView: View {
     case .saveProjectCopy:
       exportProjectBackup(copyOnly: true)
     case .settings:
-      sendResponderAction("showSettingsWindow:")
+      openSettings()
     case .welcome:
       NotificationCenter.default.post(name: .draftHarbourShowWelcomeWindow, object: nil)
     case .about:

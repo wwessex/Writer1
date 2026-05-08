@@ -25,6 +25,7 @@ final class NativeDocumentCommandRequest {
 
 struct DraftHarbourCommands: Commands {
   @FocusedValue(\.projectStore) private var store
+  @Environment(\.openSettings) private var openSettings
 
   var body: some Commands {
     CommandGroup(replacing: .newItem) {
@@ -489,7 +490,7 @@ struct DraftHarbourCommands: Commands {
     case .welcome:
       NotificationCenter.default.post(name: .draftHarbourShowWelcomeWindow, object: nil)
     case .settings:
-      NSApp.sendAction(NSSelectorFromString("showSettingsWindow:"), to: nil, from: nil)
+      openSettings()
     case .about:
       NSApp.sendAction(#selector(NSApplication.orderFrontStandardAboutPanel(_:)), to: nil, from: nil)
     case .showSpellingPanel:
