@@ -16,7 +16,8 @@ final class ToolPanelWindowCoordinator: NSObject, NSWindowDelegate {
     store: ProjectStore,
     exportAction: @escaping (ExportRequest) -> Void,
     runCommand: @escaping (NativeCommandID) -> Void,
-    selectionChanged: @escaping (String) -> Void
+    selectionChanged: @escaping (String) -> Void,
+    focusEditProposal: @escaping (AIEditProposal) -> Void
   ) {
     let content = ToolPanelView(
       panel: selectedPanel,
@@ -24,6 +25,7 @@ final class ToolPanelWindowCoordinator: NSObject, NSWindowDelegate {
       exportAction: exportAction,
       runCommand: runCommand,
       selectionChanged: selectionChanged,
+      focusEditProposal: focusEditProposal,
       closeAction: { [weak self] in self?.close() }
     )
 
@@ -37,12 +39,13 @@ final class ToolPanelWindowCoordinator: NSObject, NSWindowDelegate {
 
     let hostingController = NSHostingController(rootView: content)
     let panel = NSPanel(
-      contentRect: NSRect(x: 0, y: 0, width: 900, height: 680),
+      contentRect: NSRect(x: 0, y: 0, width: 1180, height: 760),
       styleMask: [.titled, .closable, .miniaturizable, .resizable, .utilityWindow],
       backing: .buffered,
       defer: false
     )
     panel.title = selectedPanel.title
+    panel.minSize = NSSize(width: 1120, height: 700)
     panel.contentViewController = hostingController
     panel.isReleasedWhenClosed = false
     panel.delegate = self

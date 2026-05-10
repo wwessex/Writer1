@@ -363,6 +363,12 @@ struct DraftHarbourCommands: Commands {
 
       Divider()
 
+      Button("AI Chat") {
+        perform(.aiChat)
+      }
+      .keyboardShortcut("0", modifiers: [.command, .shift])
+      .disabled(!canPerform(.aiChat))
+
       Button("AI Writing Tools") {
         perform(.aiWriting)
       }

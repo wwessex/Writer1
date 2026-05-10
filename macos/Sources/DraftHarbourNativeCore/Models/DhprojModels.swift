@@ -393,6 +393,7 @@ public struct DhprojEnvelope: Codable, Equatable, Sendable {
   public var storyBlueprint: StoryBlueprint?
   public var exportHistory: [ExportHistoryRecord]
   public var aiProviders: [AIProviderConfig]
+  public var aiChatThreads: [AIChatThread]
   public var aiRevisionLog: [AIRevisionRecord]
   public var collaboration: CollaborationState
 
@@ -412,6 +413,7 @@ public struct DhprojEnvelope: Codable, Equatable, Sendable {
     case storyBlueprint
     case exportHistory
     case aiProviders
+    case aiChatThreads
     case aiRevisionLog
     case collaboration
   }
@@ -432,6 +434,7 @@ public struct DhprojEnvelope: Codable, Equatable, Sendable {
     storyBlueprint: StoryBlueprint? = nil,
     exportHistory: [ExportHistoryRecord] = [],
     aiProviders: [AIProviderConfig] = [],
+    aiChatThreads: [AIChatThread] = [],
     aiRevisionLog: [AIRevisionRecord] = [],
     collaboration: CollaborationState = CollaborationState()
   ) {
@@ -450,6 +453,7 @@ public struct DhprojEnvelope: Codable, Equatable, Sendable {
     self.storyBlueprint = storyBlueprint
     self.exportHistory = exportHistory
     self.aiProviders = aiProviders
+    self.aiChatThreads = aiChatThreads
     self.aiRevisionLog = aiRevisionLog
     self.collaboration = collaboration
   }
@@ -472,6 +476,7 @@ public struct DhprojEnvelope: Codable, Equatable, Sendable {
     storyBlueprint = try container.decodeIfPresent(StoryBlueprint.self, forKey: .storyBlueprint)
     exportHistory = try container.decodeIfPresent([ExportHistoryRecord].self, forKey: .exportHistory) ?? []
     aiProviders = try container.decodeIfPresent([AIProviderConfig].self, forKey: .aiProviders) ?? []
+    aiChatThreads = try container.decodeIfPresent([AIChatThread].self, forKey: .aiChatThreads) ?? []
     aiRevisionLog = try container.decodeIfPresent([AIRevisionRecord].self, forKey: .aiRevisionLog) ?? []
     collaboration = try container.decodeIfPresent(CollaborationState.self, forKey: .collaboration) ?? CollaborationState()
     sections.sort { $0.order < $1.order }

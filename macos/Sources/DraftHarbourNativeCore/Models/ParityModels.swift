@@ -19,6 +19,7 @@ public enum NativeCommandID: String, Codable, CaseIterable, Sendable {
   case onboarding
   case about
   case characterBible
+  case aiChat
   case aiWriting
   case aiSuggestions
   case comments
@@ -90,7 +91,7 @@ public enum NativeCommandID: String, Codable, CaseIterable, Sendable {
       return .responderChain
     case .openProjectFile, .settings, .about, .welcome:
       return .system
-    case .importDocument, .newSection, .export, .saveProjectFile, .openRecent, .reopenLastProject, .exportBackup, .importBackup, .saveProjectCopy, .snapshots, .analysis, .wordCount, .dashboard, .onboarding, .characterBible, .aiWriting, .aiSuggestions, .comments, .addComment, .advancedAnalytics, .integrations, .projects, .sceneTemplates, .exportHistory, .publishingAssistant, .aiPanel, .translation, .corkboard, .inspector, .quickSwitcher, .findReplace, .nativeFind, .projectFindReplace, .workspaceWrite, .workspaceCorkboard, .workspaceReview, .toggleSidebar, .toggleToolPanel, .togglePageView, .toggleFocusMode, .themeAuto, .themeLight, .themeDark, .insertHorizontalRule, .insertBlockquote, .formatBold, .formatItalic, .formatUnderline, .formatHeading1, .formatHeading2, .formatParagraph, .toggleTypewriterMode, .storyCards, .revealProjectInFinder, .copyProjectPath, .shareSelection, .shareActiveSection, .printActiveSection, .printProject, .copyProjectLink, .copySectionLink, .indexSpotlight, .clearSpotlightIndex:
+    case .importDocument, .newSection, .export, .saveProjectFile, .openRecent, .reopenLastProject, .exportBackup, .importBackup, .saveProjectCopy, .snapshots, .analysis, .wordCount, .dashboard, .onboarding, .characterBible, .aiChat, .aiWriting, .aiSuggestions, .comments, .addComment, .advancedAnalytics, .integrations, .projects, .sceneTemplates, .exportHistory, .publishingAssistant, .aiPanel, .translation, .corkboard, .inspector, .quickSwitcher, .findReplace, .nativeFind, .projectFindReplace, .workspaceWrite, .workspaceCorkboard, .workspaceReview, .toggleSidebar, .toggleToolPanel, .togglePageView, .toggleFocusMode, .themeAuto, .themeLight, .themeDark, .insertHorizontalRule, .insertBlockquote, .formatBold, .formatItalic, .formatUnderline, .formatHeading1, .formatHeading2, .formatParagraph, .toggleTypewriterMode, .storyCards, .revealProjectInFinder, .copyProjectPath, .shareSelection, .shareActiveSection, .printActiveSection, .printProject, .copyProjectLink, .copySectionLink, .indexSpotlight, .clearSpotlightIndex:
       return .native
     }
   }
@@ -345,6 +346,7 @@ public struct ExportHistoryRecord: Codable, Equatable, Identifiable, Sendable {
 }
 
 public enum AIProviderType: String, Codable, CaseIterable, Sendable {
+  case appleFoundation = "apple-foundation"
   case managedCloud = "managed-cloud"
   case openAICompatible = "openai-compatible"
   case serverProxy = "server-proxy"

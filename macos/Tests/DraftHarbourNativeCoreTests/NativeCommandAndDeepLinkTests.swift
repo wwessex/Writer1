@@ -17,6 +17,7 @@ final class NativeCommandAndDeepLinkTests: XCTestCase {
       .analysis,
       .advancedAnalytics,
       .sceneTemplates,
+      .aiChat,
       .aiSuggestions,
       .publishingAssistant,
       .exportHistory,
@@ -53,6 +54,7 @@ final class NativeCommandAndDeepLinkTests: XCTestCase {
     XCTAssertTrue(QuickSwitcherIndex.search("analysis", in: envelope).contains { $0.commandID == .analysis })
     XCTAssertTrue(QuickSwitcherIndex.search("advanced", in: envelope).contains { $0.commandID == .advancedAnalytics })
     XCTAssertTrue(QuickSwitcherIndex.search("templates", in: envelope).contains { $0.commandID == .sceneTemplates })
+    XCTAssertTrue(QuickSwitcherIndex.search("ai chat", in: envelope).contains { $0.commandID == .aiChat })
     XCTAssertTrue(QuickSwitcherIndex.search("suggestions", in: envelope).contains { $0.commandID == .aiSuggestions })
     XCTAssertTrue(QuickSwitcherIndex.search("publishing", in: envelope).contains { $0.commandID == .publishingAssistant })
     XCTAssertTrue(QuickSwitcherIndex.search("export history", in: envelope).contains { $0.commandID == .exportHistory })
