@@ -15,6 +15,7 @@ enum ToolPanel: String, CaseIterable, Identifiable, Hashable {
   case storyCards
   case sceneTemplates
   case integrations
+  case aiChat
   case ai
   case aiSuggestions
   case publishingAssistant
@@ -36,6 +37,7 @@ enum ToolPanel: String, CaseIterable, Identifiable, Hashable {
     case .storyCards: "Story Cards"
     case .sceneTemplates: "Scene Templates"
     case .integrations: "Integrations"
+    case .aiChat: "AI Chat"
     case .ai: "AI Writing"
     case .aiSuggestions: "AI Suggestions"
     case .publishingAssistant: "Publishing Assistant"
@@ -57,6 +59,7 @@ enum ToolPanel: String, CaseIterable, Identifiable, Hashable {
     case .storyCards: "rectangle.grid.2x2"
     case .sceneTemplates: "doc.badge.plus"
     case .integrations: "point.3.connected.trianglepath.dotted"
+    case .aiChat: "message.badge.waveform"
     case .ai: "sparkles"
     case .aiSuggestions: "wand.and.stars"
     case .publishingAssistant: "book.pages"
@@ -524,13 +527,23 @@ struct NativeDocumentView: View {
       selectionChanged: { rawValue in
         selectedToolPanel = rawValue
         persistToolPanelSelection(rawValue)
-      }
+      },
+      focusEditProposal: focusAIEditProposal(_:)
     )
+  }
+
+  private func focusAIEditProposal(_ proposal: AIEditProposal) {
+    workspaceMode.wrappedValue = .write
+    if !inspectorVisible {
+      inspectorVisible = true
+    }
+    store.selectSection(proposal.sectionId)
+    selectedRange = NSRange(location: proposal.utf16Start, length: proposal.utf16Length)
   }
 
   private func commandEnabled(_ command: NativeCommandID) -> Bool {
     switch command {
-    case .newSection, .importDocument, .export, .saveProjectFile, .exportBackup, .importBackup, .saveProjectCopy, .openRecent, .reopenLastProject, .dashboard, .quickSwitcher, .nativeFind, .projectFindReplace, .workspaceWrite, .workspaceCorkboard, .workspaceReview, .toggleSidebar, .toggleToolPanel, .togglePageView, .toggleFocusMode, .toggleTypewriterMode, .themeAuto, .themeLight, .themeDark, .wordCount, .analysis, .advancedAnalytics, .characterBible, .storyCards, .comments, .aiWriting, .aiSuggestions, .translation, .integrations, .exportHistory, .publishingAssistant, .onboarding, .inspector, .findReplace, .copyProjectLink, .indexSpotlight, .clearSpotlightIndex, .welcome, .showSpellingPanel, .checkSpelling, .toggleContinuousSpellChecking, .toggleGrammarChecking, .toggleAutomaticSpellingCorrection, .showSubstitutionsPanel, .toggleSmartQuotes, .toggleSmartDashes, .toggleTextReplacement:
+    case .newSection, .importDocument, .export, .saveProjectFile, .exportBackup, .importBackup, .saveProjectCopy, .openRecent, .reopenLastProject, .dashboard, .quickSwitcher, .nativeFind, .projectFindReplace, .workspaceWrite, .workspaceCorkboard, .workspaceReview, .toggleSidebar, .toggleToolPanel, .togglePageView, .toggleFocusMode, .toggleTypewriterMode, .themeAuto, .themeLight, .themeDark, .wordCount, .analysis, .advancedAnalytics, .characterBible, .storyCards, .comments, .aiChat, .aiWriting, .aiSuggestions, .translation, .integrations, .exportHistory, .publishingAssistant, .onboarding, .inspector, .findReplace, .copyProjectLink, .indexSpotlight, .clearSpotlightIndex, .welcome, .showSpellingPanel, .checkSpelling, .toggleContinuousSpellChecking, .toggleGrammarChecking, .toggleAutomaticSpellingCorrection, .showSubstitutionsPanel, .toggleSmartQuotes, .toggleSmartDashes, .toggleTextReplacement:
       return true
     case .snapshots, .addComment, .sceneTemplates, .insertBlockquote, .insertHorizontalRule, .formatBold, .formatItalic, .formatUnderline, .formatHeading1, .formatHeading2, .formatParagraph, .shareActiveSection, .printActiveSection:
       return store.activeSection != nil
@@ -818,6 +831,8 @@ struct NativeDocumentView: View {
       workspaceMode.wrappedValue = .corkboard
     case .integrations:
       showToolPanel(.integrations)
+    case .aiChat:
+      showToolPanel(.aiChat)
     case .aiWriting, .translation:
       showToolPanel(.ai)
     case .aiPanel, .aiSuggestions:

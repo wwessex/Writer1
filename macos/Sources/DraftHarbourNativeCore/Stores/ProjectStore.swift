@@ -532,11 +532,143 @@ public final class ProjectStore {
   }
 
   @discardableResult
+  public func addAICharacterCandidatesToStoryBible(
+    _ candidates: [AICharacterCandidate],
+    minimumMentions: Int = 2,
+    limit: Int = 40
+  ) -> [CharacterEntity] {
+    _ = removeAICharacterFalsePositiveEntries()
+    var existingNames = Set(envelope.characters.map { Self.normalizedStoryBibleName($0.name) })
+    var addedCharacters: [CharacterEntity] = []
+
+    for candidate in candidates {
+      guard !candidate.inStoryBible,
+            candidate.mentionCount >= minimumMentions,
+            addedCharacters.count < limit else { continue }
+
+      let normalizedName = Self.normalizedStoryBibleName(candidate.name)
+      guard !normalizedName.isEmpty,
+            AIProjectContextIndex.isLikelyCharacterName(normalizedName),
+            !existingNames.contains(normalizedName) else { continue }
+
+      let sections = candidate.sectionTitles.prefix(8).joined(separator: ", ")
+      let description: String
+      if sections.isEmpty {
+        description = "Detected from manuscript scan."
+      } else {
+        description = "Detected from manuscript scan. Appears in: \(sections)."
+      }
+      let evidence = candidate.evidence
+        .prefix(5)
+        .map { "- \($0)" }
+        .joined(separator: "\n")
+      let notes = [
+        "AI manuscript scan: \(candidate.mentionCount) mention\(candidate.mentionCount == 1 ? "" : "s").",
+        evidence.isEmpty ? "" : "Evidence:\n\(evidence)"
+      ]
+      .filter { !$0.isEmpty }
+      .joined(separator: "\n\n")
+
+      let character = CharacterEntity(
+        novelId: envelope.project.id,
+        name: candidate.name,
+        description: description,
+        role: "other",
+        traits: ["AI-detected"],
+        notes: notes
+      )
+      envelope.characters.append(character)
+      existingNames.insert(normalizedName)
+      addedCharacters.append(character)
+    }
+
+    if !addedCharacters.isEmpty {
+      markChanged()
+    }
+    return addedCharacters
+  }
+
+  @discardableResult
+  public func removeAICharacterFalsePositiveEntries() -> [String] {
+    let removableIds = envelope.characters
+      .filter { character in
+        let normalizedName = Self.normalizedStoryBibleName(character.name)
+        return Self.isGeneratedAICharacter(character) &&
+          !AIProjectContextIndex.isLikelyCharacterName(normalizedName)
+      }
+      .map(\.id)
+
+    guard !removableIds.isEmpty else { return [] }
+    let removableSet = Set(removableIds)
+    envelope.characters.removeAll { removableSet.contains($0.id) }
+    for index in envelope.worldEntries.indices {
+      envelope.worldEntries[index].linkedCharacters.removeAll { removableSet.contains($0) }
+    }
+    markChanged()
+    return removableIds
+  }
+
+  @discardableResult
   public func addWorldEntry(name: String, category: String = "other") -> WorldEntry {
     let entry = WorldEntry(novelId: envelope.project.id, category: category, name: name)
     envelope.worldEntries.append(entry)
     markChanged()
     return entry
+  }
+
+  @discardableResult
+  public func addAIWorldCandidatesToStoryBible(
+    _ candidates: [AIWorldCandidate],
+    limit: Int = 40
+  ) -> [WorldEntry] {
+    var existingNames = Set(envelope.worldEntries.map { Self.normalizedStoryBibleName($0.name) })
+    let knownCharacterNames = Set(envelope.characters.map { Self.normalizedStoryBibleName($0.name) })
+    var addedEntries: [WorldEntry] = []
+
+    for candidate in candidates {
+      guard !candidate.inStoryBible,
+            addedEntries.count < limit else { continue }
+
+      let normalizedName = Self.normalizedStoryBibleName(candidate.name)
+      guard !normalizedName.isEmpty,
+            AIProjectContextIndex.isLikelyWorldName(normalizedName, evidence: candidate.evidence.joined(separator: "\n"), knownCharacterNames: knownCharacterNames),
+            !existingNames.contains(normalizedName) else { continue }
+
+      let sections = candidate.sectionTitles.prefix(8).joined(separator: ", ")
+      let description: String
+      if sections.isEmpty {
+        description = "Detected from manuscript scan."
+      } else {
+        description = "Detected from manuscript scan. Appears in: \(sections)."
+      }
+      let evidence = candidate.evidence
+        .prefix(5)
+        .map { "- \($0)" }
+        .joined(separator: "\n")
+      let notes = [
+        "AI manuscript world scan: \(candidate.mentionCount) mention\(candidate.mentionCount == 1 ? "" : "s").",
+        evidence.isEmpty ? "" : "Evidence:\n\(evidence)"
+      ]
+      .filter { !$0.isEmpty }
+      .joined(separator: "\n\n")
+
+      let entry = WorldEntry(
+        novelId: envelope.project.id,
+        category: candidate.category,
+        name: candidate.name,
+        description: description,
+        tags: ["AI-detected"],
+        notes: notes
+      )
+      envelope.worldEntries.append(entry)
+      existingNames.insert(normalizedName)
+      addedEntries.append(entry)
+    }
+
+    if !addedEntries.isEmpty {
+      markChanged()
+    }
+    return addedEntries
   }
 
   public func updateCharacter(id: String, update: (inout CharacterEntity) -> Void) {
@@ -564,6 +696,19 @@ public final class ProjectStore {
   public func deleteWorldEntry(id: String) {
     envelope.worldEntries.removeAll { $0.id == id }
     markChanged()
+  }
+
+  private static func normalizedStoryBibleName(_ name: String) -> String {
+    name
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+      .lowercased()
+  }
+
+  private static func isGeneratedAICharacter(_ character: CharacterEntity) -> Bool {
+    character.traits.contains { $0.caseInsensitiveCompare("AI-detected") == .orderedSame } &&
+      (character.description.localizedCaseInsensitiveContains("Detected from manuscript scan") ||
+       character.notes.localizedCaseInsensitiveContains("AI manuscript scan"))
   }
 
   public func updateIntegration(_ config: IntegrationConfig) {
@@ -726,6 +871,124 @@ public final class ProjectStore {
       envelope.aiProviders.append(config)
     }
     markChanged()
+  }
+
+  @discardableResult
+  public func ensureAIChatThread(id: String? = nil, title: String = "AI Chat") -> AIChatThread {
+    if let id, let existing = envelope.aiChatThreads.first(where: { $0.id == id }) {
+      return existing
+    }
+    let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    let resolvedTitle = trimmedTitle.isEmpty ? "AI Chat" : String(trimmedTitle.prefix(56))
+    let thread = AIChatThread(title: resolvedTitle)
+    envelope.aiChatThreads.insert(thread, at: 0)
+    markChanged()
+    return thread
+  }
+
+  @discardableResult
+  public func appendAIChatMessage(threadID: String, message: AIChatMessage) throws -> AIChatMessage {
+    guard let index = envelope.aiChatThreads.firstIndex(where: { $0.id == threadID }) else {
+      throw DraftHarbourError.invalidSelection
+    }
+    envelope.aiChatThreads[index].messages.append(message)
+    envelope.aiChatThreads[index].updatedAt = currentTimeMilliseconds()
+    markChanged()
+    return message
+  }
+
+  @discardableResult
+  public func appendAIChatMessage(
+    threadID: String,
+    role: AIChatRole,
+    content: String,
+    providerId: String? = nil,
+    model: String? = nil,
+    editProposals: [AIEditProposal] = []
+  ) throws -> AIChatMessage {
+    try appendAIChatMessage(
+      threadID: threadID,
+      message: AIChatMessage(
+        role: role,
+        content: content,
+        providerId: providerId,
+        model: model,
+        editProposals: editProposals
+      )
+    )
+  }
+
+  @discardableResult
+  public func rejectAIEditProposal(threadID: String, messageID: String, proposalID: String) throws -> AIEditProposalStatus {
+    guard let indices = aiEditProposalIndices(threadID: threadID, messageID: messageID, proposalID: proposalID) else {
+      throw DraftHarbourError.invalidSelection
+    }
+    envelope.aiChatThreads[indices.thread].messages[indices.message].editProposals[indices.proposal].status = .rejected
+    envelope.aiChatThreads[indices.thread].updatedAt = currentTimeMilliseconds()
+    markChanged()
+    return .rejected
+  }
+
+  @discardableResult
+  public func acceptAIEditProposal(threadID: String, messageID: String, proposalID: String, providerId: String, prompt: String) throws -> AIEditProposalStatus {
+    guard let indices = aiEditProposalIndices(threadID: threadID, messageID: messageID, proposalID: proposalID) else {
+      throw DraftHarbourError.invalidSelection
+    }
+    let proposal = envelope.aiChatThreads[indices.thread].messages[indices.message].editProposals[indices.proposal]
+    guard proposal.status == .pending else { return proposal.status }
+    guard let sectionIndex = envelope.sections.firstIndex(where: { $0.id == proposal.sectionId }) else {
+      envelope.aiChatThreads[indices.thread].messages[indices.message].editProposals[indices.proposal].status = .stale
+      markChanged()
+      return .stale
+    }
+
+    let before = envelope.sections[sectionIndex].content ?? ""
+    let nsBefore = before as NSString
+    let range = NSRange(location: proposal.utf16Start, length: proposal.utf16Length)
+    guard range.location >= 0,
+          range.length >= 0,
+          range.location + range.length <= nsBefore.length,
+          let stringRange = Range(range, in: before),
+          String(before[stringRange]) == proposal.originalText else {
+      envelope.aiChatThreads[indices.thread].messages[indices.message].editProposals[indices.proposal].status = .stale
+      envelope.aiChatThreads[indices.thread].updatedAt = currentTimeMilliseconds()
+      markChanged()
+      return .stale
+    }
+
+    envelope.snapshots.insert(Snapshot(chapterId: proposal.sectionId, doc: before, label: "AI Chat"), at: 0)
+    var after = before
+    after.replaceSubrange(stringRange, with: proposal.replacementText)
+    envelope.sections[sectionIndex].content = after
+    envelope.sections[sectionIndex].updatedAt = currentTimeMilliseconds()
+    envelope.aiChatThreads[indices.thread].messages[indices.message].editProposals[indices.proposal].status = .accepted
+    envelope.aiChatThreads[indices.thread].updatedAt = currentTimeMilliseconds()
+    envelope.aiRevisionLog.insert(
+      AIRevisionRecord(sectionId: proposal.sectionId, providerId: providerId, prompt: prompt.isEmpty ? proposal.rationale : prompt, before: before, after: after),
+      at: 0
+    )
+    activeSectionID = proposal.sectionId
+    markChanged()
+    return .accepted
+  }
+
+  @discardableResult
+  public func acceptAllPendingAIEditProposals(threadID: String, providerId: String, prompt: String) -> [AIEditProposalStatus] {
+    guard let thread = envelope.aiChatThreads.first(where: { $0.id == threadID }) else { return [] }
+    let pending = thread.messages.flatMap { message in
+      message.editProposals
+        .filter { $0.status == .pending }
+        .map { (message.id, $0) }
+    }
+    .sorted { lhs, rhs in
+      if lhs.1.sectionId == rhs.1.sectionId {
+        return lhs.1.utf16Start > rhs.1.utf16Start
+      }
+      return lhs.1.sectionId < rhs.1.sectionId
+    }
+    return pending.compactMap { messageID, proposal in
+      try? acceptAIEditProposal(threadID: threadID, messageID: messageID, proposalID: proposal.id, providerId: providerId, prompt: prompt)
+    }
   }
 
   @discardableResult
@@ -916,6 +1179,15 @@ public final class ProjectStore {
   private func markChanged() {
     envelope.project.updatedAt = currentTimeMilliseconds()
     revision += 1
+  }
+
+  private func aiEditProposalIndices(threadID: String, messageID: String, proposalID: String) -> (thread: Int, message: Int, proposal: Int)? {
+    guard let threadIndex = envelope.aiChatThreads.firstIndex(where: { $0.id == threadID }),
+          let messageIndex = envelope.aiChatThreads[threadIndex].messages.firstIndex(where: { $0.id == messageID }),
+          let proposalIndex = envelope.aiChatThreads[threadIndex].messages[messageIndex].editProposals.firstIndex(where: { $0.id == proposalID }) else {
+      return nil
+    }
+    return (threadIndex, messageIndex, proposalIndex)
   }
 
   private func boundedRange(_ range: NSRange, in text: String) -> NSRange {

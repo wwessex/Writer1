@@ -48,12 +48,18 @@ private struct AnalysisChartPoint: Identifiable {
   var value: Int
 }
 
+private struct StoryBibleListItem: Identifiable {
+  var id: String
+  var name: String
+}
+
 struct ToolPanelView: View {
   var panel: ToolPanel
   @Bindable var store: ProjectStore
   var exportAction: (ExportRequest) -> Void
   var runCommand: (NativeCommandID) -> Void = { _ in }
   var selectionChanged: (String) -> Void = { _ in }
+  var focusEditProposal: (AIEditProposal) -> Void = { _ in }
   var closeAction: (() -> Void)?
   @Environment(\.dismiss) private var dismiss
 
@@ -154,38 +160,10 @@ struct ToolPanelView: View {
   }
 
   var body: some View {
-    NavigationSplitView {
-      List(ToolPanel.allCases, selection: $selectedPanel) { item in
-        Label(item.title, systemImage: item.systemImage)
-          .tag(item)
-      }
-      .navigationSplitViewColumnWidth(210)
-    } detail: {
-      VStack(alignment: .leading, spacing: 16) {
-        HStack {
-          Label(selectedPanel.title, systemImage: selectedPanel.systemImage)
-            .font(.title2.bold())
-            .lineLimit(1)
-            .minimumScaleFactor(0.85)
-          Spacer()
-          Button("Done") {
-            if let closeAction {
-              closeAction()
-            } else {
-              dismiss()
-            }
-          }
-            .keyboardShortcut(.defaultAction)
-            .help("Close tool panel")
-        }
-
-        Divider()
-        ScrollView {
-          content
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-      }
-      .padding(22)
+    HStack(spacing: 0) {
+      toolPanelSidebar
+      Divider()
+      toolPanelDetail
     }
     .onAppear {
       selectedPanel = panel
@@ -197,8 +175,60 @@ struct ToolPanelView: View {
     }
     .onChange(of: selectedPanel) { _, newValue in
       selectionChanged(newValue.rawValue)
+      if newValue == .characterBible {
+        removeGeneratedCharacterFalsePositives()
+      }
     }
-    .frame(width: 860, height: 640)
+    .frame(minWidth: 1120, idealWidth: 1180, minHeight: 700, idealHeight: 760)
+  }
+
+  private var toolPanelSidebar: some View {
+    List(ToolPanel.allCases, selection: $selectedPanel) { item in
+      Label(item.title, systemImage: item.systemImage)
+        .tag(item)
+    }
+    .listStyle(.sidebar)
+    .frame(width: 270)
+  }
+
+  private var toolPanelDetail: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      HStack {
+        Label(selectedPanel.title, systemImage: selectedPanel.systemImage)
+          .font(.title2.bold())
+          .lineLimit(1)
+          .minimumScaleFactor(0.85)
+        Spacer()
+        Button("Done") {
+          if let closeAction {
+            closeAction()
+          } else {
+            dismiss()
+          }
+        }
+        .keyboardShortcut(.defaultAction)
+        .help("Close tool panel")
+      }
+
+      Divider()
+      ScrollView {
+        content
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    .padding(22)
+    .onAppear {
+      removeGeneratedCharacterFalsePositives()
+    }
+  }
+
+  private func removeGeneratedCharacterFalsePositives() {
+    let removedIds = store.removeAICharacterFalsePositiveEntries()
+    guard !removedIds.isEmpty else { return }
+    if let selectedCharacterID, removedIds.contains(selectedCharacterID) {
+      self.selectedCharacterID = nil
+    }
   }
 
   @ViewBuilder
@@ -226,6 +256,8 @@ struct ToolPanelView: View {
       sceneTemplatesContent
     case .integrations:
       integrationsContent
+    case .aiChat:
+      AIChatPanelView(store: store, focusEditProposal: focusEditProposal)
     case .ai:
       aiContent
     case .aiSuggestions:
@@ -1157,49 +1189,82 @@ struct ToolPanelView: View {
   }
 
   private var characterBibleContent: some View {
-    HStack(alignment: .top, spacing: 20) {
-      VStack(alignment: .leading, spacing: 10) {
-        HStack {
-          Text("Characters")
-            .font(.headline)
-          Spacer()
-          Button {
-            let character = store.addCharacter(name: "New Character")
-            selectedCharacterID = character.id
-          } label: {
-            Image(systemName: "plus")
+    HStack(alignment: .top, spacing: 18) {
+      storyBibleListColumn(
+        title: "Characters",
+        buttonHelp: "Add character",
+        items: store.envelope.characters.map { StoryBibleListItem(id: $0.id, name: $0.name) },
+        selection: Binding(
+          get: { selectedCharacterID },
+          set: { value in
+            selectedCharacterID = value
+            if value != nil {
+              selectedWorldEntryID = nil
+            }
           }
+        ),
+        addAction: {
+          let character = store.addCharacter(name: "New Character")
+          selectedCharacterID = character.id
+          selectedWorldEntryID = nil
         }
-        List(store.envelope.characters, selection: $selectedCharacterID) { character in
-          Text(character.name)
-            .tag(character.id)
-        }
-        .frame(minWidth: 180, minHeight: 360)
-      }
+      )
 
-      VStack(alignment: .leading, spacing: 10) {
-        HStack {
-          Text("World")
-            .font(.headline)
-          Spacer()
-          Button {
-            let entry = store.addWorldEntry(name: "New Entry")
-            selectedWorldEntryID = entry.id
-          } label: {
-            Image(systemName: "plus")
+      storyBibleListColumn(
+        title: "World",
+        buttonHelp: "Add world entry",
+        items: store.envelope.worldEntries.map { StoryBibleListItem(id: $0.id, name: $0.name) },
+        selection: Binding(
+          get: { selectedWorldEntryID },
+          set: { value in
+            selectedWorldEntryID = value
+            if value != nil {
+              selectedCharacterID = nil
+            }
           }
+        ),
+        addAction: {
+          let entry = store.addWorldEntry(name: "New Entry")
+          selectedWorldEntryID = entry.id
+          selectedCharacterID = nil
         }
-        List(store.envelope.worldEntries, selection: $selectedWorldEntryID) { entry in
-          Text(entry.name)
-            .tag(entry.id)
-        }
-        .frame(minWidth: 180, minHeight: 360)
-      }
+      )
 
       Divider()
       bibleDetail
-        .frame(minWidth: 280, maxWidth: .infinity, alignment: .topLeading)
+        .frame(minWidth: 320, maxWidth: .infinity, minHeight: 440, alignment: .topLeading)
     }
+    .frame(maxWidth: .infinity, minHeight: 460, alignment: .topLeading)
+  }
+
+  private func storyBibleListColumn(
+    title: String,
+    buttonHelp: String,
+    items: [StoryBibleListItem],
+    selection: Binding<String?>,
+    addAction: @escaping () -> Void
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
+      HStack {
+        Text(title)
+          .font(.headline)
+        Spacer()
+        Button(action: addAction) {
+          Image(systemName: "plus")
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .help(buttonHelp)
+      }
+      List(items, selection: selection) { item in
+        Text(item.name)
+          .lineLimit(1)
+          .tag(item.id)
+      }
+      .listStyle(.inset)
+      .frame(minHeight: 400)
+    }
+    .frame(minWidth: 220, idealWidth: 240, maxWidth: 280, alignment: .topLeading)
   }
 
   @ViewBuilder
@@ -2518,6 +2583,8 @@ struct ToolPanelView: View {
       return "Custom LLM"
     case .localOpenAI:
       return "Local OpenAI"
+    case .appleFoundation:
+      return "Apple Foundation"
     }
   }
 

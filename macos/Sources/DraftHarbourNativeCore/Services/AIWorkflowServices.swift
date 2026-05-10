@@ -138,11 +138,14 @@ public struct NativeAIProviderFactory {
     if policy.disableAIProviders == true {
       throw DraftHarbourError.providerNotConfigured("AI disabled by managed policy")
     }
-    if policy.forceLocalOnly == true, config.provider != .localOpenAI {
+    if policy.forceLocalOnly == true, !Self.isLocalProvider(config) {
       throw DraftHarbourError.providerNotConfigured("\(config.label) disabled by local-only policy")
     }
     if policy.disabledAIProviderTypes?.contains(config.provider) == true {
       throw DraftHarbourError.providerNotConfigured("\(config.label) disabled by managed policy")
+    }
+    if config.provider == .appleFoundation {
+      return AppleFoundationModelsProvider(id: config.id, displayName: config.label)
     }
     guard let endpoint = URL(string: config.endpoint) else {
       throw DraftHarbourError.providerNotConfigured("\(config.label) endpoint")
@@ -155,6 +158,18 @@ public struct NativeAIProviderFactory {
       apiKey: apiKey,
       defaultModel: config.model
     )
+  }
+
+  private static func isLocalProvider(_ config: AIProviderConfig) -> Bool {
+    if config.provider == .appleFoundation || config.provider == .localOpenAI {
+      return true
+    }
+    guard config.provider == .openAICompatible || config.provider == .customLLM,
+          let endpoint = URL(string: config.endpoint),
+          let host = endpoint.host?.lowercased() else {
+      return false
+    }
+    return host == "localhost" || host == "127.0.0.1" || host == "::1"
   }
 }
 
